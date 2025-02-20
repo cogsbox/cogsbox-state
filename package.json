@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
@@ -15,13 +15,13 @@
   },
   "files": [
     "dist"
-  ],    
+  ],
   "repository": "github:cogsbox/cogsbox-state",
   "scripts": {
     "build": "vite build",
     "lint": "eslint src --ext ts,tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"", 
-      "dev": "vite  src/examples"
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "dev": "vite  src/examples"
   },
   "dependencies": {
     "rollup-preserve-directives": "^1.1.3",
