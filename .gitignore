@@ -5,6 +5,5 @@
 .env
 .env*.local
 
-
 # typescript
 *.tsbuildinfo

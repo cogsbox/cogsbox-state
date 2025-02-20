@@ -10,6 +10,7 @@ import type {
 type StateUpdater<StateValue> =
     | StateValue
     | ((prevValue: StateValue) => StateValue);
+
 export type FreshValuesObject = {
     pathsToValues?: string[];
     prevValue?: any;
