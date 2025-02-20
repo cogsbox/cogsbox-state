@@ -7,7 +7,10 @@ export const isObject = (item: any): item is Record<string, any> => {
         item !== null
     );
 };
-type GenericObject = Record<string, any>;
+export type GenericObject = Record<string, any>;
+export const isFunction = <TStateObject extends unknown>(
+    arg: any,
+): arg is (prev: TStateObject) => TStateObject => typeof arg === "function";
 export const isArray = (item: any): item is Array<any> => {
     return Array.isArray(item);
 };

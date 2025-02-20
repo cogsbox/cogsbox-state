@@ -6,16 +6,10 @@ import type {
     UpdateOpts,
 } from "./CogsState";
 
-import { getNestedValue, updateNestedProperty } from "./utility";
-
+import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-
 import { getGlobalStore } from "./store";
-
-export const isFunction = <TStateObject extends unknown>(
-    arg: any,
-): arg is (prev: TStateObject) => TStateObject => typeof arg === "function";
 
 export function updateFn<U>(
     setState: EffectiveSetState<U>,

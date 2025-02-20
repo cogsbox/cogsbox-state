@@ -9,11 +9,10 @@ import {
     useSyncExternalStore,
 } from "react";
 
-import { getNestedValue } from "./utility.js";
+import { getNestedValue, isFunction, type GenericObject } from "./utility.js";
 import {
     cutFunc,
     FormControlComponent,
-    isFunction,
     pushFunc,
     updateFn,
     ValidationWrapper,
@@ -27,7 +26,7 @@ import { getGlobalStore } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
-type GenericObject = Record<string, any>;
+
 export type ServerSyncStatus = {
     isFresh: boolean;
     isFreshTime: number;
@@ -657,7 +656,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             });
         }
 
-        const depsKey = `${thisKey}////${componentId}`;
+        const depsKey = `${thisKey}////${componentIdRef.current}`;
         const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(thisKey) || {
@@ -675,9 +674,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
         return () => {
             const depsKey = `${thisKey}////${componentIdRef.current}`;
-            const stateEntry = getGlobalStore
-                .getState()
-                .stateComponents.get(thisKey);
+
             if (stateEntry) {
                 stateEntry.components.delete(depsKey);
                 if (stateEntry.components.size === 0) {
