@@ -4,7 +4,7 @@ import type {
     FormOptsType,
     UpdateArg,
     UpdateOpts,
-} from "./useCogsState";
+} from "./CogsState";
 
 import { getNestedValue, updateNestedProperty } from "./utility";
 

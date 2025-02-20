@@ -1,4 +1,4 @@
-import type { InitialStateType, TransformedStateType } from "./useCogsState";
+import type { InitialStateType, TransformedStateType } from "./CogsState";
 export const isObject = (item: any): item is Record<string, any> => {
     return (
         item &&

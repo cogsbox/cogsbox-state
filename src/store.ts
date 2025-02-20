@@ -5,7 +5,7 @@ import type {
     SyncActionsType,
     SyncInfo,
     UpdateTypeDetail,
-} from "./useCogsState.js";
+} from "./CogsState.js";
 
 type StateUpdater<StateValue> =
     | StateValue

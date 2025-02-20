@@ -16,16 +16,15 @@ import {
     isFunction,
     pushFunc,
     updateFn,
-    useGetKeyState,
     ValidationWrapper,
 } from "./updaterFunctions.js";
-import { getDifferences, isDeepEqual, transformStateFunc } from "./utility.js";
+import { isDeepEqual, transformStateFunc } from "./utility.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 import { ZodObject, type ZodRawShape } from "zod";
 
-import { getGlobalStore } from "./store";
-import { useCogsConfig } from "./CogsStateClient";
+import { getGlobalStore } from "./store.js";
+import { useCogsConfig } from "./CogsStateClient.js";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 type GenericObject = Record<string, any>;
@@ -420,7 +419,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     getGlobalStore.getState().setInitialStates(statePart);
     type StateKeys = keyof typeof statePart;
 
-    const useGlobalCogsState = <StateKey extends StateKeys>(
+    const useCogsState = <StateKey extends StateKeys>(
         stateKey: StateKey,
         options?: OptionsType<(typeof statePart)[StateKey]>,
     ) => {
@@ -434,7 +433,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
             ? options.modifyState(thiState)
             : thiState;
 
-        const [state, updater] = useCogsState<(typeof statePart)[StateKey]>(
+        const [state, updater] = useCogsStateFn<(typeof statePart)[StateKey]>(
             partialState,
             {
                 stateKey: stateKey as string,
@@ -458,7 +457,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         setOptions({ stateKey, options, initialOptionsPart });
     }
 
-    return { useGlobalCogsState, setCogsOptions };
+    return { useCogsState, setCogsOptions };
 };
 
 const {
@@ -467,13 +466,10 @@ const {
     getInitialOptions,
     getKeyState,
     getValidationErrors,
-
     setStateLog,
     updateInitialStateGlobal,
     addValidationError,
     removeValidationError,
-
-    setServerState,
     setServerSyncActions,
 } = getGlobalStore.getState();
 
@@ -523,6 +519,7 @@ type LocalStorageData<T> = {
     lastSyncedWithServer?: number;
     baseServerState?: T; // Add this to track what server state our changes are based on
 };
+
 const updateGlobalState = (
     thisKey: string,
     initialState: any,
@@ -568,7 +565,7 @@ const notifyComponents = (thisKey: string) => {
     });
 };
 
-export function useCogsState<TStateObject extends unknown>(
+export function useCogsStateFn<TStateObject extends unknown>(
     stateObject: TStateObject,
     {
         stateKey,
@@ -636,7 +633,6 @@ export function useCogsState<TStateObject extends unknown>(
                     newState = localData.state;
                 }
             }
-            // Update global state first
             updateGlobalState(
                 thisKey,
                 initialState,
@@ -645,8 +641,6 @@ export function useCogsState<TStateObject extends unknown>(
                 componentIdRef.current,
                 sessionId,
             );
-
-            // Then notify components
             notifyComponents(thisKey);
         }
     }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
@@ -693,14 +687,6 @@ export function useCogsState<TStateObject extends unknown>(
         };
     }, []);
 
-    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////
-    /////////////////////////////////////////////////////////////////
-
-    /*state setter */
     const effectiveSetState = (
         newStateOrFunction:
             | TStateObject
@@ -718,9 +704,8 @@ export function useCogsState<TStateObject extends unknown>(
                 ? newStateOrFunction(prevValue as TStateObject)
                 : newStateOrFunction;
 
-            // After state update, update all DOM elements tracking this path
             const signalId = `${thisKey}-${path.join(".")}`;
-            // console.log("signalId", signalId);
+
             if (signalId) {
                 const elements = getGlobalStore
                     .getState()
