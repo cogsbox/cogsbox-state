@@ -8,6 +8,7 @@ export const isObject = (item: any): item is Record<string, any> => {
     );
 };
 export type GenericObject = Record<string, any>;
+
 export const isFunction = <TStateObject extends unknown>(
     arg: any,
 ): arg is (prev: TStateObject) => TStateObject => typeof arg === "function";
