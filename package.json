@@ -1,5 +1,5 @@
 {
-  "name": "cogsbox-state",
+  "name": "@cogsbox/cogsbox-state",
   "version": "0.5.1",
   "description": "React state management library with form controls and server sync",
   "type": "module",
