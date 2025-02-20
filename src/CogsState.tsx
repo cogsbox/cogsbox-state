@@ -123,7 +123,6 @@ export type FormOptsType = {
         stretch?: boolean;
         props?: GenericObject;
         disable?: boolean;
-        onChange?: { clear?: string[] | string[][] };
     };
     formElements?: boolean;
     debounceTime?: number;

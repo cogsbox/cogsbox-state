@@ -1,10 +1,10 @@
-# CogsState
+# Cobgsbox State
 
 > ⚠️ **Warning**: This package is currently a work in progress and not ready for production use. The API is unstable and subject to breaking changes. Please do not use in production environments.
 
 ---
 
-CogsState is a state management library that provides a fluent interface for managing complex state in React applications.
+Cobgsbox State is a state management library that provides a fluent interface for managing complex state in React applications.
 
 ## Installation
 
@@ -212,11 +212,11 @@ Finds an item in array by property comparison.
 
 ```typescript
 // Find and update product
-updater.catalog.products.findWith("id", "123").price.update(99.99);
+updater.catalog.products.findWith("id", 123).price.update(99.99);
 
 // Find and update cart item
 updater.cart.items
-    .findWith("productId", "123")
+    .findWith("productId", 123)
     .quantity.update((prev) => prev + 1);
 ```
 

@@ -210,14 +210,6 @@ export const FormControlComponent = <TStateObject,>({
         getGlobalStore.getState().serverSyncActions[stateKey!];
     const serverState = getGlobalStore.getState().serverState[stateKey!];
 
-    const [time, setTime] = useState(
-        stateKey && serverState?.serverSync?.debounce
-            ? serverState!.serverSync!.debounce!
-            : 3000,
-    );
-
-    const thisStateOpts = getInitialOptions(stateKey!);
-
     const stateValue = useGetKeyState(stateKey, path);
     const [inputValue, setInputValue] = useState<any>(
         getGlobalStore.getState().getNestedState(stateKey, path),
@@ -237,25 +229,6 @@ export const FormControlComponent = <TStateObject,>({
         }
 
         timeoutRef.current = setTimeout(() => {
-            if (formOpts?.validation?.onChange?.clear) {
-                // Handle validation clears...
-                if (Array.isArray(formOpts.validation.onChange.clear[0])) {
-                    formOpts.validation.onChange.clear.forEach((clearPath) => {
-                        removeValidationError(
-                            validationKey +
-                                "." +
-                                (clearPath as string[]).join("."),
-                        );
-                    });
-                } else {
-                    removeValidationError(
-                        validationKey +
-                            "." +
-                            formOpts.validation.onChange.clear.join("."),
-                    );
-                }
-            }
-
             updateFn(setState, payload, path, validationKey);
         }, formOpts?.debounceTime ?? 300);
     };
@@ -295,11 +268,6 @@ export const FormControlComponent = <TStateObject,>({
             onChange: (e: any) => updater(e.target.value),
         },
     });
-
-    useEffect(() => {
-        if (!stateKey || !serverSyncActions) return;
-        setTime((serverSyncActions?.actionTimeStamp ?? 3000) - Date.now());
-    }, [serverSyncActions]);
 
     return (
         <>

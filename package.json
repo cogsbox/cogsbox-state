@@ -15,7 +15,8 @@
   },
   "files": [
     "dist"
-  ],
+  ],    
+  "repository": "github:cogsbox/cogsbox-state",
   "scripts": {
     "build": "vite build",
     "lint": "eslint src --ext ts,tsx",
