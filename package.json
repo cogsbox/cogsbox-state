@@ -1,5 +1,5 @@
 {
-  "name": "@cogsbox/cogsbox-state",
+  "name": "cogsbox-state",
   "version": "0.5.1",
   "description": "React state management library with form controls and server sync",
   "type": "module",
@@ -20,7 +20,8 @@
   "scripts": {
     "build": "vite build",
     "lint": "eslint src --ext ts,tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"", 
+      "dev": "vite  src/examples"
   },
   "dependencies": {
     "rollup-preserve-directives": "^1.1.3",
