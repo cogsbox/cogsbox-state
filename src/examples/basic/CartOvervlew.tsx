@@ -4,16 +4,14 @@ import { useCogsState } from "./state";
 export const CartOverview = () => {
     const cart = useCogsState("cart");
     const products = useCogsState("products");
-    console.log("11111111111111cartState", cart.get());
+
     const items = cart.items;
     return (
         <div>
             {cart._componentId}
             <h3>Cart ({items.get().length} items)</h3>
             {items.get().map((item, itemIndex) => {
-                const product = products.items.find(
-                    (p) => p.id === item.productId,
-                );
+                const product = products.items.findWith("id", item.productId);
                 return (
                     <div key={item.id}>
                         {product?.name} - Qty: {item.quantity}

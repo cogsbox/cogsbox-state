@@ -110,7 +110,9 @@ export type ArrayEndType<TShape extends unknown> = {
         callbackfn: (value: InferArrayElement<TShape>, index: number) => void,
     ) => ArrayEndType<TShape>;
     getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
-} & EndType<TShape>;
+} & EndType<TShape> & {
+        [K in keyof (any[] extends infer T ? T : never)]: never;
+    };
 
 export type UpdateType<T> = (
     payload: UpdateArg<Prettify<T>>,
@@ -173,6 +175,8 @@ export type EndType<T> = {
         hideMessage?: boolean;
     }) => JSX.Element;
     lastSynced?: SyncInfo;
+} & {
+    [K in keyof (any extends infer T ? T : never)]: never;
 };
 export type StateObject<T> = (T extends any[]
     ? ArrayEndType<T>

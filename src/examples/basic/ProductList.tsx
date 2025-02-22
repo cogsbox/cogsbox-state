@@ -8,7 +8,7 @@ export const ProductList = () => {
 
     return (
         <div>
-            {products.items.map((product) => (
+            {products.items.get().map((product) => (
                 <div key={product.id}>
                     {product.name} - ${product.price}
                     <button
