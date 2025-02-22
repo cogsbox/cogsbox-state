@@ -412,6 +412,7 @@ function setOptions<StateKey, Opt>({
 
 export const createCogsState = <State extends Record<string, unknown>>(
     initialState: State,
+    opts?: { reRenderType?: "get" | "state" | "none" },
 ) => {
     let newInitialState = initialState;
 

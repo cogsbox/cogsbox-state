@@ -254,7 +254,9 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, zodSchema }: OptionsType<T>): T;
-export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State) => {
+export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opts?: {
+    reRenderType?: "get" | "state" | "none";
+}) => {
     useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
 };

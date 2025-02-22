@@ -1,6 +1,11 @@
 {
   "name": "basic",
   "private": true,
+  "type": "module",
+  "dependencies": {
+    "tailwindcss": "workspace:*",
+    "@tailwindcss/vite": "workspace:*"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build"
