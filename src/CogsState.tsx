@@ -445,7 +445,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
             },
         );
 
-        return [state, updater] as const;
+        return updater;
     };
 
     function setCogsOptions<StateKey extends StateKeys>(

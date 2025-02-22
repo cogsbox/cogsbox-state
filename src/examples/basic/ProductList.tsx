@@ -1,12 +1,11 @@
 "use client";
 import { useCogsState } from "./state";
-
+import { v4 as uuidv4 } from "uuid";
 // ProductList.tsx
 export const ProductList = () => {
-    const [products, productsUpdater] = useCogsState("products");
-    const [cartState, cartUpdater] = useCogsState("cart");
-    console.log("products", products);
-    console.log("cartState", cartState);
+    const products = useCogsState("products");
+    const cart = useCogsState("cart");
+
     return (
         <div>
             {products.items.map((product) => (
@@ -14,9 +13,9 @@ export const ProductList = () => {
                     {product.name} - ${product.price}
                     <button
                         onClick={() =>
-                            cartUpdater.items.uniqueInsert(
+                            cart.items.uniqueInsert(
                                 {
-                                    id: cartState.items.length + 1,
+                                    id: uuidv4(),
                                     productId: product.id,
                                     quantity: 1,
                                     unitPrice: product.price,

@@ -1,7 +1,7 @@
 import { createCogsState } from "../../CogsState";
 
 interface Product {
-    id: number;
+    id: number | string;
     name: string;
     price: number;
     stock: number;
@@ -9,8 +9,8 @@ interface Product {
 }
 
 interface CartItem {
-    id: number;
-    productId: number;
+    id: number | string;
+    productId: number | string;
     quantity: number;
     unitPrice: number;
 }

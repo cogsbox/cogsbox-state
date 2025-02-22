@@ -2,14 +2,15 @@ import { useCogsState } from "./state";
 
 // CartOverview.tsx
 export const CartOverview = () => {
-    const [cartState, cartUpdater] = useCogsState("cart");
-    const [products] = useCogsState("products");
-    console.log("11111111111111cartState", cartState, cartUpdater.get());
+    const cart = useCogsState("cart");
+    const products = useCogsState("products");
+    console.log("11111111111111cartState", cart.get());
+    const items = cart.items;
     return (
         <div>
-            {cartUpdater._componentId}
-            <h3>Cart ({cartUpdater.items.get().length} items)</h3>
-            {cartState.items.map((item, itemIndex) => {
+            {cart._componentId}
+            <h3>Cart ({items.get().length} items)</h3>
+            {items.get().map((item, itemIndex) => {
                 const product = products.items.find(
                     (p) => p.id === item.productId,
                 );
@@ -18,7 +19,7 @@ export const CartOverview = () => {
                         {product?.name} - Qty: {item.quantity}
                         <button
                             onClick={() =>
-                                cartUpdater.items
+                                items
                                     .findWith("productId", item.productId)
                                     .quantity.update((prev) => prev + 1)
                             }
@@ -28,7 +29,7 @@ export const CartOverview = () => {
                         <button
                             onClick={
                                 () =>
-                                    cartUpdater.items
+                                    items
                                         .findWith("productId", item.productId)
                                         .cut()
                                 // or cartUpdater.items.cut(itemIndex)}

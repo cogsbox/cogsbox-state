@@ -30,6 +30,7 @@ export default defineConfig({
             external: ["zod", "zod-to-json-schema", "crypto"],
             plugins: [preserveDirectives()],
         },
+
         sourcemap: true,
         target: "esnext",
     },

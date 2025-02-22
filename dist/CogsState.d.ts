@@ -251,7 +251,7 @@ export type TransformedStateType<T> = {
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, zodSchema }: OptionsType<T>): T;
 export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State) => {
-    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => readonly [TransformedStateType<State>[StateKey], StateObject<TransformedStateType<State>[StateKey]>];
+    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
 };
 type LocalStorageData<T> = {
