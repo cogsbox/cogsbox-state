@@ -613,16 +613,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }, [syncUpdate]);
 
     useEffect(() => {
-        if (initState) {
-            const { initialState, dependencies } = initState;
+        setAndMergeOptions(thisKey as string, {
+            initState,
+        });
+        const localData = loadFromLocalStorage(
+            sessionId + "-" + thisKey + "-" + initState?.localStorageKey,
+        );
+        let newState = null;
+        if (initState?.initialState) {
+            newState = initState?.initialState;
 
-            setAndMergeOptions(thisKey as string, {
-                initState,
-            });
-            const localData = loadFromLocalStorage(
-                sessionId + "-" + thisKey + "-" + initState?.localStorageKey,
-            );
-            let newState = initialState;
             if (localData) {
                 if (
                     localData.lastUpdated >
@@ -633,14 +633,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
             }
             updateGlobalState(
                 thisKey,
-                initialState,
+                initState?.initialState,
                 newState,
                 effectiveSetState,
                 componentIdRef.current,
                 sessionId,
             );
-            notifyComponents(thisKey);
         }
+        notifyComponents(thisKey);
     }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
 
     useEffect(() => {
@@ -661,7 +661,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             .stateComponents.get(thisKey) || {
             components: new Map(),
         };
-
+        console.log("stateEntry", stateEntry);
         stateEntry.components.set(depsKey, {
             forceUpdate: () => forceUpdate({}),
             paths: new Set(),
@@ -670,7 +670,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
 
         getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-
+        console.log(
+            "   getGlobalStore.getState().stateComponent",
+            getGlobalStore.getState().stateComponents,
+        );
         return () => {
             const depsKey = `${thisKey}////${componentIdRef.current}`;
 
@@ -783,7 +786,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(thisKey);
-
+            console.log("stateEntry", stateEntry);
             if (stateEntry) {
                 for (const [
                     key,

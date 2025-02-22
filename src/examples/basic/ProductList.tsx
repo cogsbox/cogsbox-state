@@ -5,7 +5,8 @@ import { useCogsState } from "./state";
 export const ProductList = () => {
     const [products, productsUpdater] = useCogsState("products");
     const [cartState, cartUpdater] = useCogsState("cart");
-
+    console.log("products", products);
+    console.log("cartState", cartState);
     return (
         <div>
             {products.items.map((product) => (
