@@ -8,14 +8,22 @@ interface Product {
     category: string;
 }
 
+type Products = { items: Product[]; category: string };
+
 interface CartItem {
     id: number | string;
     productId: number | string;
     quantity: number;
     unitPrice: number;
 }
+type Cart = { items: CartItem[]; total: number; isOpen: boolean };
 
-const dbState = {
+type StateType = {
+    products: Products;
+    cart: Cart;
+};
+
+const dbState: StateType = {
     products: {
         items: [
             {
@@ -39,12 +47,8 @@ const dbState = {
                 stock: 30,
                 category: "shoes",
             },
-        ] as Product[],
-        filters: {
-            category: "all",
-            searchTerm: "",
-            maxPrice: 100,
-        },
+        ],
+        category: "Clothing",
     },
     cart: {
         items: [] as CartItem[],

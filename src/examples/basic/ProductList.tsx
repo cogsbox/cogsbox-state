@@ -26,6 +26,11 @@ export const ProductList = () => {
                     >
                         Add to Cart
                     </button>
+                    <button
+                        onClick={() => cart.total.update((prev) => prev + 1)}
+                    >
+                        Add to Cart
+                    </button>
                 </div>
             ))}
         </div>

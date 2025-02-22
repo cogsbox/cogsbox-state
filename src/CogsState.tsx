@@ -7,6 +7,7 @@ import {
     useRef,
     useState,
     useSyncExternalStore,
+    type ReactNode,
 } from "react";
 
 import { getNestedValue, isFunction, type GenericObject } from "./utility.js";
@@ -147,7 +148,7 @@ export type ObjectEndType<T> = EndType<T> & {
     ) => any;
     delete: () => void;
 };
-
+type EffectFunction<T> = (state: T) => ReactNode;
 export type EndType<T> = {
     update: UpdateType<T>;
     _path: string[];
@@ -160,6 +161,7 @@ export type EndType<T> = {
     get: () => T;
 
     $get: () => T;
+    $effect: (fn: EffectFunction<T>) => ReturnType<EffectFunction<T>>;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -709,23 +711,49 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 : newStateOrFunction;
 
             const signalId = `${thisKey}-${path.join(".")}`;
-
             if (signalId) {
-                const elements = getGlobalStore
+                let isArrayOperation = false;
+                let elements = getGlobalStore
                     .getState()
                     .signalDomElements.get(signalId);
-                //   console.log("elements", elements);
+
+                if (
+                    (!elements || elements.size === 0) &&
+                    (updateObj.updateType === "insert" ||
+                        updateObj.updateType === "cut")
+                ) {
+                    // Remove last segment (index) from path
+                    const arrayPath = path.slice(0, -1);
+                    const arrayValue = getNestedValue(payload, arrayPath);
+                    // If it's an array, use that path for signal
+                    if (Array.isArray(arrayValue)) {
+                        isArrayOperation = true;
+                        const arraySignalId = `${thisKey}-${arrayPath.join(".")}`;
+                        elements = getGlobalStore
+                            .getState()
+                            .signalDomElements.get(arraySignalId);
+                    }
+                }
+
                 if (elements) {
-                    const newValue = getNestedValue(payload, path);
-                    elements.forEach(({ parentId, position }) => {
+                    const newValue = isArrayOperation
+                        ? getNestedValue(payload, path.slice(0, -1)) // Get array for array operations
+                        : getNestedValue(payload, path); // Get normal value otherwise
+                    elements.forEach(({ parentId, position, effect }) => {
                         const parent = document.querySelector(
                             `[data-parent-id="${parentId}"]`,
                         );
                         if (parent) {
                             const childNodes = Array.from(parent.childNodes);
                             if (childNodes[position]) {
+                                const displayValue = effect
+                                    ? new Function(
+                                          "state",
+                                          `return (${effect})(state)`,
+                                      )(newValue)
+                                    : newValue;
                                 childNodes[position].textContent =
-                                    String(newValue);
+                                    String(displayValue);
                             }
                         }
                     });
@@ -922,53 +950,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         TStateObject,
         StateObject<TStateObject>,
     ];
-}
-
-function SignalRenderer({
-    proxy,
-}: {
-    proxy: { _path: string[]; _stateKey: string };
-}) {
-    const elementRef = useRef<HTMLSpanElement>(null);
-    const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
-
-    useEffect(() => {
-        const element = elementRef.current;
-        if (!element || !element.parentElement) {
-            console.log("No element or parent");
-            return;
-        }
-
-        const parentElement = element.parentElement;
-        const childNodes = Array.from(parentElement.childNodes);
-        const position = childNodes.indexOf(element);
-
-        // Get or create parent ID
-        let parentId = parentElement.getAttribute("data-parent-id");
-        if (!parentId) {
-            parentId = `parent-${crypto.randomUUID()}`;
-            parentElement.setAttribute("data-parent-id", parentId);
-        }
-
-        const instanceId = `instance-${crypto.randomUUID()}`;
-        const elementInfo = { instanceId, parentId, position };
-
-        getGlobalStore.getState().addSignalElement(signalId, elementInfo);
-
-        const textNode = document.createTextNode(
-            String(
-                getGlobalStore
-                    .getState()
-                    .getNestedState(proxy._stateKey, proxy._path),
-            ),
-        );
-        element.replaceWith(textNode);
-    }, [proxy._stateKey, proxy._path.join(".")]);
-
-    return createElement("span", {
-        ref: elementRef,
-        style: { display: "none" },
-    });
 }
 
 function createProxyHandler<T>(
@@ -1265,11 +1246,27 @@ function createProxyHandler<T>(
                             );
                         };
                     }
+                    if (prop === "$effect") {
+                        return (fn: any) =>
+                            $cogsSignal({
+                                _stateKey: stateKey,
+                                _path: path,
+                                _effect: fn.toString(),
+                            });
+                    }
 
+                    if (prop === "$get") {
+                        return () =>
+                            $cogsSignal({
+                                _stateKey: stateKey,
+                                _path: path,
+                            });
+                    }
                     if (prop === "$get") {
                         return () =>
                             $cogsSignal({ _stateKey: stateKey, _path: path });
                     }
+
                     if (prop === "stateEach") {
                         return (
                             callbackfn: (
@@ -1519,10 +1516,66 @@ function createProxyHandler<T>(
     );
 }
 
-export function $cogsSignal(proxy: { _path: string[]; _stateKey: string }) {
+export function $cogsSignal(proxy: {
+    _path: string[];
+    _stateKey: string;
+    _effect?: string;
+}) {
     return createElement(SignalRenderer, { proxy });
 }
+function SignalRenderer({
+    proxy,
+}: {
+    proxy: {
+        _path: string[];
+        _stateKey: string;
+        _effect?: string;
+    };
+}) {
+    const elementRef = useRef<HTMLSpanElement>(null);
+    const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
+    console.log("SignalRenderer", signalId);
+    useEffect(() => {
+        const element = elementRef.current;
+        if (!element || !element.parentElement) return;
 
+        const parentElement = element.parentElement;
+        const childNodes = Array.from(parentElement.childNodes);
+        const position = childNodes.indexOf(element);
+
+        let parentId = parentElement.getAttribute("data-parent-id");
+        if (!parentId) {
+            parentId = `parent-${crypto.randomUUID()}`;
+            parentElement.setAttribute("data-parent-id", parentId);
+            if (proxy._effect) {
+                parentElement.setAttribute("data-signal-effect", proxy._effect);
+            }
+        }
+
+        const instanceId = `instance-${crypto.randomUUID()}`;
+        const elementInfo = {
+            instanceId,
+            parentId,
+            position,
+            effect: proxy._effect,
+        };
+
+        getGlobalStore.getState().addSignalElement(signalId, elementInfo);
+
+        const value = getGlobalStore
+            .getState()
+            .getNestedState(proxy._stateKey, proxy._path);
+
+        const textNode = document.createTextNode(String(value));
+        element.replaceWith(textNode);
+    }, [proxy._stateKey, proxy._path.join("."), proxy._effect]);
+
+    return createElement("span", {
+        ref: elementRef,
+        style: { display: "none" },
+        "data-signal-id": signalId,
+    });
+}
 export function $cogsSignalStore(proxy: {
     _path: string[];
     _stateKey: string;

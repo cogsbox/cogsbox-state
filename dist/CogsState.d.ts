@@ -1,3 +1,4 @@
+import { ReactNode } from 'react';
 import { GenericObject } from './utility.js';
 import { UseMutationResult } from '@tanstack/react-query';
 import { ZodObject, ZodRawShape } from 'zod';
@@ -88,6 +89,7 @@ export type ObjectEndType<T> = EndType<T> & {
     stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
     delete: () => void;
 };
+type EffectFunction<T> = (state: T) => ReactNode;
 export type EndType<T> = {
     update: UpdateType<T>;
     _path: string[];
@@ -95,6 +97,7 @@ export type EndType<T> = {
     formElement: (validationKey: string, control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
     $get: () => T;
+    $effect: (fn: EffectFunction<T>) => ReturnType<EffectFunction<T>>;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -273,10 +276,12 @@ export declare function useCogsStateFn<TStateObject extends unknown>(stateObject
 export declare function $cogsSignal(proxy: {
     _path: string[];
     _stateKey: string;
+    _effect?: string;
 }): import('react').FunctionComponentElement<{
     proxy: {
         _path: string[];
         _stateKey: string;
+        _effect?: string;
     };
 }>;
 export declare function $cogsSignalStore(proxy: {

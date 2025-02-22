@@ -75,11 +75,21 @@ export type CogsGlobalState = {
     removeValidationError: (path: string) => void;
     signalDomElements: Map<
         string,
-        Set<{ instanceId: string; parentId: string; position: number }>
+        Set<{
+            instanceId: string;
+            parentId: string;
+            position: number;
+            effect?: string;
+        }>
     >;
     addSignalElement: (
         signalId: string,
-        elementInfo: { instanceId: string; parentId: string; position: number },
+        elementInfo: {
+            instanceId: string;
+            parentId: string;
+            position: number;
+            effect?: string;
+        },
     ) => void;
     removeSignalElement: (signalId: string, instanceId: string) => void;
     reRenderTriggerPrevValue: Record<string, any>;
