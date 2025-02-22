@@ -33,6 +33,7 @@ export type FormElementParmas<T> = {
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & {
     upsert: UpdateType<U>;
+    cut: () => void;
 } & StateObject<U>;
 export type PushArgs<U> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts) => void;
 export interface GlobalState<T, K extends keyof T = keyof T> {

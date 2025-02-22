@@ -203,12 +203,7 @@ export const FormControlComponent = <TStateObject,>({
     formOpts,
     stateKey,
 }: FormControlComponentProps<TStateObject>) => {
-    const { getInitialOptions, getValidationErrors, removeValidationError } =
-        getGlobalStore.getState();
-    const validationErrors = useGetValidationErrors(validationKey, path);
-    const serverSyncActions =
-        getGlobalStore.getState().serverSyncActions[stateKey!];
-    const serverState = getGlobalStore.getState().serverState[stateKey!];
+    const { getValidationErrors } = getGlobalStore.getState();
 
     const stateValue = useGetKeyState(stateKey, path);
     const [inputValue, setInputValue] = useState<any>(

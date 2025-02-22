@@ -16,7 +16,7 @@ import {
     pushFunc,
     updateFn,
     ValidationWrapper,
-} from "./updaterFunctions.js";
+} from "./Functions.js";
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
@@ -62,7 +62,7 @@ export type StateKeys = string;
 type findWithFuncType<U> = (
     thisKey: keyof U,
     thisValue: U[keyof U],
-) => EndType<U> & { upsert: UpdateType<U> } & StateObject<U>;
+) => EndType<U> & { upsert: UpdateType<U>; cut: () => void } & StateObject<U>;
 export type PushArgs<U> = (
     update:
         | Prettify<U>
@@ -1351,11 +1351,22 @@ function createProxyHandler<T>(
                             const foundValue = currentState[foundIndex];
                             const newPath = [...path, foundIndex.toString()];
 
-                            // ADDED: Clear cache for find operation
-                            shapeCache.clear();
-                            stateVersion++;
-
-                            return rebuildStateShape(foundValue, newPath);
+                            // Create the proxy for the found item and add cut method
+                            const itemProxy = rebuildStateShape(
+                                foundValue,
+                                newPath,
+                            );
+                            return {
+                                ...itemProxy,
+                                cut: () => {
+                                    cutFunc(
+                                        effectiveSetState,
+                                        path,
+                                        stateKey,
+                                        foundIndex,
+                                    );
+                                },
+                            };
                         };
                     }
 
