@@ -148,7 +148,7 @@ export type ObjectEndType<T> = EndType<T> & {
     ) => any;
     delete: () => void;
 };
-type EffectFunction<T> = (state: T) => ReactNode;
+type EffectFunction<T, R> = (state: T) => R;
 export type EndType<T> = {
     update: UpdateType<T>;
     _path: string[];
@@ -161,7 +161,7 @@ export type EndType<T> = {
     get: () => T;
 
     $get: () => T;
-    $effect: (fn: EffectFunction<T>) => ReturnType<EffectFunction<T>>;
+    $effect: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -1081,6 +1081,18 @@ function createProxyHandler<T>(
 
         const handler = {
             get(target: any, prop: string) {
+                console.log("prop", prop);
+                if (prop === "get") {
+                    return () =>
+                        getGlobalStore
+                            .getState()
+                            .getNestedState(stateKey, path);
+                }
+
+                if (prop === "$get") {
+                    return () =>
+                        $cogsSignal({ _stateKey: stateKey, _path: path });
+                }
                 if (prop !== "then" && prop !== "$get") {
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
@@ -1091,7 +1103,7 @@ function createProxyHandler<T>(
                         const component =
                             stateEntry.components.get(fullComponentId);
                         if (component) {
-                            component.paths.add(currentPath);
+                            component.paths.add(currentPath); //if i remove this then .get is on prdouct
                         }
                     }
                 }
@@ -1201,18 +1213,6 @@ function createProxyHandler<T>(
                     };
                 }
 
-                if (prop === "get") {
-                    return () =>
-                        getGlobalStore
-                            .getState()
-                            .getNestedState(stateKey, path);
-                }
-
-                if (prop === "$get") {
-                    return () =>
-                        $cogsSignal({ _stateKey: stateKey, _path: path });
-                }
-
                 if (prop === "formElement") {
                     return (
                         validationKey: string,
@@ -1261,10 +1261,6 @@ function createProxyHandler<T>(
                                 _stateKey: stateKey,
                                 _path: path,
                             });
-                    }
-                    if (prop === "$get") {
-                        return () =>
-                            $cogsSignal({ _stateKey: stateKey, _path: path });
                     }
 
                     if (prop === "stateEach") {
@@ -1356,22 +1352,27 @@ function createProxyHandler<T>(
                             const foundValue = currentState[foundIndex];
                             const newPath = [...path, foundIndex.toString()];
 
-                            // Create the proxy for the found item and add cut method
+                            shapeCache.clear();
+                            stateVersion++;
+
                             const itemProxy = rebuildStateShape(
                                 foundValue,
                                 newPath,
                             );
-                            return {
-                                ...itemProxy,
-                                cut: () => {
+
+                            // ADDED: Clear cache for find operation
+                            shapeCache.clear();
+                            stateVersion++;
+                            // Try returning without spread
+                            return Object.assign(itemProxy, {
+                                cut: () =>
                                     cutFunc(
                                         effectiveSetState,
                                         path,
                                         stateKey,
                                         foundIndex,
-                                    );
-                                },
-                            };
+                                    ),
+                            });
                         };
                     }
 
@@ -1547,9 +1548,6 @@ function SignalRenderer({
         if (!parentId) {
             parentId = `parent-${crypto.randomUUID()}`;
             parentElement.setAttribute("data-parent-id", parentId);
-            if (proxy._effect) {
-                parentElement.setAttribute("data-signal-effect", proxy._effect);
-            }
         }
 
         const instanceId = `instance-${crypto.randomUUID()}`;
