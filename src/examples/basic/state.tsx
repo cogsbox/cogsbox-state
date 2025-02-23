@@ -1,4 +1,4 @@
-import { createCogsState } from "../../CogsState";
+import { createCogsState } from "cogsbox-state";
 
 interface Product {
     id: number | string;
@@ -29,21 +29,21 @@ const dbState: StateType = {
             {
                 id: 1,
                 name: "T-Shirt",
-                price: 29.99,
+                price: 5,
                 stock: 100,
                 category: "clothing",
             },
             {
                 id: 2,
                 name: "Jeans",
-                price: 59.99,
+                price: 10,
                 stock: 50,
                 category: "clothing",
             },
             {
                 id: 3,
                 name: "Sneakers",
-                price: 89.99,
+                price: 25,
                 stock: 30,
                 category: "shoes",
             },

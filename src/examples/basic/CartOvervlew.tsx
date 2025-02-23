@@ -1,4 +1,3 @@
-import ComponentIdRenderer from "./ComponentIdRenderer";
 import { FlashWrapper } from "./FlashOnUpdate";
 import { useCogsState } from "./state";
 
@@ -7,11 +6,10 @@ export const CartOverviewGet = () => {
     const cart = useCogsState("cart");
     const products = useCogsState("products");
 
-    const items = cart.items;
     return (
         <FlashWrapper componentId={cart._componentId!}>
-            <h3>Cart ({cart.items.get().length} items)</h3>{" "}
-            <h3> £ {cart.total.get()}</h3>
+            <div>Cart ({cart.items.get().length} items)</div>{" "}
+            <div> £ {cart.total.get()}</div>
             {cart.items.get().map((item, itemIndex) => {
                 const product = products.items.findWith("id", item.productId);
                 return (
@@ -19,7 +17,7 @@ export const CartOverviewGet = () => {
                         {product?.name.get()} - Qty: {item.quantity}
                         <button
                             onClick={() =>
-                                items
+                                cart.items
                                     .findWith("productId", item.productId)
                                     .quantity.update((prev) => prev + 1)
                             }
@@ -29,7 +27,7 @@ export const CartOverviewGet = () => {
                         <button
                             onClick={
                                 () =>
-                                    items
+                                    cart.items
                                         .findWith("productId", item.productId)
                                         .cut()
                                 // or cartUpdater.items.cut(itemIndex)}
@@ -43,14 +41,17 @@ export const CartOverviewGet = () => {
         </FlashWrapper>
     );
 };
+
 export const CartOverview = () => {
     const cart = useCogsState("cart");
     const products = useCogsState("products");
 
     return (
         <FlashWrapper componentId={cart._componentId!}>
-            <h3>Cart ({cart.items.$effect((state) => state.length)} items)</h3>
-            <h3> £ {cart.total.$get()}</h3>
+            <div>
+                Cart ({cart.items.$effect((state) => state.length)} items)
+            </div>
+            <div> £ {cart.total.$get()}</div>
             {cart.items.$stateMap((item, setter) => {
                 console.log("products", products);
                 const product = products.items.findWith("id", item.productId);
@@ -80,8 +81,8 @@ export const CartOverviewDep = () => {
 
     return (
         <FlashWrapper componentId={cart._componentId!}>
-            <h3>Cart ({cart.items.get().length} items)</h3>{" "}
-            <h3> £ {cart.total.get()}</h3>
+            <div>Cart ({cart.items.get().length} items)</div>{" "}
+            <div> £ {cart.total.get()}</div>
             {cart.items.stateMap((item, setter) => {
                 const product = products.items.findWith("id", item.productId);
                 return (

@@ -68,12 +68,14 @@ export type CogsGlobalState = {
         parentId: string;
         position: number;
         effect?: string;
+        map?: string;
     }>>;
     addSignalElement: (signalId: string, elementInfo: {
         instanceId: string;
         parentId: string;
         position: number;
         effect?: string;
+        map?: string;
     }) => void;
     removeSignalElement: (signalId: string, instanceId: string) => void;
     reRenderTriggerPrevValue: Record<string, any>;

@@ -26,9 +26,9 @@ export const FlashWrapper = ({
             ref={ref}
             className="transition-all duration-500 bg-white rounded "
         >
-            <div className="flex items-center gap-2 bg-blue-400">
+            <div className="flex items-center h-8 ">
                 <ComponentIdRenderer componentId={componentId} />
-                <div className="flex h-6 w-6 rounded  items-center justify-center p-1">
+                <div className="flex h-full w-6   items-center bg-blue-400 justify-center p-1">
                     <div className="text-white">{renderCountRef.current}</div>
                 </div>
             </div>

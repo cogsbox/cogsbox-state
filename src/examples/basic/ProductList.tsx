@@ -7,11 +7,24 @@ export const ProductList = () => {
     const cart = useCogsState("cart");
 
     return (
-        <div>
-            {products.items.get().map((product) => (
-                <div key={product.id}>
-                    {product.name} - ${product.price}
+        <div className="w-[400px] flex flex-col gap-2">
+            {products.items.stateMap((product, productSetter) => (
+                <div key={product.id} className="flex gap-2 items-center">
+                    <div className="w-[200px]">{product.name}</div>
+                    <input
+                        className="w-[100px] border-2 border-black p-2"
+                        value={product.price}
+                        onChange={(e) => {
+                            productSetter.price.update(Number(e.target.value));
+                            cart.total.update(
+                                products.items
+                                    .get()
+                                    .reduce((acc, item) => acc + item.price, 0),
+                            );
+                        }}
+                    />
                     <button
+                        className="bg-blue-500 text-white p-1 rounded cursor-pointer hover:bg-blue-600 px-2"
                         onClick={() => {
                             cart.items.uniqueInsert(
                                 {

@@ -32,7 +32,7 @@ export type FormElementParmas<T> = {
 };
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
-export type PushArgs<U> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts) => void;
+export type PushArgs<U> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => void;
 type CutFunctionType = (index?: number, options?: {
     waitForSync?: boolean;
 }) => void;
@@ -46,7 +46,8 @@ export type ArrayEndType<TShape extends unknown> = {
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>>;
     cut: CutFunctionType;
-    stateEach: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
+    stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
+    $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(field: K) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
     uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[]) => void;
     stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
@@ -54,7 +55,7 @@ export type ArrayEndType<TShape extends unknown> = {
 } & EndType<TShape> & {
     [K in keyof (any[] extends infer T ? T : never)]: never;
 };
-export type UpdateType<T> = (payload: UpdateArg<Prettify<T>>, opts?: UpdateOpts) => void;
+export type UpdateType<T> = (payload: UpdateArg<Prettify<T>>, opts?: UpdateOpts<T>) => void;
 export type FormOptsType = {
     key?: string;
     validation?: {
@@ -69,10 +70,8 @@ export type FormOptsType = {
 };
 export type FormControl<T> = (obj: FormElementParmas<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
-export type UpdateOpts = {
-    timelineLabel?: string;
-    timeLineMessage?: string;
-    validate?: boolean;
+export type UpdateOpts<T> = {
+    afterUpdate?: (state: T) => void;
 };
 export type ObjectEndType<T> = EndType<T> & {
     [K in keyof T]-?: ObjectEndType<T[K]>;
@@ -129,7 +128,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 export type EffectiveSetState<TStateObject> = (newStateOrFunction: TStateObject | ((prevState: TStateObject) => TStateObject), path: string[], updateObj: {
     updateType: "update" | "insert" | "cut";
-}, validationKey?: string, opts?: UpdateOpts) => void;
+}, validationKey?: string, opts?: UpdateOpts<TStateObject>) => void;
 export type UpdateTypeDetail = {
     timeStamp: number;
     stateKey: string;

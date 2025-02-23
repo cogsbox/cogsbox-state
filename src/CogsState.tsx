@@ -68,7 +68,7 @@ export type PushArgs<U> = (
     update:
         | Prettify<U>
         | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>),
-    opts?: UpdateOpts,
+    opts?: UpdateOpts<U>,
 ) => void;
 
 type CutFunctionType = (
@@ -96,6 +96,15 @@ export type ArrayEndType<TShape extends unknown> = {
             arraySetter: StateObject<TShape>,
         ) => void,
     ) => any;
+    $stateMap: (
+        callbackfn: (
+            value: InferArrayElement<TShape>,
+            setter: StateObject<InferArrayElement<TShape>>,
+            index: number,
+            array: TShape,
+            arraySetter: StateObject<TShape>,
+        ) => void,
+    ) => any;
     stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(
         field: K,
     ) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
@@ -113,7 +122,7 @@ export type ArrayEndType<TShape extends unknown> = {
 
 export type UpdateType<T> = (
     payload: UpdateArg<Prettify<T>>,
-    opts?: UpdateOpts,
+    opts?: UpdateOpts<T>,
 ) => void;
 export type FormOptsType = {
     key?: string;
@@ -131,10 +140,8 @@ export type FormOptsType = {
 export type FormControl<T> = (obj: FormElementParmas<T>) => JSX.Element;
 
 export type UpdateArg<S> = S | ((prevState: S) => S);
-export type UpdateOpts = {
-    timelineLabel?: string;
-    timeLineMessage?: string;
-    validate?: boolean;
+export type UpdateOpts<T> = {
+    afterUpdate?: (state: T) => void;
 };
 export type ObjectEndType<T> = EndType<T> & {
     [K in keyof T]-?: ObjectEndType<T[K]>;
@@ -214,7 +221,7 @@ export type EffectiveSetState<TStateObject> = (
     path: string[],
     updateObj: { updateType: "update" | "insert" | "cut" },
     validationKey?: string,
-    opts?: UpdateOpts,
+    opts?: UpdateOpts<TStateObject>,
 ) => void;
 
 export type UpdateTypeDetail = {
@@ -664,7 +671,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             .stateComponents.get(thisKey) || {
             components: new Map(),
         };
-        console.log("stateEntry", stateEntry);
+
         stateEntry.components.set(depsKey, {
             forceUpdate: () => forceUpdate({}),
             paths: new Set(),
@@ -673,10 +680,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
 
         getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-        console.log(
-            "   getGlobalStore.getState().stateComponent",
-            getGlobalStore.getState().stateComponents,
-        );
+
         return () => {
             const depsKey = `${thisKey}////${componentIdRef.current}`;
 
@@ -815,7 +819,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(thisKey);
-            console.log("stateEntry", stateEntry);
+
             if (stateEntry) {
                 for (const [
                     key,
@@ -1078,7 +1082,6 @@ function createProxyHandler<T>(
         const handler = {
             get(target: any, prop: string) {
                 if (prop !== "then" && !prop.startsWith("$")) {
-                    console.log("prop", prop);
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
                     const stateEntry = getGlobalStore
@@ -1486,7 +1489,7 @@ function createProxyHandler<T>(
                 if (prop === "_isServerSynced") return baseObj._isServerSynced;
 
                 if (prop === "update") {
-                    return (payload: UpdateArg<T>, opts?: UpdateOpts) => {
+                    return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
                         // ADDED: Invalidate cache on update
                         invalidateCachePath(path);
                         updateFn(effectiveSetState, payload, path, "");
@@ -1558,25 +1561,8 @@ function SignalMapRenderer({
         ) => ReactNode;
     };
 }) {
-    const value = useSyncExternalStore(
-        (notify) => {
-            const stateEntry = getGlobalStore
-                .getState()
-                .stateComponents.get(proxy._stateKey) || {
-                components: new Map(),
-            };
-            stateEntry.components.set(proxy._stateKey, {
-                forceUpdate: notify,
-                paths: new Set([proxy._path.join(".")]),
-            });
-            return () => stateEntry.components.delete(proxy._stateKey);
-        },
-        () =>
-            getGlobalStore
-                .getState()
-                .getNestedState(proxy._stateKey, proxy._path),
-    );
-
+    const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
+    console.log("value", value);
     if (!Array.isArray(value)) {
         return null;
     }

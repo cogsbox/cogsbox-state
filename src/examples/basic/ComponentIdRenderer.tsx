@@ -4,10 +4,8 @@ export default function ComponentIdRenderer({
     componentId: string;
 }) {
     return (
-        <div className="bg-blue-400 rounded p-1 px-4 w-full text-white text-sm">
-            <div className=" ">
-                <h3>{componentId}</h3>
-            </div>
+        <div className="bg-blue-300 flex items-center  px-4 w-full h-full text-white text-sm">
+            <h3>{componentId}</h3>
         </div>
     );
 }
