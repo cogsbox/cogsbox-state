@@ -1,16 +1,16 @@
 import { create as f } from "./node_modules/zustand/esm/react.js";
-const v = f((o, l) => ({
+const v = f((a, l) => ({
   stateComponents: /* @__PURE__ */ new Map(),
   subscribe: (e) => l().subscribe(e),
   reactiveDeps: {},
-  setReactiveDeps: (e, r) => o((t) => ({
+  setReactiveDeps: (e, r) => a((t) => ({
     ...t,
     reactiveDeps: {
       ...t.reactiveDeps,
       [e]: r
     }
   })),
-  deleteReactiveDeps: (e) => o((r) => {
+  deleteReactiveDeps: (e) => a((r) => {
     const { [e]: t, ...n } = r.reactiveDeps;
     return {
       ...r,
@@ -20,16 +20,14 @@ const v = f((o, l) => ({
   reRenderTriggerPrevValue: {},
   signalDomElements: /* @__PURE__ */ new Map(),
   addSignalElement: (e, r) => {
-    console.log("Adding signal element", e, r);
     const t = l().signalDomElements;
-    t.has(e) || t.set(e, /* @__PURE__ */ new Set()), t.get(e).add(r), console.log("After adding", t.get(e)), o({ signalDomElements: new Map(t) });
+    t.has(e) || t.set(e, /* @__PURE__ */ new Set()), t.get(e).add(r), a({ signalDomElements: new Map(t) });
   },
   removeSignalElement: (e, r) => {
-    console.log("Removing signal element", e, r);
     const t = l().signalDomElements, n = t.get(e);
-    n && n.forEach((a) => {
-      a.instanceId === r && n.delete(a);
-    }), o({ signalDomElements: new Map(t) });
+    n && n.forEach((o) => {
+      o.instanceId === r && n.delete(o);
+    }), a({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
   updaterState: {},
@@ -44,7 +42,7 @@ const v = f((o, l) => ({
   serverSyncLog: {},
   serverSideOrNot: {},
   setServerSyncLog: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       serverSyncLog: {
         ...t.serverSyncLog,
         [e]: [...t.serverSyncLog[e] ?? [], r]
@@ -52,7 +50,7 @@ const v = f((o, l) => ({
     }));
   },
   setServerSideOrNot: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       serverSideOrNot: {
         ...t.serverSideOrNot,
         [e]: r
@@ -62,7 +60,7 @@ const v = f((o, l) => ({
   getServerSideOrNot: (e) => l().serverSideOrNot[e],
   getThisLocalUpdate: (e) => l().stateLog[e],
   setServerState: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       serverState: {
         ...t.serverState,
         [e]: r
@@ -70,18 +68,18 @@ const v = f((o, l) => ({
     }));
   },
   setStateLog: (e, r) => {
-    o((t) => {
-      const n = t.stateLog[e] ?? [], a = r(n);
+    a((t) => {
+      const n = t.stateLog[e] ?? [], o = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: a
+          [e]: o
         }
       };
     });
   },
   setIsLoadingGlobal: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       isLoadingGlobal: {
         ...t.isLoadingGlobal,
         [e]: r
@@ -89,7 +87,7 @@ const v = f((o, l) => ({
     }));
   },
   setServerSyncActions: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       serverSyncActions: {
         ...t.serverSyncActions,
         [e]: r
@@ -97,23 +95,23 @@ const v = f((o, l) => ({
     }));
   },
   addValidationError: (e, r) => {
-    o((t) => {
-      const n = new Map(t.validationErrors), a = n.get(e) || [];
-      return n.set(e, [...a, r]), { validationErrors: n };
+    a((t) => {
+      const n = new Map(t.validationErrors), o = n.get(e) || [];
+      return n.set(e, [...o, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
-    o((r) => {
+    a((r) => {
       const t = new Map(r.validationErrors);
       console.log("updatedErrors", t);
       let n = !1;
-      const a = e.split(".");
+      const o = e.split(".");
       return Array.from(t.keys()).forEach((i) => {
         const c = i.split(".");
-        if (c.length >= a.length) {
+        if (c.length >= o.length) {
           let S = !0;
-          for (let s = 0; s < a.length; s++)
-            if (c[s] !== a[s]) {
+          for (let s = 0; s < o.length; s++)
+            if (c[s] !== o[s]) {
               S = !1;
               break;
             }
@@ -123,24 +121,24 @@ const v = f((o, l) => ({
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = l().validationErrors, n = e.split("."), a = (i, c) => i === "[*]" ? !0 : Array.isArray(i) ? i.includes(parseInt(c)) : i === c;
+    const r = [], t = l().validationErrors, n = e.split("."), o = (i, c) => i === "[*]" ? !0 : Array.isArray(i) ? i.includes(parseInt(c)) : i === c;
     return Array.from(t.keys()).forEach((i) => {
       const c = i.split(".");
       if (c.length >= n.length) {
         let S = !0;
         for (let s = 0; s < n.length; s++) {
-          const d = n[s], g = c[s];
+          const d = n[s], u = c[s];
           if (d === "[*]" || Array.isArray(d)) {
-            const u = parseInt(g);
-            if (isNaN(u)) {
+            const g = parseInt(u);
+            if (isNaN(g)) {
               S = !1;
               break;
             }
-            if (!a(d, g)) {
+            if (!o(d, u)) {
               S = !1;
               break;
             }
-          } else if (d !== g) {
+          } else if (d !== u) {
             S = !1;
             break;
           }
@@ -154,28 +152,28 @@ const v = f((o, l) => ({
   },
   getInitialOptions: (e) => l().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = l().cogsStateStore[e], n = (a, i) => {
-      if (i.length === 0) return a;
+    const t = l().cogsStateStore[e], n = (o, i) => {
+      if (i.length === 0) return o;
       const c = i[0], S = i.slice(1);
       if (c === "[*]") {
-        if (!Array.isArray(a)) {
+        if (!Array.isArray(o)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (S.length === 0) return a;
-        const d = a.map(
-          (g) => n(g, S)
+        if (S.length === 0) return o;
+        const d = o.map(
+          (u) => n(u, S)
         );
         return Array.isArray(d[0]) ? d.flat() : d;
       }
-      const s = a[c];
+      const s = o[c];
       if (s !== void 0)
         return n(s, S);
     };
     return n(t, r);
   },
   setInitialStateOptions: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       initialStateOptions: {
         ...t.initialStateOptions,
         [e]: r
@@ -183,7 +181,7 @@ const v = f((o, l) => ({
     }));
   },
   updateInitialStateGlobal: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       initialStateGlobal: {
         ...t.initialStateGlobal,
         [e]: r
@@ -193,11 +191,11 @@ const v = f((o, l) => ({
   getUpdaterState: (e) => l().updaterState[e],
   setUpdaterState: (e, r) => {
     const t = l().updaterState;
-    !e || !r || o({ updaterState: { ...t ?? {}, [e]: r } });
+    !e || !r || a({ updaterState: { ...t ?? {}, [e]: r } });
   },
   getKeyState: (e) => l().cogsStateStore[e],
   setState: (e, r) => {
-    o((t) => ({
+    a((t) => ({
       cogsStateStore: {
         ...t.cogsStateStore,
         [e]: typeof r == "function" ? r(t.cogsStateStore[e]) : r
@@ -205,7 +203,7 @@ const v = f((o, l) => ({
     }));
   },
   setInitialStates: (e) => {
-    o((r) => ({
+    a((r) => ({
       cogsStateStore: {
         ...r.cogsStateStore,
         ...e
@@ -213,7 +211,7 @@ const v = f((o, l) => ({
     }));
   },
   syncInfoStore: /* @__PURE__ */ new Map(),
-  setSyncInfo: (e, r) => o((t) => {
+  setSyncInfo: (e, r) => a((t) => {
     const n = new Map(t.syncInfoStore);
     return n.set(e, r), { ...t, syncInfoStore: n };
   }),

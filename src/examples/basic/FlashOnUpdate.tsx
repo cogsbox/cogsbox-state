@@ -26,12 +26,13 @@ export const FlashWrapper = ({
             ref={ref}
             className="transition-all duration-500 bg-white rounded "
         >
-            <div className="flex items-center h-8 ">
+            <div className="flex items-center h-10 ">
                 <ComponentIdRenderer componentId={componentId} />
-                <div className="flex h-full w-[200px]  items-center bg-blue-400 justify-center p-1 px-2">
-                    <div className="text-white">
-                        Render: {renderCountRef.current}
-                    </div>
+                <div className="flex h-full w-[200px] text-white items-center bg-blue-400 justify-center p-1 px-2">
+                    Render: <div className="w-2" />
+                    <span className="text-2xl font-bold">
+                        {renderCountRef.current}
+                    </span>
                 </div>
             </div>
             <div className="p-6">{children}</div>

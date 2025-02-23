@@ -3,6 +3,7 @@ import {
     createElement,
     startTransition,
     useEffect,
+    useLayoutEffect,
     useMemo,
     useRef,
     useState,
@@ -87,6 +88,15 @@ export type ArrayEndType<TShape extends unknown> = {
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>>;
     cut: CutFunctionType;
+    stateMapNoRender: (
+        callbackfn: (
+            value: InferArrayElement<TShape>,
+            setter: StateObject<InferArrayElement<TShape>>,
+            index: number,
+            array: TShape,
+            arraySetter: StateObject<TShape>,
+        ) => void,
+    ) => any;
     stateMap: (
         callbackfn: (
             value: InferArrayElement<TShape>,
@@ -653,7 +663,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         notifyComponents(thisKey);
     }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
         if (noStateKey) {
             setAndMergeOptions(thisKey as string, {
                 serverSync,
@@ -1075,25 +1085,28 @@ function createProxyHandler<T>(
 
         // MODIFIED: Cache check with version
         const cachedEntry = shapeCache.get(cacheKey);
-        if (cachedEntry?.stateVersion === stateVersion) {
-            return cachedEntry.proxy;
-        }
+        // if (cachedEntry?.stateVersion === stateVersion) {
+        //     return cachedEntry.proxy;
+        // }
 
         const handler = {
             get(target: any, prop: string) {
                 if (
                     prop !== "then" &&
                     !prop.startsWith("$") &&
-                    prop == "stateMapNoRender"
+                    prop !== "stateMapNoRender"
                 ) {
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
+
                     const stateEntry = getGlobalStore
                         .getState()
                         .stateComponents.get(stateKey);
+
                     if (stateEntry && currentPath) {
                         const component =
                             stateEntry.components.get(fullComponentId);
+
                         if (component) {
                             component.paths.add(currentPath);
                         }
@@ -1113,7 +1126,9 @@ function createProxyHandler<T>(
                             );
                         };
                     }
-
+                    if (stateKey == "cart") {
+                        console.log("get222222", prop, path);
+                    }
                     if (prop === "stateMap" || prop === "stateMapNoRender") {
                         return (
                             callbackfn: (
@@ -1589,10 +1604,12 @@ function SignalMapRenderer({
         proxy._path,
     ) as ArrayEndType<any>;
     // Use existing global state management
-    return arraySetter.stateMap((item, setter, index, value, arraysetter) => {
-        // Execute map function in React context with existing state/proxies
-        return proxy._mapFn(item, setter, index, value, arraysetter);
-    });
+    return arraySetter.stateMapNoRender(
+        (item, setter, index, value, arraysetter) => {
+            // Execute map function in React context with existing state/proxies
+            return proxy._mapFn(item, setter, index, value, arraysetter);
+        },
+    );
 }
 function SignalRenderer({
     proxy,
@@ -1605,7 +1622,7 @@ function SignalRenderer({
 }) {
     const elementRef = useRef<HTMLSpanElement>(null);
     const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
-    console.log("SignalRenderer", signalId);
+
     useEffect(() => {
         const element = elementRef.current;
         if (!element || !element.parentElement) return;

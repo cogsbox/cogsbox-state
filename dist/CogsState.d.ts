@@ -46,6 +46,7 @@ export type ArrayEndType<TShape extends unknown> = {
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>>;
     cut: CutFunctionType;
+    stateMapNoRender: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(field: K) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;

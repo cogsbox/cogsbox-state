@@ -12,7 +12,7 @@ export const ProductList = () => {
                 <div key={product.id} className="flex gap-2 items-center">
                     <div className="w-[200px]">{product.name}</div>
                     <input
-                        className="w-[100px] border-2 border-black p-2"
+                        className="w-[100px] border-2 border-orange-500 px-2 py-1"
                         value={product.price}
                         onChange={(e) => {
                             productSetter.price.update(Number(e.target.value));
@@ -24,7 +24,7 @@ export const ProductList = () => {
                         }}
                     />
                     <button
-                        className="bg-blue-500 text-white p-1 rounded cursor-pointer hover:bg-blue-600 px-2"
+                        className="bg-orange-500 text-white p-1 rounded cursor-pointer hover:bg-orange-600 px-2"
                         onClick={() => {
                             cart.items.uniqueInsert(
                                 {

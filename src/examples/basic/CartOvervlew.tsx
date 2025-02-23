@@ -16,25 +16,34 @@ export const CartOverviewGet = () => {
             <CodeLine
                 header={true}
                 code={`const cart = useCogsState("cart")`}
-            />
-            <div className="h-2" />
+            />{" "}
+            <div className="h-4" />
             <CodeLine code={`cart.items.get().length`} />
-            <div className="p-3">
-                Cart ({cart.items.get().length} items)
+            <div className="p-1 px-4 border-2 border-blue-500  rounded-b-lg">
+                ({cart.items.get().length} items)
             </div>{" "}
+            <div className="h-4" />
             <CodeLine code={`cart.total.get()`} />
-            <div className="p-3">Total: $ {cart.total.get()}</div>
+            <div className="p-1 px-4 border-2 border-blue-500  rounded-b-lg">
+                Total: $ {cart.total.get()}
+            </div>{" "}
+            <div className="h-4" />
             <CodeLine code={`cart.items.get().map((item, itemIndex) =>`} />
-            <div className="p-3">
+            <div className="p-3 min-h-[200px] flex flex-col gap-2 ">
                 {cart.items.get().map((item, itemIndex) => {
                     const product = products.items.findWith(
                         "id",
                         item.productId
                     );
+                    console.log("cartItems", cart.items, item.productId);
                     return (
-                        <div key={item.id}>
+                        <div
+                            key={item.id}
+                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_50px_90px] gap-2 px-2"
+                        >
                             {product?.name.get()} - Qty: {item.quantity}
                             <button
+                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
                                 onClick={() =>
                                     cart.items
                                         .findWith("productId", item.productId)
@@ -44,6 +53,7 @@ export const CartOverviewGet = () => {
                                 +
                             </button>
                             <button
+                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
                                 onClick={
                                     () =>
                                         cart.items
@@ -79,34 +89,45 @@ export const CartOverview = () => {
             <CodeLine
                 header={true}
                 code={`const cart = useCogsState("cart")`}
-            />
-            <div className="h-2" />
+            />{" "}
+            <div className="h-4" />
             <CodeLine code={`cart.items.$effect((state) => state.length)`} />
-            <div className="p-3">
-                Cart ({cart.items.$effect((state) => state.length ?? 0)} items)
+            <div className="p-1 px-4 border-2 border-blue-500  rounded-b-lg">
+                {cart.items.$effect((state) => state.length || 0) || "0"} items
             </div>{" "}
+            <div className="h-4" />
             <CodeLine code={`cart.total.$get()`} />
-            <div className="p-3">Total: $ {cart.total.$get()}</div>
+            <div className="p-1 px-4 border-2 border-blue-500  rounded-b-lg">
+                Total: $ {cart.total.$get()}
+            </div>{" "}
             <CodeLine code={`cart.items.$stateMap((item, setter)`} />
-            <div className="p-3">
+            <div className="p-3 min-h-[200px] flex flex-col gap-2 ">
                 {cart.items.$stateMap((item, setter) => {
-                    console.log("products", products);
                     const product = products.items.findWith(
                         "id",
                         item.productId
                     );
 
                     return (
-                        <div key={item.id}>
+                        <div
+                            key={item.id}
+                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_50px_90px] gap-2 px-2"
+                        >
                             {product.name.$get()} - Qty: {item.quantity}
                             <button
+                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
                                 onClick={() =>
                                     setter.quantity.update((prev) => prev + 1)
                                 }
                             >
                                 +
                             </button>
-                            <button onClick={() => setter.cut()}>Remove</button>
+                            <button
+                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
+                                onClick={() => setter.cut()}
+                            >
+                                Remove
+                            </button>
                         </div>
                     );
                 })}{" "}

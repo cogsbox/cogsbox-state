@@ -165,17 +165,15 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         signalId: string,
         elementInfo: { instanceId: string; parentId: string; position: number },
     ) => {
-        console.log("Adding signal element", signalId, elementInfo);
         const current = get().signalDomElements;
         if (!current.has(signalId)) {
             current.set(signalId, new Set());
         }
         current.get(signalId)!.add(elementInfo);
-        console.log("After adding", current.get(signalId));
+
         set({ signalDomElements: new Map(current) }); // Create new reference to trigger update
     },
     removeSignalElement: (signalId: string, instanceId: string) => {
-        console.log("Removing signal element", signalId, instanceId);
         const current = get().signalDomElements;
         const elements = current.get(signalId);
         if (elements) {
