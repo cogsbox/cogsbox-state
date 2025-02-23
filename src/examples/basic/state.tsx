@@ -1,4 +1,4 @@
-import { createCogsState } from "cogsbox-state";
+import { createCogsState } from "../../CogsState";
 
 interface Product {
     id: number | string;

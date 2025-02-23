@@ -7,7 +7,7 @@ export const ProductList = () => {
     const cart = useCogsState("cart");
 
     return (
-        <div className="w-[400px] flex flex-col gap-2">
+        <div className="w-[400px] flex flex-col gap-2 p-8">
             {products.items.stateMap((product, productSetter) => (
                 <div key={product.id} className="flex gap-2 items-center">
                     <div className="w-[200px]">{product.name}</div>
@@ -19,7 +19,7 @@ export const ProductList = () => {
                             cart.total.update(
                                 products.items
                                     .get()
-                                    .reduce((acc, item) => acc + item.price, 0),
+                                    .reduce((acc, item) => acc + item.price, 0)
                             );
                         }}
                     />
@@ -33,15 +33,15 @@ export const ProductList = () => {
                                     quantity: 1,
                                     unitPrice: product.price,
                                 },
-                                ["productId"],
+                                ["productId"]
                             );
                             cart.total.update((prev) =>
                                 cart.items
                                     .get()
                                     .reduce(
                                         (acc, item) => acc + item.unitPrice,
-                                        0,
-                                    ),
+                                        0
+                                    )
                             );
                         }}
                     >

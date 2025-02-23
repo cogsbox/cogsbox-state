@@ -1081,7 +1081,11 @@ function createProxyHandler<T>(
 
         const handler = {
             get(target: any, prop: string) {
-                if (prop !== "then" && !prop.startsWith("$")) {
+                if (
+                    prop !== "then" &&
+                    !prop.startsWith("$") &&
+                    prop == "stateMapNoRender"
+                ) {
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
                     const stateEntry = getGlobalStore
@@ -1110,7 +1114,7 @@ function createProxyHandler<T>(
                         };
                     }
 
-                    if (prop === "stateMap") {
+                    if (prop === "stateMap" || prop === "stateMapNoRender") {
                         return (
                             callbackfn: (
                                 value: InferArrayElement<T>,
@@ -1129,9 +1133,10 @@ function createProxyHandler<T>(
                                       .getState()
                                       .getNestedState(stateKey, path);
 
-                            // ADDED: Clear shape cache for array operations
-                            shapeCache.clear();
-                            stateVersion++;
+                            if (prop !== "stateMapNoRender") {
+                                shapeCache.clear();
+                                stateVersion++;
+                            }
 
                             return arrayToMap.map((val: any, index: number) => {
                                 const thisIndex =
@@ -1165,7 +1170,7 @@ function createProxyHandler<T>(
                                 index: number,
                                 array: T,
                                 arraySetter: StateObject<T>,
-                            ) => ReactNode,
+                            ) => void,
                         ) => {
                             return createElement(SignalMapRenderer, {
                                 proxy: {
@@ -1173,6 +1178,9 @@ function createProxyHandler<T>(
                                     _path: path,
                                     _mapFn: callbackfn as any, // Pass the actual function, not string
                                 },
+                                effectiveSetState,
+                                componentId,
+                                rebuildStateShape,
                             });
                         };
                     }
@@ -1548,6 +1556,9 @@ export function $cogsSignal(proxy: {
 
 function SignalMapRenderer({
     proxy,
+    effectiveSetState,
+    componentId,
+    rebuildStateShape,
 }: {
     proxy: {
         _stateKey: string;
@@ -1560,23 +1571,27 @@ function SignalMapRenderer({
             arraySetter: any,
         ) => ReactNode;
     };
+    effectiveSetState: any;
+    componentId: string;
+    rebuildStateShape: (
+        currentState: any,
+        path: string[],
+        meta?: { filtered?: string[][]; validIndices?: number[] },
+    ) => any;
 }) {
     const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
     console.log("value", value);
     if (!Array.isArray(value)) {
         return null;
     }
-
+    const arraySetter = rebuildStateShape(
+        value,
+        proxy._path,
+    ) as ArrayEndType<any>;
     // Use existing global state management
-    return value.map((item, index) => {
+    return arraySetter.stateMap((item, setter, index, value, arraysetter) => {
         // Execute map function in React context with existing state/proxies
-        return proxy._mapFn(
-            item,
-            getGlobalStore.getState().updaterState[proxy._stateKey],
-            index,
-            value,
-            getGlobalStore.getState().updaterState[proxy._stateKey],
-        );
+        return proxy._mapFn(item, setter, index, value, arraysetter);
     });
 }
 function SignalRenderer({

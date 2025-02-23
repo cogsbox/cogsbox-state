@@ -10,7 +10,7 @@ export default function App() {
         const products = useCogsState("products");
     
         return (
-            <FlashWrapper componentId={cart._componentId!}>
+            <>
                 <div>Cart ({cart.items.get().length} items)</div>{" "}
                 <div> £ {cart.total.get()}</div>
                 {cart.items.get().map((item, itemIndex) => {
@@ -41,7 +41,7 @@ export default function App() {
                         </div>
                     );
                 })}
-            </FlashWrapper>
+            </>
         );`;
 
     return (
@@ -71,7 +71,7 @@ export default function App() {
                     </SyntaxHighlighter>
                 </div>
             </div>
-            <LivePreview />
+            {/* <LivePreview /> */}
         </div>
     );
 }

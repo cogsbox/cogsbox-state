@@ -28,8 +28,10 @@ export const FlashWrapper = ({
         >
             <div className="flex items-center h-8 ">
                 <ComponentIdRenderer componentId={componentId} />
-                <div className="flex h-full w-6   items-center bg-blue-400 justify-center p-1">
-                    <div className="text-white">{renderCountRef.current}</div>
+                <div className="flex h-full w-[200px]  items-center bg-blue-400 justify-center p-1 px-2">
+                    <div className="text-white">
+                        Render: {renderCountRef.current}
+                    </div>
                 </div>
             </div>
             <div className="p-6">{children}</div>
