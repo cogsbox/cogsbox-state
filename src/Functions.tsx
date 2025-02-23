@@ -204,7 +204,6 @@ export const FormControlComponent = <TStateObject,>({
     stateKey,
 }: FormControlComponentProps<TStateObject>) => {
     const { getValidationErrors } = getGlobalStore.getState();
-
     const stateValue = useGetKeyState(stateKey, path);
     const [inputValue, setInputValue] = useState<any>(
         getGlobalStore.getState().getNestedState(stateKey, path),
