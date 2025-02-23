@@ -87,7 +87,7 @@ export type ArrayEndType<TShape extends unknown> = {
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>>;
     cut: CutFunctionType;
-    stateEach: (
+    stateMap: (
         callbackfn: (
             value: InferArrayElement<TShape>,
             setter: StateObject<InferArrayElement<TShape>>,
@@ -1077,7 +1077,7 @@ function createProxyHandler<T>(
 
         const handler = {
             get(target: any, prop: string) {
-                if (prop !== "then" && prop !== "$get") {
+                if (prop !== "then" && !prop.startsWith("$")) {
                     console.log("prop", prop);
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
@@ -1107,7 +1107,7 @@ function createProxyHandler<T>(
                         };
                     }
 
-                    if (prop === "stateEach") {
+                    if (prop === "stateMap") {
                         return (
                             callbackfn: (
                                 value: InferArrayElement<T>,
@@ -1154,7 +1154,25 @@ function createProxyHandler<T>(
                             });
                         };
                     }
-
+                    if (prop === "$stateMap") {
+                        return (
+                            callbackfn: (
+                                value: InferArrayElement<T>,
+                                setter: StateObject<InferArrayElement<T>>,
+                                index: number,
+                                array: T,
+                                arraySetter: StateObject<T>,
+                            ) => ReactNode,
+                        ) => {
+                            return createElement(SignalMapRenderer, {
+                                proxy: {
+                                    _stateKey: stateKey,
+                                    _path: path,
+                                    _mapFn: callbackfn as any, // Pass the actual function, not string
+                                },
+                            });
+                        };
+                    }
                     if (prop === "stateFlattenOn") {
                         return (fieldName: string) => {
                             const isFiltered = meta?.filtered?.some(
@@ -1523,6 +1541,57 @@ export function $cogsSignal(proxy: {
     _effect?: string;
 }) {
     return createElement(SignalRenderer, { proxy });
+}
+
+function SignalMapRenderer({
+    proxy,
+}: {
+    proxy: {
+        _stateKey: string;
+        _path: string[];
+        _mapFn: (
+            value: any,
+            setter: any,
+            index: number,
+            array: any[],
+            arraySetter: any,
+        ) => ReactNode;
+    };
+}) {
+    const value = useSyncExternalStore(
+        (notify) => {
+            const stateEntry = getGlobalStore
+                .getState()
+                .stateComponents.get(proxy._stateKey) || {
+                components: new Map(),
+            };
+            stateEntry.components.set(proxy._stateKey, {
+                forceUpdate: notify,
+                paths: new Set([proxy._path.join(".")]),
+            });
+            return () => stateEntry.components.delete(proxy._stateKey);
+        },
+        () =>
+            getGlobalStore
+                .getState()
+                .getNestedState(proxy._stateKey, proxy._path),
+    );
+
+    if (!Array.isArray(value)) {
+        return null;
+    }
+
+    // Use existing global state management
+    return value.map((item, index) => {
+        // Execute map function in React context with existing state/proxies
+        return proxy._mapFn(
+            item,
+            getGlobalStore.getState().updaterState[proxy._stateKey],
+            index,
+            value,
+            getGlobalStore.getState().updaterState[proxy._stateKey],
+        );
+    });
 }
 function SignalRenderer({
     proxy,

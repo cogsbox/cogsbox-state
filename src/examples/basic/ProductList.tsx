@@ -12,7 +12,7 @@ export const ProductList = () => {
                 <div key={product.id}>
                     {product.name} - ${product.price}
                     <button
-                        onClick={() =>
+                        onClick={() => {
                             cart.items.uniqueInsert(
                                 {
                                     id: uuidv4(),
@@ -21,8 +21,16 @@ export const ProductList = () => {
                                     unitPrice: product.price,
                                 },
                                 ["productId"],
-                            )
-                        }
+                            );
+                            cart.total.update((prev) =>
+                                cart.items
+                                    .get()
+                                    .reduce(
+                                        (acc, item) => acc + item.unitPrice,
+                                        0,
+                                    ),
+                            );
+                        }}
                     >
                         Add
                     </button>

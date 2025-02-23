@@ -80,6 +80,7 @@ export type CogsGlobalState = {
             parentId: string;
             position: number;
             effect?: string;
+            map?: string;
         }>
     >;
     addSignalElement: (
@@ -89,6 +90,7 @@ export type CogsGlobalState = {
             parentId: string;
             position: number;
             effect?: string;
+            map?: string;
         },
     ) => void;
     removeSignalElement: (signalId: string, instanceId: string) => void;

@@ -10,7 +10,8 @@ export const CartOverviewGet = () => {
     const items = cart.items;
     return (
         <FlashWrapper componentId={cart._componentId!}>
-            <h3>Cart ({cart.items.get().length} items)</h3>
+            <h3>Cart ({cart.items.get().length} items)</h3>{" "}
+            <h3> £ {cart.total.get()}</h3>
             {cart.items.get().map((item, itemIndex) => {
                 const product = products.items.findWith("id", item.productId);
                 return (
@@ -49,13 +50,14 @@ export const CartOverview = () => {
     return (
         <FlashWrapper componentId={cart._componentId!}>
             <h3>Cart ({cart.items.$effect((state) => state.length)} items)</h3>
-
-            {cart.items.stateEach((item, setter) => {
+            <h3> £ {cart.total.$get()}</h3>
+            {cart.items.$stateMap((item, setter) => {
+                console.log("products", products);
                 const product = products.items.findWith("id", item.productId);
-                console.log("product", product.name.get(), item);
+
                 return (
                     <div key={item.id}>
-                        {product.name.$get()} - Qty: {item.quantity}
+                        {product.name.$get()} - Qty: {item.quantity} - value:{" "}
                         <button
                             onClick={() =>
                                 setter.quantity.update((prev) => prev + 1)
@@ -78,8 +80,9 @@ export const CartOverviewDep = () => {
 
     return (
         <FlashWrapper componentId={cart._componentId!}>
-            <h3>Cart ({cart.items.get().length} items)</h3>
-            {cart.items.stateEach((item, setter) => {
+            <h3>Cart ({cart.items.get().length} items)</h3>{" "}
+            <h3> £ {cart.total.get()}</h3>
+            {cart.items.stateMap((item, setter) => {
                 const product = products.items.findWith("id", item.productId);
                 return (
                     <div key={item.id}>

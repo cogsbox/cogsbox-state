@@ -4,9 +4,9 @@ export default function ComponentIdRenderer({
     componentId: string;
 }) {
     return (
-        <div className="bg-blue-400 rounded p-2 px-4 w-full">
+        <div className="bg-blue-400 rounded p-1 px-4 w-full text-white text-sm">
             <div className=" ">
-                <h3>Component Id: {componentId}</h3>
+                <h3>{componentId}</h3>
             </div>
         </div>
     );

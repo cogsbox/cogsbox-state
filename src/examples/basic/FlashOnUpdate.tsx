@@ -22,12 +22,17 @@ export const FlashWrapper = ({
     });
 
     return (
-        <div ref={ref} className="transition-all duration-500">
-            <ComponentIdRenderer componentId={componentId} />
-            <div className="flex h-5 w-5 rounded-lg bg-blue-400 items-center justify-center">
-                <div className="text-white">{renderCountRef.current}</div>
+        <div
+            ref={ref}
+            className="transition-all duration-500 bg-white rounded "
+        >
+            <div className="flex items-center gap-2 bg-blue-400">
+                <ComponentIdRenderer componentId={componentId} />
+                <div className="flex h-6 w-6 rounded  items-center justify-center p-1">
+                    <div className="text-white">{renderCountRef.current}</div>
+                </div>
             </div>
-            {children}
+            <div className="p-6">{children}</div>
         </div>
     );
 };
