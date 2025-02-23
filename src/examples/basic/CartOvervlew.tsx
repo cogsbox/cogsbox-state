@@ -1,6 +1,5 @@
-
-import ComponentIdRenderer from "../components/ComponentIdRenderer";
-import { FlashWrapper } from "../components/FlashOnUpdate";
+import ComponentIdRenderer from "./ComponentIdRenderer";
+import { FlashWrapper } from "./FlashOnUpdate";
 import { useCogsState } from "./state";
 
 // CartOverview.tsx
@@ -10,8 +9,7 @@ export const CartOverviewGet = () => {
 
     const items = cart.items;
     return (
-        <FlashWrapper>
-            <ComponentIdRenderer componentId={cart._componentId!} />
+        <FlashWrapper componentId={cart._componentId!}>
             <h3>Cart ({cart.items.get().length} items)</h3>
             {cart.items.get().map((item, itemIndex) => {
                 const product = products.items.findWith("id", item.productId);
@@ -49,9 +47,7 @@ export const CartOverview = () => {
     const products = useCogsState("products");
 
     return (
-        <FlashWrapper>
-            <ComponentIdRenderer componentId={cart._componentId!} />
-
+        <FlashWrapper componentId={cart._componentId!}>
             <h3>Cart ({cart.items.$effect((state) => state.length)} items)</h3>
 
             {cart.items.stateEach((item, setter) => {
@@ -81,8 +77,7 @@ export const CartOverviewDep = () => {
     const products = useCogsState("products");
 
     return (
-        <FlashWrapper>
-            <ComponentIdRenderer componentId={cart._componentId!} />
+        <FlashWrapper componentId={cart._componentId!}>
             <h3>Cart ({cart.items.get().length} items)</h3>
             {cart.items.stateEach((item, setter) => {
                 const product = products.items.findWith("id", item.productId);
