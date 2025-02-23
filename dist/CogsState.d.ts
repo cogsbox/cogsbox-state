@@ -1,4 +1,3 @@
-import { ReactNode } from 'react';
 import { GenericObject } from './utility.js';
 import { UseMutationResult } from '@tanstack/react-query';
 import { ZodObject, ZodRawShape } from 'zod';
@@ -32,16 +31,8 @@ export type FormElementParmas<T> = {
     };
 };
 export type StateKeys = string;
-type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & {
-    upsert: UpdateType<U>;
-    cut: () => void;
-} & StateObject<U>;
+type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
 export type PushArgs<U> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts) => void;
-export interface GlobalState<T, K extends keyof T = keyof T> {
-    getKeyState: () => T;
-    setState: (newState: T | ((previousState: T) => T)) => void;
-    key: K;
-}
 type CutFunctionType = (index?: number, options?: {
     waitForSync?: boolean;
 }) => void;
@@ -89,15 +80,15 @@ export type ObjectEndType<T> = EndType<T> & {
     stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
     delete: () => void;
 };
-type EffectFunction<T> = (state: T) => ReactNode;
-export type EndType<T> = {
+type EffectFunction<T, R> = (state: T) => R;
+export type EndType<T, IsArrayElement = false> = {
     update: UpdateType<T>;
     _path: string[];
     _stateKey: string;
     formElement: (validationKey: string, control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
     $get: () => T;
-    $effect: (fn: EffectFunction<T>) => ReturnType<EffectFunction<T>>;
+    $effect: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -110,12 +101,14 @@ export type EndType<T> = {
         hideMessage?: boolean;
     }) => JSX.Element;
     lastSynced?: SyncInfo;
-} & {
+} & (IsArrayElement extends true ? {
+    cut: () => void;
+} : {}) & {
     [K in keyof (any extends infer T ? T : never)]: never;
 };
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
-} & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T> & {
+} & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
     _componentId: string | null;
     _initialState: T;
     updateInitialState: (newState: T | null) => {

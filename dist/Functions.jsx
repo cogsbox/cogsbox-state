@@ -1,5 +1,5 @@
 import { j as f } from "./node_modules/react/jsx-runtime.jsx";
-import { isFunction as y, getNestedValue as V, updateNestedProperty as j } from "./utility.js";
+import { getNestedValue as V, isFunction as y, updateNestedProperty as j } from "./utility.js";
 import b, { r as S } from "./node_modules/react/index.js";
 import { getGlobalStore as l } from "./store.js";
 function v(s, t, e, n) {

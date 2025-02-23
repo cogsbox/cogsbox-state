@@ -63,18 +63,14 @@ export type StateKeys = string;
 type findWithFuncType<U> = (
     thisKey: keyof U,
     thisValue: U[keyof U],
-) => EndType<U> & { upsert: UpdateType<U>; cut: () => void } & StateObject<U>;
+) => EndType<U> & StateObject<U>;
 export type PushArgs<U> = (
     update:
         | Prettify<U>
         | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>),
     opts?: UpdateOpts,
 ) => void;
-export interface GlobalState<T, K extends keyof T = keyof T> {
-    getKeyState: () => T;
-    setState: (newState: T | ((previousState: T) => T)) => void;
-    key: K;
-}
+
 type CutFunctionType = (
     index?: number,
     options?: { waitForSync?: boolean },
@@ -149,7 +145,7 @@ export type ObjectEndType<T> = EndType<T> & {
     delete: () => void;
 };
 type EffectFunction<T, R> = (state: T) => R;
-export type EndType<T> = {
+export type EndType<T, IsArrayElement = false> = {
     update: UpdateType<T>;
     _path: string[];
     _stateKey: string;
@@ -159,7 +155,6 @@ export type EndType<T> = {
         opts?: FormOptsType,
     ) => JSX.Element;
     get: () => T;
-
     $get: () => T;
     $effect: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
@@ -167,8 +162,8 @@ export type EndType<T> = {
     setValidation: (ctx: string) => void;
     removeValidation: (ctx: string) => void;
     ignoreFields: (fields: string[]) => StateObject<T>;
-    _selected: boolean; // New field for selection state
-    setSelected: (value: boolean) => void; // New method to update selection
+    _selected: boolean;
+    setSelected: (value: boolean) => void;
     validationWrapper: ({
         children,
         hideMessage,
@@ -177,9 +172,10 @@ export type EndType<T> = {
         hideMessage?: boolean;
     }) => JSX.Element;
     lastSynced?: SyncInfo;
-} & {
-    [K in keyof (any extends infer T ? T : never)]: never;
-};
+} & (IsArrayElement extends true ? { cut: () => void } : {}) & {
+        [K in keyof (any extends infer T ? T : never)]: never;
+    };
+
 export type StateObject<T> = (T extends any[]
     ? ArrayEndType<T>
     : T extends Record<string, unknown> | object
@@ -187,7 +183,7 @@ export type StateObject<T> = (T extends any[]
       : T extends string | number | boolean | null
         ? T
         : never) &
-    EndType<T> & {
+    EndType<T, true> & {
         _componentId: string | null;
         _initialState: T;
         updateInitialState: (newState: T | null) => {
@@ -1081,19 +1077,8 @@ function createProxyHandler<T>(
 
         const handler = {
             get(target: any, prop: string) {
-                console.log("prop", prop);
-                if (prop === "get") {
-                    return () =>
-                        getGlobalStore
-                            .getState()
-                            .getNestedState(stateKey, path);
-                }
-
-                if (prop === "$get") {
-                    return () =>
-                        $cogsSignal({ _stateKey: stateKey, _path: path });
-                }
                 if (prop !== "then" && prop !== "$get") {
+                    console.log("prop", prop);
                     const currentPath = path.join(".");
                     const fullComponentId = `${stateKey}////${componentId}`;
                     const stateEntry = getGlobalStore
@@ -1103,11 +1088,288 @@ function createProxyHandler<T>(
                         const component =
                             stateEntry.components.get(fullComponentId);
                         if (component) {
-                            component.paths.add(currentPath); //if i remove this then .get is on prdouct
+                            component.paths.add(currentPath);
                         }
                     }
                 }
+                if (Array.isArray(currentState)) {
+                    if (prop === "getSelected") {
+                        return () => {
+                            const selectedIndex = selectedIndexMap.get(
+                                path.join("."),
+                            );
+                            if (selectedIndex === undefined) return undefined;
+                            return rebuildStateShape(
+                                currentState[selectedIndex],
+                                [...path, selectedIndex.toString()],
+                                meta,
+                            );
+                        };
+                    }
 
+                    if (prop === "stateEach") {
+                        return (
+                            callbackfn: (
+                                value: InferArrayElement<T>,
+                                setter: StateObject<InferArrayElement<T>>,
+                                index: number,
+                                array: T,
+                                arraySetter: StateObject<T>,
+                            ) => void,
+                        ) => {
+                            const isFiltered = meta?.filtered?.some(
+                                (p) => p.join(".") === path.join("."),
+                            );
+                            const arrayToMap = isFiltered
+                                ? currentState
+                                : getGlobalStore
+                                      .getState()
+                                      .getNestedState(stateKey, path);
+
+                            // ADDED: Clear shape cache for array operations
+                            shapeCache.clear();
+                            stateVersion++;
+
+                            return arrayToMap.map((val: any, index: number) => {
+                                const thisIndex =
+                                    isFiltered && val.__origIndex
+                                        ? val.__origIndex
+                                        : index;
+                                const elementProxy = rebuildStateShape(
+                                    val,
+                                    [...path, thisIndex.toString()],
+                                    meta,
+                                );
+                                return callbackfn(
+                                    val,
+                                    elementProxy,
+                                    index,
+                                    currentState as any,
+                                    rebuildStateShape(
+                                        currentState as any,
+                                        path,
+                                        meta,
+                                    ),
+                                );
+                            });
+                        };
+                    }
+
+                    if (prop === "stateFlattenOn") {
+                        return (fieldName: string) => {
+                            const isFiltered = meta?.filtered?.some(
+                                (p) => p.join(".") === path.join("."),
+                            );
+                            const arrayToMap = isFiltered
+                                ? currentState
+                                : getGlobalStore
+                                      .getState()
+                                      .getNestedState(stateKey, path);
+
+                            // ADDED: Clear shape cache for flattening operation
+                            shapeCache.clear();
+                            stateVersion++;
+
+                            const flattenedResults = arrayToMap.flatMap(
+                                (val: any, index: number) => {
+                                    return val[fieldName] ?? [];
+                                },
+                            );
+
+                            return rebuildStateShape(
+                                flattenedResults,
+                                [...path, "[*]", fieldName],
+                                meta,
+                            );
+                        };
+                    }
+
+                    if (prop === "findWith") {
+                        return (
+                            thisKey: keyof InferArrayElement<T>,
+                            thisValue: InferArrayElement<T>[keyof InferArrayElement<T>],
+                        ) => {
+                            const foundIndex = currentState.findIndex(
+                                (obj: any) => obj[thisKey] === thisValue,
+                            );
+                            if (foundIndex === -1) return undefined;
+                            const foundValue = currentState[foundIndex];
+                            const newPath = [...path, foundIndex.toString()];
+                            // console.log(
+                            //     "findWithfindWithfindWithfindWith",
+                            //     stateKey,
+                            //     foundValue,
+                            //     newPath,
+                            // );
+                            shapeCache.clear();
+                            stateVersion++;
+
+                            // ADDED: Clear cache for find operation
+                            shapeCache.clear();
+                            stateVersion++;
+                            // Try returning without spread
+                            return rebuildStateShape(foundValue, newPath);
+                        };
+                    }
+
+                    if (prop === "index") {
+                        return (index: number) => {
+                            const indexValue = currentState[index];
+                            return rebuildStateShape(indexValue, [
+                                ...path,
+                                index.toString(),
+                            ]);
+                        };
+                    }
+
+                    if (prop === "insert") {
+                        return (payload: UpdateArg<T>) => {
+                            // ADDED: Invalidate cache on insert
+                            invalidateCachePath(path);
+                            pushFunc(
+                                effectiveSetState,
+                                payload,
+                                path,
+                                stateKey,
+                            );
+                            return rebuildStateShape(
+                                getGlobalStore.getState().cogsStateStore[
+                                    stateKey
+                                ],
+                                [],
+                            );
+                        };
+                    }
+
+                    if (prop === "uniqueInsert") {
+                        return (
+                            payload: UpdateArg<T>,
+                            fields?: (keyof InferArrayElement<T>)[],
+                        ) => {
+                            const currentArray = getGlobalStore
+                                .getState()
+                                .getNestedState(stateKey, path) as any[];
+                            const newValue = isFunction<T>(payload)
+                                ? payload(currentArray as any)
+                                : (payload as any);
+
+                            const isUnique = !currentArray.some((item) => {
+                                if (fields) {
+                                    return fields.every((field) =>
+                                        isDeepEqual(
+                                            item[field],
+                                            newValue[field],
+                                        ),
+                                    );
+                                }
+                                return isDeepEqual(item, newValue);
+                            });
+
+                            if (isUnique) {
+                                // ADDED: Invalidate cache on unique insert
+                                invalidateCachePath(path);
+                                pushFunc(
+                                    effectiveSetState,
+                                    newValue,
+                                    path,
+                                    stateKey,
+                                );
+                            }
+                        };
+                    }
+
+                    if (prop === "cut") {
+                        return (
+                            index: number,
+                            options?: { waitForSync?: boolean },
+                        ) => {
+                            if (options?.waitForSync) return;
+                            // ADDED: Invalidate cache on cut
+                            invalidateCachePath(path);
+                            cutFunc(effectiveSetState, path, stateKey, index);
+                        };
+                    }
+
+                    if (prop === "stateFilter") {
+                        return (
+                            callbackfn: (
+                                value: InferArrayElement<T>,
+                                index: number,
+                            ) => boolean,
+                        ) => {
+                            const newVal = currentState.map(
+                                (v: any, i: number) => ({
+                                    ...v,
+                                    __origIndex: i.toString(),
+                                }),
+                            );
+
+                            const validIndices: number[] = [];
+                            const filteredArray: Array<InferArrayElement<T>> =
+                                [];
+
+                            for (let i = 0; i < newVal.length; i++) {
+                                if (callbackfn(newVal[i], i)) {
+                                    validIndices.push(i);
+                                    filteredArray.push(newVal[i]);
+                                }
+                            }
+
+                            // ADDED: Clear cache for filter operation
+                            shapeCache.clear();
+                            stateVersion++;
+                            return rebuildStateShape(
+                                filteredArray as any,
+                                path,
+                                {
+                                    filtered: [...(meta?.filtered || []), path],
+                                    validIndices, // Pass through the meta
+                                },
+                            );
+                        };
+                    }
+                }
+                const lastPathElement = path[path.length - 1];
+                if (!isNaN(Number(lastPathElement))) {
+                    const parentPath = path.slice(0, -1);
+                    const parentValue = getGlobalStore
+                        .getState()
+                        .getNestedState(stateKey, parentPath);
+
+                    if (Array.isArray(parentValue) && prop === "cut") {
+                        return () =>
+                            cutFunc(
+                                effectiveSetState,
+                                parentPath,
+                                stateKey,
+                                Number(lastPathElement),
+                            );
+                    }
+                }
+
+                if (prop === "get") {
+                    return () =>
+                        getGlobalStore
+                            .getState()
+                            .getNestedState(stateKey, path);
+                }
+
+                if (prop === "$effect") {
+                    return (fn: any) =>
+                        $cogsSignal({
+                            _stateKey: stateKey,
+                            _path: path,
+                            _effect: fn.toString(),
+                        });
+                }
+
+                if (prop === "$get") {
+                    return () =>
+                        $cogsSignal({
+                            _stateKey: stateKey,
+                            _path: path,
+                        });
+                }
                 if (prop === "lastSynced") {
                     const syncKey = `${stateKey}:${path.join(".")}`;
                     return getGlobalStore.getState().getSyncInfo(syncKey);
@@ -1230,268 +1492,6 @@ function createProxyHandler<T>(
                             />
                         );
                     };
-                }
-
-                if (Array.isArray(currentState)) {
-                    if (prop === "getSelected") {
-                        return () => {
-                            const selectedIndex = selectedIndexMap.get(
-                                path.join("."),
-                            );
-                            if (selectedIndex === undefined) return undefined;
-                            return rebuildStateShape(
-                                currentState[selectedIndex],
-                                [...path, selectedIndex.toString()],
-                                meta,
-                            );
-                        };
-                    }
-                    if (prop === "$effect") {
-                        return (fn: any) =>
-                            $cogsSignal({
-                                _stateKey: stateKey,
-                                _path: path,
-                                _effect: fn.toString(),
-                            });
-                    }
-
-                    if (prop === "$get") {
-                        return () =>
-                            $cogsSignal({
-                                _stateKey: stateKey,
-                                _path: path,
-                            });
-                    }
-
-                    if (prop === "stateEach") {
-                        return (
-                            callbackfn: (
-                                value: InferArrayElement<T>,
-                                setter: StateObject<InferArrayElement<T>>,
-                                index: number,
-                                array: T,
-                                arraySetter: StateObject<T>,
-                            ) => void,
-                        ) => {
-                            const isFiltered = meta?.filtered?.some(
-                                (p) => p.join(".") === path.join("."),
-                            );
-                            const arrayToMap = isFiltered
-                                ? currentState
-                                : getGlobalStore
-                                      .getState()
-                                      .getNestedState(stateKey, path);
-
-                            // ADDED: Clear shape cache for array operations
-                            shapeCache.clear();
-                            stateVersion++;
-
-                            return arrayToMap.map((val: any, index: number) => {
-                                const thisIndex =
-                                    isFiltered && val.__origIndex
-                                        ? val.__origIndex
-                                        : index;
-                                const elementProxy = rebuildStateShape(
-                                    val,
-                                    [...path, thisIndex.toString()],
-                                    meta,
-                                );
-                                return callbackfn(
-                                    val,
-                                    elementProxy,
-                                    index,
-                                    currentState as any,
-                                    rebuildStateShape(
-                                        currentState as any,
-                                        path,
-                                        meta,
-                                    ),
-                                );
-                            });
-                        };
-                    }
-
-                    if (prop === "stateFlattenOn") {
-                        return (fieldName: string) => {
-                            const isFiltered = meta?.filtered?.some(
-                                (p) => p.join(".") === path.join("."),
-                            );
-                            const arrayToMap = isFiltered
-                                ? currentState
-                                : getGlobalStore
-                                      .getState()
-                                      .getNestedState(stateKey, path);
-
-                            // ADDED: Clear shape cache for flattening operation
-                            shapeCache.clear();
-                            stateVersion++;
-
-                            const flattenedResults = arrayToMap.flatMap(
-                                (val: any, index: number) => {
-                                    return val[fieldName] ?? [];
-                                },
-                            );
-
-                            return rebuildStateShape(
-                                flattenedResults,
-                                [...path, "[*]", fieldName],
-                                meta,
-                            );
-                        };
-                    }
-
-                    if (prop === "findWith") {
-                        return (
-                            thisKey: keyof InferArrayElement<T>,
-                            thisValue: InferArrayElement<T>[keyof InferArrayElement<T>],
-                        ) => {
-                            const foundIndex = currentState.findIndex(
-                                (obj: any) => obj[thisKey] === thisValue,
-                            );
-                            if (foundIndex === -1) return undefined;
-                            const foundValue = currentState[foundIndex];
-                            const newPath = [...path, foundIndex.toString()];
-
-                            shapeCache.clear();
-                            stateVersion++;
-
-                            const itemProxy = rebuildStateShape(
-                                foundValue,
-                                newPath,
-                            );
-
-                            // ADDED: Clear cache for find operation
-                            shapeCache.clear();
-                            stateVersion++;
-                            // Try returning without spread
-                            return Object.assign(itemProxy, {
-                                cut: () =>
-                                    cutFunc(
-                                        effectiveSetState,
-                                        path,
-                                        stateKey,
-                                        foundIndex,
-                                    ),
-                            });
-                        };
-                    }
-
-                    if (prop === "index") {
-                        return (index: number) => {
-                            const indexValue = currentState[index];
-                            return rebuildStateShape(indexValue, [
-                                ...path,
-                                index.toString(),
-                            ]);
-                        };
-                    }
-
-                    if (prop === "insert") {
-                        return (payload: UpdateArg<T>) => {
-                            // ADDED: Invalidate cache on insert
-                            invalidateCachePath(path);
-                            pushFunc(
-                                effectiveSetState,
-                                payload,
-                                path,
-                                stateKey,
-                            );
-                            return rebuildStateShape(
-                                getGlobalStore.getState().cogsStateStore[
-                                    stateKey
-                                ],
-                                [],
-                            );
-                        };
-                    }
-
-                    if (prop === "uniqueInsert") {
-                        return (
-                            payload: UpdateArg<T>,
-                            fields?: (keyof InferArrayElement<T>)[],
-                        ) => {
-                            const currentArray = getGlobalStore
-                                .getState()
-                                .getNestedState(stateKey, path) as any[];
-                            const newValue = isFunction<T>(payload)
-                                ? payload(currentArray as any)
-                                : (payload as any);
-
-                            const isUnique = !currentArray.some((item) => {
-                                if (fields) {
-                                    return fields.every((field) =>
-                                        isDeepEqual(
-                                            item[field],
-                                            newValue[field],
-                                        ),
-                                    );
-                                }
-                                return isDeepEqual(item, newValue);
-                            });
-
-                            if (isUnique) {
-                                // ADDED: Invalidate cache on unique insert
-                                invalidateCachePath(path);
-                                pushFunc(
-                                    effectiveSetState,
-                                    newValue,
-                                    path,
-                                    stateKey,
-                                );
-                            }
-                        };
-                    }
-
-                    if (prop === "cut") {
-                        return (
-                            index: number,
-                            options?: { waitForSync?: boolean },
-                        ) => {
-                            if (options?.waitForSync) return;
-                            // ADDED: Invalidate cache on cut
-                            invalidateCachePath(path);
-                            cutFunc(effectiveSetState, path, stateKey, index);
-                        };
-                    }
-
-                    if (prop === "stateFilter") {
-                        return (
-                            callbackfn: (
-                                value: InferArrayElement<T>,
-                                index: number,
-                            ) => boolean,
-                        ) => {
-                            const newVal = currentState.map(
-                                (v: any, i: number) => ({
-                                    ...v,
-                                    __origIndex: i.toString(),
-                                }),
-                            );
-
-                            const validIndices: number[] = [];
-                            const filteredArray: Array<InferArrayElement<T>> =
-                                [];
-
-                            for (let i = 0; i < newVal.length; i++) {
-                                if (callbackfn(newVal[i], i)) {
-                                    validIndices.push(i);
-                                    filteredArray.push(newVal[i]);
-                                }
-                            }
-
-                            // ADDED: Clear cache for filter operation
-                            shapeCache.clear();
-                            stateVersion++;
-                            return rebuildStateShape(
-                                filteredArray as any,
-                                path,
-                                {
-                                    filtered: [...(meta?.filtered || []), path],
-                                    validIndices, // Pass through the meta
-                                },
-                            );
-                        };
-                    }
                 }
 
                 const nextPath = [...path, prop];

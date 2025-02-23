@@ -1,4 +1,5 @@
-import { $cogsSignal } from "../../CogsState";
+
+import ComponentIdRenderer from "../components/ComponentIdRenderer";
 import { FlashWrapper } from "../components/FlashOnUpdate";
 import { useCogsState } from "./state";
 
@@ -10,13 +11,13 @@ export const CartOverviewGet = () => {
     const items = cart.items;
     return (
         <FlashWrapper>
-            {cart._componentId}
-            <h3>Cart ({items.get().length} items)</h3>
-            {items.get().map((item, itemIndex) => {
+            <ComponentIdRenderer componentId={cart._componentId!} />
+            <h3>Cart ({cart.items.get().length} items)</h3>
+            {cart.items.get().map((item, itemIndex) => {
                 const product = products.items.findWith("id", item.productId);
                 return (
                     <div key={item.id}>
-                        {product?.name} - Qty: {item.quantity}
+                        {product?.name.get()} - Qty: {item.quantity}
                         <button
                             onClick={() =>
                                 items
@@ -46,15 +47,14 @@ export const CartOverviewGet = () => {
 export const CartOverview = () => {
     const cart = useCogsState("cart");
     const products = useCogsState("products");
-    console.log("cart", cart.get());
-    const items = cart.items;
 
     return (
         <FlashWrapper>
-            {cart._componentId}
+            <ComponentIdRenderer componentId={cart._componentId!} />
 
-            <h3>Cart ({items.$effect((state) => state.length)} items)</h3>
-            {items.stateEach((item, setter) => {
+            <h3>Cart ({cart.items.$effect((state) => state.length)} items)</h3>
+
+            {cart.items.stateEach((item, setter) => {
                 const product = products.items.findWith("id", item.productId);
                 console.log("product", product.name.get(), item);
                 return (
@@ -62,24 +62,12 @@ export const CartOverview = () => {
                         {product.name.$get()} - Qty: {item.quantity}
                         <button
                             onClick={() =>
-                                items
-                                    .findWith("productId", item.productId)
-                                    .quantity.update((prev) => prev + 1)
+                                setter.quantity.update((prev) => prev + 1)
                             }
                         >
                             +
                         </button>
-                        <button
-                            onClick={
-                                () =>
-                                    items
-                                        .findWith("productId", item.productId)
-                                        .cut()
-                                // or cartUpdater.items.cut(itemIndex)}
-                            }
-                        >
-                            Remove
-                        </button>
+                        <button onClick={() => setter.cut()}>Remove</button>
                     </div>
                 );
             })}
@@ -88,35 +76,31 @@ export const CartOverview = () => {
 };
 export const CartOverviewDep = () => {
     const cart = useCogsState("cart", {
-        reactiveDeps: (state) => [state.total],
+        reactiveDeps: (state) => [state.items],
     });
     const products = useCogsState("products");
 
-    const items = cart.items;
     return (
         <FlashWrapper>
-            {cart._componentId}
-            <h3>Cart ({items.get().length} items)</h3>
-            {items.get().map((item, itemIndex) => {
+            <ComponentIdRenderer componentId={cart._componentId!} />
+            <h3>Cart ({cart.items.get().length} items)</h3>
+            {cart.items.stateEach((item, setter) => {
                 const product = products.items.findWith("id", item.productId);
                 return (
                     <div key={item.id}>
                         {product?.name.get()} - Qty: {item.quantity}
                         <button
                             onClick={() =>
-                                items
-                                    .findWith("productId", item.productId)
-                                    .quantity.update((prev) => prev + 1)
+                                setter.quantity.update((prev) => prev + 1)
                             }
                         >
                             +
                         </button>
                         <button
                             onClick={
-                                () =>
-                                    items
-                                        .findWith("productId", item.productId)
-                                        .cut()
+                                () => {
+                                    setter.cut();
+                                }
                                 // or cartUpdater.items.cut(itemIndex)}
                             }
                         >
