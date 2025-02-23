@@ -216,7 +216,10 @@ export const FormControlComponent = <TStateObject,>({
 
     const timeoutRef = useRef<NodeJS.Timeout>();
 
-    let updater = (payload: UpdateArg<TStateObject>, opts?: UpdateOpts) => {
+    let updater = (
+        payload: UpdateArg<TStateObject>,
+        opts?: UpdateOpts<TStateObject>,
+    ) => {
         setInputValue(payload);
 
         if (timeoutRef.current) {

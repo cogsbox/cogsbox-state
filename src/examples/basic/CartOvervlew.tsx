@@ -52,7 +52,7 @@ export const CartOverview = () => {
                 Cart ({cart.items.$effect((state) => state.length)} items)
             </div>
             <div> £ {cart.total.$get()}</div>
-            {cart.items.$stateMap((item, setter) => {
+            {/* {cart.items.$stateMap((item, setter) => {
                 console.log("products", products);
                 const product = products.items.findWith("id", item.productId);
 
@@ -69,7 +69,7 @@ export const CartOverview = () => {
                         <button onClick={() => setter.cut()}>Remove</button>
                     </div>
                 );
-            })}
+            })} */}
         </FlashWrapper>
     );
 };

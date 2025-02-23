@@ -140,16 +140,20 @@ root.render(<App />);`,
 
     return (
         <SandpackProvider
-            template="react-ts"
+            template="vite-react-ts"
             files={files}
             theme="light"
             customSetup={{
                 dependencies: {
-                    react: "^18.2.0",
-                    "react-dom": "^18.2.0",
                     "cogsbox-state": "latest",
                     zustand: "^5.0.3",
                     uuid: "^9.0.0",
+                    "@trpc/next": "^10.0.0",
+                    "@trpc/client": "^10.0.0",
+                    "@trpc/server": "^10.0.0",
+                    "@trpc/react-query": "^10.0.0",
+                    "@tanstack/react-query": "^4.3.8",
+                    next: "13.0.0",
                 },
                 entry: "/index.tsx", // Add this
             }}
