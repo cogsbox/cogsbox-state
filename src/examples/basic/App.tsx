@@ -71,7 +71,7 @@ export default function App() {
                     </SyntaxHighlighter>
                 </div>
             </div>
-            <LivePreview />
+            {/* <LivePreview /> */}
         </div>
     );
 }
