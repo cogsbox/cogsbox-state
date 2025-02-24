@@ -1,17 +1,20 @@
-export default function CodeLine({
-    code,
-    header,
-}: {
-    code: string;
-    header?: boolean;
-}) {
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+
+export default function CodeLine({ code }: { code: string }) {
     return (
-        <div
-            className={`bg-gray-100 rounded-t-lg h-16 px-2 flex items-center font-bold text-sm py-2  mt-0.5 ${
-                header && "text-xl"
-            }`}
+        <SyntaxHighlighter
+            language="typescript"
+            customStyle={{
+                padding: 4,
+
+                margin: 0,
+                maxWidth: "400px",
+                width: "100%",
+                overflowX: "auto",
+                fontSize: "14px",
+            }}
         >
-            <code>{code}</code>
-        </div>
+            {code}
+        </SyntaxHighlighter>
     );
 }

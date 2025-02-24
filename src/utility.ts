@@ -400,3 +400,30 @@ export function transformStateFunc<State extends unknown>(initialState: State) {
         GenericObject,
     ];
 }
+
+export function debounce<F extends (...args: any[]) => any>(
+    func: (...args: any[]) => any,
+    wait: number,
+): F & { cancel: () => void } {
+    let timeoutID: NodeJS.Timeout | null = null;
+
+    const debounced: any = (...args: Parameters<F>) => {
+        if (timeoutID) {
+            clearTimeout(timeoutID);
+        }
+
+        timeoutID = setTimeout(() => func(...args), wait);
+    };
+
+    debounced.cancel = () => {
+        if (timeoutID) {
+            clearTimeout(timeoutID);
+            timeoutID = null;
+        }
+    };
+
+    return debounced as DebouncedFunction<F>;
+}
+export type DebouncedFunction<F extends (...args: any[]) => any> = F & {
+    cancel: () => void;
+};

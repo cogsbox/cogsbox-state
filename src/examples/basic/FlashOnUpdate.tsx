@@ -3,10 +3,12 @@ import React, { useEffect, useRef, useState } from "react";
 export const FlashWrapper = ({
     children,
     title,
+    color,
     componentId,
 }: {
     children: React.ReactNode;
-    title: string;
+    title: string | React.ReactNode;
+    color: string;
     componentId: string;
 }) => {
     const ref = useRef<HTMLDivElement>(null);
@@ -31,10 +33,14 @@ export const FlashWrapper = ({
             ref={ref}
             className="transition-all duration-500 bg-white rounded-lg font-bold shadow"
         >
-            <div className="flex items-center  bg-sky-500 text-white rounded-t-lg  px-4 w-full  p-2">
+            <div
+                className={`flex items-center ${
+                    color ? color : "bg-white"
+                } text-white rounded-t-lg  px-4 w-full  p-2`}
+            >
                 <div className="text-2xl flex-1"> {title} </div>
 
-                <div className="flex h-full w-[150px]  items-center  justify-center px-2">
+                <div className="flex h-full w-[110px]  items-center  justify-center px-2">
                     Render: <div className="w-2" />
                     <span className="text-2xl ">{renderCountRef.current}</span>
                 </div>

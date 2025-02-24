@@ -73,6 +73,7 @@ export type FormControl<T> = (obj: FormElementParmas<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type UpdateOpts<T> = {
     afterUpdate?: (state: T) => void;
+    debounce?: number;
 };
 export type ObjectEndType<T> = EndType<T> & {
     [K in keyof T]-?: ObjectEndType<T[K]>;

@@ -1,25 +1,26 @@
-import { $cogsSignal as r, $cogsSignalStore as s, addStateOptions as o, createCogsState as a, useCogsStateFn as g } from "./CogsState.jsx";
+import { $cogsSignal as r, $cogsSignalStore as o, addStateOptions as s, createCogsState as a, useCogsStateFn as n } from "./CogsState.jsx";
 import { config as f, useCogsConfig as i } from "./CogsStateClient.jsx";
-import { deleteNestedProperty as p, getArrayLengthDifferences as d, getArrayLengthDifferencesArray as u, getDifferences as y, getDifferencesArray as S, getNestedValue as l, isArray as A, isDeepEqual as D, isFunction as m, isObject as C, transformStateFunc as x, updateNestedProperty as F } from "./utility.js";
+import { debounce as d, deleteNestedProperty as p, getArrayLengthDifferences as u, getArrayLengthDifferencesArray as y, getDifferences as S, getDifferencesArray as l, getNestedValue as A, isArray as D, isDeepEqual as m, isFunction as C, isObject as x, transformStateFunc as F, updateNestedProperty as N } from "./utility.js";
 export {
   r as $cogsSignal,
-  s as $cogsSignalStore,
-  o as addStateOptions,
+  o as $cogsSignalStore,
+  s as addStateOptions,
   f as config,
   a as createCogsState,
+  d as debounce,
   p as deleteNestedProperty,
-  d as getArrayLengthDifferences,
-  u as getArrayLengthDifferencesArray,
-  y as getDifferences,
-  S as getDifferencesArray,
-  l as getNestedValue,
-  A as isArray,
-  D as isDeepEqual,
-  m as isFunction,
-  C as isObject,
-  x as transformStateFunc,
-  F as updateNestedProperty,
+  u as getArrayLengthDifferences,
+  y as getArrayLengthDifferencesArray,
+  S as getDifferences,
+  l as getDifferencesArray,
+  A as getNestedValue,
+  D as isArray,
+  m as isDeepEqual,
+  C as isFunction,
+  x as isObject,
+  F as transformStateFunc,
+  N as updateNestedProperty,
   i as useCogsConfig,
-  g as useCogsStateFn
+  n as useCogsStateFn
 };
 //# sourceMappingURL=index.js.map

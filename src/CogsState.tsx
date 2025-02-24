@@ -12,6 +12,7 @@ import {
 } from "react";
 
 import {
+    debounce,
     getNestedValue,
     isFunction,
     updateNestedProperty,
@@ -158,6 +159,7 @@ export type FormControl<T> = (obj: FormElementParmas<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type UpdateOpts<T> = {
     afterUpdate?: (state: T) => void;
+    debounce?: number;
 };
 export type ObjectEndType<T> = EndType<T> & {
     [K in keyof T]-?: ObjectEndType<T[K]>;
@@ -841,7 +843,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
             const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(thisKey);
-
+            if (stateKey == "products") {
+                console.log("thisKey", thisKey);
+                console.log("stateEntry", stateEntry);
+            }
             if (stateEntry) {
                 for (const [
                     key,
@@ -877,6 +882,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
                     if (!shouldUpdate && reactiveTypes.includes("deps")) {
                         if (component.depsFunction) {
                             const depsResult = component.depsFunction(payload);
+
                             if (typeof depsResult === "boolean") {
                                 if (depsResult) {
                                     shouldUpdate = true;
@@ -884,6 +890,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
                             } else if (
                                 !isDeepEqual(component.deps, depsResult)
                             ) {
+                                console.log(
+                                    "reactiveTypes",
+                                    isDeepEqual(component.deps, depsResult),
+                                    depsResult,
+                                );
                                 component.deps = depsResult;
                                 shouldUpdate = true;
                             }
@@ -1583,8 +1594,23 @@ function createProxyHandler<T>(
                 if (prop === "update") {
                     return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
                         // ADDED: Invalidate cache on update
+                        if (opts?.debounce) {
+                            debounce(() => {
+                                updateFn(effectiveSetState, payload, path, "");
+                                const newValue = getGlobalStore
+                                    .getState()
+                                    .getNestedState(stateKey, path);
+                                if (opts?.afterUpdate)
+                                    opts.afterUpdate(newValue);
+                            }, opts.debounce);
+                        } else {
+                            updateFn(effectiveSetState, payload, path, "");
+                            const newValue = getGlobalStore
+                                .getState()
+                                .getNestedState(stateKey, path);
+                            if (opts?.afterUpdate) opts.afterUpdate(newValue);
+                        }
                         invalidateCachePath(path);
-                        updateFn(effectiveSetState, payload, path, "");
                     };
                 }
 
