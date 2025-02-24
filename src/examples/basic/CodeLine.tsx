@@ -7,7 +7,7 @@ export default function CodeLine({
 }) {
     return (
         <div
-            className={`bg-gray-200 rounded-t-lg  px-2 flex items-center font-bold text-sm py-2  mt-0.5 ${
+            className={`bg-gray-100 rounded-t-lg h-16 px-2 flex items-center font-bold text-sm py-2  mt-0.5 ${
                 header && "text-xl"
             }`}
         >

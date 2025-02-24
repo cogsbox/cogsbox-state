@@ -16,7 +16,12 @@ interface CartItem {
     quantity: number;
     unitPrice: number;
 }
-type Cart = { items: CartItem[]; total: number; isOpen: boolean };
+type Cart = {
+    items: CartItem[];
+    total: number;
+    isOpen: boolean;
+    status: "open" | "closed";
+};
 
 type StateType = {
     products: Products;
@@ -54,6 +59,7 @@ const dbState: StateType = {
         items: [] as CartItem[],
         isOpen: false,
         total: 0,
+        status: "open",
     },
 };
 

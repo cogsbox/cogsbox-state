@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type {
     OptionsType,
+    ReactivityType,
     StateKeys,
     SyncActionsType,
     SyncInfo,
@@ -125,6 +126,7 @@ export type CogsGlobalState = {
                     paths: Set<string>;
                     deps?: any[];
                     depsFunction?: (state: any) => any[] | true;
+                    reactiveType: ReactivityType[] | ReactivityType;
                 }
             >;
         }

@@ -1,11 +1,12 @@
 import React, { useEffect, useRef, useState } from "react";
-import ComponentIdRenderer from "./ComponentIdRenderer";
 
 export const FlashWrapper = ({
     children,
+    title,
     componentId,
 }: {
     children: React.ReactNode;
+    title: string;
     componentId: string;
 }) => {
     const ref = useRef<HTMLDivElement>(null);
@@ -13,29 +14,35 @@ export const FlashWrapper = ({
 
     useEffect(() => {
         if (!ref.current) return;
-        ref.current.style.outline = "8px solid #48f3";
+        ref.current.style.outline = "8px solid red";
+        ref.current.style.backgroundColor = "red";
         renderCountRef.current++;
         const timer = setTimeout(() => {
-            if (ref.current) ref.current.style.outline = "none";
-        }, 300);
+            if (ref.current) {
+                ref.current.style.outline = "none";
+                ref.current.style.backgroundColor = "white";
+            }
+        }, 200);
         return () => clearTimeout(timer);
     });
 
     return (
         <div
             ref={ref}
-            className="transition-all duration-500 bg-white rounded "
+            className="transition-all duration-500 bg-white rounded-lg font-bold shadow"
         >
-            <div className="flex items-center h-10 ">
-                <ComponentIdRenderer componentId={componentId} />
-                <div className="flex h-full w-[200px] text-white items-center bg-blue-400 justify-center p-1 px-2">
+            <div className="flex items-center  bg-sky-500 text-white rounded-t-lg  px-4 w-full  p-2">
+                <div className="text-2xl flex-1"> {title} </div>
+
+                <div className="flex h-full w-[150px]  items-center  justify-center px-2">
                     Render: <div className="w-2" />
-                    <span className="text-2xl font-bold">
-                        {renderCountRef.current}
-                    </span>
+                    <span className="text-2xl ">{renderCountRef.current}</span>
                 </div>
             </div>
-            <div className="p-6">{children}</div>
+            <div className="px-6 py-2 font-normal">
+                {children}{" "}
+                <div className="text-xs text-gray-300 ">{componentId}</div>
+            </div>
         </div>
     );
 };

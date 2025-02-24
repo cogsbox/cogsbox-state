@@ -50,7 +50,7 @@ export type ArrayEndType<TShape extends unknown> = {
     stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(field: K) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
-    uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[]) => void;
+    uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[], onMatch?: (existingItem: any) => any) => void;
     stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
     getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
 } & EndType<TShape> & {
@@ -88,7 +88,7 @@ export type EndType<T, IsArrayElement = false> = {
     formElement: (validationKey: string, control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
     $get: () => T;
-    $effect: <R>(fn: EffectFunction<T, R>) => R;
+    $derive: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -156,6 +156,7 @@ type CookieType<T> = {
     OnUnMountCookie?: Boolean;
 };
 export type CogsCookiesType<T extends string[] = string[]> = CookieType<ArrayToObject<T>>;
+export type ReactivityType = "none" | "component" | "deps" | "all";
 export type OptionsType<T extends unknown = unknown> = {
     serverSync?: ServerSyncType<T>;
     validationKey?: string;
@@ -172,6 +173,7 @@ export type OptionsType<T extends unknown = unknown> = {
     formElements?: FormsElementsType;
     enabledSync?: (state: T) => boolean;
     reactiveDeps?: (state: T) => any[] | true;
+    reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
     initState?: {
         localStorageKey?: string;
@@ -262,7 +264,7 @@ type LocalStorageData<T> = {
     lastSyncedWithServer?: number;
     baseServerState?: T;
 };
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, zodSchema, localStorage, formElements, middleware, reactiveDeps, componentId, initState, syncUpdate, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, zodSchema, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initState, syncUpdate, }?: {
     stateKey?: string;
     componentId?: string;
 } & OptionsType<TStateObject>): [TStateObject, StateObject<TStateObject>];

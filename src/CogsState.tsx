@@ -11,7 +11,12 @@ import {
     type ReactNode,
 } from "react";
 
-import { getNestedValue, isFunction, type GenericObject } from "./utility.js";
+import {
+    getNestedValue,
+    isFunction,
+    updateNestedProperty,
+    type GenericObject,
+} from "./utility.js";
 import {
     cutFunc,
     FormControlComponent,
@@ -121,6 +126,7 @@ export type ArrayEndType<TShape extends unknown> = {
     uniqueInsert: (
         payload: UpdateArg<InferArrayElement<TShape>>,
         fields?: (keyof InferArrayElement<TShape>)[],
+        onMatch?: (existingItem: any) => any,
     ) => void;
     stateFilter: (
         callbackfn: (value: InferArrayElement<TShape>, index: number) => void,
@@ -173,7 +179,7 @@ export type EndType<T, IsArrayElement = false> = {
     ) => JSX.Element;
     get: () => T;
     $get: () => T;
-    $effect: <R>(fn: EffectFunction<T, R>) => R;
+    $derive: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
     showValidationErrors: (ctx: string) => string[];
     setValidation: (ctx: string) => void;
@@ -270,6 +276,7 @@ type CookieType<T> = {
 export type CogsCookiesType<T extends string[] = string[]> = CookieType<
     ArrayToObject<T>
 >;
+export type ReactivityType = "none" | "component" | "deps" | "all";
 
 export type OptionsType<T extends unknown = unknown> = {
     serverSync?: ServerSyncType<T>;
@@ -289,6 +296,7 @@ export type OptionsType<T extends unknown = unknown> = {
     formElements?: FormsElementsType;
     enabledSync?: (state: T) => boolean;
     reactiveDeps?: (state: T) => any[] | true;
+    reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
     initState?: {
         localStorageKey?: string;
@@ -460,6 +468,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
                 localStorage: options?.localStorage,
                 middleware: options?.middleware,
                 enabledSync: options?.enabledSync,
+                reactiveType: options?.reactiveType,
                 reactiveDeps: options?.reactiveDeps,
                 initState: options?.initState,
             },
@@ -593,6 +602,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         formElements,
         middleware,
         reactiveDeps,
+        reactiveType,
         componentId,
         initState,
         syncUpdate,
@@ -610,7 +620,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const componentUpdatesRef = useRef(new Set<string>());
     const componentIdRef = useRef(componentId ?? uuidv4());
     const latestInitialOptionsRef = useRef<any>(null);
-    latestInitialOptionsRef.current = getInitialOptions(thisKey as string); //i have to do this for it to work
+    latestInitialOptionsRef.current = getInitialOptions(thisKey as string);
+
     useEffect(() => {
         if (
             syncUpdate &&
@@ -687,6 +698,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             paths: new Set(),
             deps: [],
             depsFunction: reactiveDeps || undefined,
+            reactiveType: reactiveType ?? ["component", "deps"],
         });
 
         getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
@@ -835,26 +847,51 @@ export function useCogsStateFn<TStateObject extends unknown>(
                     key,
                     component,
                 ] of stateEntry.components.entries()) {
-                    if (
-                        component.depsFunction ||
-                        (component.paths && component.paths.has(pathToCheck))
-                    ) {
+                    let shouldUpdate = false;
+                    const reactiveTypes = Array.isArray(component.reactiveType)
+                        ? component.reactiveType
+                        : [component.reactiveType || "component"];
+
+                    // Skip if reactivity is disabled
+                    if (reactiveTypes.includes("none")) {
+                        continue;
+                    }
+
+                    // Force update if "all" is specified
+                    if (reactiveTypes.includes("all")) {
+                        component.forceUpdate();
+                        continue;
+                    }
+
+                    // Check component-level path reactivity
+                    if (reactiveTypes.includes("component")) {
+                        if (
+                            component.paths &&
+                            component.paths.has(pathToCheck)
+                        ) {
+                            shouldUpdate = true;
+                        }
+                    }
+
+                    // Check dependency-based reactivity
+                    if (!shouldUpdate && reactiveTypes.includes("deps")) {
                         if (component.depsFunction) {
                             const depsResult = component.depsFunction(payload);
-
                             if (typeof depsResult === "boolean") {
                                 if (depsResult) {
-                                    component.forceUpdate();
+                                    shouldUpdate = true;
                                 }
                             } else if (
                                 !isDeepEqual(component.deps, depsResult)
                             ) {
                                 component.deps = depsResult;
-                                component.forceUpdate();
+                                shouldUpdate = true;
                             }
-                        } else {
-                            component.forceUpdate();
                         }
+                    }
+
+                    if (shouldUpdate) {
+                        component.forceUpdate();
                     }
                 }
             }
@@ -907,7 +944,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
             );
 
             if (middleware) {
-                middleware({ updateLog: stateLog, update: newUpdate });
+                middleware({
+                    updateLog: stateLog,
+                    update: newUpdate,
+                });
             }
             if (latestInitialOptionsRef.current?.serverSync) {
                 const serverStateStore =
@@ -1112,6 +1152,7 @@ function createProxyHandler<T>(
                         }
                     }
                 }
+
                 if (Array.isArray(currentState)) {
                     if (prop === "getSelected") {
                         return () => {
@@ -1126,9 +1167,7 @@ function createProxyHandler<T>(
                             );
                         };
                     }
-                    if (stateKey == "cart") {
-                        console.log("get222222", prop, path);
-                    }
+
                     if (prop === "stateMap" || prop === "stateMapNoRender") {
                         return (
                             callbackfn: (
@@ -1289,6 +1328,7 @@ function createProxyHandler<T>(
                         return (
                             payload: UpdateArg<T>,
                             fields?: (keyof InferArrayElement<T>)[],
+                            onMatch?: (existingItem: any) => any,
                         ) => {
                             const currentArray = getGlobalStore
                                 .getState()
@@ -1297,26 +1337,47 @@ function createProxyHandler<T>(
                                 ? payload(currentArray as any)
                                 : (payload as any);
 
+                            let matchedItem: any = null;
                             const isUnique = !currentArray.some((item) => {
                                 if (fields) {
-                                    return fields.every((field) =>
+                                    const isMatch = fields.every((field) =>
                                         isDeepEqual(
                                             item[field],
                                             newValue[field],
                                         ),
                                     );
+                                    if (isMatch) {
+                                        matchedItem = item;
+                                    }
+                                    return isMatch;
                                 }
-                                return isDeepEqual(item, newValue);
+                                const isMatch = isDeepEqual(item, newValue);
+                                if (isMatch) {
+                                    matchedItem = item;
+                                }
+                                return isMatch;
                             });
 
                             if (isUnique) {
-                                // ADDED: Invalidate cache on unique insert
                                 invalidateCachePath(path);
                                 pushFunc(
                                     effectiveSetState,
                                     newValue,
                                     path,
                                     stateKey,
+                                );
+                            } else if (onMatch && matchedItem) {
+                                const updatedItem = onMatch(matchedItem);
+                                const updatedArray = currentArray.map((item) =>
+                                    isDeepEqual(item, matchedItem)
+                                        ? updatedItem
+                                        : item,
+                                );
+                                invalidateCachePath(path);
+                                updateFn(
+                                    effectiveSetState,
+                                    updatedArray as any,
+                                    path,
                                 );
                             }
                         };
@@ -1397,8 +1458,16 @@ function createProxyHandler<T>(
                             .getState()
                             .getNestedState(stateKey, path);
                 }
+                if (prop === "$derive") {
+                    return (fn: any) =>
+                        $cogsSignal({
+                            _stateKey: stateKey,
+                            _path: path,
+                            _effect: fn.toString(),
+                        });
+                }
 
-                if (prop === "$effect") {
+                if (prop === "$derive") {
                     return (fn: any) =>
                         $cogsSignal({
                             _stateKey: stateKey,

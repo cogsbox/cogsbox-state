@@ -1,4 +1,4 @@
-import { OptionsType, StateKeys, SyncActionsType, SyncInfo, UpdateTypeDetail } from './CogsState.js';
+import { OptionsType, ReactivityType, StateKeys, SyncActionsType, SyncInfo, UpdateTypeDetail } from './CogsState.js';
 
 type StateUpdater<StateValue> = StateValue | ((prevValue: StateValue) => StateValue);
 export type FreshValuesObject = {
@@ -97,6 +97,7 @@ export type CogsGlobalState = {
             paths: Set<string>;
             deps?: any[];
             depsFunction?: (state: any) => any[] | true;
+            reactiveType: ReactivityType[] | ReactivityType;
         }>;
     }>;
     syncInfoStore: Map<string, SyncInfo>;
