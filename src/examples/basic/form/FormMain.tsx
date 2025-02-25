@@ -5,8 +5,8 @@ import { useCogsState } from "./state";
 export default function FormsMain() {
     const [activeTab, setActiveTab] = useState("description");
     const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
-    const user = useCogsState("user");
-
+    const user = useCogsState("user", { reactiveType: ["all"] });
+    console.log("dsadsadasdasdasd");
     const addNewAddress = () => {
         user.addresses.insert({
             street: "",
@@ -446,7 +446,7 @@ export default function FormsMain() {
                                                                     index
                                                                 )
                                                             }
-                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm
+                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer
                               ${
                                   currentAddressIndex === index
                                       ? "bg-orange-500 text-white"
@@ -500,6 +500,8 @@ user.addresses.index(${currentAddressIndex}).street.formElement((params) => (
                                             </div>
 
                                             {/* Street Field */}
+                                            {/* Street Field */}
+
                                             {user.addresses
                                                 .index(currentAddressIndex)
                                                 .street.formElement(

@@ -138,19 +138,25 @@ export const useStoreSubscription = <T,>(
         selector(getGlobalStore.getState(), fullPath),
     );
     const previousValueRef = useRef<T>(value);
-
+    const fullPathRef = useRef(fullPath);
     useEffect(() => {
-        const unsubscribe = getGlobalStore.subscribe((store) => {
-            const newValue = selector(store, fullPath);
+        fullPathRef.current = fullPath; // Ensure latest fullPath is always used
+
+        setValue(selector(getGlobalStore.getState(), fullPath));
+
+        const callback = (store: any) => {
+            const newValue = selector(store, fullPathRef.current);
+
             if (!compare(previousValueRef.current, newValue)) {
                 previousValueRef.current = newValue;
                 setValue(newValue);
             }
-        });
-
-        return () => unsubscribe();
+        };
+        const unsubscribe = getGlobalStore.subscribe(callback);
+        return () => {
+            unsubscribe();
+        };
     }, [fullPath]);
-
     return value;
 };
 export const useGetValidationErrors = (
@@ -209,7 +215,9 @@ export const FormControlComponent = <TStateObject,>({
     const [inputValue, setInputValue] = useState<any>(
         getGlobalStore.getState().getNestedState(stateKey, path),
     );
-
+    if (path.includes("street")) {
+        console.log("d123123123", path, stateValue, inputValue);
+    }
     const initialOptions = getInitialOptions(stateKey);
     if (!initialOptions?.validationKey) {
         throw new Error(
@@ -254,6 +262,7 @@ export const FormControlComponent = <TStateObject,>({
               date: new Date(rawSyncStatus.timeStamp),
           }
         : null;
+
     const childElement = child({
         get: () =>
             inputValue ||
@@ -275,7 +284,8 @@ export const FormControlComponent = <TStateObject,>({
     });
 
     return (
-        <>
+        <div key={"dsads" + path.join(".")}>
+            {path.join(".")}
             <ValidationWrapper
                 {...{
                     formOpts,
@@ -286,7 +296,7 @@ export const FormControlComponent = <TStateObject,>({
             >
                 {childElement}
             </ValidationWrapper>
-        </>
+        </div>
     );
 };
 
@@ -332,6 +342,8 @@ export function ValidationWrapper({
                 thisStateOpts.formElements!.validation!({
                     children: (
                         <React.Fragment key={path.toString()}>
+                            {" "}
+                            {path.toString()}
                             {children}
                         </React.Fragment>
                     ),
