@@ -87,7 +87,7 @@ export type EndType<T, IsArrayElement = false> = {
     update: UpdateType<T>;
     _path: string[];
     _stateKey: string;
-    formElement: (validationKey: string, control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
+    formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
@@ -258,7 +258,6 @@ export type TransformedStateType<T> = {
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, zodSchema }: OptionsType<T>): T;
 export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opts?: {
     reRenderType?: "get" | "state" | "none";
-    validationKey?: string;
 }) => {
     useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;

@@ -1,4 +1,4 @@
-import { createCogsState } from "../../CogsState";
+import { createCogsState } from "../../../CogsState";
 
 type StateType = {
     products: {

@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
-import CodeLine from "./CodeLine";
-import { FlashWrapper } from "./FlashOnUpdate";
+import CodeLine from "../CodeLine";
+import { FlashWrapper } from "../FlashOnUpdate";
 import { useCogsState } from "./state";
 
 // CartOverviewGet.tsx

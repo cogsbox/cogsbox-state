@@ -174,11 +174,7 @@ export type EndType<T, IsArrayElement = false> = {
     update: UpdateType<T>;
     _path: string[];
     _stateKey: string;
-    formElement: (
-        validationKey: string,
-        control: FormControl<T>,
-        opts?: FormOptsType,
-    ) => JSX.Element;
+    formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
@@ -439,7 +435,7 @@ function setOptions<StateKey, Opt>({
 
 export const createCogsState = <State extends Record<string, unknown>>(
     initialState: State,
-    opts?: { reRenderType?: "get" | "state" | "none"; validationKey?: string },
+    opts?: { reRenderType?: "get" | "state" | "none" },
 ) => {
     let newInitialState = initialState;
 
@@ -456,7 +452,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         const [componentId] = useState(options?.componentId ?? uuidv4());
         setOptions({
             stateKey,
-            options: { ...options, validationKey: opts?.validationKey },
+            options,
             initialOptionsPart,
         });
 

@@ -8,10 +8,11 @@ import {
     CartOverviewFully,
     CartOverviewGet,
 } from "./CartOvervlew";
+
 import { TriangleAlert } from "lucide-react";
 import { useCogsState } from "./state";
-import CodeLine from "./CodeLine";
-import { FlashWrapper } from "./FlashOnUpdate";
+import CodeLine from "../CodeLine";
+import { FlashWrapper } from "../FlashOnUpdate";
 // Code for individual components - minimal examples
 const fullyReactiveCode = `export const CartOverviewFully = () => {
     // Fully reactive - re-renders on any state changes
@@ -455,7 +456,7 @@ function TabbedSection() {
 }
 
 // Modified App component with code toggles
-export default function App() {
+export default function ReactiveMain() {
     return (
         <div className="flex flex-col items-center justify-center w-full">
             <div className="h-6" />
