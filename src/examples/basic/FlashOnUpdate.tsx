@@ -45,7 +45,7 @@ export const FlashWrapper = ({
                     <span className="text-2xl ">{renderCountRef.current}</span>
                 </div>
             </div>
-            <div className="px-6 py-2 font-normal">
+            <div className="px-8 py-4 font-normal">
                 {children}{" "}
                 <div className="text-xs text-gray-300 ">{componentId}</div>
             </div>

@@ -466,7 +466,7 @@ export default function ReactiveMain() {
                         {" "}
                         <TabbedSection />
                     </div>{" "}
-                    <div className="rounded-lg border-2 border-orange-500 w-[400px] bg-white">
+                    <div className=" shadow rounded-lg w-[400px] bg-white">
                         <ProductList />
                     </div>
                     <div className="flex flex-col gap-2 w-[500px]">

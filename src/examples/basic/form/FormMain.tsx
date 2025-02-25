@@ -1,12 +1,14 @@
 import React, { useState } from "react";
 import { useCogsState } from "./state";
+import { Code } from "lucide-react";
+import CodeLine from "../CodeLine";
 
 // Main Form Example Component
 export default function FormsMain() {
     const [activeTab, setActiveTab] = useState("description");
     const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
-    const user = useCogsState("user", { reactiveType: ["all"] });
-    console.log("dsadsadasdasdasd");
+    const user = useCogsState("user");
+
     const addNewAddress = () => {
         user.addresses.insert({
             street: "",
@@ -72,8 +74,8 @@ export default function FormsMain() {
                                         <h3 className="font-medium text-blue-800 mb-2">
                                             Basic Usage
                                         </h3>
-                                        <pre className="text-xs bg-gray-800 text-white p-3 rounded">
-                                            {`// Basic usage with get/set
+                                        <CodeLine
+                                            code={`// Basic usage with get/set
 {stateObject.field.formElement((params) => (
   <input 
     value={params.get()}
@@ -93,7 +95,7 @@ export default function FormsMain() {
   validation: { message: "Field is required" },
   debounceTime: 300
 })}`}
-                                        </pre>
+                                        />
                                     </div>
 
                                     {/* params.get() */}
@@ -224,203 +226,127 @@ export default function FormsMain() {
                                     Personal Information
                                 </h3>
 
-                                {/* First Name Field */}
-                                <div className="grid grid-cols-2 gap-4 items-start">
-                                    <div className="text-sm bg-gray-100 p-3 rounded">
-                                        <div className="font-medium">
-                                            First Name
-                                        </div>
-                                        <pre className="text-xs mt-2 overflow-auto">
-                                            {`user.firstName.formElement((params) => (
-  <input
-    value={params.get()}
-    onChange={(e) => params.set(e.target.value)}
-  />
-))`}
-                                        </pre>
-                                    </div>
-
-                                    <div>
-                                        {user.firstName.formElement(
-                                            (params) => (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">
-                                                        First Name
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
-                                                        value={params.get()}
-                                                        onChange={(e) =>
-                                                            params.set(
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            ),
-                                            {
-                                                validation: {
-                                                    message:
-                                                        "First name is required",
-                                                },
-                                            }
-                                        )}
-                                    </div>
+                                <div>
+                                    {user.firstName.formElement(
+                                        (params) => (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    First Name
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    value={params.get()}
+                                                    onChange={(e) =>
+                                                        params.set(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        ),
+                                        {
+                                            validation: {
+                                                message:
+                                                    "First name is required",
+                                            },
+                                        }
+                                    )}
                                 </div>
 
-                                {/* Last Name Field */}
-                                <div className="grid grid-cols-2 gap-4 items-start">
-                                    <div className="text-sm bg-gray-100 p-3 rounded">
-                                        <div className="font-medium">
-                                            Last Name
-                                        </div>
-                                        <pre className="text-xs mt-2 overflow-auto">
-                                            {`user.lastName.formElement((params) => (
-  <input
-    value={params.get()}
-    onChange={(e) => params.set(e.target.value)}
-  />
-))`}
-                                        </pre>
-                                    </div>
-
-                                    <div>
-                                        {user.lastName.formElement(
-                                            (params) => (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">
-                                                        Last Name
-                                                    </label>
-                                                    <input
-                                                        type="text"
-                                                        className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
-                                                        value={params.get()}
-                                                        onChange={(e) =>
-                                                            params.set(
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            ),
-                                            {
-                                                validation: {
-                                                    message:
-                                                        "Last name is required",
-                                                },
-                                            }
-                                        )}
-                                    </div>
+                                <div>
+                                    {user.lastName.formElement(
+                                        (params) => (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Last Name
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    value={params.get()}
+                                                    onChange={(e) =>
+                                                        params.set(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        ),
+                                        {
+                                            validation: {
+                                                message:
+                                                    "Last name is required",
+                                            },
+                                        }
+                                    )}
                                 </div>
 
-                                {/* Email Field with inputProps */}
-                                <div className="grid grid-cols-2 gap-4 items-start">
-                                    <div className="text-sm bg-gray-100 p-3 rounded">
-                                        <div className="font-medium">
-                                            Email with inputProps
-                                        </div>
-                                        <pre className="text-xs mt-2 overflow-auto">
-                                            {`user.email.formElement((params) => (
-  <input
-    {...params.inputProps}
-    type="email"
-  />
-))`}
-                                        </pre>
-                                    </div>
-
-                                    <div>
-                                        {user.email.formElement(
-                                            (params) => (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">
-                                                        Email Address
-                                                    </label>
-                                                    <input
-                                                        {...params.inputProps}
-                                                        type="email"
-                                                        className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
-                                                    />
-                                                </div>
-                                            ),
-                                            {
-                                                validation: {
-                                                    message:
-                                                        "Please enter a valid email address",
-                                                },
-                                                debounceTime: 500,
-                                            }
-                                        )}
-                                    </div>
+                                <div>
+                                    {user.email.formElement(
+                                        (params) => (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Email Address
+                                                </label>
+                                                <input
+                                                    {...params.inputProps}
+                                                    type="email"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                />
+                                            </div>
+                                        ),
+                                        {
+                                            validation: {
+                                                message:
+                                                    "Please enter a valid email address",
+                                            },
+                                        }
+                                    )}
                                 </div>
 
-                                {/* Phone Field with validation errors */}
-                                <div className="grid grid-cols-2 gap-4 items-start">
-                                    <div className="text-sm bg-gray-100 p-3 rounded">
-                                        <div className="font-medium">
-                                            Phone with Validation
-                                        </div>
-                                        <pre className="text-xs mt-2 overflow-auto">
-                                            {`user.phone.formElement((params) => (
-  <>
-    <input value={params.get()} onChange={...} />
-    {params.validationErrors().length > 0 && (
-      <div className="error">
-        {params.validationErrors().join(', ')}
-      </div>
-    )}
-  </>
-))`}
-                                        </pre>
-                                    </div>
-
-                                    <div>
-                                        {user.phone.formElement(
-                                            (params) => (
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700">
-                                                        Phone Number
-                                                    </label>
-                                                    <input
-                                                        type="tel"
-                                                        className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
-                                                        value={params.get()}
-                                                        onChange={(e) =>
-                                                            params.set(
-                                                                e.target.value
-                                                            )
-                                                        }
-                                                        placeholder="(555) 123-4567"
-                                                    />
-                                                    {params.validationErrors()
-                                                        .length > 0 && (
-                                                        <div className="text-xs text-red-500 mt-1">
-                                                            {params
-                                                                .validationErrors()
-                                                                .join(", ")}
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            ),
-                                            {
-                                                validation: {
-                                                    message:
-                                                        "Please enter a valid phone number",
-                                                },
-                                            }
-                                        )}
-                                    </div>
+                                <div>
+                                    {user.phone.formElement(
+                                        (params) => (
+                                            <div>
+                                                <label className="block text-sm font-medium text-gray-700">
+                                                    Phone Number
+                                                </label>
+                                                <input
+                                                    type="tel"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    value={params.get()}
+                                                    onChange={(e) =>
+                                                        params.set(
+                                                            e.target.value
+                                                        )
+                                                    }
+                                                    placeholder="(555) 123-4567"
+                                                />
+                                                {params.validationErrors()
+                                                    .length > 0 && (
+                                                    <div className="text-xs text-red-500 mt-1">
+                                                        {params
+                                                            .validationErrors()
+                                                            .join(", ")}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ),
+                                        {
+                                            validation: {
+                                                message:
+                                                    "Please enter a valid phone number",
+                                            },
+                                        }
+                                    )}
                                 </div>
                             </div>
 
                             {/* Address Form */}
                             <div>
-                                <div className="bg-orange-100 p-4 rounded-lg border-l-4 border-orange-500 mb-4">
+                                <div className=" p-4 rounded-lg  mb-4">
                                     <div className="flex justify-between items-center">
-                                        <h3 className="font-medium text-orange-800">
-                                            Address Information
-                                        </h3>
                                         <button
                                             onClick={addNewAddress}
                                             className="px-3 py-1 bg-orange-500 text-white text-sm rounded hover:bg-orange-600"
@@ -433,7 +359,7 @@ export default function FormsMain() {
                                     {user.addresses.get().length > 0 && (
                                         <div className="mt-4 flex items-center">
                                             <div className="text-sm text-orange-800 font-medium mr-2">
-                                                Select Address:
+                                                Addresses
                                             </div>
                                             <div className="flex space-x-2">
                                                 {user.addresses
@@ -446,7 +372,7 @@ export default function FormsMain() {
                                                                     index
                                                                 )
                                                             }
-                                                            className={`w-8 h-8 rounded-full flex items-center justify-center text-sm cursor-pointer
+                                                            className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
                               ${
                                   currentAddressIndex === index
                                       ? "bg-orange-500 text-white"
@@ -486,22 +412,6 @@ export default function FormsMain() {
                                 {user.addresses.get().length > 0 && (
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-1 gap-4">
-                                            {/* Using stateMap with formElement */}
-                                            <div className="text-sm bg-gray-100 p-3 rounded mb-4">
-                                                <div className="font-medium">
-                                                    Array with formElement
-                                                </div>
-                                                <pre className="text-xs mt-2 overflow-auto">
-                                                    {`// Access array elements with index
-user.addresses.index(${currentAddressIndex}).street.formElement((params) => (
-  <input value={params.get()} onChange={...} />
-))`}
-                                                </pre>
-                                            </div>
-
-                                            {/* Street Field */}
-                                            {/* Street Field */}
-
                                             {user.addresses
                                                 .index(currentAddressIndex)
                                                 .street.formElement(
@@ -683,50 +593,31 @@ user.addresses.index(${currentAddressIndex}).street.formElement((params) => (
                                                         </div>
                                                     )
                                                 )}
-
-                                            {/* Using stateMap with formElement */}
-                                            <div className="text-sm bg-gray-100 p-3 rounded mt-4">
-                                                <div className="font-medium">
-                                                    Alternative: Using stateMap
-                                                </div>
-                                                <pre className="text-xs mt-2 overflow-auto">
-                                                    {`// Iterate through all addresses
-user.addresses.stateMap((address, addressSetter, index) => (
-  <div key={index}>
-    {addressSetter.street.formElement((params) => (
-      <input value={params.get()} onChange={...} />
-    ))}
-  </div>
-))`}
-                                                </pre>
-                                            </div>
                                         </div>
                                     </div>
                                 )}
                             </div>
 
                             {/* Form Actions */}
-                            <div className="mt-4 flex justify-end space-x-4">
+                            <div className="mt-4 flex justify-end space-x-4 ">
+                                <CodeLine
+                                    code={`user.revertToInitialState()`}
+                                />
                                 <button
                                     type="button"
                                     className="px-4 py-2 border-2 border-orange-500 text-orange-700 rounded-md hover:bg-orange-50"
-                                    onClick={() =>
-                                        user.revertToInitialState({
-                                            validationKey: "formValidation",
-                                        })
-                                    }
+                                    onClick={() => user.revertToInitialState()}
                                 >
                                     Reset Form
                                 </button>
-
-                                <button
-                                    type="button"
-                                    className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
-                                    onClick={() => setActiveTab("json")}
-                                >
-                                    View JSON
-                                </button>
                             </div>
+                            <button
+                                type="button"
+                                className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
+                                onClick={() => setActiveTab("json")}
+                            >
+                                View JSON
+                            </button>
                         </div>
                     </div>
                 </div>

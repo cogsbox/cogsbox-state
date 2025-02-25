@@ -215,9 +215,7 @@ export const FormControlComponent = <TStateObject,>({
     const [inputValue, setInputValue] = useState<any>(
         getGlobalStore.getState().getNestedState(stateKey, path),
     );
-    if (path.includes("street")) {
-        console.log("d123123123", path, stateValue, inputValue);
-    }
+
     const initialOptions = getInitialOptions(stateKey);
     if (!initialOptions?.validationKey) {
         throw new Error(
@@ -284,8 +282,7 @@ export const FormControlComponent = <TStateObject,>({
     });
 
     return (
-        <div key={"dsads" + path.join(".")}>
-            {path.join(".")}
+        <>
             <ValidationWrapper
                 {...{
                     formOpts,
@@ -296,7 +293,7 @@ export const FormControlComponent = <TStateObject,>({
             >
                 {childElement}
             </ValidationWrapper>
-        </div>
+        </>
     );
 };
 
@@ -342,8 +339,6 @@ export function ValidationWrapper({
                 thisStateOpts.formElements!.validation!({
                     children: (
                         <React.Fragment key={path.toString()}>
-                            {" "}
-                            {path.toString()}
                             {children}
                         </React.Fragment>
                     ),
