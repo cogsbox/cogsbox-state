@@ -28,13 +28,13 @@ const initialState: StateType = {
     user: {
         firstName: "John",
         lastName: "Doe",
-        email: "john.doe@example.com",
+        email: "",
         phone: "(555) 123-4567",
         addresses: [
             {
                 street: "123 Main St",
                 city: "Anytown",
-                state: "CA",
+                state: "",
                 zipCode: "12345",
                 country: "USA",
                 isDefault: true,
