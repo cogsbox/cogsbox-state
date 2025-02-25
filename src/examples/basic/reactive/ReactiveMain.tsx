@@ -40,7 +40,7 @@ const componentReactiveCode = `export const CartOverviewGet = () => {
     const cart = useCogsState("cart");
     
     return (
-      <div className="p-4 rounded bg-amber-500">
+      <div className="p-4 rounded bg-amber-400">
         <h3>Component Reactive</h3>
         <div className="flex justify-between">
           <div>Items: {cart.items.get().length}</div>
@@ -84,7 +84,7 @@ const signalBasedCode = `export const CartOverview = () => {
     );
   };`;
 
-const CartComponentsDescription = () => {
+const CartComponentsTypes = () => {
   return (
     <div className="bg-white rounded-lg p-6 w-full space-y-6 text-gray-600">
       <p className="mb-4">
@@ -144,6 +144,13 @@ const CartComponentsDescription = () => {
           </div>
         </div>{" "}
       </div>
+    </div>
+  );
+};
+
+const CartComponentsDescription = () => {
+  return (
+    <div className="bg-white rounded-lg p-6 w-full space-y-6 text-gray-600">
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
           <div className="rounded-full h-6 w-6 bg-gray-500" /> Fully Reactive
@@ -152,7 +159,7 @@ const CartComponentsDescription = () => {
       </div>
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
-          <div className="rounded-full h-6 w-6 bg-amber-500" /> Component
+          <div className="rounded-full h-6 w-6 bg-amber-400" /> Component
           Reactive
         </h2>
         <p>
@@ -168,16 +175,16 @@ const CartComponentsDescription = () => {
           Dependencies
         </h2>
         <p>
-          A more optimized approach where you specify exactly which parts of the
-          state should cause re-renders using reactiveDeps.
+          A different but maybe mroe risky approach where you specify exactly
+          which parts of the state should cause re-renders using reactiveDeps.
         </p>
         <p>
           <span className="text-red-500">
             <TriangleAlert size={24} className="inline-block" />
-            This approach has risks. If you update a property price, it won't
-            update the component because the price of the products state is
-            never directly used in the component. The total price of the cart is
-            derived in the initial form.
+            If you update a property price, it won't update the component
+            because the price of the products state is never directly used in
+            the component. The total price of the cart is derived in the initial
+            form.
             <TriangleAlert size={24} className="inline-block" />
           </span>
         </p>
@@ -248,7 +255,7 @@ function ComponentList() {
                   componentData.forceUpdate();
                 }
               }}
-              className="block w-full text-left p-2 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 hover:border-gray-300 cursor-pointer"
+              className="block w-full text-left p-2 bg-amber-50 hover:bg-gray-100 rounded border border-amber-500 hover:border-amber-500 cursor-pointer"
             >
               {componentId.split("/").pop()}
             </button>
@@ -317,7 +324,7 @@ const ComponentCodeView = () => {
       {/* Component Reactive */}
       <div className="mb-8">
         <h3 className="text-lg font-semibold text-gray-800 mb-3 flex items-center gap-2">
-          <div className="rounded-full h-6 w-6 bg-amber-500" />
+          <div className="rounded-full h-6 w-6 bg-amber-400" />
           Component Reactive
         </h3>
         <div className="bg-gray-900 rounded-lg overflow-auto">
@@ -382,12 +389,23 @@ const ComponentCodeView = () => {
 };
 
 function TabbedSection() {
-  const [tab, setTab] = useState<"description" | "json" | "component" | "code">(
-    "description"
-  );
+  const [tab, setTab] = useState<
+    "types" | "description" | "json" | "component" | "code"
+  >("description");
   return (
     <div className=" flex flex-col gap-1">
       <div className="flex border-b border-gray-200">
+        {" "}
+        <button
+          className={`px-4 py-2 text-sm font-medium cursor-pointer ${
+            tab === "types"
+              ? "text-blue-600 border-b-2 border-blue-500"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setTab("types")}
+        >
+          Types
+        </button>
         <button
           className={`px-4 py-2 text-sm font-medium cursor-pointer ${
             tab === "description"
@@ -428,7 +446,8 @@ function TabbedSection() {
         >
           Component Code
         </button>
-      </div>
+      </div>{" "}
+      {tab === "types" && <CartComponentsTypes />}
       {tab === "description" && <CartComponentsDescription />}
       {tab === "component" && <ComponentTriggers />}
       {tab === "json" && <JSONView />}
@@ -448,11 +467,11 @@ export default function ReactiveMain() {
             {" "}
             <TabbedSection />
           </div>{" "}
-          <div className=" shadow rounded-lg w-[400px] bg-white">
+          <div className="flex flex-col gap-2 shadow rounded-lg w-[500px] bg-white">
             <ProductList />
+            <CartOverviewFully />
           </div>
           <div className="flex flex-col gap-2 w-[500px]">
-            <CartOverviewFully />
             <CartOverviewGet />
             <CartOverviewDep />
             <CartOverview />

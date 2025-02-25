@@ -53,30 +53,27 @@ const CodeExampleDropdown = () => {
   </div>
 ))}`;
       case "lastName":
-        return `{user.lastName.formElement(
-  (params) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700">
-        Last Name
-      </label>
-      <input
-        type="text"
-        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-        {...params.inputProps}
-      />
-      {params.validationErrors().map((error, index) => (
-        <div key={index} className="text-red-500">
-          <TriangleIcon className="inline-block" />
+        return `       
+    {user.lastName.formElement(
+    (params) => (
+        <div>
+        <label className="block text-sm font-medium text-gray-700">
+            Last Name
+        </label>
+        <input
+            type="text"
+            className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+            {...params.inputProps}
+        />
         </div>
-      ))}
-    </div>
-  ),
-  {
-    validation: {
-      hideMessage: true,
-    },
-  }
-)}`;
+    ),
+    {
+        validation: {
+        message: "Please enter your last name",
+        },
+    }
+    )}
+    `;
       case "email":
         return `{user.email.formElement(
   (params) => (

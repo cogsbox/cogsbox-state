@@ -10,7 +10,7 @@ export const CartOverviewGet = () => {
 
   return (
     <FlashWrapper
-      color="bg-amber-500"
+      color="bg-amber-400"
       componentId={cart._componentId!}
       title="Component Reactive"
     >
@@ -52,7 +52,7 @@ export const CartOverviewDep = () => {
       componentId={cart._componentId!}
       title={
         <div className="flex gap-2">
-          <div className="flex w-8 h-8 items-center justify-center rounded-lg bg-red-500 p-1">
+          <div className="flex w-6 h-6 items-center justify-center rounded-lg bg-red-500 p-1">
             <TriangleAlert size={30} className="inline-block" />{" "}
           </div>
           Reactive Dependencies
@@ -154,7 +154,10 @@ export const CartOverview = () => {
       <div className="flex flex-col gap-2 w-full">
         <div className="flex w-full">
           <div className="w-3/4">
-            <CodeLine code={`cart.items.$derive((state) => state.length)`} />
+            <CodeLine
+              code={`cart.items.$derive((state) => 
+    state.length)`}
+            />
           </div>
           <div className="w-1/4 p-1 px-4 text-white  bg-blue-500 rounded">
             {cart.items.$derive((state) => state.length || 0) || "0"} items

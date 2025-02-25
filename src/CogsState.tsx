@@ -661,7 +661,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId
       );
     }
-    notifyComponents(thisKey);
+    forceUpdate({});
   }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
@@ -691,7 +691,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
 
     getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-
+    forceUpdate({});
     return () => {
       const depsKey = `${thisKey}////${componentIdRef.current}`;
 
@@ -821,7 +821,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           ? path.join(".")
           : [...path].slice(0, -1).join(".");
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-      if (stateKey == "products") {
+      if (stateKey == "cart") {
         console.log("thisKey", thisKey);
         console.log("stateEntry", stateEntry);
       }
@@ -852,13 +852,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
               shouldUpdate = true;
             }
           }
-          console.log(
-            "reactiveTypes",
-            key,
-            component,
-            reactiveTypes,
-            shouldUpdate
-          );
+
           // Check dependency-based reactivity
           if (!shouldUpdate && reactiveTypes.includes("deps")) {
             if (component.depsFunction) {
@@ -869,13 +863,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
                   shouldUpdate = true;
                 }
               } else if (!isDeepEqual(component.deps, depsResult)) {
-                console.log(
-                  "reactiveTypes",
-                  component.deps,
-                  depsResult,
-                  isDeepEqual(component.deps, depsResult),
-                  depsResult
-                );
                 component.deps = depsResult;
                 shouldUpdate = true;
               }
@@ -1137,15 +1124,16 @@ function createProxyHandler<T>(
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
-
+          console.log("component ", fullComponentId);
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
-
+            console.log("component ", stateKey, fullComponentId, stateEntry);
             if (component) {
               // Only add paths for non-root or specifically for get() at root
               if (path.length > 0 || prop === "get") {
                 component.paths.add(currentPath);
               }
+            } else {
             }
           }
         }

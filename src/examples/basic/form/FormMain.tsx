@@ -33,7 +33,7 @@ export default function FormsMain() {
             {/* Tabs Navigation */}
             <div className="flex border-b border-gray-200 mb-6">
               <button
-                className={`px-4 py-2 text-sm font-medium ${
+                className={`px-4 py-2 text-sm font-medium cursor-pointer ${
                   activeTab === "description"
                     ? "text-blue-600 border-b-2 border-blue-500"
                     : "text-gray-500 hover:text-gray-700"
@@ -43,7 +43,7 @@ export default function FormsMain() {
                 FormElement API
               </button>
               <button
-                className={`px-4 py-2 text-sm font-medium ${
+                className={`px-4 py-2 text-sm font-medium cursor-pointer  ${
                   activeTab === "json"
                     ? "text-blue-600 border-b-2 border-blue-500"
                     : "text-gray-500 hover:text-gray-700"
@@ -65,41 +65,6 @@ export default function FormsMain() {
                     connected to state, handling binding, validation, and
                     synchronization.
                   </p>
-
-                  <div className="bg-blue-50 p-4 rounded-lg">
-                    <h3 className="font-medium text-blue-800 mb-2">
-                      Basic Usage
-                    </h3>
-                    <CodeLine
-                      code={`// Basic usage with get/set
-{stateObject.field.formElement((params) => (
-  <input 
-    value={params.get()}
-    onChange={(e) => params.set(e.target.value)}
-  />
-))}
-
-// With validation
-{stateObject.field.formElement(
-  (params) => (
-    <>
-      <input 
-        value={params.get()} 
-        onChange={(e) => params.set(e.target.value)} 
-      />
-      {params.validationErrors().length > 0 && (
-        <div className="error">
-          {params.validationErrors().join(", ")}
-        </div>
-      )}
-    </>
-  ), 
-  {
-    validation: { message: "Field is required" }
-  }
-)}`}
-                    />
-                  </div>
 
                   {/* params.get() */}
                   <div className="border-l-4 border-blue-500 pl-4">
@@ -212,32 +177,34 @@ export default function FormsMain() {
               </div>
             )}
           </div>
-          <div>
+          <div className="">
             {" "}
-            <div className="flex  h-12 ">
-              <CodeLine code={`user.revertToInitialState()`} />
-              <button
-                type="button"
-                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px] cursor-pointer"
-                onClick={() => user.revertToInitialState()}
-              >
-                Reset Form
-              </button>
+            <div className="p-6">
+              <div className="flex gap-2 h-12 ">
+                <CodeLine code={`user.revertToInitialState()`} />
+                <button
+                  type="button"
+                  className="px-4 py-2 border-2 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[200px] cursor-pointer"
+                  onClick={() => user.revertToInitialState()}
+                >
+                  Reset Form
+                </button>
+              </div>
+              <div className="  h-4 " />
+              <div className="flex gap-2  h-12 ">
+                <CodeLine code={` user.validateZodSchema()`} />
+                <button
+                  type="button"
+                  className="px-4 py-2 border-2 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[200px] cursor-pointer"
+                  onClick={() => {
+                    console.log("validating", user);
+                    user.validateZodSchema();
+                  }}
+                >
+                  Simulated Save
+                </button>
+              </div>{" "}
             </div>
-            <div className="  h-4 " />
-            <div className="flex  h-12 ">
-              <CodeLine code={` user.validateZodSchema()`} />
-              <button
-                type="button"
-                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px] cursor-pointer"
-                onClick={() => {
-                  console.log("validating", user);
-                  user.validateZodSchema();
-                }}
-              >
-                Simulated Save
-              </button>
-            </div>{" "}
             <CodeExampleDropdown />
             <div className="  h-4 " />
           </div>
@@ -245,126 +212,107 @@ export default function FormsMain() {
             <div className="grid grid-cols-1 gap-6">
               {/* User Form */}
               <div className="space-y-4">
-                <h3 className="font-medium text-gray-700 border-b pb-2">
-                  Personal Information
-                </h3>
+                {user.firstName.formElement((params) => (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">
+                      First Name
+                    </label>
+                    <input
+                      type="text"
+                      className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
+                        params.validationErrors().length > 0
+                          ? "border-red-500"
+                          : ""
+                      }`}
+                      value={params.get()}
+                      onChange={(e) => params.set(e.target.value)}
+                    />
+                  </div>
+                ))}
 
-                <div>
-                  {user.firstName.formElement((params) => (
+                {user.lastName.formElement(
+                  (params) => (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        First Name
+                        Last Name
                       </label>
                       <input
                         type="text"
+                        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                        {...params.inputProps}
+                      />
+                    </div>
+                  ),
+                  {
+                    validation: {
+                      message: "Please enter your last name",
+                    },
+                  }
+                )}
+
+                {user.email.formElement(
+                  (params) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Email Address
+                      </label>
+                      <input
+                        {...params.inputProps}
+                        type="email"
                         className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
                           params.validationErrors().length > 0
                             ? "border-red-500"
                             : ""
                         }`}
-                        value={params.get()}
-                        onChange={(e) => params.set(e.target.value)}
                       />
                     </div>
-                  ))}
-                </div>
+                  ),
+                  {
+                    validation: {
+                      message: "Please enter a valid email address",
+                    },
+                  }
+                )}
 
-                <div>
-                  {user.lastName.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Last Name
-                        </label>
-                        <input
-                          type="text"
-                          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                          {...params.inputProps}
-                        />
-                        {params.validationErrors().map((error, index) => (
-                          <div key={index} className="text-red-500">
-                            <TriangleIcon className="inline-block" />
-                          </div>
-                        ))}
-                      </div>
-                    ),
-                    {
-                      validation: {
-                        hideMessage: true,
-                      },
-                    }
-                  )}
-                </div>
-
-                <div>
-                  {user.email.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Email Address
-                        </label>
-                        <input
-                          {...params.inputProps}
-                          type="email"
-                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
-                            params.validationErrors().length > 0
-                              ? "border-red-500"
-                              : ""
-                          }`}
-                        />
-                      </div>
-                    ),
-                    {
-                      validation: {
-                        message: "Please enter a valid email address",
-                      },
-                    }
-                  )}
-                </div>
-
-                <div>
-                  {user.phone.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                          value={params.get()}
-                          onChange={(e) => params.set(e.target.value)}
-                          placeholder="(555) 123-4567"
-                        />
-                        {params.validationErrors().length > 0 && (
-                          <div className="text-xs text-red-500 mt-1">
-                            {params.validationErrors().join(", ")}
-                          </div>
-                        )}
-                      </div>
-                    ),
-                    {
-                      validation: {
-                        message: "Please enter a valid phone number",
-                      },
-                    }
-                  )}
-                </div>
+                {user.phone.formElement(
+                  (params) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Phone Number
+                      </label>
+                      <input
+                        type="tel"
+                        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                        value={params.get()}
+                        onChange={(e) => params.set(e.target.value)}
+                        placeholder="(555) 123-4567"
+                      />
+                      {params.validationErrors().length > 0 && (
+                        <div className="text-xs text-red-500 mt-1">
+                          {params.validationErrors().join(", ")}
+                        </div>
+                      )}
+                    </div>
+                  ),
+                  {
+                    validation: {
+                      message: "Please enter a valid phone number",
+                    },
+                  }
+                )}
               </div>
-              {/* Address Form */}
-              <div>
-                <div className=" rounded-lg  mb-4">
-                  {/* Address Navigation */}
 
-                  <div className=" font-medium ">Addresses</div>
-                  <div className="h-2" />
-                  <div className="flex space-x-2">
-                    {user.addresses.stateMap((_, setter, index) => {
-                      return (
-                        <button
-                          key={index}
-                          onClick={() => setCurrentAddressIndex(index)}
-                          className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
+              {/* Address Navigation */}
+
+              <div className=" font-medium ">Addresses</div>
+
+              <div className="flex space-x-2">
+                {user.addresses.stateMap((_, setter, index) => {
+                  return (
+                    <button
+                      key={index}
+                      onClick={() => setCurrentAddressIndex(index)}
+                      className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
                                  ${
                                    setter.showValidationErrors().length > 0
                                      ? "border-2 border-red-500 bg-red-400"
@@ -372,158 +320,157 @@ export default function FormsMain() {
                                      ? "bg-amber-400 text-white"
                                      : "bg-amber-200 text-amber-800 hover:bg-amber-300"
                                  }`}
-                        >
-                          {index + 1}
-                          {}
-                        </button>
-                      );
-                    })}{" "}
-                    <button
-                      onClick={addNewAddress}
-                      className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
                     >
-                      Add
+                      {index + 1}
+                      {}
                     </button>
-                  </div>
-                </div>
-                {user.addresses.get().length > 1 && (
-                  <button
-                    onClick={() => {
-                      user.addresses.cut(currentAddressIndex);
-                      setCurrentAddressIndex(
-                        Math.max(0, currentAddressIndex - 1)
-                      );
-                    }}
-                    className="ml-auto px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
-                  >
-                    Remove Selected Address
-                  </button>
-                )}
-                {/* Current Address Form */}
-                {user.addresses.get().length > 0 && (
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-1 gap-4">
-                      {user.addresses
-                        .index(currentAddressIndex)
-                        .street.formElement(
-                          (params) => (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">
-                                Street
-                              </label>
-                              <input
-                                type="text"
-                                className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                                value={params.get()}
-                                onChange={(e) => params.set(e.target.value)}
-                              />
-                            </div>
-                          ),
-                          {
-                            validation: {
-                              message: "Street address is required",
-                            },
-                          }
-                        )}
+                  );
+                })}{" "}
+                <button
+                  onClick={addNewAddress}
+                  className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
+                >
+                  Add
+                </button>
+              </div>
 
-                      {/* City and State in a row */}
-                      <div className="grid grid-cols-2 gap-4">
-                        {user.addresses
-                          .index(currentAddressIndex)
-                          .city.formElement((params) => (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">
-                                City
-                              </label>
-                              <input
-                                type="text"
-                                className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                                value={params.get()}
-                                onChange={(e) => params.set(e.target.value)}
-                              />
-                            </div>
-                          ))}
-
-                        {user.addresses
-                          .index(currentAddressIndex)
-                          .state.formElement((params) => (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">
-                                State
-                              </label>
-                              <input
-                                type="text"
-                                className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                                value={params.get()}
-                                onChange={(e) => params.set(e.target.value)}
-                              />
-                            </div>
-                          ))}
-                      </div>
-
-                      {/* Zip and Country in a row */}
-                      <div className="grid grid-cols-2 gap-4">
-                        {user.addresses
-                          .index(currentAddressIndex)
-                          .zipCode.formElement((params) => (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">
-                                Zip Code
-                              </label>
-                              <input
-                                type="text"
-                                className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                                value={params.get()}
-                                onChange={(e) => params.set(e.target.value)}
-                              />
-                            </div>
-                          ))}
-
-                        {user.addresses
-                          .index(currentAddressIndex)
-                          .country.formElement((params) => (
-                            <div>
-                              <label className="block text-sm font-medium text-gray-700">
-                                Country
-                              </label>
-                              <select
-                                className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                                value={params.get()}
-                                onChange={(e) => params.set(e.target.value)}
-                              >
-                                <option value="USA">United States</option>
-                                <option value="CAN">Canada</option>
-                                <option value="MEX">Mexico</option>
-                                <option value="GBR">United Kingdom</option>
-                              </select>
-                            </div>
-                          ))}
-                      </div>
-
-                      {/* Default Address Checkbox */}
-                      {user.addresses
-                        .index(currentAddressIndex)
-                        .isDefault.formElement((params) => (
-                          <div className="flex items-center">
-                            <input
-                              type="checkbox"
-                              className="h-4 w-4 text-amber-400 focus:ring-amber-400 border-amber-300 rounded"
-                              checked={params.get()}
-                              onChange={(e) => params.set(e.target.checked)}
-                              id={`default-address-${currentAddressIndex}`}
-                            />
-                            <label
-                              htmlFor={`default-address-${currentAddressIndex}`}
-                              className="ml-2 block text-sm text-gray-700"
-                            >
-                              Set as default address
+              {user.addresses.get().length > 1 && (
+                <button
+                  onClick={() => {
+                    user.addresses.cut(currentAddressIndex);
+                    setCurrentAddressIndex(
+                      Math.max(0, currentAddressIndex - 1)
+                    );
+                  }}
+                  className="ml-auto px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+                >
+                  Remove Selected Address
+                </button>
+              )}
+              {/* Current Address Form */}
+              {user.addresses.get().length > 0 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-1 gap-4">
+                    {user.addresses
+                      .index(currentAddressIndex)
+                      .street.formElement(
+                        (params) => (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Street
                             </label>
+                            <input
+                              type="text"
+                              className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                              value={params.get()}
+                              onChange={(e) => params.set(e.target.value)}
+                            />
+                          </div>
+                        ),
+                        {
+                          validation: {
+                            message: "Street address is required",
+                          },
+                        }
+                      )}
+
+                    {/* City and State in a row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {user.addresses
+                        .index(currentAddressIndex)
+                        .city.formElement((params) => (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              City
+                            </label>
+                            <input
+                              type="text"
+                              className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                              value={params.get()}
+                              onChange={(e) => params.set(e.target.value)}
+                            />
+                          </div>
+                        ))}
+
+                      {user.addresses
+                        .index(currentAddressIndex)
+                        .state.formElement((params) => (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              State
+                            </label>
+                            <input
+                              type="text"
+                              className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                              value={params.get()}
+                              onChange={(e) => params.set(e.target.value)}
+                            />
                           </div>
                         ))}
                     </div>
+
+                    {/* Zip and Country in a row */}
+                    <div className="grid grid-cols-2 gap-4">
+                      {user.addresses
+                        .index(currentAddressIndex)
+                        .zipCode.formElement((params) => (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Zip Code
+                            </label>
+                            <input
+                              type="text"
+                              className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                              value={params.get()}
+                              onChange={(e) => params.set(e.target.value)}
+                            />
+                          </div>
+                        ))}
+
+                      {user.addresses
+                        .index(currentAddressIndex)
+                        .country.formElement((params) => (
+                          <div>
+                            <label className="block text-sm font-medium text-gray-700">
+                              Country
+                            </label>
+                            <select
+                              className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                              value={params.get()}
+                              onChange={(e) => params.set(e.target.value)}
+                            >
+                              <option value="USA">United States</option>
+                              <option value="CAN">Canada</option>
+                              <option value="MEX">Mexico</option>
+                              <option value="GBR">United Kingdom</option>
+                            </select>
+                          </div>
+                        ))}
+                    </div>
+
+                    {/* Default Address Checkbox */}
+                    {user.addresses
+                      .index(currentAddressIndex)
+                      .isDefault.formElement((params) => (
+                        <div className="flex items-center">
+                          <input
+                            type="checkbox"
+                            className="h-4 w-4 text-amber-400 focus:ring-amber-400 border-amber-300 rounded"
+                            checked={params.get()}
+                            onChange={(e) => params.set(e.target.checked)}
+                            id={`default-address-${currentAddressIndex}`}
+                          />
+                          <label
+                            htmlFor={`default-address-${currentAddressIndex}`}
+                            className="ml-2 block text-sm text-gray-700"
+                          >
+                            Set as default address
+                          </label>
+                        </div>
+                      ))}
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>{" "}
         </div>

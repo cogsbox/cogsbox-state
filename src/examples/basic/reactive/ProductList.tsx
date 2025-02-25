@@ -26,13 +26,13 @@ export const ProductList = () => {
   }, [cart.items.get(), products.items.get()]);
 
   return (
-    <div className="w-full flex flex-col gap-2 p-8 min-w-0 h-full">
+    <div className="w-full flex flex-col gap-2 p-8 min-w-0 ">
       {products.items.stateMap((product, productSetter) => (
         <div key={product.id} className="flex gap-2 items-center">
           <div className="w-[200px]">{product.name}</div>
           $
           <input
-            className="w-[100px] border-2 border-amber-500 px-2 py-1"
+            className="w-[100px] border-2 border-amber-400 px-2 py-1"
             value={product.price}
             step={0.01}
             onChange={(e) => {
@@ -40,7 +40,7 @@ export const ProductList = () => {
             }}
           />
           <button
-            className="bg-amber-500 text-white p-1 rounded cursor-pointer hover:bg-amber-600 px-2"
+            className="bg-amber-400 text-white p-1 rounded cursor-pointer hover:bg-amber-600 px-2"
             onClick={() => {
               cart.items.uniqueInsert(
                 {
@@ -70,7 +70,7 @@ export const ProductList = () => {
             >
               {product?.name.get()} - Qty: {item.quantity}
               <button
-                className="border rounded border-white hover:bg-amber-400 cursor-pointer bg-amber-500 text-white"
+                className="border rounded border-white hover:bg-amber-400 cursor-pointer bg-amber-400 text-white"
                 onClick={() => setter.cut()}
               >
                 Remove
@@ -88,7 +88,7 @@ export const ProductList = () => {
       <div className="flex gap-2 w-full ">
         <div className="flex-1">Toggle Status - ({cart.status.get()})</div>
         <button
-          className="border rounded-lg border-white hover:bg-amber-400 cursor-pointer bg-amber-500 text-white px-2  py-1"
+          className="border rounded-lg border-white hover:bg-amber-400 cursor-pointer bg-amber-400 text-white px-2  py-1"
           onClick={() =>
             cart.status.update((s) => {
               return s === "open" ? "closed" : "open";
@@ -98,7 +98,6 @@ export const ProductList = () => {
           Toggle
         </button>
       </div>{" "}
-      <div className="flex-1" />
       <div className="text-sm text-gray-500"> {cart._componentId}</div>
     </div>
   );
