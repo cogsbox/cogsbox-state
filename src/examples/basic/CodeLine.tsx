@@ -8,7 +8,7 @@ export default function CodeLine({ code }: { code: string }) {
                 padding: 4,
 
                 margin: 0,
-                maxWidth: "400px",
+
                 width: "100%",
                 overflowX: "auto",
                 fontSize: "14px",

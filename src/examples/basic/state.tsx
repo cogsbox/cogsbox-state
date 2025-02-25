@@ -1,31 +1,27 @@
 import { createCogsState } from "../../CogsState";
 
-interface Product {
-    id: number | string;
-    name: string;
-    price: number;
-    stock: number;
-    category: string;
-}
-
-type Products = { items: Product[]; category: string };
-
-interface CartItem {
-    id: number | string;
-    productId: number | string;
-    quantity: number;
-    unitPrice: number;
-}
-type Cart = {
-    items: CartItem[];
-    total: number;
-    isOpen: boolean;
-    status: "open" | "closed";
-};
-
 type StateType = {
-    products: Products;
-    cart: Cart;
+    products: {
+        items: {
+            id: number | string;
+            name: string;
+            price: number;
+            stock: number;
+            category: string;
+        }[];
+        category: string;
+    };
+    cart: {
+        items: {
+            id: number | string;
+            productId: number | string;
+            quantity: number;
+            unitPrice: number;
+        }[];
+        total: number;
+        isOpen: boolean;
+        status: "open" | "closed";
+    };
 };
 
 const dbState: StateType = {
@@ -56,7 +52,7 @@ const dbState: StateType = {
         category: "Clothing",
     },
     cart: {
-        items: [] as CartItem[],
+        items: [],
         isOpen: false,
         total: 0,
         status: "open",

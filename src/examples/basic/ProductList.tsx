@@ -27,7 +27,7 @@ export const ProductList = () => {
     }, [cart.items.get(), products.items.get()]);
 
     return (
-        <div className="w-[600px] flex flex-col gap-2 p-8 min-w-0 h-full">
+        <div className="w-full flex flex-col gap-2 p-8 min-w-0 h-full">
             {products.items.stateMap((product, productSetter) => (
                 <div key={product.id} className="flex gap-2 items-center">
                     <div className="w-[200px]">{product.name}</div>
@@ -62,6 +62,28 @@ export const ProductList = () => {
                     </button>
                 </div>
             ))}
+            <div className="p-3 min-h-[160px] flex flex-col gap-2">
+                {cart.items.stateMap((item, setter) => {
+                    const product = products.items.findWith(
+                        "id",
+                        item.productId
+                    );
+                    return (
+                        <div
+                            key={item.id}
+                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_90px] gap-2 px-2"
+                        >
+                            {product?.name.get()} - Qty: {item.quantity}
+                            <button
+                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
+                                onClick={() => setter.cut()}
+                            >
+                                Remove
+                            </button>
+                        </div>
+                    );
+                })}
+            </div>{" "}
             <div className="h-4" />
             <div className="text-gray-500 text-sm">
                 {" "}

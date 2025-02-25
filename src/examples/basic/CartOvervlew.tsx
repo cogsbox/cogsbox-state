@@ -12,11 +12,10 @@ export const CartOverviewGet = () => {
         <FlashWrapper
             color="bg-orange-500"
             componentId={cart._componentId!}
-            title="Component Reactive - get()"
+            title="Component Reactive"
         >
             <CodeLine code={`const cart = useCogsState("cart")`} />{" "}
             <div className="h-4" />
-            {/* Updated layout: CodeLine (2/3) and value (1/4) vertically stacked */}
             <div className="flex flex-col gap-2 w-full">
                 <div className="flex w-full">
                     <div className="w-3/4">
@@ -35,35 +34,6 @@ export const CartOverviewGet = () => {
                         Total: $ {cart.total.get()}
                     </div>
                 </div>
-            </div>
-            <div className="h-4" />
-            <CodeLine code={`cart.items.get().map((item, itemIndex) =>`} />
-            <div className="p-3 min-h-[160px] flex flex-col gap-2">
-                {cart.items.get().map((item, itemIndex) => {
-                    const product = products.items.findWith(
-                        "id",
-                        item.productId
-                    );
-                    console.log("cartItems", cart.items, item.productId);
-                    return (
-                        <div
-                            key={item.id}
-                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_90px] gap-2 px-2"
-                        >
-                            {product?.name.get()} - Qty: {item.quantity}
-                            <button
-                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
-                                onClick={() =>
-                                    cart.items
-                                        .findWith("productId", item.productId)
-                                        .cut()
-                                }
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    );
-                })}
             </div>
         </FlashWrapper>
     );
@@ -117,31 +87,6 @@ export const CartOverviewDep = () => {
                     </div>
                 </div>
             </div>
-
-            <div className="h-4" />
-            <CodeLine code={`cart.items.stateMap((item, setter) =>`} />
-            <div className="p-3 min-h-[160px] flex flex-col gap-2">
-                {cart.items.stateMap((item, setter) => {
-                    const product = products.items.findWith(
-                        "id",
-                        item.productId
-                    );
-                    return (
-                        <div
-                            key={item.id}
-                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_90px] gap-2 px-2"
-                        >
-                            {product?.name.get()} - Qty: {item.quantity}
-                            <button
-                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
-                                onClick={() => setter.cut()}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
         </FlashWrapper>
     );
 };
@@ -189,31 +134,6 @@ export const CartOverviewFully = () => {
                     </div>
                 </div>
             </div>
-
-            <div className="h-4" />
-            <CodeLine code={`cart.items.stateMap((item, setter) =>`} />
-            <div className="p-3 min-h-[160px] flex flex-col gap-2">
-                {cart.items.stateMap((item, setter) => {
-                    const product = products.items.findWith(
-                        "id",
-                        item.productId
-                    );
-                    return (
-                        <div
-                            key={item.id}
-                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_90px] gap-2 px-2"
-                        >
-                            {product?.name.get()} - Qty: {item.quantity}
-                            <button
-                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
-                                onClick={() => setter.cut()}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    );
-                })}
-            </div>
         </FlashWrapper>
     );
 };
@@ -253,31 +173,6 @@ export const CartOverview = () => {
                         Total: $ {cart.total.$get()}
                     </div>
                 </div>
-            </div>
-            <div className="h-4" />
-            <CodeLine code={`cart.items.$stateMap((item, setter)`} />
-            <div className="p-3 min-h-[160px] flex flex-col gap-2">
-                {cart.items.$stateMap((item, setter) => {
-                    const product = products.items.findWith(
-                        "id",
-                        item.productId
-                    );
-
-                    return (
-                        <div
-                            key={item.id}
-                            className="border-2 border-blue-500 p-1 rounded cursor-pointer grid grid-cols-[auto_90px] gap-2 px-2"
-                        >
-                            {product.name.$get()} - Qty: {item.quantity}
-                            <button
-                                className="border rounded border-white hover:bg-orange-400 cursor-pointer bg-orange-500 text-white"
-                                onClick={() => setter.cut()}
-                            >
-                                Remove
-                            </button>
-                        </div>
-                    );
-                })}
             </div>
         </FlashWrapper>
     );

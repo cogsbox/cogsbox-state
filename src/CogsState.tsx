@@ -872,12 +872,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
                     if (reactiveTypes.includes("component")) {
                         if (
                             component.paths &&
-                            component.paths.has(pathToCheck)
+                            (component.paths.has(pathToCheck) ||
+                                component.paths.has(""))
                         ) {
                             shouldUpdate = true;
                         }
                     }
-
+                    console.log(
+                        "reactiveTypes",
+                        key,
+                        component,
+                        reactiveTypes,
+                        shouldUpdate,
+                    );
                     // Check dependency-based reactivity
                     if (!shouldUpdate && reactiveTypes.includes("deps")) {
                         if (component.depsFunction) {
@@ -892,6 +899,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
                             ) {
                                 console.log(
                                     "reactiveTypes",
+                                    component.deps,
+                                    depsResult,
                                     isDeepEqual(component.deps, depsResult),
                                     depsResult,
                                 );
@@ -1154,12 +1163,15 @@ function createProxyHandler<T>(
                         .getState()
                         .stateComponents.get(stateKey);
 
-                    if (stateEntry && currentPath) {
+                    if (stateEntry) {
                         const component =
                             stateEntry.components.get(fullComponentId);
 
                         if (component) {
-                            component.paths.add(currentPath);
+                            // Only add paths for non-root or specifically for get() at root
+                            if (path.length > 0 || prop === "get") {
+                                component.paths.add(currentPath);
+                            }
                         }
                     }
                 }
@@ -1516,6 +1528,9 @@ function createProxyHandler<T>(
                         loadFromLocalStorage(
                             sessionId + "-" + stateKey + "-" + key,
                         );
+                }
+                if (prop === "getComponents") {
+                    return getGlobalStore().stateComponents.get(stateKey);
                 }
                 if (prop === "setSelected") {
                     return (value: boolean) => {
