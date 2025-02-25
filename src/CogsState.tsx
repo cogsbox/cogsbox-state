@@ -30,7 +30,7 @@ import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 import { ZodObject, type ZodRawShape } from "zod";
 
-import { getGlobalStore } from "./store.js";
+import { getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
@@ -210,6 +210,7 @@ export type StateObject<T> = (T extends any[]
         : never) &
     EndType<T, true> & {
         _componentId: string | null;
+        getComponents: () => ComponentsType;
         _initialState: T;
         updateInitialState: (newState: T | null) => {
             fetchId: (field: keyof T) => string | number;
@@ -761,8 +762,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
                 if (elements) {
                     const newValue = isArrayOperation
-                        ? getNestedValue(payload, path.slice(0, -1)) // Get array for array operations
-                        : getNestedValue(payload, path); // Get normal value otherwise
+                        ? getNestedValue(payload, path.slice(0, -1))
+                        : getNestedValue(payload, path);
                     elements.forEach(({ parentId, position, effect }) => {
                         const parent = document.querySelector(
                             `[data-parent-id="${parentId}"]`,
@@ -1529,9 +1530,7 @@ function createProxyHandler<T>(
                             sessionId + "-" + stateKey + "-" + key,
                         );
                 }
-                if (prop === "getComponents") {
-                    return getGlobalStore().stateComponents.get(stateKey);
-                }
+
                 if (prop === "setSelected") {
                     return (value: boolean) => {
                         const parentPath = path.slice(0, -1);
@@ -1555,6 +1554,10 @@ function createProxyHandler<T>(
 
                 if (path.length == 0) {
                     if (prop == "_componentId") return componentId;
+                    if (prop === "getComponents") {
+                        return () =>
+                            getGlobalStore().stateComponents.get(stateKey);
+                    }
                     if (prop === "_initialState")
                         return getGlobalStore.getState().initialStateGlobal[
                             stateKey

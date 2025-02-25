@@ -1,6 +1,7 @@
 import { GenericObject } from './utility.js';
 import { UseMutationResult } from '@tanstack/react-query';
 import { ZodObject, ZodRawShape } from 'zod';
+import { ComponentsType } from './store.js';
 
 type Prettify<T> = {
     [K in keyof T]: T[K];
@@ -111,6 +112,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     [K in keyof T]-?: StateObject<T[K]>;
 } & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
     _componentId: string | null;
+    getComponents: () => ComponentsType;
     _initialState: T;
     updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;

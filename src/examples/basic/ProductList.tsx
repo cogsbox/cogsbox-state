@@ -48,7 +48,6 @@ export const ProductList = () => {
                                     id: uuidv4(),
                                     productId: product.id,
                                     quantity: 1,
-                                    unitPrice: product.price,
                                 },
                                 ["productId"],
                                 (existing) => ({

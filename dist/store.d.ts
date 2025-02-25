@@ -11,6 +11,15 @@ type SyncLogType = {
     timeStamp: number;
 };
 type StateValue = any;
+export type ComponentsType = {
+    components: Map<string, {
+        forceUpdate: () => void;
+        paths: Set<string>;
+        deps?: any[];
+        depsFunction?: (state: any) => any[] | true;
+        reactiveType: ReactivityType[] | ReactivityType;
+    }>;
+};
 export type CogsGlobalState = {
     updaterState: {
         [key: string]: any;
@@ -91,15 +100,7 @@ export type CogsGlobalState = {
     }) => void;
     deleteReactiveDeps: (key: string) => void;
     subscribe: (listener: () => void) => () => void;
-    stateComponents: Map<string, {
-        components: Map<string, {
-            forceUpdate: () => void;
-            paths: Set<string>;
-            deps?: any[];
-            depsFunction?: (state: any) => any[] | true;
-            reactiveType: ReactivityType[] | ReactivityType;
-        }>;
-    }>;
+    stateComponents: Map<string, ComponentsType>;
     syncInfoStore: Map<string, SyncInfo>;
     setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
     getSyncInfo: (key: string) => SyncInfo | null;

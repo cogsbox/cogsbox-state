@@ -575,8 +575,6 @@ function B(t, i, m, S) {
           return (n) => ct(
             S + "-" + t + "-" + n
           );
-        if (o === "getComponents")
-          return a().stateComponents.get(t);
         if (o === "setSelected")
           return (n) => {
             const c = e.slice(0, -1), l = Number(e[e.length - 1]), r = c.join(".");
@@ -586,6 +584,8 @@ function B(t, i, m, S) {
           };
         if (e.length == 0) {
           if (o == "_componentId") return m;
+          if (o === "getComponents")
+            return () => a().stateComponents.get(t);
           if (o === "_initialState")
             return a.getState().initialStateGlobal[t];
           if (o === "_serverState")

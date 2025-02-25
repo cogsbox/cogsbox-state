@@ -95,38 +95,104 @@ function JSONView() {
         </div>
     );
 }
+
+const ComponentTriggers = () => {
+    const cart = useCogsState("cart");
+    const componentsData = cart.getComponents();
+
+    // Check if componentsData exists and has a components property that is a Map
+    const componentsMap = componentsData?.components;
+
+    return (
+        <div className="bg-white rounded-lg p-6">
+            <h2 className="text-lg font-semibold mb-3">Components</h2>
+            Click to force update a component
+            <div className="h-6" />
+            Some component ids will be for the form itself and this component{" "}
+            <div className="h-6" />
+            {componentsMap && componentsMap instanceof Map ? (
+                <div className="space-y-2">
+                    {[...componentsMap.entries()].map(
+                        ([componentId, componentData]) => (
+                            <button
+                                key={componentId}
+                                onClick={() => {
+                                    if (
+                                        componentData &&
+                                        typeof componentData.forceUpdate ===
+                                            "function"
+                                    ) {
+                                        componentData.forceUpdate();
+                                    }
+                                }}
+                                className="block w-full text-left p-2 bg-gray-50 hover:bg-gray-100 rounded border border-gray-200 hover:border-gray-300 cursor-pointer"
+                            >
+                                {componentId.split("/").pop()}
+                            </button>
+                        )
+                    )}
+                </div>
+            ) : (
+                <div className="text-gray-500 p-2">
+                    Components map not found or not iterable
+                </div>
+            )}
+        </div>
+    );
+};
 // Modified App component with code toggles
 export default function App() {
-    const [tab, setTab] = useState<"description" | "json">("description");
+    const [tab, setTab] = useState<"description" | "json" | "component">(
+        "description"
+    );
     return (
         <div className="flex flex-col items-center justify-center w-full">
             <div className="h-6" />
             <div className="w-[90%]">
                 <div className="w-full bg-sky-50 rounded-lg p-6 flex flex gap-4">
                     <div className="bg-white rounded-lg p-6 flex-1 flex gap-4">
-                        {" "}
                         <div className="rounded-lg border-2 border-blue-500 w-[500px]">
                             <ProductList />
                         </div>
                         <div className="w-[700px] flex flex-col gap-1">
-                            <div className="flex gap-1 items-center p-2 bg-gray-50">
+                            <div className="flex border-b border-gray-200">
                                 <button
-                                    className="border rounded-lg border-gray-600 hover:bg-gray-200 cursor-pointer bg-gray-100 text-gray-600 px-2  py-1"
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                        tab === "description"
+                                            ? "text-blue-600 border-b-2 border-blue-500"
+                                            : "text-gray-500 hover:text-gray-700"
+                                    }`}
                                     onClick={() => setTab("description")}
                                 >
                                     Description
                                 </button>
                                 <button
-                                    className="border rounded-lg border-gray-600 hover:bg-gray-200 cursor-pointer bg-gray-100 text-gray-600  px-2  py-1"
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                        tab === "json"
+                                            ? "text-blue-600 border-b-2 border-blue-500"
+                                            : "text-gray-500 hover:text-gray-700"
+                                    }`}
                                     onClick={() => setTab("json")}
                                 >
                                     JSON
                                 </button>{" "}
+                                <button
+                                    className={`px-4 py-2 text-sm font-medium ${
+                                        tab === "component"
+                                            ? "text-blue-600 border-b-2 border-blue-500"
+                                            : "text-gray-500 hover:text-gray-700"
+                                    }`}
+                                    onClick={() => setTab("component")}
+                                >
+                                    Trigger Component Render
+                                </button>
                             </div>
-                            {tab == "description" && (
+
+                            {tab === "description" && (
                                 <CartComponentsDescription />
                             )}
-                            {tab == "json" && <JSONView />}
+                            {tab === "component" && <ComponentTriggers />}
+                            {tab === "json" && <JSONView />}
                         </div>
                     </div>
                     <div className="flex flex-col gap-2 w-[700px]">

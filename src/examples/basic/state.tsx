@@ -16,7 +16,6 @@ type StateType = {
             id: number | string;
             productId: number | string;
             quantity: number;
-            unitPrice: number;
         }[];
         total: number;
         isOpen: boolean;
