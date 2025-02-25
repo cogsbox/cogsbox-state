@@ -36,9 +36,9 @@ export const FlashWrapper = ({
             <div
                 className={`flex items-center ${
                     color ? color : "bg-white"
-                } text-white rounded-t-lg  px-4 w-full  p-2`}
+                } text-white rounded-t-lg  px-4 w-full   py-0.5`}
             >
-                <div className="text-2xl flex-1"> {title} </div>
+                <div className="text-xl flex-1"> {title} </div>
 
                 <div className="flex h-full w-[110px]  items-center  justify-center px-2">
                     Render: <div className="w-2" />

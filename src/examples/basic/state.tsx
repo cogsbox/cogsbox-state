@@ -18,7 +18,6 @@ type StateType = {
             quantity: number;
         }[];
         total: number;
-        isOpen: boolean;
         status: "open" | "closed";
     };
 };
@@ -52,7 +51,6 @@ const dbState: StateType = {
     },
     cart: {
         items: [],
-        isOpen: false,
         total: 0,
         status: "open",
     },

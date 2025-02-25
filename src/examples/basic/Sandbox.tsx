@@ -93,7 +93,6 @@ const initialState = {
   },
   cart: {
     items: [],
-    isOpen: false,
     total: 0,
   },
 };

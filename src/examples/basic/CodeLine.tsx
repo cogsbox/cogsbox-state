@@ -5,7 +5,7 @@ export default function CodeLine({ code }: { code: string }) {
         <SyntaxHighlighter
             language="typescript"
             customStyle={{
-                padding: 4,
+                padding: 2,
 
                 margin: 0,
 

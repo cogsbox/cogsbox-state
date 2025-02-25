@@ -11,13 +11,12 @@ export declare const useGetSyncInfo: (key: string, path: string[]) => import('./
 export declare const useGetKeyState: (key: string, path: string[]) => any;
 interface FormControlComponentProps<TStateObject> {
     setState: EffectiveSetState<TStateObject>;
-    validationKey: string;
     path: string[];
     child: (obj: FormElementParmas<TStateObject>) => JSX.Element;
     formOpts?: FormOptsType;
     stateKey: string;
 }
-export declare const FormControlComponent: <TStateObject>({ setState, validationKey, path, child, formOpts, stateKey, }: FormControlComponentProps<TStateObject>) => import("react/jsx-runtime").JSX.Element;
+export declare const FormControlComponent: <TStateObject>({ setState, path, child, formOpts, stateKey, }: FormControlComponentProps<TStateObject>) => import("react/jsx-runtime").JSX.Element;
 export declare function ValidationWrapper({ formOpts, path, validationKey, stateKey, children, validIndices, }: {
     formOpts?: FormOptsType;
     path: string[];

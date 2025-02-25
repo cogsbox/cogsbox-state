@@ -161,6 +161,7 @@ type CookieType<T> = {
 export type CogsCookiesType<T extends string[] = string[]> = CookieType<ArrayToObject<T>>;
 export type ReactivityType = "none" | "component" | "deps" | "all";
 export type OptionsType<T extends unknown = unknown> = {
+    componentId?: string;
     serverSync?: ServerSyncType<T>;
     validationKey?: string;
     enableServerState?: boolean;
@@ -257,6 +258,7 @@ export type TransformedStateType<T> = {
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, zodSchema }: OptionsType<T>): T;
 export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opts?: {
     reRenderType?: "get" | "state" | "none";
+    validationKey?: string;
 }) => {
     useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;

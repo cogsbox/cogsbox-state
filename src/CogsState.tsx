@@ -282,6 +282,7 @@ export type CogsCookiesType<T extends string[] = string[]> = CookieType<
 export type ReactivityType = "none" | "component" | "deps" | "all";
 
 export type OptionsType<T extends unknown = unknown> = {
+    componentId?: string;
     serverSync?: ServerSyncType<T>;
     validationKey?: string;
     enableServerState?: boolean;
@@ -438,7 +439,7 @@ function setOptions<StateKey, Opt>({
 
 export const createCogsState = <State extends Record<string, unknown>>(
     initialState: State,
-    opts?: { reRenderType?: "get" | "state" | "none" },
+    opts?: { reRenderType?: "get" | "state" | "none"; validationKey?: string },
 ) => {
     let newInitialState = initialState;
 
@@ -452,8 +453,12 @@ export const createCogsState = <State extends Record<string, unknown>>(
         stateKey: StateKey,
         options?: OptionsType<(typeof statePart)[StateKey]>,
     ) => {
-        const [componentId] = useState(uuidv4());
-        setOptions({ stateKey, options, initialOptionsPart });
+        const [componentId] = useState(options?.componentId ?? uuidv4());
+        setOptions({
+            stateKey,
+            options: { ...options, validationKey: opts?.validationKey },
+            initialOptionsPart,
+        });
 
         const thiState =
             getGlobalStore.getState().cogsStateStore[stateKey as string] ||
@@ -1633,15 +1638,10 @@ function createProxyHandler<T>(
                 }
 
                 if (prop === "formElement") {
-                    return (
-                        validationKey: string,
-                        child: FormControl<T>,
-                        formOpts?: FormOptsType,
-                    ) => {
+                    return (child: FormControl<T>, formOpts?: FormOptsType) => {
                         return (
                             <FormControlComponent<T>
                                 setState={effectiveSetState}
-                                validationKey={validationKey}
                                 stateKey={stateKey}
                                 path={path}
                                 child={child}

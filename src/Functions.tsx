@@ -189,7 +189,7 @@ export const useGetKeyState = (key: string, path: string[]) => {
 };
 interface FormControlComponentProps<TStateObject> {
     setState: EffectiveSetState<TStateObject>;
-    validationKey: string;
+
     path: string[];
     child: (obj: FormElementParmas<TStateObject>) => JSX.Element;
     formOpts?: FormOptsType;
@@ -197,18 +197,26 @@ interface FormControlComponentProps<TStateObject> {
 }
 export const FormControlComponent = <TStateObject,>({
     setState,
-    validationKey,
+
     path,
     child,
     formOpts,
     stateKey,
 }: FormControlComponentProps<TStateObject>) => {
-    const { getValidationErrors } = getGlobalStore.getState();
+    const { getValidationErrors, getInitialOptions } =
+        getGlobalStore.getState();
     const stateValue = useGetKeyState(stateKey, path);
     const [inputValue, setInputValue] = useState<any>(
         getGlobalStore.getState().getNestedState(stateKey, path),
     );
 
+    const initialOptions = getInitialOptions(stateKey);
+    if (!initialOptions?.validationKey) {
+        throw new Error(
+            "Validation key not found. You need ot set it in the options for the createCogsState function",
+        );
+    }
+    const validationKey = initialOptions.validationKey;
     useEffect(() => {
         setInputValue(stateValue);
     }, [stateKey, path.join("."), stateValue]);
