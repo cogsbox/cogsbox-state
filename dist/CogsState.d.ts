@@ -61,6 +61,7 @@ export type UpdateType<T> = (payload: UpdateArg<Prettify<T>>, opts?: UpdateOpts<
 export type FormOptsType = {
     key?: string;
     validation?: {
+        hideMessage?: boolean;
         message?: string;
         stretch?: boolean;
         props?: GenericObject;

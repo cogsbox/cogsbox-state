@@ -144,6 +144,7 @@ export type UpdateType<T> = (
 export type FormOptsType = {
   key?: string;
   validation?: {
+    hideMessage?: boolean;
     message?: string;
     stretch?: boolean;
     props?: GenericObject;
@@ -1159,8 +1160,8 @@ function createProxyHandler<T>(
             }
             const errors = getGlobalStore
               .getState()
-              .getValidationErrors(init.key);
-            console.log("errors222222222222222222", errors);
+              .getValidationErrors(init.key + "." + path.join("."));
+
             return errors;
           };
         }
@@ -1233,8 +1234,7 @@ function createProxyHandler<T>(
                   _path: path,
                   _mapFn: callbackfn as any, // Pass the actual function, not string
                 },
-                effectiveSetState,
-                componentId,
+
                 rebuildStateShape,
               });
             };
@@ -1671,8 +1671,7 @@ export function $cogsSignal(proxy: {
 
 function SignalMapRenderer({
   proxy,
-  effectiveSetState,
-  componentId,
+
   rebuildStateShape,
 }: {
   proxy: {
@@ -1686,8 +1685,7 @@ function SignalMapRenderer({
       arraySetter: any
     ) => ReactNode;
   };
-  effectiveSetState: any;
-  componentId: string;
+
   rebuildStateShape: (
     currentState: any,
     path: string[],

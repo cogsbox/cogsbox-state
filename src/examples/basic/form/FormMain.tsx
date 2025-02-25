@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { useCogsState } from "./state";
-import { Code } from "lucide-react";
+import { Code, TriangleIcon } from "lucide-react";
 import CodeLine from "../CodeLine";
+import CodeExampleDropdown from "./CodeExamples";
 
 // Main Form Example Component
 export default function FormsMain() {
@@ -211,7 +212,35 @@ export default function FormsMain() {
               </div>
             )}
           </div>
-          {/* Right Column - Forms (always visible) */}
+          <div>
+            {" "}
+            <div className="flex  h-12 ">
+              <CodeLine code={`user.revertToInitialState()`} />
+              <button
+                type="button"
+                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px] cursor-pointer"
+                onClick={() => user.revertToInitialState()}
+              >
+                Reset Form
+              </button>
+            </div>
+            <div className="  h-4 " />
+            <div className="flex  h-12 ">
+              <CodeLine code={` user.validateZodSchema()`} />
+              <button
+                type="button"
+                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px] cursor-pointer"
+                onClick={() => {
+                  console.log("validating", user);
+                  user.validateZodSchema();
+                }}
+              >
+                Simulated Save
+              </button>
+            </div>{" "}
+            <CodeExampleDropdown />
+            <div className="  h-4 " />
+          </div>
           <div className="bg-white rounded-lg p-6">
             <div className="grid grid-cols-1 gap-6">
               {/* User Form */}
@@ -221,26 +250,23 @@ export default function FormsMain() {
                 </h3>
 
                 <div>
-                  {user.firstName.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          First Name
-                        </label>
-                        <input
-                          type="text"
-                          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                          value={params.get()}
-                          onChange={(e) => params.set(e.target.value)}
-                        />
-                      </div>
-                    ),
-                    {
-                      validation: {
-                        message: "First name is required",
-                      },
-                    }
-                  )}
+                  {user.firstName.formElement((params) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        First Name
+                      </label>
+                      <input
+                        type="text"
+                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
+                          params.validationErrors().length > 0
+                            ? "border-red-500"
+                            : ""
+                        }`}
+                        value={params.get()}
+                        onChange={(e) => params.set(e.target.value)}
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 <div>
@@ -253,14 +279,18 @@ export default function FormsMain() {
                         <input
                           type="text"
                           className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                          value={params.get()}
-                          onChange={(e) => params.set(e.target.value)}
+                          {...params.inputProps}
                         />
+                        {params.validationErrors().map((error, index) => (
+                          <div key={index} className="text-red-500">
+                            <TriangleIcon className="inline-block" />
+                          </div>
+                        ))}
                       </div>
                     ),
                     {
                       validation: {
-                        message: "Last name is required",
+                        hideMessage: true,
                       },
                     }
                   )}
@@ -276,7 +306,11 @@ export default function FormsMain() {
                         <input
                           {...params.inputProps}
                           type="email"
-                          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
+                            params.validationErrors().length > 0
+                              ? "border-red-500"
+                              : ""
+                          }`}
                         />
                       </div>
                     ),
@@ -319,29 +353,18 @@ export default function FormsMain() {
               </div>
               {/* Address Form */}
               <div>
-                <div className=" p-4 rounded-lg  mb-4">
-                  <div className="flex justify-between items-center">
-                    <button
-                      onClick={addNewAddress}
-                      className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
-                    >
-                      Add New Address
-                    </button>
-                  </div>
+                <div className=" rounded-lg  mb-4">
                   {/* Address Navigation */}
-                  {user.addresses.get().length > 0 && (
-                    <div className="mt-4 flex items-center">
-                      <div className="text-sm text-amber-800 font-medium mr-2">
-                        Addresses
-                      </div>
-                      <div className="flex space-x-2">
-                        {user.addresses.stateMap((_, setter, index) => {
-                          console.log("setter", setter.showValidationErrors());
-                          return (
-                            <button
-                              key={index}
-                              onClick={() => setCurrentAddressIndex(index)}
-                              className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
+
+                  <div className=" font-medium ">Addresses</div>
+                  <div className="h-2" />
+                  <div className="flex space-x-2">
+                    {user.addresses.stateMap((_, setter, index) => {
+                      return (
+                        <button
+                          key={index}
+                          onClick={() => setCurrentAddressIndex(index)}
+                          className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
                                  ${
                                    setter.showValidationErrors().length > 0
                                      ? "border-2 border-red-500 bg-red-400"
@@ -349,15 +372,19 @@ export default function FormsMain() {
                                      ? "bg-amber-400 text-white"
                                      : "bg-amber-200 text-amber-800 hover:bg-amber-300"
                                  }`}
-                            >
-                              {index + 1}
-                              {}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}{" "}
+                        >
+                          {index + 1}
+                          {}
+                        </button>
+                      );
+                    })}{" "}
+                    <button
+                      onClick={addNewAddress}
+                      className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
+                    >
+                      Add
+                    </button>
+                  </div>
                 </div>
                 {user.addresses.get().length > 1 && (
                   <button
@@ -499,51 +526,6 @@ export default function FormsMain() {
               </div>
             </div>
           </div>{" "}
-          <div>
-            {" "}
-            This is the only validation setup
-            <CodeLine
-              code={`setCogsOptions("user", {
-  validation: {
-    key: "userValidation",
-    zodSchema: userSchema,
-  },
-  formElements: {
-    validation: ({ children, active, message }) => (
-      <div>
-        {children}
-        {active && <div className="error-message">{message}</div>}
-      </div>
-    ),
-  },
-});`}
-            />{" "}
-            <div className="  h-4 " />
-            <div className="flex  h-12 ">
-              <CodeLine code={`user.revertToInitialState()`} />
-              <button
-                type="button"
-                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px]"
-                onClick={() => user.revertToInitialState()}
-              >
-                Reset Form
-              </button>
-            </div>
-            <div className="  h-4 " />
-            <div className="flex  h-12 ">
-              <CodeLine code={` user.validateZodSchema()`} />
-              <button
-                type="button"
-                className="px-4 py-2 border-2 border-amber-400 text-amber-700 rounded-md hover:bg-amber-50 min-w-[200px]"
-                onClick={() => {
-                  console.log("validating", user);
-                  user.validateZodSchema();
-                }}
-              >
-                Simulated Save
-              </button>
-            </div>{" "}
-          </div>
         </div>
       </div>
     </div>
