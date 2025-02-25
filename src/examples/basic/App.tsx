@@ -238,7 +238,7 @@ const CustomIdComponent = () => {
     );
 };
 
-const ComponentTriggers = () => {
+function ComponentList() {
     const cart = useCogsState("cart");
     const componentsData = cart.getComponents();
 
@@ -246,12 +246,8 @@ const ComponentTriggers = () => {
     const componentsMap = componentsData?.components;
 
     return (
-        <div className="bg-white rounded-lg p-6">
-            <h2 className="text-lg font-semibold mb-3">Components</h2>
-            Click to force update a component
-            <div className="h-6" />
-            Some component ids will be for the form itself and this component{" "}
-            <div className="h-6" />
+        <>
+            {" "}
             {componentsMap && componentsMap instanceof Map ? (
                 <div className="space-y-2">
                     {[...componentsMap.entries()].map(
@@ -279,12 +275,30 @@ const ComponentTriggers = () => {
                     Components map not found or not iterable
                 </div>
             )}
+        </>
+    );
+}
+
+const ComponentTriggers = () => {
+    return (
+        <div className="bg-white rounded-lg p-6">
+            <h2 className="text-lg font-semibold mb-3">Components</h2>
+            All the components that use some version fo the following hook will
+            bne displayed here
+            <CodeLine code={`  const cart = useCogsState("cart");`} />{" "}
+            <div className="h-1" />
+            Click them to force a component re-render.
+            <div className="h-6" />
+            Some component ids will be for the form itself and this component{" "}
+            <div className="h-6" />
             <div className="h-4" />
+            <ComponentList />
+            <div className="h-4" />{" "}
             <div>
                 You can even add custom component Ids to components for easy
                 reference
             </div>{" "}
-            <div className="h-4" />
+            <div className="h-2" />
             <CustomIdComponent />
         </div>
     );
@@ -384,69 +398,74 @@ const ComponentCodeView = () => {
     );
 };
 
-// Modified App component with code toggles
-export default function App() {
+function TabbedSection() {
     const [tab, setTab] = useState<
         "description" | "json" | "component" | "code"
     >("description");
+    return (
+        <div className=" flex flex-col gap-1">
+            <div className="flex border-b border-gray-200">
+                <button
+                    className={`px-4 py-2 text-sm font-medium cursor-pointer ${
+                        tab === "description"
+                            ? "text-blue-600 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setTab("description")}
+                >
+                    Description
+                </button>
+                <button
+                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
+                        tab === "json"
+                            ? "text-blue-600 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setTab("json")}
+                >
+                    JSON
+                </button>{" "}
+                <button
+                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
+                        tab === "component"
+                            ? "text-blue-600 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setTab("component")}
+                >
+                    Trigger Component Render
+                </button>{" "}
+                <button
+                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
+                        tab === "code"
+                            ? "text-blue-600 border-b-2 border-blue-500"
+                            : "text-gray-500 hover:text-gray-700"
+                    }`}
+                    onClick={() => setTab("code")}
+                >
+                    Component Code
+                </button>
+            </div>
+            {tab === "description" && <CartComponentsDescription />}
+            {tab === "component" && <ComponentTriggers />}
+            {tab === "json" && <JSONView />}
+            {tab === "code" && <ComponentCodeView />}
+        </div>
+    );
+}
+
+// Modified App component with code toggles
+export default function App() {
     return (
         <div className="flex flex-col items-center justify-center w-full">
             <div className="h-6" />
             <div className="w-[90%]">
                 <div className="w-full bg-sky-50 rounded-lg p-6 flex flex gap-4">
                     <div className="bg-white rounded-lg p-6 flex-1 flex gap-4">
-                        <div className=" flex flex-col gap-1">
-                            <div className="flex border-b border-gray-200">
-                                <button
-                                    className={`px-4 py-2 text-sm font-medium cursor-pointer ${
-                                        tab === "description"
-                                            ? "text-blue-600 border-b-2 border-blue-500"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                                    onClick={() => setTab("description")}
-                                >
-                                    Description
-                                </button>
-                                <button
-                                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
-                                        tab === "json"
-                                            ? "text-blue-600 border-b-2 border-blue-500"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                                    onClick={() => setTab("json")}
-                                >
-                                    JSON
-                                </button>{" "}
-                                <button
-                                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
-                                        tab === "component"
-                                            ? "text-blue-600 border-b-2 border-blue-500"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                                    onClick={() => setTab("component")}
-                                >
-                                    Trigger Component Render
-                                </button>{" "}
-                                <button
-                                    className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
-                                        tab === "code"
-                                            ? "text-blue-600 border-b-2 border-blue-500"
-                                            : "text-gray-500 hover:text-gray-700"
-                                    }`}
-                                    onClick={() => setTab("code")}
-                                >
-                                    Component Code
-                                </button>
-                            </div>
-                            {tab === "description" && (
-                                <CartComponentsDescription />
-                            )}
-                            {tab === "component" && <ComponentTriggers />}
-                            {tab === "json" && <JSONView />}
-                            {tab === "code" && <ComponentCodeView />}
-                        </div>
+                        {" "}
+                        <TabbedSection />
                     </div>{" "}
-                    <div className="rounded-lg border-2 border-blue-500 w-[400px] bg-white">
+                    <div className="rounded-lg border-2 border-orange-500 w-[400px] bg-white">
                         <ProductList />
                     </div>
                     <div className="flex flex-col gap-2 w-[500px]">
