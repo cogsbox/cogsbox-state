@@ -217,12 +217,12 @@ export const FormControlComponent = <TStateObject,>({
     );
 
     const initialOptions = getInitialOptions(stateKey);
-    if (!initialOptions?.validationKey) {
+    if (!initialOptions?.validation?.key) {
         throw new Error(
             "Validation key not found. You need ot set it in the options for the createCogsState function",
         );
     }
-    const validationKey = initialOptions.validationKey;
+    const validationKey = initialOptions.validation?.key;
     useEffect(() => {
         setInputValue(stateValue);
     }, [stateKey, path.join("."), stateValue]);

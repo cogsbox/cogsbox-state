@@ -1,4 +1,5 @@
 // state.ts
+import { z, ZodSchema } from "zod";
 import { createCogsState } from "../../../CogsState";
 
 type Address = {
@@ -41,44 +42,45 @@ const initialState: StateType = {
         ],
     },
 };
+const userSchema = z.object({
+    firstName: z.string().min(2),
+    lastName: z.string().min(2),
+    email: z.string().email(),
+    phone: z.string().min(10),
+    addresses: z.array(
+        z.object({
+            street: z.string().min(2),
+            city: z.string().min(2),
+            state: z.string().min(2),
+            zipCode: z.string().min(5),
+            country: z.string().min(2),
+            isDefault: z.boolean(),
+        })
+    ),
+});
 
 // Create the CogsState with validation
 export const { useCogsState, setCogsOptions } = createCogsState(initialState);
 
 // Set up additional options for specific state keys
 setCogsOptions("user", {
-    validationKey: "userValidation",
+    validation: {
+        key: "userValidation",
+        zodSchema: userSchema,
+    },
     formElements: {
         validation: ({ children, active, message }) => (
-            <div className="form-field">
-                {children}
-                {active && <div className="error-message">{message}</div>}
+            <div>
+                {active ? (
+                    <div className="font-bold text-red-500  ">
+                        {" "}
+                        {children}
+                        {message}
+                    </div>
+                ) : (
+                    children
+                )}
             </div>
         ),
     },
 });
-
-// Sample validation utility functions
-export const validateEmail = (email: string): string | null => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email) ? null : "Please enter a valid email address";
-};
-
-export const validateRequired = (
-    value: string,
-    fieldName: string
-): string | null => {
-    return value?.trim() ? null : `${fieldName} is required`;
-};
-
-export const validatePhone = (phone: string): string | null => {
-    const phoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/;
-    return phoneRegex.test(phone)
-        ? null
-        : "Phone format should be (555) 123-4567";
-};
-
-export const validateZipCode = (zipCode: string): string | null => {
-    const zipRegex = /^\d{5}(-\d{4})?$/;
-    return zipRegex.test(zipCode) ? null : "Please enter a valid ZIP code";
-};

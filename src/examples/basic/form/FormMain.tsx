@@ -84,17 +84,24 @@ export default function FormsMain() {
 ))}
 
 // With validation
-{stateObject.field.formElement((params) => (
-  <>
-    <input value={params.get()} onChange={(e) => params.set(e.target.value)} />
-    {params.validationErrors().length > 0 && (
-      <div className="error">{params.validationErrors().join(', ')}</div>
-    )}
-  </>
-), {
-  validation: { message: "Field is required" },
-  debounceTime: 300
-})}`}
+{stateObject.field.formElement(
+  (params) => (
+    <>
+      <input 
+        value={params.get()} 
+        onChange={(e) => params.set(e.target.value)} 
+      />
+      {params.validationErrors().length > 0 && (
+        <div className="error">
+          {params.validationErrors().join(", ")}
+        </div>
+      )}
+    </>
+  ), 
+  {
+    validation: { message: "Field is required" }
+  }
+)}`}
                                         />
                                     </div>
 
@@ -235,7 +242,7 @@ export default function FormsMain() {
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                     value={params.get()}
                                                     onChange={(e) =>
                                                         params.set(
@@ -263,7 +270,7 @@ export default function FormsMain() {
                                                 </label>
                                                 <input
                                                     type="text"
-                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                     value={params.get()}
                                                     onChange={(e) =>
                                                         params.set(
@@ -292,7 +299,7 @@ export default function FormsMain() {
                                                 <input
                                                     {...params.inputProps}
                                                     type="email"
-                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                 />
                                             </div>
                                         ),
@@ -314,7 +321,7 @@ export default function FormsMain() {
                                                 </label>
                                                 <input
                                                     type="tel"
-                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                     value={params.get()}
                                                     onChange={(e) =>
                                                         params.set(
@@ -342,14 +349,13 @@ export default function FormsMain() {
                                     )}
                                 </div>
                             </div>
-
                             {/* Address Form */}
                             <div>
                                 <div className=" p-4 rounded-lg  mb-4">
                                     <div className="flex justify-between items-center">
                                         <button
                                             onClick={addNewAddress}
-                                            className="px-3 py-1 bg-orange-500 text-white text-sm rounded hover:bg-orange-600"
+                                            className="px-3 py-1 bg-orange-400 text-white text-sm rounded hover:bg-orange-600 cursor-pointer"
                                         >
                                             Add New Address
                                         </button>
@@ -375,7 +381,7 @@ export default function FormsMain() {
                                                             className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
                               ${
                                   currentAddressIndex === index
-                                      ? "bg-orange-500 text-white"
+                                      ? "bg-orange-400 text-white"
                                       : "bg-orange-200 text-orange-800 hover:bg-orange-300"
                               }`}
                                                         >
@@ -401,7 +407,7 @@ export default function FormsMain() {
                                                     }}
                                                     className="ml-auto px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
                                                 >
-                                                    Remove
+                                                    Remove Selected Address
                                                 </button>
                                             )}
                                         </div>
@@ -422,7 +428,7 @@ export default function FormsMain() {
                                                             </label>
                                                             <input
                                                                 type="text"
-                                                                className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                                className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                                 value={params.get()}
                                                                 onChange={(e) =>
                                                                     params.set(
@@ -453,7 +459,7 @@ export default function FormsMain() {
                                                                 </label>
                                                                 <input
                                                                     type="text"
-                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                                     value={params.get()}
                                                                     onChange={(
                                                                         e
@@ -479,7 +485,7 @@ export default function FormsMain() {
                                                                 </label>
                                                                 <input
                                                                     type="text"
-                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                                     value={params.get()}
                                                                     onChange={(
                                                                         e
@@ -508,7 +514,7 @@ export default function FormsMain() {
                                                                 </label>
                                                                 <input
                                                                     type="text"
-                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                                     value={params.get()}
                                                                     onChange={(
                                                                         e
@@ -533,7 +539,7 @@ export default function FormsMain() {
                                                                     Country
                                                                 </label>
                                                                 <select
-                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-500 p-2 focus:border-orange-600 focus:ring-orange-600"
+                                                                    className="mt-1 block w-full rounded-md border-2 border-orange-400 p-2 focus:border-orange-600 focus:ring-orange-600"
                                                                     value={params.get()}
                                                                     onChange={(
                                                                         e
@@ -573,7 +579,7 @@ export default function FormsMain() {
                                                         <div className="flex items-center">
                                                             <input
                                                                 type="checkbox"
-                                                                className="h-4 w-4 text-orange-500 focus:ring-orange-500 border-orange-300 rounded"
+                                                                className="h-4 w-4 text-orange-400 focus:ring-orange-400 border-orange-300 rounded"
                                                                 checked={params.get()}
                                                                 onChange={(e) =>
                                                                     params.set(
@@ -597,27 +603,50 @@ export default function FormsMain() {
                                     </div>
                                 )}
                             </div>
-
                             {/* Form Actions */}
-                            <div className="mt-4 flex justify-end space-x-4 ">
+                            <div className="flex  h-12 ">
                                 <CodeLine
                                     code={`user.revertToInitialState()`}
                                 />
                                 <button
                                     type="button"
-                                    className="px-4 py-2 border-2 border-orange-500 text-orange-700 rounded-md hover:bg-orange-50"
+                                    className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
                                     onClick={() => user.revertToInitialState()}
                                 >
                                     Reset Form
                                 </button>
                             </div>
-                            <button
-                                type="button"
-                                className="px-4 py-2 bg-orange-500 text-white rounded-md hover:bg-orange-600"
-                                onClick={() => setActiveTab("json")}
-                            >
-                                View JSON
-                            </button>
+                            the save Button validates from the schema passed in{" "}
+                            <CodeLine
+                                code={` setCogsOptions("user", {
+                                validation: {
+                                    key: "userValidation",
+                                    zodSchema: userSchema,
+                                },
+                                formElements: {
+                                    validation: ({ children, active, message }) => (
+                                        <div>
+                                            {children}
+                                            {active && <div className="error-message">{message}</div>}
+                                        </div>
+                                    ),
+                                },
+                            });
+                            `}
+                            />
+                            <div className="flex  h-12 ">
+                                <CodeLine code={` user.validateZodSchema()`} />
+                                <button
+                                    type="button"
+                                    className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
+                                    onClick={() => {
+                                        console.log("validating", user);
+                                        user.validateZodSchema();
+                                    }}
+                                >
+                                    Simulated Save
+                                </button>
+                            </div>{" "}
                         </div>
                     </div>
                 </div>

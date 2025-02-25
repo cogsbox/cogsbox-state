@@ -73,19 +73,19 @@ const v = (o, t, e = (n, r) => JSON.stringify(n) === JSON.stringify(r)) => {
       u();
     };
   }, [o]), n;
-}, C = (o, t, e) => {
+}, k = (o, t, e) => {
   const n = o + "." + (t.length > 0 ? [t.join(".")] : []) + (e && e.length > 0 ? "." + e : "");
   return e?.length === 0 ? [] : v(
     n,
     (r, s) => r.getValidationErrors(s) || []
   );
-}, $ = (o, t) => {
+}, C = (o, t) => {
   const e = `${o}:${t.join(".")}`;
   return v(
     e,
     (n, r) => n.getSyncInfo(r)
   );
-}, k = (o, t) => v(
+}, $ = (o, t) => v(
   `${o}:${t.join(".")}`,
   (e, n) => e.getNestedState(o, t)
 ), P = ({
@@ -95,14 +95,14 @@ const v = (o, t, e = (n, r) => JSON.stringify(n) === JSON.stringify(r)) => {
   formOpts: n,
   stateKey: r
 }) => {
-  const { getValidationErrors: s, getInitialOptions: i } = l.getState(), c = k(r, t), [u, a] = S.useState(
+  const { getValidationErrors: s, getInitialOptions: i } = l.getState(), c = $(r, t), [u, a] = S.useState(
     l.getState().getNestedState(r, t)
   ), g = i(r);
-  if (!g?.validationKey)
+  if (!g?.validation?.key)
     throw new Error(
       "Validation key not found. You need ot set it in the options for the createCogsState function"
     );
-  const m = g.validationKey;
+  const m = g.validation?.key;
   S.useEffect(() => {
     a(c);
   }, [r, t.join("."), c]);
@@ -115,7 +115,7 @@ const v = (o, t, e = (n, r) => JSON.stringify(n) === JSON.stringify(r)) => {
   S.useEffect(() => () => {
     f.current && clearTimeout(f.current);
   }, []);
-  const j = $(r, t), F = j ? {
+  const j = C(r, t), F = j ? {
     ...j,
     date: new Date(j.timeStamp)
   } : null, w = e({
@@ -149,7 +149,7 @@ function G({
   children: r,
   validIndices: s
 }) {
-  const { getInitialOptions: i, getValidationErrors: c } = l.getState(), u = C(
+  const { getInitialOptions: i, getValidationErrors: c } = l.getState(), u = k(
     e,
     t,
     s
@@ -174,9 +174,9 @@ export {
   D as cutFunc,
   U as pushFunc,
   R as updateFn,
-  k as useGetKeyState,
-  $ as useGetSyncInfo,
-  C as useGetValidationErrors,
+  $ as useGetKeyState,
+  C as useGetSyncInfo,
+  k as useGetValidationErrors,
   v as useStoreSubscription
 };
 //# sourceMappingURL=Functions.jsx.map

@@ -28,7 +28,7 @@ import {
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
-import { ZodObject, type ZodRawShape } from "zod";
+import { ZodArray, ZodObject, type ZodRawShape } from "zod";
 
 import { getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
@@ -207,6 +207,7 @@ export type StateObject<T> = (T extends any[]
     EndType<T, true> & {
         _componentId: string | null;
         getComponents: () => ComponentsType;
+        validateZodSchema: () => void;
         _initialState: T;
         updateInitialState: (newState: T | null) => {
             fetchId: (field: keyof T) => string | number;
@@ -280,7 +281,11 @@ export type ReactivityType = "none" | "component" | "deps" | "all";
 export type OptionsType<T extends unknown = unknown> = {
     componentId?: string;
     serverSync?: ServerSyncType<T>;
-    validationKey?: string;
+    validation?: {
+        key?: string;
+        zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+    };
+
     enableServerState?: boolean;
     middleware?: ({
         updateLog,
@@ -290,7 +295,6 @@ export type OptionsType<T extends unknown = unknown> = {
         update: UpdateTypeDetail;
     }) => void;
 
-    zodSchema?: ZodObject<ZodRawShape>;
     modifyState?: (state: T) => T;
     localStorage?: { key: string | ((state: T) => string) };
     formElements?: FormsElementsType;
@@ -382,13 +386,6 @@ export type CogsInitialState<T> = {
 export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
-
-export function addStateOptions<T extends unknown>(
-    initialState: T,
-    { formElements, zodSchema }: OptionsType<T>,
-) {
-    return { initialState: initialState, formElements, zodSchema } as T;
-}
 
 function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     const getInitialOptions = getGlobalStore.getState().getInitialOptions;
@@ -601,7 +598,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     {
         stateKey,
         serverSync,
-        zodSchema,
         localStorage,
         formElements,
         middleware,
@@ -683,7 +679,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
             setAndMergeOptions(thisKey as string, {
                 serverSync,
                 formElements,
-                zodSchema,
                 initState,
                 localStorage,
                 middleware,
@@ -1554,7 +1549,93 @@ function createProxyHandler<T>(
                 }
 
                 if (path.length == 0) {
-                    if (prop == "_componentId") return componentId;
+                    if (prop === "validateZodSchema") {
+                        return () => {
+                            const init = getGlobalStore
+                                .getState()
+                                .getInitialOptions(stateKey)?.validation;
+                            const addValidationError =
+                                getGlobalStore.getState().addValidationError;
+                            const removeValidationError =
+                                getGlobalStore.getState().removeValidationError;
+
+                            if (!init?.zodSchema) {
+                                throw new Error("Zod schema not found");
+                            }
+
+                            if (!init?.key) {
+                                throw new Error("Validation key not found");
+                            }
+                            removeValidationError(init.key);
+                            const thisObject =
+                                getGlobalStore.getState().cogsStateStore[
+                                    stateKey
+                                ];
+
+                            try {
+                                // First clear any existing validation errors for this schema
+                                // This ensures we don't have stale errors
+                                const existingErrors = getGlobalStore
+                                    .getState()
+                                    .getValidationErrors(init.key);
+                                if (
+                                    existingErrors &&
+                                    existingErrors.length > 0
+                                ) {
+                                    existingErrors.forEach(([errorPath]) => {
+                                        if (
+                                            errorPath &&
+                                            errorPath.startsWith(init.key!)
+                                        ) {
+                                            removeValidationError(errorPath);
+                                        }
+                                    });
+                                }
+
+                                // Attempt to validate with Zod
+                                const result =
+                                    init.zodSchema.safeParse(thisObject);
+
+                                if (!result.success) {
+                                    // Process Zod errors and add them to the validation store
+                                    const zodErrors = result.error.errors;
+
+                                    zodErrors.forEach((error) => {
+                                        const errorPath = error.path;
+                                        const errorMessage = error.message;
+
+                                        // Build the full path for the validation error
+                                        // Format: validationKey.path.to.field
+                                        const fullErrorPath = [
+                                            init.key,
+                                            ...errorPath,
+                                        ].join(".");
+
+                                        // Add the error to the store
+                                        addValidationError(
+                                            fullErrorPath,
+                                            errorMessage,
+                                        );
+
+                                        console.log(
+                                            `Validation error at ${fullErrorPath}: ${errorMessage}`,
+                                        );
+                                    });
+
+                                    return false;
+                                }
+
+                                return true;
+                            } catch (error) {
+                                console.error(
+                                    "Zod schema validation failed",
+                                    error,
+                                );
+                                return false;
+                            }
+                        };
+                    }
+                    if (prop === "_componentId") return componentId;
                     if (prop === "getComponents") {
                         return () =>
                             getGlobalStore().stateComponents.get(stateKey);
@@ -1595,8 +1676,8 @@ function createProxyHandler<T>(
                             validationKey={
                                 getGlobalStore
                                     .getState()
-                                    .getInitialOptions(stateKey)
-                                    ?.validationKey || ""
+                                    .getInitialOptions(stateKey)?.validation
+                                    ?.key || ""
                             }
                             stateKey={stateKey}
                             validIndices={meta?.validIndices}

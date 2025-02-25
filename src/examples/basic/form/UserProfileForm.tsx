@@ -4,9 +4,7 @@ import { useCogsState } from "./state";
 // User Profile Form Component
 const UserProfileForm = () => {
     // Get user state with validation key
-    const user = useCogsState("user", {
-        validationKey: "userForm",
-    });
+    const user = useCogsState("user");
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();

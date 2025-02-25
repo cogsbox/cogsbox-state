@@ -1,6 +1,6 @@
 import { GenericObject } from './utility.js';
 import { UseMutationResult } from '@tanstack/react-query';
-import { ZodObject, ZodRawShape } from 'zod';
+import { ZodArray, ZodObject, ZodRawShape } from 'zod';
 import { ComponentsType } from './store.js';
 
 type Prettify<T> = {
@@ -113,6 +113,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
 } & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
     _componentId: string | null;
     getComponents: () => ComponentsType;
+    validateZodSchema: () => void;
     _initialState: T;
     updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;
@@ -163,13 +164,15 @@ export type ReactivityType = "none" | "component" | "deps" | "all";
 export type OptionsType<T extends unknown = unknown> = {
     componentId?: string;
     serverSync?: ServerSyncType<T>;
-    validationKey?: string;
+    validation?: {
+        key?: string;
+        zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+    };
     enableServerState?: boolean;
     middleware?: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;
     }) => void;
-    zodSchema?: ZodObject<ZodRawShape>;
     modifyState?: (state: T) => T;
     localStorage?: {
         key: string | ((state: T) => string);
@@ -255,7 +258,6 @@ export type CogsInitialState<T> = {
 export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
-export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, zodSchema }: OptionsType<T>): T;
 export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opts?: {
     reRenderType?: "get" | "state" | "none";
 }) => {
@@ -268,7 +270,7 @@ type LocalStorageData<T> = {
     lastSyncedWithServer?: number;
     baseServerState?: T;
 };
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, zodSchema, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initState, syncUpdate, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initState, syncUpdate, }?: {
     stateKey?: string;
     componentId?: string;
 } & OptionsType<TStateObject>): [TStateObject, StateObject<TStateObject>];
