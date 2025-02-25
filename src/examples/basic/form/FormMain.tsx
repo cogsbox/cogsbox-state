@@ -28,7 +28,7 @@ export default function FormsMain() {
                     CogsState Form Examples
                 </h1>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left Column - Tabs for API Description and JSON */}
                     <div>
                         {/* Tabs Navigation */}
@@ -223,7 +223,6 @@ export default function FormsMain() {
                             </div>
                         )}
                     </div>
-
                     {/* Right Column - Forms (always visible) */}
                     <div className="bg-white rounded-lg p-6">
                         <div className="grid grid-cols-1 gap-6">
@@ -603,22 +602,22 @@ export default function FormsMain() {
                                     </div>
                                 )}
                             </div>
-                            {/* Form Actions */}
-                            <div className="flex  h-12 ">
-                                <CodeLine
-                                    code={`user.revertToInitialState()`}
-                                />
-                                <button
-                                    type="button"
-                                    className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
-                                    onClick={() => user.revertToInitialState()}
-                                >
-                                    Reset Form
-                                </button>
-                            </div>
-                            the save Button validates from the schema passed in{" "}
-                            <CodeLine
-                                code={` setCogsOptions("user", {
+                        </div>
+                    </div>{" "}
+                    <div>
+                        <div className="flex  h-12 ">
+                            <CodeLine code={`user.revertToInitialState()`} />
+                            <button
+                                type="button"
+                                className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
+                                onClick={() => user.revertToInitialState()}
+                            >
+                                Reset Form
+                            </button>
+                        </div>
+                        the save Button validates from the schema passed in{" "}
+                        <CodeLine
+                            code={` setCogsOptions("user", {
                                 validation: {
                                     key: "userValidation",
                                     zodSchema: userSchema,
@@ -633,21 +632,20 @@ export default function FormsMain() {
                                 },
                             });
                             `}
-                            />
-                            <div className="flex  h-12 ">
-                                <CodeLine code={` user.validateZodSchema()`} />
-                                <button
-                                    type="button"
-                                    className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
-                                    onClick={() => {
-                                        console.log("validating", user);
-                                        user.validateZodSchema();
-                                    }}
-                                >
-                                    Simulated Save
-                                </button>
-                            </div>{" "}
-                        </div>
+                        />
+                        <div className="flex  h-12 ">
+                            <CodeLine code={` user.validateZodSchema()`} />
+                            <button
+                                type="button"
+                                className="px-4 py-2 border-2 border-orange-400 text-orange-700 rounded-md hover:bg-orange-50 min-w-[200px]"
+                                onClick={() => {
+                                    console.log("validating", user);
+                                    user.validateZodSchema();
+                                }}
+                            >
+                                Simulated Save
+                            </button>
+                        </div>{" "}
                     </div>
                 </div>
             </div>

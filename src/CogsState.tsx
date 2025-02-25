@@ -1054,6 +1054,13 @@ function createProxyHandler<T>(
         },
 
         revertToInitialState: (obj?: { validationKey?: string }) => {
+            const init = getGlobalStore
+                .getState()
+                .getInitialOptions(stateKey)?.validation;
+            if (init?.key) {
+                removeValidationError(init?.key);
+            }
+
             if (obj?.validationKey) {
                 removeValidationError(obj.validationKey);
             }
@@ -1556,8 +1563,6 @@ function createProxyHandler<T>(
                                 .getInitialOptions(stateKey)?.validation;
                             const addValidationError =
                                 getGlobalStore.getState().addValidationError;
-                            const removeValidationError =
-                                getGlobalStore.getState().removeValidationError;
 
                             if (!init?.zodSchema) {
                                 throw new Error("Zod schema not found");
