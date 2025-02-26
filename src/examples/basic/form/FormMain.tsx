@@ -8,7 +8,9 @@ import CodeExampleDropdown from "./CodeExamples";
 export default function FormsMain() {
   const [activeTab, setActiveTab] = useState("description");
   const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
-  const user = useCogsState("user");
+  const user = useCogsState("user", {
+    reactiveDeps: (state) => [state.addresses],
+  });
 
   const addNewAddress = () => {
     user.addresses.insert({
@@ -212,140 +214,215 @@ export default function FormsMain() {
             <div className="grid grid-cols-1 gap-6">
               {/* User Form */}
               <div className="space-y-4">
-                {user.firstName.formElement((params) => (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">
-                      First Name
-                    </label>
-                    <input
-                      type="text"
-                      className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
-                      value={params.get()}
-                      onChange={(e) => params.set(e.target.value)}
-                    />
-                  </div>
-                ))}
-
-                {user.lastName.formElement(
-                  (params) => (
+                {/* First Name Field with explanation */}
+                <div className="bg-amber-50 p-3 rounded-md mb-4">
+                  <p className="text-xs text-amber-700 mb-2">
+                    <strong>Direct value/onChange pattern:</strong> This field
+                    demonstrates manually connecting the input to state using
+                    params.get() and params.set(). This gives you complete
+                    control over how the value is read and written.
+                  </p>
+                  {user.firstName.formElement((params) => (
                     <div>
                       <label className="block text-sm font-medium text-gray-700">
-                        Last Name
+                        First Name
                       </label>
                       <input
                         type="text"
-                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
-                          params.validationErrors().length > 0
-                            ? "border-red-500"
-                            : ""
-                        }`}
-                        {...params.inputProps}
-                      />
-                    </div>
-                  ),
-                  {
-                    validation: {
-                      hideMessage: true,
-                    },
-                  }
-                )}
-
-                {user.email.formElement(
-                  (params) => (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Email Address
-                      </label>
-                      <input
-                        {...params.inputProps}
-                        type="email"
                         className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
-                      />
-                    </div>
-                  ),
-                  {
-                    validation: {
-                      message: "Please enter a valid email address",
-                    },
-                  }
-                )}
-
-                {user.phone.formElement(
-                  (params) => (
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">
-                        Phone Number
-                      </label>
-                      <input
-                        type="tel"
-                        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
                         value={params.get()}
                         onChange={(e) => params.set(e.target.value)}
-                        placeholder="(555) 123-4567"
+                        onBlur={params.inputProps.onBlur}
+                        ref={params.inputProps.ref}
                       />
-                      {params.validationErrors().length > 0 && (
-                        <div className="text-xs text-red-500 mt-1">
-                          {params.validationErrors().join(", ")}
-                        </div>
-                      )}
                     </div>
-                  ),
-                  {
-                    validation: {
-                      message: "Please enter a valid phone number",
-                    },
-                  }
+                  ))}
+                </div>
+
+                {/* Last Name Field with explanation */}
+                <div className="bg-amber-50 p-3 rounded-md mb-4">
+                  <p className="text-xs text-amber-700 mb-2">
+                    <strong>Hidden validation:</strong> This field uses
+                    inputProps for simplified binding with the hideMessage
+                    option in the validation config to handle validation state
+                    without showing error messages. Notice the red border that
+                    appears when validation fails.
+                  </p>
+                  {user.lastName.formElement(
+                    (params) => (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Last Name
+                        </label>
+                        <input
+                          type="text"
+                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
+                            params.validationErrors().length > 0
+                              ? "border-red-500"
+                              : ""
+                          }`}
+                          {...params.inputProps}
+                        />
+                      </div>
+                    ),
+                    {
+                      validation: {
+                        hideMessage: true,
+                      },
+                    }
+                  )}
+                </div>
+
+                {/* Email Field with explanation */}
+                <div className="bg-amber-50 p-3 rounded-md mb-4">
+                  <p className="text-xs text-amber-700 mb-2">
+                    <strong>Custom validation message:</strong> This field
+                    demonstrates setting a custom validation message in the
+                    formElement options. The message is displayed when
+                    validation fails instead of using the default Zod error
+                    messages.
+                  </p>
+                  {user.email.formElement(
+                    (params) => (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Email Address
+                        </label>
+                        <input
+                          {...params.inputProps}
+                          type="email"
+                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
+                        />
+                      </div>
+                    ),
+                    {
+                      validation: {
+                        message: "Please enter a valid email address",
+                      },
+                    }
+                  )}
+                </div>
+
+                {/* Phone Field with explanation */}
+                <div className="bg-amber-50 p-3 rounded-md mb-4">
+                  <p className="text-xs text-amber-700 mb-2">
+                    <strong>Custom error display:</strong> This field shows how
+                    to manually display validation errors by using
+                    params.validationErrors() directly in the component. This
+                    gives you complete control over error presentation.
+                  </p>
+                  {user.phone.formElement(
+                    (params) => (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">
+                          Phone Number
+                        </label>
+                        <input
+                          type="tel"
+                          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                          value={params.get()}
+                          onChange={(e) => params.set(e.target.value)}
+                          onBlur={() => {
+                            params.addValidationError("custom onBlur");
+                          }}
+                          placeholder="(555) 123-4567"
+                        />
+                      </div>
+                    ),
+                    {
+                      validation: {
+                        message: "Please enter a valid phone number",
+                      },
+                    }
+                  )}
+                </div>
+              </div>
+              {/* Address Navigation with explanation */}
+              <div className="bg-amber-50 p-3 rounded-md mb-4">
+                <p className="text-xs text-amber-700 mb-2">
+                  <strong>Array management:</strong> This section demonstrates
+                  working with array data. The buttons below show how to render
+                  multiple items with stateMap, add/remove items, and track
+                  validation status for each array element.
+                </p>
+                <div className="font-medium">Addresses</div>
+
+                <div className="flex space-x-2 mt-2 relative">
+                  {user.addresses.stateMap((_, setter, index) => {
+                    const errorCount = setter.showValidationErrors().length;
+                    return (
+                      <button
+                        key={index}
+                        onClick={() => setCurrentAddressIndex(index)}
+                        className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer relative
+                  ${
+                    errorCount > 0
+                      ? "border-2 border-red-500 bg-red-400"
+                      : currentAddressIndex === index
+                      ? "bg-amber-400 text-white"
+                      : "bg-amber-200 text-amber-800 hover:bg-amber-300"
+                  }`}
+                      >
+                        {index + 1}
+                        {errorCount > 0 && (
+                          <div className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold shadow-md">
+                            {errorCount}
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}{" "}
+                  <button
+                    onClick={addNewAddress}
+                    className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
+                  >
+                    Add
+                  </button>
+                </div>
+
+                {user.addresses.get().length > 1 && (
+                  <button
+                    onClick={() => {
+                      user.addresses.cut(currentAddressIndex);
+                      setCurrentAddressIndex(
+                        Math.max(0, currentAddressIndex - 1)
+                      );
+                    }}
+                    className="ml-auto px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600 mt-2"
+                  >
+                    Remove Selected Address
+                  </button>
                 )}
               </div>
-
-              {/* Address Navigation */}
-
-              <div className=" font-medium ">Addresses</div>
-
-              <div className="flex space-x-2">
-                {user.addresses.stateMap((_, setter, index) => {
-                  return (
-                    <button
-                      key={index}
-                      onClick={() => setCurrentAddressIndex(index)}
-                      className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer
-                                 ${
-                                   setter.showValidationErrors().length > 0
-                                     ? "border-2 border-red-500 bg-red-400"
-                                     : currentAddressIndex === index
-                                     ? "bg-amber-400 text-white"
-                                     : "bg-amber-200 text-amber-800 hover:bg-amber-300"
-                                 }`}
-                    >
-                      {index + 1}
-                      {}
-                    </button>
-                  );
-                })}{" "}
+              <div className="flex gap-2 h-8 w-full px-4 justify-between">
                 <button
-                  onClick={addNewAddress}
-                  className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
+                  type="button"
+                  className="px-2 py-0.5 border-1 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[150px] cursor-pointer"
+                  onClick={() => user.revertToInitialState()}
                 >
-                  Add
+                  Reset Form
                 </button>
-              </div>
 
-              {user.addresses.get().length > 1 && (
                 <button
+                  type="button"
+                  className="px-2 py-0.5 border-1 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[150px] cursor-pointer"
                   onClick={() => {
-                    user.addresses.cut(currentAddressIndex);
-                    setCurrentAddressIndex(
-                      Math.max(0, currentAddressIndex - 1)
-                    );
+                    console.log("validating", user);
+                    user.validateZodSchema();
                   }}
-                  className="ml-auto px-2 py-1 bg-red-500 text-white text-sm rounded hover:bg-red-600"
                 >
-                  Remove Selected Address
+                  Simulated Save
                 </button>
-              )}
+              </div>{" "}
               {/* Current Address Form */}
               {user.addresses.get().length > 0 && (
-                <div className="space-y-4">
+                <div className="space-y-4 bg-amber-50 p-3 rounded-md">
+                  <p className="text-xs text-amber-700 mb-2">
+                    <strong>Nested array access:</strong> These fields
+                    demonstrate how to access and update elements in a nested
+                    array using the index() method. Notice how validation works
+                    correctly for each array element.
+                  </p>{" "}
                   <div className="grid grid-cols-1 gap-4">
                     {user.addresses
                       .index(currentAddressIndex)
@@ -404,7 +481,6 @@ export default function FormsMain() {
                           </div>
                         ))}
                     </div>
-
                     {/* Zip and Country in a row */}
                     <div className="grid grid-cols-2 gap-4">
                       {user.addresses
@@ -443,27 +519,33 @@ export default function FormsMain() {
                           </div>
                         ))}
                     </div>
-
                     {/* Default Address Checkbox */}
-                    {user.addresses
-                      .index(currentAddressIndex)
-                      .isDefault.formElement((params) => (
-                        <div className="flex items-center">
-                          <input
-                            type="checkbox"
-                            className="h-4 w-4 text-amber-400 focus:ring-amber-400 border-amber-300 rounded"
-                            checked={params.get()}
-                            onChange={(e) => params.set(e.target.checked)}
-                            id={`default-address-${currentAddressIndex}`}
-                          />
-                          <label
-                            htmlFor={`default-address-${currentAddressIndex}`}
-                            className="ml-2 block text-sm text-gray-700"
-                          >
-                            Set as default address
-                          </label>
-                        </div>
-                      ))}
+                    <div className="bg-amber-100 p-2 rounded-md">
+                      <p className="text-xs text-amber-700 mb-2">
+                        <strong>Boolean field handling:</strong> For boolean the
+                        standard debounce time is interally set to 20ms instead
+                        of the usual 200ms
+                      </p>
+                      {user.addresses
+                        .index(currentAddressIndex)
+                        .isDefault.formElement((params) => (
+                          <div className="flex items-center">
+                            <input
+                              type="checkbox"
+                              className="h-4 w-4 text-amber-400 focus:ring-amber-400 border-amber-300 rounded"
+                              checked={params.get()}
+                              onChange={(e) => params.set(e.target.checked)}
+                              id={`default-address-${currentAddressIndex}`}
+                            />
+                            <label
+                              htmlFor={`default-address-${currentAddressIndex}`}
+                              className="ml-2 block text-sm text-gray-700"
+                            >
+                              Set as default address
+                            </label>
+                          </div>
+                        ))}
+                    </div>
                   </div>
                 </div>
               )}

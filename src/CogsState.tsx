@@ -30,7 +30,7 @@ import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
 import { boolean, ZodArray, ZodObject, type ZodRawShape } from "zod";
 
-import { getGlobalStore, type ComponentsType } from "./store.js";
+import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
@@ -56,8 +56,10 @@ export type FormElementParmas<T> = {
   syncStatus: (SyncInfo & { date: Date }) | null;
   path: string[];
   validationErrors: () => string[];
+  addValidationError: (message?: string) => void;
 
   inputProps: {
+    ref?: React.RefObject<any>;
     value?: T;
     onChange?: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -185,6 +187,7 @@ export type EndType<T, IsArrayElement = false> = {
   ignoreFields: (fields: string[]) => StateObject<T>;
   _selected: boolean;
   setSelected: (value: boolean) => void;
+  getFormRef: () => React.RefObject<any> | undefined;
   validationWrapper: ({
     children,
     hideMessage,
@@ -205,6 +208,7 @@ export type StateObject<T> = (T extends any[]
       ? T
       : never) &
   EndType<T, true> & {
+    getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;
@@ -1565,6 +1569,12 @@ function createProxyHandler<T>(
           if (prop === "getComponents") {
             return () => getGlobalStore().stateComponents.get(stateKey);
           }
+          if (prop === "getAllFormRefs") {
+            return () => {
+              return formRefStore.getState().getFormRefsByStateKey(stateKey);
+            };
+          }
+
           if (prop === "_initialState")
             return getGlobalStore.getState().initialStateGlobal[stateKey];
           if (prop === "_serverState")
@@ -1575,6 +1585,13 @@ function createProxyHandler<T>(
             return baseObj.revertToInitialState;
           if (prop === "updateInitialState") return baseObj.updateInitialState;
           if (prop === "removeValidation") return baseObj.removeValidation;
+        }
+        if (prop === "getFormRef") {
+          return () => {
+            return formRefStore
+              .getState()
+              .getFormRef(stateKey + "." + path.join("."));
+          };
         }
 
         if (prop === "validationWrapper") {

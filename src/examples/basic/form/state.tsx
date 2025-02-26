@@ -36,7 +36,7 @@ const initialState: StateType = {
         city: "",
         state: "",
         zipCode: "",
-        country: "",
+        country: "USA",
         isDefault: false,
       },
     ],
@@ -77,14 +77,8 @@ setCogsOptions("user", {
   formElements: {
     validation: ({ children, active, message }) => (
       <div>
-        {active ? (
-          <div>
-            {children}
-            <span className="font-bold text-red-500  ">{message}</span>
-          </div>
-        ) : (
-          children
-        )}
+        {children}{" "}
+        {active && <span className="font-bold text-red-500  ">{message}</span>}
       </div>
     ),
   },

@@ -26,7 +26,9 @@ export type FormElementParmas<T> = {
     }) | null;
     path: string[];
     validationErrors: () => string[];
+    addValidationError: (message?: string) => void;
     inputProps: {
+        ref?: React.RefObject<any>;
         value?: T;
         onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
         onBlur?: () => void;
@@ -100,6 +102,7 @@ export type EndType<T, IsArrayElement = false> = {
     ignoreFields: (fields: string[]) => StateObject<T>;
     _selected: boolean;
     setSelected: (value: boolean) => void;
+    getFormRef: () => React.RefObject<any> | undefined;
     validationWrapper: ({ children, hideMessage, }: {
         children: React.ReactNode;
         hideMessage?: boolean;
@@ -113,6 +116,7 @@ export type EndType<T, IsArrayElement = false> = {
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
 } & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
+    getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;

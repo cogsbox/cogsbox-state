@@ -1,8 +1,36 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import CodeLine from "../CodeLine";
+import { useCogsState } from "./state";
 
 const CodeExampleDropdown = () => {
   const [selectedExample, setSelectedExample] = useState("global");
+
+  const user = useCogsState("user");
+
+  useEffect(() => {
+    const formRefs = user.getAllFormRefs();
+    if (formRefs) {
+      const fieldToExampleMap = {
+        "user.firstName": "firstName",
+        "user.lastName": "lastName",
+        "user.email": "email",
+        "user.phone": "phone",
+        "user.addresses.0.street": "street",
+        "user.addresses.0.isDefault": "isDefault",
+      } as any;
+
+      formRefs.forEach((refElement, key) => {
+        if (refElement && refElement.current) {
+          const mappedExample = fieldToExampleMap[key];
+          if (mappedExample) {
+            refElement.current.addEventListener("focus", () => {
+              setSelectedExample(mappedExample);
+            });
+          }
+        }
+      });
+    }
+  }, []);
 
   // List of available examples
   const exampleOptions = [
@@ -49,6 +77,7 @@ const CodeExampleDropdown = () => {
       }\`}
       value={params.get()}
       onChange={(e) => params.set(e.target.value)}
+      ref={params.inputProps.ref} // Important: This connects to the ref system
     />
   </div>
 ))}`;
@@ -64,6 +93,7 @@ const CodeExampleDropdown = () => {
             type="text"
             className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
             {...params.inputProps}
+            // inputProps already includes the ref
         />
         </div>
     ),
@@ -89,6 +119,7 @@ const CodeExampleDropdown = () => {
             ? "border-red-500"
             : ""
         }\`}
+        // inputProps already includes the ref
       />
     </div>
   ),
@@ -111,6 +142,7 @@ const CodeExampleDropdown = () => {
         value={params.get()}
         onChange={(e) => params.set(e.target.value)}
         placeholder="(555) 123-4567"
+        ref={params.inputProps.ref} // Important: This connects to the ref system
       />
       {params.validationErrors().length > 0 && (
         <div className="text-xs text-red-500 mt-1">
@@ -139,6 +171,7 @@ const CodeExampleDropdown = () => {
           className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
           value={params.get()}
           onChange={(e) => params.set(e.target.value)}
+          ref={params.inputProps.ref} // Important: This connects to the ref system
         />
       </div>
     ),
@@ -159,6 +192,7 @@ const CodeExampleDropdown = () => {
         checked={params.get()}
         onChange={(e) => params.set(e.target.checked)}
         id={\`default-address-\${currentAddressIndex}\`}
+        ref={params.inputProps.ref} // Important: This connects to the ref system
       />
       <label
         htmlFor={\`default-address-\${currentAddressIndex}\`}
@@ -178,17 +212,17 @@ const CodeExampleDropdown = () => {
       case "global":
         return "This is the configuration that enables validation across all form elements";
       case "firstName":
-        return "Basic form element with manual value and onChange handling";
+        return "Basic form element with manual value and onChange handling. Focus on this field to see this example.";
       case "lastName":
-        return "Using the inputProps shorthand and custom validation rendering";
+        return "Using the inputProps shorthand and custom validation rendering. Focus on this field to see this example.";
       case "email":
-        return "Form element with custom validation message";
+        return "Form element with custom validation message. Focus on this field to see this example.";
       case "phone":
-        return "Form element with placeholder and inline validation errors";
+        return "Form element with placeholder and inline validation errors. Focus on this field to see this example.";
       case "street":
-        return "Nested form element for arrays using index()";
+        return "Nested form element for arrays using index(). Focus on this field to see this example.";
       case "isDefault":
-        return "Checkbox implementation with label";
+        return "Checkbox implementation with label. Focus on this field to see this example.";
       default:
         return "";
     }
@@ -217,14 +251,12 @@ const CodeExampleDropdown = () => {
       </p>
 
       {/* Code example */}
-      <div className="bg-gray-100 p-4 rounded-lg">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="font-medium">
-            {exampleOptions.find((e) => e.id === selectedExample)?.label}
-          </h4>
-        </div>
-        <CodeLine style="dark" code={getExampleCode(selectedExample)} />
+      <div className="flex justify-between items-center mb-2">
+        <h4 className="font-medium">
+          {exampleOptions.find((e) => e.id === selectedExample)?.label}
+        </h4>
       </div>
+      <CodeLine style="dark" code={getExampleCode(selectedExample)} />
     </div>
   );
 };

@@ -16,10 +16,18 @@ const UserProfileForm = () => {
   return (
     <div className="bg-white rounded-lg p-6 shadow-md max-w-md mx-auto">
       <h2 className="text-xl font-semibold mb-4">User Profile</h2>
+      <p className="text-gray-600 mb-6">
+        This form demonstrates different ways to use CogsState form validation.
+      </p>
 
       <form onSubmit={handleSubmit}>
-        <div className="space-y-4">
-          {/* First Name Field - standard*/}
+        {/* First Name Field - basic implementation */}
+        <div className="bg-gray-50 p-4 rounded-md">
+          <p className="text-sm text-gray-600 mb-3">
+            <strong>Basic Implementation:</strong> This field demonstrates the
+            simplest way to use form elements. It manually handles the value and
+            onChange without using the inputProps shorthand.
+          </p>
           {user.firstName.formElement((params) => (
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -33,8 +41,16 @@ const UserProfileForm = () => {
               />
             </div>
           ))}
+        </div>
 
-          {/* Last Name Field - custom message & spread props */}
+        {/* Last Name Field - using inputProps & custom validation message */}
+        <div className="bg-gray-50 p-4 rounded-md">
+          <p className="text-sm text-gray-600 mb-3">
+            <strong>InputProps & Custom Messages:</strong> This field uses the
+            inputProps shorthand to automatically wire up value and onChange. It
+            also demonstrates setting a custom validation message in the
+            formElement options.
+          </p>
           {user.lastName.formElement(
             (params) => (
               <div>
@@ -54,8 +70,16 @@ const UserProfileForm = () => {
               },
             }
           )}
+        </div>
 
-          {/* Email Field */}
+        {/* Email Field - custom validation display */}
+        <div className="bg-gray-50 p-4 rounded-md">
+          <p className="text-sm text-gray-600 mb-3">
+            <strong>Custom Error Display:</strong> This field shows how to
+            display field-specific validation errors by using the
+            validationErrors() method. It gives you full control over how errors
+            are presented to the user.
+          </p>
           {user.email.formElement((params) => (
             <div>
               <label className="block text-sm font-medium text-gray-700">
@@ -73,8 +97,16 @@ const UserProfileForm = () => {
               ))}
             </div>
           ))}
+        </div>
 
-          {/* Phone Field */}
+        {/* Phone Field with onBlur validation */}
+        <div className="bg-gray-50 p-4 rounded-md">
+          <p className="text-sm text-gray-600 mb-3">
+            <strong>onBlur Validation:</strong> This field demonstrates how to
+            implement validation that only triggers when the field loses focus
+            (onBlur), rather than on every keystroke. This creates a better user
+            experience for complex validations.
+          </p>
           {user.phone.formElement(
             (params) => (
               <div>
@@ -86,6 +118,15 @@ const UserProfileForm = () => {
                   className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   value={params.get()}
                   onChange={(e) => params.set(e.target.value)}
+                  onBlur={() => {
+                    // Example of custom onBlur validation logic
+                    console.log("Phone field blurred");
+                    const value = params.get();
+
+                    if (value && !/^\(\d{3}\) \d{3}-\d{4}$/.test(value)) {
+                      console.log("Would trigger validation here");
+                    }
+                  }}
                   placeholder="(555) 123-4567"
                 />
                 {/* Display validation errors if any */}
@@ -111,7 +152,7 @@ const UserProfileForm = () => {
             className="inline-flex justify-center rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             onClick={() =>
               user.revertToInitialState({
-                validationKey: "userForm",
+                validationKey: "userValidation",
               })
             }
           >

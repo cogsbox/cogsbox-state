@@ -10,7 +10,7 @@ import {
 import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
-import { getGlobalStore } from "./store";
+import { getGlobalStore, formRefStore } from "./store";
 import { validateZodPathFunc } from "./useValidateZodPath";
 
 export function updateFn<U>(
@@ -204,7 +204,26 @@ export const FormControlComponent = <TStateObject,>({
   stateKey,
 }: FormControlComponentProps<TStateObject>) => {
   const [_, forceUpdate] = useState({});
-  const { getValidationErrors, getInitialOptions } = getGlobalStore.getState();
+  const { registerFormRef, getFormRef } = formRefStore.getState();
+  const refKey = stateKey + "." + path.join(".");
+
+  // Create a local ref
+  const localFormRef = useRef<HTMLInputElement>(null);
+
+  // Get existing ref from the store (if any)
+  const existingRef = getFormRef(refKey);
+  if (!existingRef) {
+    registerFormRef(stateKey + "." + path.join("."), localFormRef);
+  }
+  // Use the existing ref if available, otherwise use the local one
+  const formRef = existingRef || localFormRef;
+
+  const {
+    getValidationErrors,
+    addValidationError,
+    getInitialOptions,
+    removeValidationError,
+  } = getGlobalStore.getState();
   const stateValue = useGetKeyState(stateKey, path);
   const [inputValue, setInputValue] = useState<any>(
     getGlobalStore.getState().getNestedState(stateKey, path)
@@ -236,15 +255,19 @@ export const FormControlComponent = <TStateObject,>({
       clearTimeout(timeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(() => {
-      updateFn(setState, payload, path, validationKey);
-    }, formOpts?.debounceTime ?? 300);
+    timeoutRef.current = setTimeout(
+      () => {
+        console.log(typeof stateValue);
+        updateFn(setState, payload, path, validationKey);
+      },
+      formOpts?.debounceTime ?? (typeof stateValue == "boolean" ? 20 : 200)
+    );
   };
 
   // New function to validate on blur
   const validateField = async () => {
     if (!initialOptions.validation?.zodSchema) return;
-
+    removeValidationError(validationKey + "." + path.join("."));
     try {
       // Get the current field value
       const fieldValue = getGlobalStore
@@ -274,15 +297,8 @@ export const FormControlComponent = <TStateObject,>({
   // Handle blur event
   const handleBlur = () => {
     console.log("handleBlur");
-    if (validateOnBlur) {
-      // Ensure state is updated first
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
 
-      // Then validate
-      validateField();
-    }
+    validateField();
   };
 
   // Clear timeout on unmount
@@ -310,8 +326,11 @@ export const FormControlComponent = <TStateObject,>({
     path: path,
     validationErrors: () =>
       getValidationErrors(validationKey + "." + path.join(".")),
+    addValidationError: (message?: string) => {
+      removeValidationError(validationKey + "." + path.join("."));
+      addValidationError(validationKey + "." + path.join("."), message ?? "");
+    },
 
-    // Add default input props with blur handler
     inputProps: {
       value:
         inputValue ||
@@ -319,6 +338,7 @@ export const FormControlComponent = <TStateObject,>({
         "",
       onChange: (e: any) => updater(e.target.value),
       onBlur: handleBlur,
+      ref: formRef,
     },
   });
 
@@ -352,14 +372,14 @@ export function ValidationWrapper({
   children: React.ReactNode;
   validIndices?: number[];
 }) {
-  const { getInitialOptions, getValidationErrors } = getGlobalStore.getState();
+  const { getInitialOptions } = getGlobalStore.getState();
 
   const validationErrors = useGetValidationErrors(
     validationKey,
     path,
     validIndices
   );
-  console.log("renderValidationWrapper", validationErrors);
+
   const thesMessages: string[] = [];
 
   if (validationErrors) {
@@ -368,11 +388,15 @@ export function ValidationWrapper({
       thesMessages.push(newMessage);
     }
   }
-  let fullMessageString =
-    thesMessages?.length > 0 ? thesMessages?.join(", ") : "";
-
   const thisStateOpts = getInitialOptions(stateKey!);
-  const message = formOpts?.validation?.message;
+  let fullMessageString = thisStateOpts?.validation?.onBlur
+    ? thesMessages?.length > 0
+      ? thesMessages?.join(", ")
+      : formOpts?.validation?.message
+        ? formOpts?.validation?.message
+        : ""
+    : "";
+
   return (
     <>
       {thisStateOpts?.formElements?.validation &&
@@ -382,11 +406,7 @@ export function ValidationWrapper({
             <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
           active: fullMessageString != "" ? true : false,
-          message: message
-            ? message
-            : message == "" || formOpts?.validation?.hideMessage
-              ? ""
-              : fullMessageString,
+          message: formOpts?.validation?.hideMessage ? "" : fullMessageString,
           path,
 
           ...(formOpts?.key && { key: formOpts?.key }),

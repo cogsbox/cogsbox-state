@@ -13,6 +13,7 @@ export default function CodeLine({
   return (
     <SyntaxHighlighter
       language="typescript"
+      wrapLines={true}
       style={style == "dark" ? vscDarkPlus : undefined}
       customStyle={{
         padding: 4,

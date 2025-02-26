@@ -20,6 +20,14 @@ export type ComponentsType = {
         reactiveType: ReactivityType[] | ReactivityType;
     }>;
 };
+export type FormRefStoreState = {
+    formRefs: Map<string, React.RefObject<any>>;
+    registerFormRef: (id: string, ref: React.RefObject<any>) => void;
+    getFormRef: (id: string) => React.RefObject<any> | undefined;
+    removeFormRef: (id: string) => void;
+    getFormRefsByStateKey: (stateKey: string) => Map<string, React.RefObject<any>>;
+};
+export declare const formRefStore: import('zustand').UseBoundStore<import('zustand').StoreApi<FormRefStoreState>>;
 export type CogsGlobalState = {
     updaterState: {
         [key: string]: any;
