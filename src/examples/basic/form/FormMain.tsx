@@ -219,11 +219,7 @@ export default function FormsMain() {
                     </label>
                     <input
                       type="text"
-                      className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
-                        params.validationErrors().length > 0
-                          ? "border-red-500"
-                          : ""
-                      }`}
+                      className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
                       value={params.get()}
                       onChange={(e) => params.set(e.target.value)}
                     />
@@ -238,14 +234,18 @@ export default function FormsMain() {
                       </label>
                       <input
                         type="text"
-                        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
+                          params.validationErrors().length > 0
+                            ? "border-red-500"
+                            : ""
+                        }`}
                         {...params.inputProps}
                       />
                     </div>
                   ),
                   {
                     validation: {
-                      message: "Please enter your last name",
+                      hideMessage: true,
                     },
                   }
                 )}
@@ -259,11 +259,7 @@ export default function FormsMain() {
                       <input
                         {...params.inputProps}
                         type="email"
-                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
-                          params.validationErrors().length > 0
-                            ? "border-red-500"
-                            : ""
-                        }`}
+                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
                       />
                     </div>
                   ),

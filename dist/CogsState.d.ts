@@ -29,6 +29,7 @@ export type FormElementParmas<T> = {
     inputProps: {
         value?: T;
         onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+        onBlur?: () => void;
     };
 };
 export type StateKeys = string;
@@ -168,6 +169,7 @@ export type OptionsType<T extends unknown = unknown> = {
     validation?: {
         key?: string;
         zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+        onBlur?: boolean;
     };
     enableServerState?: boolean;
     middleware?: ({ updateLog, update, }: {
@@ -271,6 +273,7 @@ type LocalStorageData<T> = {
     lastSyncedWithServer?: number;
     baseServerState?: T;
 };
+export declare const notifyComponent: (stateKey: string, componentId: string) => void;
 export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initState, syncUpdate, }?: {
     stateKey?: string;
     componentId?: string;

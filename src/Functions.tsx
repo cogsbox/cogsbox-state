@@ -1,15 +1,17 @@
-import type {
-  EffectiveSetState,
-  FormElementParmas,
-  FormOptsType,
-  UpdateArg,
-  UpdateOpts,
+import {
+  notifyComponent,
+  type EffectiveSetState,
+  type FormElementParmas,
+  type FormOptsType,
+  type UpdateArg,
+  type UpdateOpts,
 } from "./CogsState";
 
 import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
 import { getGlobalStore } from "./store";
+import { validateZodPathFunc } from "./useValidateZodPath";
 
 export function updateFn<U>(
   setState: EffectiveSetState<U>,
@@ -193,14 +195,15 @@ interface FormControlComponentProps<TStateObject> {
   formOpts?: FormOptsType;
   stateKey: string;
 }
+
 export const FormControlComponent = <TStateObject,>({
   setState,
-
   path,
   child,
   formOpts,
   stateKey,
 }: FormControlComponentProps<TStateObject>) => {
+  const [_, forceUpdate] = useState({});
   const { getValidationErrors, getInitialOptions } = getGlobalStore.getState();
   const stateValue = useGetKeyState(stateKey, path);
   const [inputValue, setInputValue] = useState<any>(
@@ -210,16 +213,19 @@ export const FormControlComponent = <TStateObject,>({
   const initialOptions = getInitialOptions(stateKey);
   if (!initialOptions?.validation?.key) {
     throw new Error(
-      "Validation key not found. You need ot set it in the options for the createCogsState function"
+      "Validation key not found. You need to set it in the options for the createCogsState function"
     );
   }
-  const validationKey = initialOptions.validation?.key;
+  const validationKey = initialOptions.validation.key;
+  const validateOnBlur = initialOptions.validation.onBlur === true;
+  initialOptions;
   useEffect(() => {
     setInputValue(stateValue);
   }, [stateKey, path.join("."), stateValue]);
 
   const timeoutRef = useRef<NodeJS.Timeout>();
 
+  // Standard updater function (unchanged)
   let updater = (
     payload: UpdateArg<TStateObject>,
     opts?: UpdateOpts<TStateObject>
@@ -233,6 +239,50 @@ export const FormControlComponent = <TStateObject,>({
     timeoutRef.current = setTimeout(() => {
       updateFn(setState, payload, path, validationKey);
     }, formOpts?.debounceTime ?? 300);
+  };
+
+  // New function to validate on blur
+  const validateField = async () => {
+    if (!initialOptions.validation?.zodSchema) return;
+
+    try {
+      // Get the current field value
+      const fieldValue = getGlobalStore
+        .getState()
+        .getNestedState(stateKey, path);
+
+      // Use your existing validateZodPathFunc
+      await validateZodPathFunc(
+        validationKey,
+        initialOptions.validation.zodSchema,
+        path,
+        fieldValue
+      );
+      console.log(
+        "Validation",
+        stateKey,
+        initialOptions.validation.zodSchema,
+        path,
+        fieldValue
+      );
+      forceUpdate({});
+    } catch (error) {
+      console.error("Validation error:", error);
+    }
+  };
+
+  // Handle blur event
+  const handleBlur = () => {
+    console.log("handleBlur");
+    if (validateOnBlur) {
+      // Ensure state is updated first
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
+      // Then validate
+      validateField();
+    }
   };
 
   // Clear timeout on unmount
@@ -261,13 +311,14 @@ export const FormControlComponent = <TStateObject,>({
     validationErrors: () =>
       getValidationErrors(validationKey + "." + path.join(".")),
 
-    // Add default input props
+    // Add default input props with blur handler
     inputProps: {
       value:
         inputValue ||
         getGlobalStore.getState().getNestedState(stateKey, path) ||
         "",
       onChange: (e: any) => updater(e.target.value),
+      onBlur: handleBlur,
     },
   });
 
@@ -286,7 +337,6 @@ export const FormControlComponent = <TStateObject,>({
     </>
   );
 };
-
 export function ValidationWrapper({
   formOpts,
   path,
@@ -303,11 +353,13 @@ export function ValidationWrapper({
   validIndices?: number[];
 }) {
   const { getInitialOptions, getValidationErrors } = getGlobalStore.getState();
+
   const validationErrors = useGetValidationErrors(
     validationKey,
     path,
     validIndices
   );
+  console.log("renderValidationWrapper", validationErrors);
   const thesMessages: string[] = [];
 
   if (validationErrors) {

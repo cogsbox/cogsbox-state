@@ -28,7 +28,7 @@ import {
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
-import { ZodArray, ZodObject, type ZodRawShape } from "zod";
+import { boolean, ZodArray, ZodObject, type ZodRawShape } from "zod";
 
 import { getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
@@ -62,6 +62,7 @@ export type FormElementParmas<T> = {
     onChange?: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => void;
+    onBlur?: () => void;
   };
 };
 
@@ -283,6 +284,7 @@ export type OptionsType<T extends unknown = unknown> = {
   validation?: {
     key?: string;
     zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+    onBlur?: boolean;
   };
 
   enableServerState?: boolean;
@@ -588,6 +590,19 @@ const notifyComponents = (thisKey: string) => {
       updates.forEach((update) => update());
     });
   });
+};
+
+export const notifyComponent = (stateKey: string, componentId: string) => {
+  const stateEntry = getGlobalStore.getState().stateComponents.get(stateKey);
+  if (stateEntry) {
+    const fullComponentId = `${stateKey}////${componentId}`;
+    const component = stateEntry.components.get(fullComponentId);
+
+    if (component) {
+      // Force an update to ensure the current value is saved
+      component.forceUpdate();
+    }
+  }
 };
 
 export function useCogsStateFn<TStateObject extends unknown>(
