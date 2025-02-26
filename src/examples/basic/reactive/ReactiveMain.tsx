@@ -5,6 +5,7 @@ import { ProductList } from "./ProductList";
 import {
   CartOverview,
   CartOverviewDep,
+  CartOverviewDepMissing,
   CartOverviewFully,
   CartOverviewGet,
 } from "./CartOvervlew";
@@ -84,65 +85,134 @@ const signalBasedCode = `export const CartOverview = () => {
     );
   };`;
 
-const CartComponentsTypes = () => {
+const CartComponentsAPI = () => {
   return (
-    <div className="bg-white rounded-lg p-6 w-full space-y-6 text-gray-600">
-      <p className="mb-4">
-        This showcase demonstrates different reactivity types and how they
-        function.
-      </p>
+    <div className="bg-white rounded-lg p-6 w-full space-y-8">
+      <div>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          Reactivity Types
+        </h2>
 
-      <div className="space-y-4">
-        {/* Default setting */}
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <CodeLine code={`reactiveType: ["component", "deps"]`} />
+        <div className="bg-white rounded-lg w-full space-y-6 text-gray-600">
+          <p className="mb-4">
+            This showcase demonstrates different reactivity types and how they
+            function.
+          </p>
+
+          <div className="space-y-4">
+            {/* Default setting */}
+            <div className="flex gap-4">
+              <div className="w-1/2">
+                <CodeLine code={`reactiveType: ["component", "deps"]`} />
+              </div>
+              <div className="w-1/2">
+                <p>
+                  Default setting. Any values used in the component and any
+                  dependencies will trigger a rerender.
+                </p>
+              </div>
+            </div>
+            {/* Component only */}
+            <div className="flex gap-4">
+              <div className="w-1/2">
+                <CodeLine code={`reactiveType: ["component"]`} />
+              </div>
+              <div className="w-1/2">
+                <p>Limit rerenders to only when a component value changes.</p>
+              </div>
+            </div>
+            {/* Dependencies only */}
+            <div className="flex gap-4">
+              <div className="w-1/2">
+                <CodeLine code={`reactiveType: ["deps"]`} />
+              </div>
+              <div className="w-1/2">
+                <p>Rerender only when a specified dependency changes.</p>
+              </div>
+            </div>
+            {/* Other settings */}
+            <div className="flex gap-4">
+              <div className="w-1/2">
+                <CodeLine code={`reactiveType: ["all"]`} />
+              </div>
+              <div className="w-1/2">
+                <p>
+                  The component will re-render whenever any value in the state
+                  object changes.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <div className="w-1/2">
+                <CodeLine code={`reactiveType: ["none"]`} />
+              </div>
+              <div className="w-1/2">
+                <p>No automatic reactivity. Requires manual updates.</p>
+              </div>
+            </div>
           </div>
-          <div className="w-1/2">
+        </div>
+      </div>
+
+      <div>
+        <h2 className="text-xl font-bold text-gray-800 mb-4">
+          Working with Reactive Dependencies
+        </h2>
+
+        <div className="space-y-6 text-gray-600">
+          <p>
+            The reactive dependencies approach provides fine-grained control
+            over component updates, allowing for performance optimizations and
+            predictable rendering behavior.
+          </p>
+
+          <div>
+            <h2 className="text-xl font-bold text-gray-800 mb-4">
+              Working with Reactive Dependencies
+            </h2>
+
             <p>
-              Default setting. Any values used in the component and any
-              dependencies will trigger a rerender.
+              The reactive dependencies approach provides fine-grained control
+              over component updates, allowing for performance optimizations and
+              predictable rendering behavior.
+            </p>
+            <div className="h-8" />
+            <h3 className="font-semibold text-gray-800 mb-2">
+              Basic Implementation
+            </h3>
+            <CodeLine
+              code={`const cart = useCogsState("cart", {
+  reactiveType: ["deps"],
+  reactiveDeps: (state) => [state.items, state.total, state.status],
+});`}
+            />
+            <p className=" text-sm">
+              This component will only re-render when the items array, total
+              value, or status changes. Changes to other properties won't
+              trigger updates.
             </p>
           </div>
+
+          <h3 className="font-semibold text-gray-800 mb-2">
+            External Dependencies
+          </h3>
+          <CodeLine
+            code={`const cart = useCogsState("cart", {
+  reactiveType: ["deps"],
+  reactiveDeps: (state) => [
+    state.items.length,  // Derived value - number of items
+    someExternalValue,  // External dependency
+    state.total > 100  // Derived condition
+  ],
+});`}
+          />
+          <p className="mt-2 text-sm">
+            You can include both derived values and external dependencies in
+            your dependency array. This allows the component to react to changes
+            outside its direct state, such as context values, props, or other
+            external state.
+          </p>
         </div>
-        {/* Component only */}
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <CodeLine code={`reactiveType: ["component"]`} />
-          </div>
-          <div className="w-1/2">
-            <p>Limit rerenders to only when a component value changes.</p>
-          </div>
-        </div>
-        {/* Dependencies only */}
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <CodeLine code={`reactiveType: ["deps"]`} />
-          </div>
-          <div className="w-1/2">
-            <p>Rerender only when a specified dependency changes.</p>
-          </div>
-        </div>
-        {/* Other settings */}
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <CodeLine code={`reactiveType: ["all"]`} />
-          </div>
-          <div className="w-1/2">
-            <p>
-              The component will re-render whenever any value in the state
-              object changes.
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-4">
-          <div className="w-1/2">
-            <CodeLine code={`reactiveType: ["none"]`} />
-          </div>
-          <div className="w-1/2">
-            <p>No automatic reactivity. Requires manual updates.</p>
-          </div>
-        </div>{" "}
       </div>
     </div>
   );
@@ -155,8 +225,9 @@ const CartComponentsDescription = () => {
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
           <div className="rounded-full h-6 w-6 bg-gray-500" /> Fully Reactive
         </h2>
-        <p>Fully reactive for any state changes. Default react behaviour</p>
+        <p>Fully reactive for any state changes. Default React behavior.</p>
       </div>
+
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
           <div className="rounded-full h-6 w-6 bg-amber-400" /> Component
@@ -169,26 +240,23 @@ const CartComponentsDescription = () => {
           to state it actually uses.
         </p>
       </div>
+
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
           <div className="rounded-full h-6 w-6 bg-sky-500" /> Reactive
           Dependencies
         </h2>
         <p>
-          A different but maybe mroe risky approach where you specify exactly
-          which parts of the state should cause re-renders using reactiveDeps.
-        </p>
-        <p>
-          <span className="text-red-500">
-            <TriangleAlert size={24} className="inline-block" />
-            If you update a property price, it won't update the component
-            because the price of the products state is never directly used in
-            the component. The total price of the cart is derived in the initial
-            form.
-            <TriangleAlert size={24} className="inline-block" />
+          This approach lets you specify exactly which parts of the state should
+          trigger re-renders using reactiveDeps. This gives you precise control
+          over component updates and can optimize performance by limiting
+          unnecessary re-renders.{" "}
+          <span className="font-bold text-red-500">
+            However there are risks involved with this, see the warning below.
           </span>
         </p>
       </div>
+
       <div>
         <h2 className="text-lg font-semibold text-gray-800 mb-2 flex gap-2">
           <div className="rounded-full h-6 w-6 bg-emerald-500" /> Reactive
@@ -201,6 +269,24 @@ const CartComponentsDescription = () => {
           ideal for complex UIs or components that require frequent updates.
         </p>
       </div>
+
+      <div className="h-4" />
+
+      <div className="mt-2 p-4 bg-red-50 border-l-4 border-red-500 rounded mb-4">
+        <h3 className="text-base font-semibold text-red-700 mb-2 flex items-center">
+          <TriangleAlert size={20} className="inline-block mr-2" />
+          Warning: Missing Dependencies Example
+        </h3>
+        <p className="text-red-700">
+          The component below demonstrates what happens when dependencies are
+          missing. It's missing the total value in its dependency array, so
+          price updates won't cause the component to update since the total
+          calculation happens elsewhere. This also causes the total to lag
+          behind by 1 total update
+        </p>
+      </div>
+
+      <CartOverviewDepMissing />
     </div>
   );
 };
@@ -277,11 +363,12 @@ const ComponentTriggers = () => {
       All the components that use some version fo the following hook will bne
       displayed here
       <CodeLine code={`  const cart = useCogsState("cart");`} />{" "}
-      <div className="h-1" />
+      <div className="h-6" />
+      This is list of all components registerd to the Cart state for this
+      example. Not all of them have the rerender styling applied.{" "}
+      <div className="h-2" />
       Click them to force a component re-render.
-      <div className="h-6" />
-      Some component ids will be for the form itself and this component{" "}
-      <div className="h-6" />
+      <div className="h-1" />
       <div className="h-4" />
       <ComponentList />
       <div className="h-4" />{" "}
@@ -390,22 +477,11 @@ const ComponentCodeView = () => {
 
 function TabbedSection() {
   const [tab, setTab] = useState<
-    "types" | "description" | "json" | "component" | "code"
+    "api" | "description" | "json" | "component" | "code"
   >("description");
   return (
     <div className=" flex flex-col gap-1">
       <div className="flex border-b border-gray-200">
-        {" "}
-        <button
-          className={`px-4 py-2 text-sm font-medium cursor-pointer ${
-            tab === "types"
-              ? "text-blue-600 border-b-2 border-blue-500"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setTab("types")}
-        >
-          Types
-        </button>
         <button
           className={`px-4 py-2 text-sm font-medium cursor-pointer ${
             tab === "description"
@@ -415,6 +491,16 @@ function TabbedSection() {
           onClick={() => setTab("description")}
         >
           Description
+        </button>
+        <button
+          className={`px-4 py-2 text-sm font-medium cursor-pointer ${
+            tab === "api"
+              ? "text-blue-600 border-b-2 border-blue-500"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setTab("api")}
+        >
+          API
         </button>
         <button
           className={`px-4 py-2 text-sm font-medium  cursor-pointer ${
@@ -447,7 +533,7 @@ function TabbedSection() {
           Component Code
         </button>
       </div>{" "}
-      {tab === "types" && <CartComponentsTypes />}
+      {tab === "api" && <CartComponentsAPI />}
       {tab === "description" && <CartComponentsDescription />}
       {tab === "component" && <ComponentTriggers />}
       {tab === "json" && <JSONView />}
@@ -467,14 +553,17 @@ export default function ReactiveMain() {
             {" "}
             <TabbedSection />
           </div>{" "}
-          <div className="flex flex-col gap-2 shadow rounded-lg w-[500px] bg-white">
-            <ProductList />
-            <CartOverviewFully />
-          </div>
-          <div className="flex flex-col gap-2 w-[500px]">
-            <CartOverviewGet />
-            <CartOverviewDep />
-            <CartOverview />
+          <div className="w-[50%] ">
+            <div className="grid grid-cols-2 gap-4  ">
+              <div className="col-span-2">
+                <ProductList />
+              </div>
+              <CartOverviewFully />
+
+              <CartOverviewGet />
+              <CartOverviewDep />
+              <CartOverview />
+            </div>
           </div>
         </div>
       </div>

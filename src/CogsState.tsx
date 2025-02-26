@@ -660,8 +660,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
+      forceUpdate({});
     }
-    forceUpdate({});
   }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
@@ -691,6 +691,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
 
     getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
+    //need to force update to create the stateUpdates references
     forceUpdate({});
     return () => {
       const depsKey = `${thisKey}////${componentIdRef.current}`;
@@ -1124,10 +1125,10 @@ function createProxyHandler<T>(
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
-          console.log("component ", fullComponentId);
+
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
-            console.log("component ", stateKey, fullComponentId, stateEntry);
+
             if (component) {
               // Only add paths for non-root or specifically for get() at root
               if (path.length > 0 || prop === "get") {
@@ -1733,11 +1734,31 @@ function SignalRenderer({
 
     getGlobalStore.getState().addSignalElement(signalId, elementInfo);
 
+    // Get the raw value from the store
     const value = getGlobalStore
       .getState()
       .getNestedState(proxy._stateKey, proxy._path);
 
-    const textNode = document.createTextNode(String(value));
+    let displayValue;
+    if (proxy._effect) {
+      try {
+        displayValue = new Function(
+          "state",
+          `return (${proxy._effect})(state)`
+        )(value);
+      } catch (err) {
+        console.error("Error evaluating effect function during mount:", err);
+        displayValue = value; // Fallback to raw value
+      }
+    } else {
+      displayValue = value;
+    }
+
+    if (displayValue !== null && typeof displayValue === "object") {
+      displayValue = JSON.stringify(displayValue);
+    }
+
+    const textNode = document.createTextNode(String(displayValue));
     element.replaceWith(textNode);
   }, [proxy._stateKey, proxy._path.join("."), proxy._effect]);
 
