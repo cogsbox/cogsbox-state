@@ -1,7 +1,7 @@
 import {
   notifyComponent,
   type EffectiveSetState,
-  type FormElementParmas,
+  type FormElementParams,
   type FormOptsType,
   type UpdateArg,
   type UpdateOpts,
@@ -191,7 +191,7 @@ interface FormControlComponentProps<TStateObject> {
   setState: EffectiveSetState<TStateObject>;
 
   path: string[];
-  child: (obj: FormElementParmas<TStateObject>) => JSX.Element;
+  child: (obj: FormElementParams<TStateObject>) => JSX.Element;
   formOpts?: FormOptsType;
   stateKey: string;
 }
@@ -264,8 +264,8 @@ export const FormControlComponent = <TStateObject,>({
     );
   };
 
-  // New function to validate on blur
-  const validateField = async () => {
+  // Handle blur event
+  const handleBlur = async () => {
     if (!initialOptions.validation?.zodSchema) return;
     removeValidationError(validationKey + "." + path.join("."));
     try {
@@ -292,13 +292,6 @@ export const FormControlComponent = <TStateObject,>({
     } catch (error) {
       console.error("Validation error:", error);
     }
-  };
-
-  // Handle blur event
-  const handleBlur = () => {
-    console.log("handleBlur");
-
-    validateField();
   };
 
   // Clear timeout on unmount

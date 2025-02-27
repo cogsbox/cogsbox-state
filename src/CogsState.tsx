@@ -49,7 +49,7 @@ export type SyncInfo = {
   userId: number;
 };
 
-export type FormElementParmas<T> = {
+export type FormElementParams<T> = {
   get: () => T;
 
   set: UpdateType<T>;
@@ -60,7 +60,7 @@ export type FormElementParmas<T> = {
 
   inputProps: {
     ref?: React.RefObject<any>;
-    value?: T;
+    value?: T extends boolean ? never : T;
     onChange?: (
       event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
     ) => void;
@@ -158,7 +158,7 @@ export type FormOptsType = {
   stateServerDifferences?: string[][];
 };
 
-export type FormControl<T> = (obj: FormElementParmas<T>) => JSX.Element;
+export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type UpdateOpts<T> = {

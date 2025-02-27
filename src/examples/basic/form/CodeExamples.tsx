@@ -54,6 +54,8 @@ const CodeExampleDropdown = () => {
   },
   formElements: {
     validation: ({ children, active, message }) => (
+
+
       <div>
         {children}
         {active && <div className="error-message">{message}</div>}
@@ -131,32 +133,33 @@ const CodeExampleDropdown = () => {
 )}`;
       case "phone":
         return `{user.phone.formElement(
-  (params) => (
-    <div>
-      <label className="block text-sm font-medium text-gray-700">
-        Phone Number
-      </label>
-      <input
-        type="tel"
-        className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-        value={params.get()}
-        onChange={(e) => params.set(e.target.value)}
-        placeholder="(555) 123-4567"
-        ref={params.inputProps.ref} // Important: This connects to the ref system
-      />
-      {params.validationErrors().length > 0 && (
-        <div className="text-xs text-red-500 mt-1">
-          {params.validationErrors().join(", ")}
-        </div>
-      )}
-    </div>
-  ),
-  {
-    validation: {
-      message: "Please enter a valid phone number",
-    },
-  }
-)}`;
+    (params) => (
+      <div>
+        <label className="block text-sm font-medium text-gray-700">
+          Phone Number
+        </label>
+        <input
+          type="tel"
+          className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
+          {...params.inputProps}
+          onBlur={(e) => {
+            if (
+              e.target.value.length == 0 ||
+              isNaN(Number(e.target.value))
+            ) {
+              params.addValidationError("custom onBlur");
+            }
+          }}
+          placeholder="(555) 123-4567"
+        />
+      </div>
+    ),
+    {
+      validation: {
+        message: "Please enter a valid phone number",
+      },
+    }
+  )}`;
       case "street":
         return `{user.addresses
   .index(currentAddressIndex)

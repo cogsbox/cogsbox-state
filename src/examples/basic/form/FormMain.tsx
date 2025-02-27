@@ -320,10 +320,14 @@ export default function FormsMain() {
                         <input
                           type="tel"
                           className="mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600"
-                          value={params.get()}
-                          onChange={(e) => params.set(e.target.value)}
-                          onBlur={() => {
-                            params.addValidationError("custom onBlur");
+                          {...params.inputProps}
+                          onBlur={(e) => {
+                            if (
+                              e.target.value.length == 0 ||
+                              isNaN(Number(e.target.value))
+                            ) {
+                              params.addValidationError("custom onBlur");
+                            }
                           }}
                           placeholder="(555) 123-4567"
                         />
@@ -359,7 +363,7 @@ export default function FormsMain() {
                     errorCount > 0
                       ? "border-2 border-red-500 bg-red-400"
                       : currentAddressIndex === index
-                      ? "bg-amber-400 text-white"
+                      ? "bg-amber-500 text-white"
                       : "bg-amber-200 text-amber-800 hover:bg-amber-300"
                   }`}
                       >
@@ -374,7 +378,7 @@ export default function FormsMain() {
                   })}{" "}
                   <button
                     onClick={addNewAddress}
-                    className="px-3 py-1 bg-amber-400 text-white text-sm rounded hover:bg-amber-600 cursor-pointer"
+                    className="px-3 py-1 border-2 border-amber-400 text-amber-600 text-sm rounded hover:bg-amber-200 cursor-pointer"
                   >
                     Add
                   </button>
@@ -533,8 +537,7 @@ export default function FormsMain() {
                             <input
                               type="checkbox"
                               className="h-4 w-4 text-amber-400 focus:ring-amber-400 border-amber-300 rounded"
-                              checked={params.get()}
-                              onChange={(e) => params.set(e.target.checked)}
+                              {...params.inputProps}
                               id={`default-address-${currentAddressIndex}`}
                             />
                             <label
