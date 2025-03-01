@@ -1,4 +1,5 @@
 import { DurableObject } from 'cloudflare:workers';
+
 type SuccessAuthed = {
 	success: boolean;
 	valid: boolean;
@@ -6,20 +7,24 @@ type SuccessAuthed = {
 	serviceId: number;
 	scopes: string[];
 };
-export class WebSockeSyncEngine extends DurableObject {
-	// Store timeouts for each WebSocket
-	private timeouts = new Map<WebSocket, number>();
-	// Timeout duration in milliseconds (5 minutes)
-	private readonly TIMEOUT_DURATION = 5000; //5 * 60 * 1000 tesitng with 5 seconds
+declare global {
+	interface WebSocket {
+		syncKeys?: Set<string>;
+	}
+}
 
-	async fetch(request: Request): Promise<Response> {
+export class WebSockeSyncEngine extends DurableObject {
+	async fetch(request: Request) {
+		const url = new URL(request.url);
+		// No longer using syncKey from URL parameters
+
 		const webSocketPair = new WebSocketPair();
 		const [client, server] = Object.values(webSocketPair);
 
-		this.ctx.acceptWebSocket(server);
+		// Initialize the syncKeys set for this WebSocket
+		server.syncKeys = new Set();
 
-		// Set initial timeout for this WebSocket
-		this.resetTimeout(server);
+		this.ctx.acceptWebSocket(server);
 
 		return new Response(null, {
 			status: 101,
@@ -27,61 +32,200 @@ export class WebSockeSyncEngine extends DurableObject {
 		});
 	}
 
-	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
-		// Reset timeout whenever a message is received
-		this.resetTimeout(ws);
+	// Handle registration of a sync key
+	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
+		// Add to this WebSocket's registered keys
+		if (!ws.syncKeys) {
+			ws.syncKeys = new Set();
+		}
+		ws.syncKeys.add(syncKey);
 
-		ws.send(`[Durable Object] message: ${message}, connections: ${this.ctx.getWebSockets().length}`);
+		// Check if we already have state for this syncKey
+		const state = await this.ctx.storage.get(syncKey);
+		console.log(`State for key: ${JSON.stringify(state)}`);
+		if (!state) {
+			// We don't have state for this key, request it from the client
+			this.requestStateFromClient(ws, syncKey);
+		} else {
+			// We already have state, notify client
+			ws.send(
+				JSON.stringify({
+					type: 'syncReady',
+					syncKey: syncKey,
+				}),
+			);
+		}
+	}
+
+	// Request state data from the client
+	requestStateFromClient(ws: WebSocket, syncKey: string) {
+		try {
+			ws.send(
+				JSON.stringify({
+					type: 'fetchState',
+					syncKey: syncKey,
+				}),
+			);
+		} catch (error) {
+			console.error('Error requesting state:', error);
+		}
+	}
+
+	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
+		let data;
+		try {
+			// Parse the message
+			if (typeof message === 'string') {
+				data = JSON.parse(message);
+			} else {
+				const decoder = new TextDecoder();
+				data = JSON.parse(decoder.decode(message));
+			}
+
+			// Handle different message types
+			switch (data.type) {
+				case 'register':
+					// Client is registering interest in a sync key
+					if (data.syncKey) {
+						await this.handleSyncKeyRegistration(ws, data.syncKey);
+						console.log(`Registered sync key: ${data.syncKey}`);
+					}
+					break;
+
+				case 'unregister':
+					// Client wants to unregister from a sync key
+					if (data.syncKey && ws.syncKeys) {
+						ws.syncKeys.delete(data.syncKey);
+						console.log(`Unregistered sync key: ${data.syncKey}`);
+
+						// Confirm unregistration to client
+						ws.send(
+							JSON.stringify({
+								type: 'unregistered',
+								syncKey: data.syncKey,
+							}),
+						);
+					}
+					break;
+
+				case 'stateData':
+					// Client is providing state data in response to our fetchState request
+					if (data.syncKey && data.data) {
+						await this.ctx.storage.put(data.syncKey, data.data);
+						console.log(`Received and stored state for key: ${data.syncKey}`);
+
+						// Notify client that state is stored
+						ws.send(
+							JSON.stringify({
+								type: 'syncReady',
+								syncKey: data.syncKey,
+							}),
+						);
+					}
+					break;
+
+				case 'getState':
+					// Client wants to retrieve state
+					if (data.syncKey) {
+						const state = await this.ctx.storage.get(data.syncKey);
+						if (state) {
+							ws.send(
+								JSON.stringify({
+									type: 'stateData',
+									syncKey: data.syncKey,
+									data: state,
+								}),
+							);
+						} else {
+							// Request state if we don't have it
+							this.requestStateFromClient(ws, data.syncKey);
+						}
+					}
+					break;
+
+				case 'updateState':
+					// Client wants to update state
+					if (data.syncKey && data.data) {
+						// Get current state
+						let currentState = await this.ctx.storage.get(data.syncKey);
+
+						// If we don't have current state, request it first
+						if (!currentState) {
+							this.requestStateFromClient(ws, data.syncKey);
+							return;
+						}
+
+						// Merge updates with current state
+						const updatedState = { ...currentState, ...data.data };
+						await this.ctx.storage.put(data.syncKey, updatedState);
+						console.log(`Updated state for key: ${updatedState}`);
+						// Confirm update to sender
+						ws.send(
+							JSON.stringify({
+								type: 'stateUpdated',
+								syncKey: data.syncKey,
+								success: true,
+							}),
+						);
+
+						// Broadcast to other clients with the same syncKey
+						this.broadcastStateUpdate(ws, data.syncKey, updatedState);
+					}
+					break;
+
+				default:
+					console.log(`Received message: ${typeof message === 'string' ? message : '[binary data]'}`);
+			}
+		} catch (error: any) {
+			// Error handling
+			ws.send(`Error processing message: ${error.message}`);
+		}
+	}
+
+	// Broadcast state updates to all connected clients with the same syncKey except sender
+	async broadcastStateUpdate(sender: WebSocket, syncKey: string, state: any) {
+		const message = JSON.stringify({
+			type: 'stateUpdated',
+			syncKey: syncKey,
+			data: state,
+		});
+
+		for (const client of this.ctx.getWebSockets()) {
+			// Check if this client has registered for this sync key
+			if (client !== sender && client.syncKeys?.has(syncKey)) {
+				try {
+					client.send(message);
+				} catch (error) {
+					console.error('Error broadcasting state update:', error);
+				}
+			}
+		}
 	}
 
 	async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-		// Clear the timeout when the WebSocket is closed
-		this.clearTimeoutForWebSocket(ws);
-		ws.close(code, 'Durable Object is closing WebSocket');
+		console.log(`WebSocket closed with code ${code} and reason: ${reason}`);
+		// Clean up any resources related to this WebSocket if needed
 	}
 
-	// Helper method to reset the timeout for a WebSocket
-	private resetTimeout(ws: WebSocket) {
-		// Clear any existing timeout
-		this.clearTimeoutForWebSocket(ws);
-
-		// Set a new timeout
-		const timeoutId = setTimeout(() => {
-			console.log('WebSocket timeout - closing inactive connection');
-			ws.close(1000, 'Connection timeout due to inactivity');
-			this.timeouts.delete(ws);
-		}, this.TIMEOUT_DURATION);
-
-		// Store the timeout ID
-		this.timeouts.set(ws, timeoutId);
-	}
-
-	// Helper method to clear the timeout for a WebSocket
-	private clearTimeoutForWebSocket(ws: WebSocket) {
-		const timeoutId = this.timeouts.get(ws);
-		if (timeoutId !== undefined) {
-			clearTimeout(timeoutId);
-			this.timeouts.delete(ws);
-		}
+	async webSocketError(ws: WebSocket, error: Error) {
+		console.error('WebSocket error:', error);
 	}
 }
 
 export default {
-	async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const url = new URL(request.url);
 
 		if (url.pathname === '/websocket' && request.method === 'GET') {
-			const authResult = await handleAuth(request);
-
-			// If handleAuth returns a Response, it means auth failed
-			if (authResult instanceof Response) {
-				console.log('failed');
-				return authResult;
-			}
-
 			const upgradeHeader = request.headers.get('Upgrade');
 			if (!upgradeHeader || upgradeHeader !== 'websocket') {
 				return new Response('Expected Upgrade: websocket', { status: 426 });
+			}
+
+			const authResult = await handleAuth(request);
+
+			if (authResult instanceof Response) {
+				return authResult;
 			}
 
 			const id = env.WEBSOCKET_SYNC_ENGINE.idFromName('sync-engine');
@@ -89,42 +233,79 @@ export default {
 
 			return stub.fetch(request);
 		}
+
 		return new Response(`<html><body><h1>Sync Engine Worker</h1></body></html>`, {
 			headers: { 'Content-Type': 'text/html' },
 		});
 	},
 };
+
 async function handleAuth(request: Request) {
 	try {
 		const url = new URL(request.url);
 		const token = url.searchParams.get('token');
 
+		// Create websocket pair for both success and error cases
+		const webSocketPair = new WebSocketPair();
+		const [client, server] = Object.values(webSocketPair);
+
 		if (!token) {
-			throw new Error('Missing token');
+			server.accept();
+			server.close(4001, 'Authentication failed: Missing token');
+			return new Response(null, {
+				status: 101,
+				webSocket: client,
+			});
 		}
 
-		const authResponse = await fetch('https://goot.co.uk:60002/ext/check-tenant-api-key', {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-				Authorization: `Bearer ${token}`,
-			},
-		});
+		try {
+			const authResponse = await fetch('https://goot.co.uk:60002/ext/check-tenant-api-key', {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+					Authorization: `Bearer ${token}`,
+				},
+			});
 
-		// Make sure the response is valid JSON
-		const authResult = (await authResponse.json()) as SuccessAuthed;
-		console.log('authResult', authResult);
+			// Handle non-OK status from auth service
+			if (!authResponse.ok) {
+				server.accept();
+				server.close(4002, `Authentication service error: ${authResponse.status}`);
+				return new Response(null, {
+					status: 101,
+					webSocket: client,
+				});
+			}
 
-		if (!authResult.success || !authResult.valid) {
-			throw new Error('Invalid token');
+			// Parse auth result
+			const authResult = (await authResponse.json()) as SuccessAuthed;
+			console.log('authResult', authResult);
+
+			if (!authResult.success || !authResult.valid) {
+				server.accept();
+				server.close(4000, 'Authentication failed: Invalid token');
+				return new Response(null, {
+					status: 101,
+					webSocket: client,
+				});
+			}
+
+			// If auth is successful, return null (indicating success)
+			return null;
+		} catch (fetchError) {
+			// Handle JSON parsing errors or network issues
+			server.accept();
+			server.close(4003, 'Authentication service unavailable');
+			return new Response(null, {
+				status: 101,
+				webSocket: client,
+			});
 		}
-
-		// If auth is successful, just return without throwing
-		return;
 	} catch (error: any) {
-		// Instead of throwing, return a proper error response
+		// Fallback for any other errors - this should rarely happen
+		// Return an HTTP error as last resort
 		return new Response(JSON.stringify({ success: false, message: error.message || 'Authentication failed' }), {
-			status: 401,
+			status: 500,
 			headers: { 'Content-Type': 'application/json' },
 		});
 	}
