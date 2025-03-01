@@ -45,7 +45,16 @@ export class WebSockeSyncEngine extends DurableObject {
 		console.log(`State for key: ${JSON.stringify(state)}`);
 		if (!state) {
 			// We don't have state for this key, request it from the client
-			this.requestStateFromClient(ws, syncKey);
+			try {
+				ws.send(
+					JSON.stringify({
+						type: 'fetchState',
+						syncKey: syncKey,
+					}),
+				);
+			} catch (error) {
+				console.error('Error requesting state:', error);
+			}
 		} else {
 			// We already have state, notify client
 			ws.send(
@@ -54,20 +63,6 @@ export class WebSockeSyncEngine extends DurableObject {
 					syncKey: syncKey,
 				}),
 			);
-		}
-	}
-
-	// Request state data from the client
-	requestStateFromClient(ws: WebSocket, syncKey: string) {
-		try {
-			ws.send(
-				JSON.stringify({
-					type: 'fetchState',
-					syncKey: syncKey,
-				}),
-			);
-		} catch (error) {
-			console.error('Error requesting state:', error);
 		}
 	}
 
@@ -121,55 +116,6 @@ export class WebSockeSyncEngine extends DurableObject {
 								syncKey: data.syncKey,
 							}),
 						);
-					}
-					break;
-
-				case 'getState':
-					// Client wants to retrieve state
-					if (data.syncKey) {
-						const state = await this.ctx.storage.get(data.syncKey);
-						if (state) {
-							ws.send(
-								JSON.stringify({
-									type: 'stateData',
-									syncKey: data.syncKey,
-									data: state,
-								}),
-							);
-						} else {
-							// Request state if we don't have it
-							this.requestStateFromClient(ws, data.syncKey);
-						}
-					}
-					break;
-
-				case 'updateState':
-					// Client wants to update state
-					if (data.syncKey && data.data) {
-						// Get current state
-						let currentState = await this.ctx.storage.get(data.syncKey);
-
-						// If we don't have current state, request it first
-						if (!currentState) {
-							this.requestStateFromClient(ws, data.syncKey);
-							return;
-						}
-
-						// Merge updates with current state
-						const updatedState = { ...currentState, ...data.data };
-						await this.ctx.storage.put(data.syncKey, updatedState);
-						console.log(`Updated state for key: ${updatedState}`);
-						// Confirm update to sender
-						ws.send(
-							JSON.stringify({
-								type: 'stateUpdated',
-								syncKey: data.syncKey,
-								success: true,
-							}),
-						);
-
-						// Broadcast to other clients with the same syncKey
-						this.broadcastStateUpdate(ws, data.syncKey, updatedState);
 					}
 					break;
 
