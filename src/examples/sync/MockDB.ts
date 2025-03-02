@@ -57,12 +57,10 @@ export async function mockFetch(
 
   switch (endpoint) {
     case "state":
-      // Handle state endpoint: /api/state/{serviceId}/{userId}/{stateKey}/{stateId}
-      if (urlParts.length >= 5) {
-        const serviceId = urlParts[1];
-        const userId = urlParts[2];
-        const stateKey = urlParts[3]!;
-        const stateId = urlParts[4]!;
+      // Handle state endpoint: /api/state/{stateKey}/{stateId}
+      if (urlParts.length >= 3) {
+        const stateKey = urlParts[1]!;
+        const stateId = urlParts[2]!;
 
         // GET request
         if (!options || options.method === "GET" || !options.method) {

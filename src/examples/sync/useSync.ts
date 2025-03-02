@@ -1,0 +1,281 @@
+import { useState, useEffect, useRef } from "react";
+
+interface SyncState<T> {
+  data: T | null;
+  status: "idle" | "connecting" | "connected" | "error" | "disconnected";
+  error: string | null;
+  lastUpdated: Date | null;
+}
+
+interface SyncOptions {
+  autoConnect?: boolean;
+  serverUrl?: string;
+  token?: string;
+}
+
+/**
+ * Custom hook for syncing state with backend via WebSocket
+ *
+ * @param syncKey - The unique key for the sync session (format: "serviceId_userId_stateKey_stateId")
+ * @param fetchStateHandler - Function to handle fetching initial state
+ * @param updateStateHandler - Function to handle state updates
+ * @param options - Configuration options
+ * @returns An object with the sync state and control functions
+ */
+export function useSync<T>(
+  syncKey: string,
+  fetchStateHandler: (syncKey: string) => Promise<T>,
+  updateStateHandler: (syncKey: string, data: T) => Promise<any>,
+  options: SyncOptions = {}
+) {
+  const {
+    autoConnect = false,
+    serverUrl = "ws://127.0.0.1:8787/websocket",
+    token = "tapi_d07811ebce02e85c_d136a589de91a9d28776bcbf1a1de93108e0dbc438d9b7b3",
+  } = options;
+
+  const [state, setState] = useState<SyncState<T>>({
+    data: null,
+    status: "idle",
+    error: null,
+    lastUpdated: null,
+  });
+  console.log("sdasdsa", state);
+  const wsRef = useRef<WebSocket | null>(null);
+  const isConnected = state.status === "connected";
+
+  // Connect to WebSocket server
+  const connect = () => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      return; // Already connected
+    }
+
+    try {
+      setState((prev) => ({ ...prev, status: "connecting", error: null }));
+
+      const wsUrl = `${serverUrl}?token=${encodeURIComponent(token)}`;
+      const ws = new WebSocket(wsUrl);
+
+      ws.onopen = () => {
+        console.log("WebSocket Connected");
+        ws.send(
+          JSON.stringify({
+            type: "register",
+            syncKey: syncKey,
+          })
+        );
+        setState((prev) => ({ ...prev, status: "connected", error: null }));
+      };
+
+      ws.onmessage = (event) => {
+        console.log("WebSocket message received:", event.data);
+        const message = JSON.parse(event.data);
+        handleWebSocketMessage(ws, message);
+      };
+
+      ws.onerror = (error) => {
+        console.error("WebSocket Error:", error);
+        setState((prev) => ({
+          ...prev,
+          status: "error",
+          error: "Connection error",
+        }));
+      };
+
+      ws.onclose = (event) => {
+        console.log("WebSocket Disconnected:", event.code, event.reason);
+        let errorMessage = null;
+
+        // Handle specific error codes
+        switch (event.code) {
+          case 4000:
+            errorMessage = "Authentication Error: Invalid token";
+            break;
+          case 4001:
+            errorMessage = "Authentication Error: Missing token";
+            break;
+          case 4002:
+            errorMessage = `Authentication Error: Service error (${event.reason})`;
+            break;
+          case 4003:
+            errorMessage = "Authentication Error: Service unavailable";
+            break;
+        }
+
+        setState((prev) => ({
+          ...prev,
+          status: "disconnected",
+          error: errorMessage,
+        }));
+      };
+
+      wsRef.current = ws;
+    } catch (error: any) {
+      setState((prev) => ({
+        ...prev,
+        status: "error",
+        error: error.message,
+      }));
+    }
+  };
+
+  // Disconnect from WebSocket server
+  const disconnect = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.close(1000, "User disconnected");
+      setState((prev) => ({ ...prev, status: "disconnected" }));
+    }
+  };
+
+  // Handle received WebSocket messages
+  const handleWebSocketMessage = async (ws: WebSocket, message: any) => {
+    switch (message.type) {
+      case "fetchState":
+        try {
+          const data = await fetchStateHandler(message.syncKey);
+          console.log("data", data);
+          ws.send(
+            JSON.stringify({
+              type: "stateData",
+              syncKey: message.syncKey,
+              data: data,
+            })
+          );
+
+          setState((prev) => ({
+            ...prev,
+            data,
+            lastUpdated: new Date(),
+          }));
+        } catch (error: any) {
+          ws.send(
+            JSON.stringify({
+              type: "error",
+              syncKey: message.syncKey,
+              message: error.message,
+            })
+          );
+
+          setState((prev) => ({
+            ...prev,
+            error: `Failed to fetch state: ${error.message}`,
+          }));
+        }
+        break;
+
+      case "updateState":
+        try {
+          const result = await updateStateHandler(
+            message.syncKey,
+            message.data
+          );
+
+          ws.send(
+            JSON.stringify({
+              type: "stateUpdated",
+              syncKey: message.syncKey,
+              success: true,
+              result,
+            })
+          );
+
+          setState((prev) => ({
+            ...prev,
+            data: message.data,
+            lastUpdated: new Date(),
+          }));
+        } catch (error: any) {
+          ws.send(
+            JSON.stringify({
+              type: "stateUpdateError",
+              syncKey: message.syncKey,
+              message: error.message,
+            })
+          );
+
+          setState((prev) => ({
+            ...prev,
+            error: `Failed to update state: ${error.message}`,
+          }));
+        }
+        break;
+
+      case "stateData":
+        // Update local state with received data
+        setState((prev) => ({
+          ...prev,
+          data: message.data,
+          lastUpdated: new Date(),
+        }));
+        break;
+
+      default:
+        console.log("Unknown message type:", message.type);
+    }
+  };
+
+  // Send a local update to sync with all clients
+  const updateState = (newData: T) => {
+    if (!isConnected) {
+      console.error("Cannot update state: not connected");
+      return false;
+    }
+
+    try {
+      wsRef.current?.send(
+        JSON.stringify({
+          type: "broadcastUpdate",
+          syncKey,
+          data: newData,
+        })
+      );
+
+      setState((prev) => ({
+        ...prev,
+        data: newData,
+      }));
+
+      return true;
+    } catch (error) {
+      console.error("Failed to send update:", error);
+      return false;
+    }
+  };
+  const clearStorage = () => {
+    if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+      wsRef.current.send(
+        JSON.stringify({
+          type: "clearStorage",
+          syncKey,
+        })
+      );
+      return true;
+    }
+    return false;
+  };
+  // Auto-connect if enabled
+  useEffect(() => {
+    if (autoConnect) {
+      connect();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (wsRef.current) {
+        wsRef.current.close(1000, "Component unmounted");
+      }
+    };
+  }, [autoConnect, syncKey]);
+
+  return {
+    state: state.data,
+    status: state.status,
+    error: state.error,
+    lastUpdated: state.lastUpdated,
+    connect,
+    disconnect,
+    clearStorage,
+    updateState,
+    isConnected,
+  };
+}

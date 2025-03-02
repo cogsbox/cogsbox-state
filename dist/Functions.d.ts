@@ -1,4 +1,4 @@
-import { EffectiveSetState, FormElementParmas, FormOptsType, UpdateArg } from './CogsState';
+import { EffectiveSetState, FormElementParams, FormOptsType, UpdateArg } from './CogsState';
 import { default as React } from 'react';
 import { getGlobalStore } from './store';
 
@@ -12,7 +12,7 @@ export declare const useGetKeyState: (key: string, path: string[]) => any;
 interface FormControlComponentProps<TStateObject> {
     setState: EffectiveSetState<TStateObject>;
     path: string[];
-    child: (obj: FormElementParmas<TStateObject>) => JSX.Element;
+    child: (obj: FormElementParams<TStateObject>) => JSX.Element;
     formOpts?: FormOptsType;
     stateKey: string;
 }

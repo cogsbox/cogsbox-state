@@ -56,11 +56,11 @@ export class WebSockeSyncEngine extends DurableObject {
 				console.error('Error requesting state:', error);
 			}
 		} else {
-			// We already have state, notify client
 			ws.send(
 				JSON.stringify({
-					type: 'syncReady',
+					type: 'stateData',
 					syncKey: syncKey,
+					data: state,
 				}),
 			);
 		}
@@ -118,7 +118,36 @@ export class WebSockeSyncEngine extends DurableObject {
 						);
 					}
 					break;
+				case 'broadcastUpdate':
+					if (data.syncKey && data.data) {
+						// Store the updated state
+						await this.ctx.storage.put(data.syncKey, data.data);
+						console.log(`Updated state for key: ${data.syncKey}`);
 
+						// Broadcast to other clients
+						await this.broadcastStateUpdate(ws, data.syncKey, data.data);
+
+						// Confirm to sender
+						ws.send(
+							JSON.stringify({
+								type: 'updateConfirmed',
+								syncKey: data.syncKey,
+							}),
+						);
+					}
+					break;
+				case 'clearStorage':
+					if (data.syncKey) {
+						await this.ctx.storage.delete(data.syncKey);
+						console.log(`Cleared storage for key: ${data.syncKey}`);
+						ws.send(
+							JSON.stringify({
+								type: 'storageCleared',
+								syncKey: data.syncKey,
+							}),
+						);
+					}
+					break;
 				default:
 					console.log(`Received message: ${typeof message === 'string' ? message : '[binary data]'}`);
 			}
