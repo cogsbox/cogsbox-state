@@ -1,28 +1,100 @@
 import { DurableObject } from 'cloudflare:workers';
+import { sign, verify } from '@tsndr/cloudflare-worker-jwt';
 
-type SuccessAuthed = {
+// Define our interfaces
+interface Env {
+	WEBSOCKET_SYNC_ENGINE: DurableObjectNamespace;
+	JWT_SECRET: string;
+}
+
+type AuthResult = {
 	success: boolean;
 	valid: boolean;
 	tenantId: number;
 	serviceId: number;
 	scopes: string[];
 };
+
+type SyncTokenPayload = {
+	sessionId: string;
+	tenantId: number;
+	serviceId: number;
+	scopes: string[];
+	exp: number; // Expiration timestamp
+	iat: number; // Issued at timestamp
+};
+
 declare global {
 	interface WebSocket {
 		syncKeys?: Set<string>;
+		tenantId?: number;
+		serviceId?: number;
 	}
 }
 
-export class WebSockeSyncEngine extends DurableObject {
+export class WebSocketSyncEngine extends DurableObject {
+	constructor(
+		readonly ctx: DurableObjectState,
+		readonly env: Env,
+	) {
+		super(ctx, env);
+	}
+
 	async fetch(request: Request) {
 		const url = new URL(request.url);
-		// No longer using syncKey from URL parameters
 
+		// Extract and validate JWT token
+		const token = url.searchParams.get('token');
+		if (!token) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: 'Missing authentication token',
+				}),
+				{
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
+		}
+
+		// Verify the token
+		let payload: SyncTokenPayload;
+		try {
+			const isValid = await verify(token, this.env.JWT_SECRET);
+			if (!isValid) {
+				throw new Error('Invalid token');
+			}
+
+			// Decode the token payload
+			const decoded = JSON.parse(atob(token.split('.')[1]));
+			payload = decoded as SyncTokenPayload;
+
+			// Check if token is expired
+			if (payload.exp < Math.floor(Date.now() / 1000)) {
+				throw new Error('Token expired');
+			}
+		} catch (error) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: 'Invalid or expired token',
+				}),
+				{
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
+		}
+
+		// Create WebSocket pair
 		const webSocketPair = new WebSocketPair();
 		const [client, server] = Object.values(webSocketPair);
 
-		// Initialize the syncKeys set for this WebSocket
+		// Initialize the WebSocket properties
 		server.syncKeys = new Set();
+		server.tenantId = payload.tenantId;
+		server.serviceId = payload.serviceId;
 
 		this.ctx.acceptWebSocket(server);
 
@@ -34,6 +106,33 @@ export class WebSockeSyncEngine extends DurableObject {
 
 	// Handle registration of a sync key
 	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
+		// Validate the syncKey format to ensure it belongs to this tenant
+		// Expected format: "serviceId-tenantId-stateKey-stateId"
+		const parts = syncKey.split('-');
+		if (parts.length < 4) {
+			ws.send(
+				JSON.stringify({
+					type: 'error',
+					message: 'Invalid syncKey format',
+					syncKey,
+				}),
+			);
+			return;
+		}
+
+		// Ensure the tenant and service IDs match those from the token
+		const [serviceId, tenantId] = parts;
+		if (parseInt(serviceId, 10) !== ws.serviceId || parseInt(tenantId, 10) !== ws.tenantId) {
+			ws.send(
+				JSON.stringify({
+					type: 'error',
+					message: 'Unauthorized access to this sync key',
+					syncKey,
+				}),
+			);
+			return;
+		}
+
 		// Add to this WebSocket's registered keys
 		if (!ws.syncKeys) {
 			ws.syncKeys = new Set();
@@ -42,7 +141,6 @@ export class WebSockeSyncEngine extends DurableObject {
 
 		// Check if we already have state for this syncKey
 		const state = await this.ctx.storage.get(syncKey);
-		console.log(`State for key: ${JSON.stringify(state)}`);
 		if (!state) {
 			// We don't have state for this key, request it from the client
 			try {
@@ -83,7 +181,6 @@ export class WebSockeSyncEngine extends DurableObject {
 					// Client is registering interest in a sync key
 					if (data.syncKey) {
 						await this.handleSyncKeyRegistration(ws, data.syncKey);
-						console.log(`Registered sync key: ${data.syncKey}`);
 					}
 					break;
 
@@ -91,8 +188,6 @@ export class WebSockeSyncEngine extends DurableObject {
 					// Client wants to unregister from a sync key
 					if (data.syncKey && ws.syncKeys) {
 						ws.syncKeys.delete(data.syncKey);
-						console.log(`Unregistered sync key: ${data.syncKey}`);
-
 						// Confirm unregistration to client
 						ws.send(
 							JSON.stringify({
@@ -106,9 +201,20 @@ export class WebSockeSyncEngine extends DurableObject {
 				case 'stateData':
 					// Client is providing state data in response to our fetchState request
 					if (data.syncKey && data.data) {
-						await this.ctx.storage.put(data.syncKey, data.data);
-						console.log(`Received and stored state for key: ${data.syncKey}`);
+						// Validate ownership of this syncKey
+						const parts = data.syncKey.split('-');
+						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
+							ws.send(
+								JSON.stringify({
+									type: 'error',
+									message: 'Unauthorized access to this sync key',
+									syncKey: data.syncKey,
+								}),
+							);
+							return;
+						}
 
+						await this.ctx.storage.put(data.syncKey, data.data);
 						// Notify client that state is stored
 						ws.send(
 							JSON.stringify({
@@ -118,15 +224,26 @@ export class WebSockeSyncEngine extends DurableObject {
 						);
 					}
 					break;
+
 				case 'broadcastUpdate':
 					if (data.syncKey && data.data) {
+						// Validate ownership of this syncKey
+						const parts = data.syncKey.split('-');
+						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
+							ws.send(
+								JSON.stringify({
+									type: 'error',
+									message: 'Unauthorized access to this sync key',
+									syncKey: data.syncKey,
+								}),
+							);
+							return;
+						}
+
 						// Store the updated state
 						await this.ctx.storage.put(data.syncKey, data.data);
-						console.log(`Updated state for key: ${data.syncKey}`);
-
 						// Broadcast to other clients
 						await this.broadcastStateUpdate(ws, data.syncKey, data.data);
-
 						// Confirm to sender
 						ws.send(
 							JSON.stringify({
@@ -136,10 +253,23 @@ export class WebSockeSyncEngine extends DurableObject {
 						);
 					}
 					break;
+
 				case 'clearStorage':
 					if (data.syncKey) {
+						// Validate ownership of this syncKey
+						const parts = data.syncKey.split('-');
+						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
+							ws.send(
+								JSON.stringify({
+									type: 'error',
+									message: 'Unauthorized access to this sync key',
+									syncKey: data.syncKey,
+								}),
+							);
+							return;
+						}
+
 						await this.ctx.storage.delete(data.syncKey);
-						console.log(`Cleared storage for key: ${data.syncKey}`);
 						ws.send(
 							JSON.stringify({
 								type: 'storageCleared',
@@ -148,12 +278,18 @@ export class WebSockeSyncEngine extends DurableObject {
 						);
 					}
 					break;
+
 				default:
-					console.log(`Received message: ${typeof message === 'string' ? message : '[binary data]'}`);
+					console.log(`Received unknown message type: ${data.type}`);
 			}
 		} catch (error: any) {
 			// Error handling
-			ws.send(`Error processing message: ${error.message}`);
+			ws.send(
+				JSON.stringify({
+					type: 'error',
+					message: `Error processing message: ${error.message}`,
+				}),
+			);
 		}
 	}
 
@@ -191,16 +327,16 @@ export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const url = new URL(request.url);
 
+		// Handle the sync-token endpoint
+		if (url.pathname === '/sync-token' && request.method === 'POST') {
+			return handleSyncToken(request, env);
+		}
+
+		// Handle the WebSocket connection endpoint
 		if (url.pathname === '/websocket' && request.method === 'GET') {
 			const upgradeHeader = request.headers.get('Upgrade');
 			if (!upgradeHeader || upgradeHeader !== 'websocket') {
 				return new Response('Expected Upgrade: websocket', { status: 426 });
-			}
-
-			const authResult = await handleAuth(request);
-
-			if (authResult instanceof Response) {
-				return authResult;
 			}
 
 			const id = env.WEBSOCKET_SYNC_ENGINE.idFromName('sync-engine');
@@ -209,79 +345,128 @@ export default {
 			return stub.fetch(request);
 		}
 
-		return new Response(`<html><body><h1>Sync Engine Worker</h1></body></html>`, {
+		// Default response
+		return new Response(`<html><body><h1>Sync Engine Worker</h1><p>Status: Online</p></body></html>`, {
 			headers: { 'Content-Type': 'text/html' },
 		});
 	},
 };
 
-async function handleAuth(request: Request) {
+// Handler for the sync-token endpoint
+async function handleSyncToken(request: Request, env: Env) {
 	try {
-		const url = new URL(request.url);
-		const token = url.searchParams.get('token');
-
-		// Create websocket pair for both success and error cases
-		const webSocketPair = new WebSocketPair();
-		const [client, server] = Object.values(webSocketPair);
-
-		if (!token) {
-			server.accept();
-			server.close(4001, 'Authentication failed: Missing token');
-			return new Response(null, {
-				status: 101,
-				webSocket: client,
-			});
+		// Extract API key from Authorization header
+		const authHeader = request.headers.get('Authorization');
+		if (!authHeader || !authHeader.startsWith('Bearer ')) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: 'Missing or invalid authorization header',
+				}),
+				{
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
 		}
 
-		try {
-			const authResponse = await fetch('https://goot.co.uk:60002/ext/check-tenant-api-key', {
-				method: 'POST',
+		const apiKey = authHeader.substring(7); // Remove 'Bearer ' prefix
+
+		// Extract sessionId from the request body
+		const body = (await request.json()) as { sessionId: string; service_id?: number };
+		const { sessionId, service_id } = body;
+
+		if (!sessionId) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: 'SessionId is required',
+				}),
+				{
+					status: 400,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
+		}
+
+		// Validate the API key by calling your auth service
+		const authResponse = await fetch('https://goot.co.uk:60002/ext/check-tenant-api-key', {
+			method: 'POST',
+			headers: {
+				'Content-Type': 'application/json',
+				Authorization: `Bearer ${apiKey}`,
+			},
+		});
+
+		if (!authResponse.ok) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: `Authentication service error: ${authResponse.status}`,
+				}),
+				{
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
+		}
+
+		const authResult = (await authResponse.json()) as AuthResult;
+
+		if (!authResult.success || !authResult.valid) {
+			return new Response(
+				JSON.stringify({
+					success: false,
+					message: 'Authentication failed: Invalid API key',
+				}),
+				{
+					status: 401,
+					headers: { 'Content-Type': 'application/json' },
+				},
+			);
+		}
+
+		// Generate a JWT token with appropriate claims
+		const payload: SyncTokenPayload = {
+			sessionId,
+			tenantId: authResult.tenantId,
+			serviceId: service_id || authResult.serviceId,
+			scopes: authResult.scopes,
+			exp: Math.floor(Date.now() / 1000) + 3600, // 1 hour expiration
+			iat: Math.floor(Date.now() / 1000),
+		};
+
+		const token = await sign(payload, env.JWT_SECRET);
+
+		// Return the token and WebSocket connection URL
+		const serverUrl = new URL('/websocket', request.url).toString().replace('http', 'ws');
+
+		return new Response(
+			JSON.stringify({
+				success: true,
+				sessionToken: token,
+				serverUrl,
+				expiresIn: 3600, // 1 hour in seconds
+			}),
+			{
+				status: 200,
 				headers: {
 					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
+					'Cache-Control': 'no-store',
 				},
-			});
-
-			// Handle non-OK status from auth service
-			if (!authResponse.ok) {
-				server.accept();
-				server.close(4002, `Authentication service error: ${authResponse.status}`);
-				return new Response(null, {
-					status: 101,
-					webSocket: client,
-				});
-			}
-
-			// Parse auth result
-			const authResult = (await authResponse.json()) as SuccessAuthed;
-			console.log('authResult', authResult);
-
-			if (!authResult.success || !authResult.valid) {
-				server.accept();
-				server.close(4000, 'Authentication failed: Invalid token');
-				return new Response(null, {
-					status: 101,
-					webSocket: client,
-				});
-			}
-
-			// If auth is successful, return null (indicating success)
-			return null;
-		} catch (fetchError) {
-			// Handle JSON parsing errors or network issues
-			server.accept();
-			server.close(4003, 'Authentication service unavailable');
-			return new Response(null, {
-				status: 101,
-				webSocket: client,
-			});
-		}
+			},
+		);
 	} catch (error: any) {
-		// Fallback for any other errors - this should rarely happen
-		// Return an HTTP error as last resort
-		return new Response(JSON.stringify({ success: false, message: error.message || 'Authentication failed' }), {
-			status: 500,
-			headers: { 'Content-Type': 'application/json' },
-		});
+		console.error('Error generating sync token:', error);
+		return new Response(
+			JSON.stringify({
+				success: false,
+				message: error.message || 'Internal server error',
+			}),
+			{
+				status: 500,
+				headers: { 'Content-Type': 'application/json' },
+			},
+		);
 	}
 }
