@@ -20,7 +20,7 @@ export default function SyncPage({
       try {
         const AUTH_API_URL = "http://127.0.0.1:8787"; // Note: changed from ws:// to http://
         const API_SECRET_KEY =
-          "dev_b723792b0e48fe95_d720d854b0d4a418e36a9af953471a4ca30210a09d0714dd";
+          "dev_0494bb347d30cb7a_8c8b9f51814618700f53344139bb25fc3fcdc6a897b30b80";
 
         const response = await fetch(`${AUTH_API_URL}/sync-token`, {
           method: "POST",
