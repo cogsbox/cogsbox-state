@@ -48,7 +48,7 @@ export async function mockFetch(
   // Parse URL to determine endpoint
   const urlParts = url.replace(/^https?:\/\/[^\/]+\/api\//, "").split("/");
   const endpoint = urlParts[0];
-
+  console.log("endpoint", endpoint);
   // Simulate network delay
   await new Promise((resolve) => setTimeout(resolve, 100));
 
@@ -99,6 +99,7 @@ function getStateData(stateKey: string, stateId: string): any {
     const item = mockDatabase[tableName!]!.find(
       (item) => item[pk].toString() === stateId
     );
+
     return item || { error: "Item not found" };
   } else if (stateKey in mockDatabase) {
     return (mockDatabase as any)[stateKey];

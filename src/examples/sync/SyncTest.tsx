@@ -13,13 +13,13 @@ const SyncTest = () => {
       setResponse((prev) => `${prev}\n\nFetching state for key: ${syncKey}`);
 
       // Parse the sync key to get components
-      const [serviceId, userId, stateKey, stateId] = syncKey.split("_");
+      const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
 
       // Fetch data from your API
       const response = await mockFetch(
         `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`
       );
-      console.log("sdsadasdasd", response);
+
       const data = await response.json();
       setResponse(
         (prev) =>
@@ -47,18 +47,11 @@ const SyncTest = () => {
       );
 
       // Parse the sync key to get components
-      const [serviceId, userId, stateKey, stateId] = syncKey.split("_");
+      const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
 
       // Update data via your API
       const response = await mockFetch(
-        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(newData),
-        }
+        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`
       );
 
       const result = await response.json();
@@ -84,7 +77,8 @@ const SyncTest = () => {
     disconnect,
     updateState,
     clearStorage,
-  } = useSync("asdasdasds_1_user_1", fetchStateHandler, updateStateHandler);
+  } = useSync("5-1-user-1", fetchStateHandler, updateStateHandler);
+
   const handleClearStorage = () => {
     const success = clearStorage();
     setResponse(

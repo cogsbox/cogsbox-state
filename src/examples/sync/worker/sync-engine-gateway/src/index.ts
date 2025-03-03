@@ -101,8 +101,7 @@ export class WebSocketSyncEngine extends DurableObject {
 
 	// Handle registration of a sync key
 	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
-		// Validate the syncKey format to ensure it belongs to this tenant
-		// Expected format: "serviceId-tenantId-stateKey-stateId"
+		console.log('handleSyncKeyRegistration', syncKey);
 		const parts = syncKey.split('-');
 		if (parts.length < 4) {
 			ws.send(
@@ -116,8 +115,9 @@ export class WebSocketSyncEngine extends DurableObject {
 		}
 
 		// Ensure the tenant and service IDs match those from the token
-		const [serviceId, tenantId] = parts;
-		if (parseInt(serviceId, 10) !== ws.serviceId || parseInt(tenantId, 10) !== ws.tenantId) {
+		const [tenantId, userId] = parts;
+		console.log('handleSyncKeyRegistration', syncKey, parts, ws.serviceId);
+		if (parseInt(tenantId, 10) !== ws.serviceId) {
 			ws.send(
 				JSON.stringify({
 					type: 'error',

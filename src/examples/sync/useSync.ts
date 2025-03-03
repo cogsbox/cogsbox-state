@@ -132,6 +132,7 @@ export function useSync<T>(
     switch (message.type) {
       case "fetchState":
         try {
+          console.log("fetchStateHandler", message.syncKey);
           const data = await fetchStateHandler(message.syncKey);
           console.log("data", data);
           ws.send(
