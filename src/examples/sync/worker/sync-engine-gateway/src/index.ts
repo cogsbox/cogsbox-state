@@ -1,11 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
-import { sign, verify } from '@tsndr/cloudflare-worker-jwt';
 
-// Define our interfaces
-interface Env {
-	WEBSOCKET_SYNC_ENGINE: DurableObjectNamespace;
-	JWT_SECRET: string;
-}
+import { sign, verify } from '@tsndr/cloudflare-worker-jwt';
 
 type AuthResult = {
 	success: boolean;
@@ -326,6 +321,19 @@ export class WebSocketSyncEngine extends DurableObject {
 export default {
 	async fetch(request: Request, env: Env, ctx: ExecutionContext) {
 		const url = new URL(request.url);
+		console.log('Request URL:', url.pathname, request.method);
+
+		// Handle CORS preflight requests (OPTIONS)
+		if (request.method === 'OPTIONS') {
+			return new Response(null, {
+				headers: {
+					'Access-Control-Allow-Origin': '*',
+					'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+					'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+					'Access-Control-Max-Age': '86400',
+				},
+			});
+		}
 
 		// Handle the sync-token endpoint
 		if (url.pathname === '/sync-token' && request.method === 'POST') {
@@ -440,7 +448,7 @@ async function handleSyncToken(request: Request, env: Env) {
 
 		// Return the token and WebSocket connection URL
 		const serverUrl = new URL('/websocket', request.url).toString().replace('http', 'ws');
-
+		console.log('authResult', authResult, serverUrl);
 		return new Response(
 			JSON.stringify({
 				success: true,
@@ -453,6 +461,9 @@ async function handleSyncToken(request: Request, env: Env) {
 				headers: {
 					'Content-Type': 'application/json',
 					'Cache-Control': 'no-store',
+					'Access-Control-Allow-Origin': '*', // Add this!
+					'Access-Control-Allow-Methods': 'POST, OPTIONS', // Add this!
+					'Access-Control-Allow-Headers': 'Content-Type, Authorization', // Add this!
 				},
 			},
 		);

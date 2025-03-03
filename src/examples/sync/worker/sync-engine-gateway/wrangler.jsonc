@@ -15,16 +15,12 @@
       "bindings": [
         {
           "name": "WEBSOCKET_SYNC_ENGINE",
-          "class_name": "WebSockeSyncEngine"
+          "class_name": "WebSocketSyncEngine"
         }
       ]
-    },
-    "migrations": [
-      {
-        "tag": "v1",
-        "new_classes": ["WebSockeSyncEngine"]
-      }
-    ]
+    }
+
+
 
   
   /**

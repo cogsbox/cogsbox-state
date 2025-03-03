@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { useSyncContext } from "./SyncProvider";
 
 interface SyncState<T> {
   data: T | null;
@@ -9,8 +10,6 @@ interface SyncState<T> {
 
 interface SyncOptions {
   autoConnect?: boolean;
-  serverUrl?: string;
-  token?: string;
 }
 
 /**
@@ -28,11 +27,10 @@ export function useSync<T>(
   updateStateHandler: (syncKey: string, data: T) => Promise<any>,
   options: SyncOptions = {}
 ) {
-  const {
-    autoConnect = false,
-    serverUrl = "ws://127.0.0.1:8787/websocket",
-    token = "tapi_d07811ebce02e85c_d136a589de91a9d28776bcbf1a1de93108e0dbc438d9b7b3",
-  } = options;
+  const { autoConnect = false } = options;
+
+  // Get session token and server URL from context
+  const { sessionToken, serverUrl } = useSyncContext();
 
   const [state, setState] = useState<SyncState<T>>({
     data: null,
@@ -40,7 +38,7 @@ export function useSync<T>(
     error: null,
     lastUpdated: null,
   });
-  console.log("sdasdsa", state);
+
   const wsRef = useRef<WebSocket | null>(null);
   const isConnected = state.status === "connected";
 
@@ -53,9 +51,11 @@ export function useSync<T>(
     try {
       setState((prev) => ({ ...prev, status: "connecting", error: null }));
 
-      const wsUrl = `${serverUrl}?token=${encodeURIComponent(token)}`;
-      const ws = new WebSocket(wsUrl);
+      // Use the sessionToken from context
+      const wsUrl = `${serverUrl}?token=${encodeURIComponent(sessionToken)}`;
+      console.log("Connecting to WebSocket:", wsUrl);
 
+      const ws = new WebSocket(wsUrl);
       ws.onopen = () => {
         console.log("WebSocket Connected");
         ws.send(

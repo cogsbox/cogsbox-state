@@ -3,4 +3,5 @@
 // eslint-disable-next-line @typescript-eslint/no-empty-interface,@typescript-eslint/no-empty-object-type
 interface Env {
 	WEBSOCKET_SYNC_ENGINE: DurableObjectNamespace<WebSocketHibernationServer>;
+	JWT_SECRET: string;
 }

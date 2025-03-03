@@ -30,7 +30,7 @@ export default function SyncPage({
           },
           body: JSON.stringify({ sessionId, service_id: 5 }),
         });
-
+        console.log("response", response);
         if (!response.ok) {
           throw new Error(`Failed to fetch token: ${response.statusText}`);
         }
@@ -69,7 +69,7 @@ export default function SyncPage({
       sessionToken={syncConfig.sessionToken}
       serverUrl={syncConfig.serverUrl}
     >
-      {children}
+      {syncConfig.sessionToken && syncConfig.serverUrl && children}
     </SyncProvider>
   );
 }

@@ -84,11 +84,7 @@ const SyncTest = () => {
     disconnect,
     updateState,
     clearStorage,
-  } = useSync("asdasdasds_1_user_1", fetchStateHandler, updateStateHandler, {
-    serverUrl: "ws://127.0.0.1:8787/websocket",
-    token:
-      "tapi_d07811ebce02e85c_d136a589de91a9d28776bcbf1a1de93108e0dbc438d9b7b3",
-  });
+  } = useSync("asdasdasds_1_user_1", fetchStateHandler, updateStateHandler);
   const handleClearStorage = () => {
     const success = clearStorage();
     setResponse(
