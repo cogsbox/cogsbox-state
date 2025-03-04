@@ -9,9 +9,6 @@ const SyncTest = () => {
   // Handler for fetching state
   const fetchStateHandler = async (syncKey: string): Promise<any> => {
     try {
-      // Log the activity
-      setResponse((prev) => `${prev}\n\nFetching state for key: ${syncKey}`);
-
       // Parse the sync key to get components
       const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
 
@@ -21,15 +18,9 @@ const SyncTest = () => {
       );
 
       const data = await response.json();
-      setResponse(
-        (prev) =>
-          `${prev}\n\nReceived state data: ${JSON.stringify(data, null, 2)}`
-      );
+
       return data;
     } catch (error: any) {
-      setResponse(
-        (prev) => `${prev}\n\nError fetching state: ${error.message}`
-      );
       throw error;
     }
   };
@@ -40,12 +31,6 @@ const SyncTest = () => {
     newData: any
   ): Promise<any> => {
     try {
-      // Log the activity
-      setResponse((prev) => `${prev}\n\nUpdating state for key: ${syncKey}`);
-      setResponse(
-        (prev) => `${prev}\n\nNew data: ${JSON.stringify(newData, null, 2)}`
-      );
-
       // Parse the sync key to get components
       const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
 
@@ -55,15 +40,9 @@ const SyncTest = () => {
       );
 
       const result = await response.json();
-      setResponse(
-        (prev) =>
-          `${prev}\n\nUpdate response: ${JSON.stringify(result, null, 2)}`
-      );
+
       return result;
     } catch (error: any) {
-      setResponse(
-        (prev) => `${prev}\n\nError updating state: ${error.message}`
-      );
       throw error;
     }
   };

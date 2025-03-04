@@ -1,12 +1,33 @@
 // sync-provider.tsx
 "use client";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  type ReactNode,
+} from "react";
 
-import React, { createContext, useContext, type ReactNode } from "react";
+// Types for the handlers
+type FetchStateHandler = (syncKey: string) => Promise<any>;
+type UpdateStateHandler = (syncKey: string, data: any) => Promise<any>;
 
 // Define the type for our context value
 interface SyncContextValue {
   sessionToken: string;
   serverUrl: string;
+
+  // Stored handlers
+  handlers: {
+    fetchState: FetchStateHandler | null;
+    updateState: UpdateStateHandler | null;
+  };
+
+  // Function to set handlers
+  registerHandlers: (
+    fetchState: FetchStateHandler,
+    updateState: UpdateStateHandler
+  ) => void;
 }
 
 // Create the context with a default value
@@ -23,9 +44,31 @@ export function SyncProvider({
   sessionToken,
   serverUrl,
 }: SyncProviderProps) {
+  // Store handlers in state
+  const [handlers, setHandlers] = useState<{
+    fetchState: FetchStateHandler | null;
+    updateState: UpdateStateHandler | null;
+  }>({
+    fetchState: null,
+    updateState: null,
+  });
+
+  // Function to register handlers
+  const registerHandlers = useCallback(
+    (fetchState: FetchStateHandler, updateState: UpdateStateHandler) => {
+      setHandlers({
+        fetchState,
+        updateState,
+      });
+    },
+    []
+  );
+
   const contextValue = {
     sessionToken,
     serverUrl,
+    handlers,
+    registerHandlers,
   };
 
   return (
