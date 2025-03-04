@@ -27,7 +27,7 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
 
   // Get session token and server URL from context
   const { sessionToken, serverUrl, handlers } = useSyncContext();
-
+  console.log("handlers", handlers);
   const [state, setState] = useState<SyncState<T>>({
     data: null,
     status: "idle",
@@ -131,11 +131,13 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
           if (!handlers.fetchState)
             throw new Error("No fetchState handler registered");
           const data = await handlers.fetchState(message.syncKey);
+
+          console.log("data", data);
           ws.send(
             JSON.stringify({
               type: "stateData",
               syncKey: syncKey,
-              data: state,
+              data: data, // This is sending the entire state object
             })
           );
           setState((prev) => ({

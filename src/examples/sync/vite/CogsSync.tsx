@@ -69,7 +69,7 @@ export default function SyncPage({
       sessionToken={syncConfig.sessionToken}
       serverUrl={syncConfig.serverUrl}
     >
-      {syncConfig.sessionToken && syncConfig.serverUrl && children}
+      {children}
     </SyncProvider>
   );
 }

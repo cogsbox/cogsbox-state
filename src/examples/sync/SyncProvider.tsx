@@ -6,6 +6,8 @@ import React, {
   useState,
   useCallback,
   type ReactNode,
+  useMemo,
+  useRef,
 } from "react";
 
 // Types for the handlers
@@ -44,8 +46,8 @@ export function SyncProvider({
   sessionToken,
   serverUrl,
 }: SyncProviderProps) {
-  // Store handlers in state
-  const [handlers, setHandlers] = useState<{
+  // Store handlers in a ref instead of state
+  const handlersRef = useRef<{
     fetchState: FetchStateHandler | null;
     updateState: UpdateStateHandler | null;
   }>({
@@ -56,11 +58,25 @@ export function SyncProvider({
   // Function to register handlers
   const registerHandlers = useCallback(
     (fetchState: FetchStateHandler, updateState: UpdateStateHandler) => {
-      setHandlers({
+      // Store the handlers directly in the ref
+      handlersRef.current = {
         fetchState,
         updateState,
-      });
+      };
     },
+    []
+  );
+
+  // Create a stable handlers object for the context value
+  const handlers = useMemo(
+    () => ({
+      get fetchState() {
+        return handlersRef.current.fetchState;
+      },
+      get updateState() {
+        return handlersRef.current.updateState;
+      },
+    }),
     []
   );
 
