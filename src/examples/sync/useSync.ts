@@ -165,6 +165,11 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
 
     switch (message.type) {
       case "fetchStateFromDb":
+        console.log(
+          "222222222222222222222222",
+          fullSyncKeyRef.current,
+          handlers
+        );
         try {
           if (!handlers.fetchState) {
             throw new Error("No fetchState handler registered");
@@ -174,7 +179,7 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
           console.log("fetchStateFromDb", data, fullSyncKeyRef.current);
           ws.send(
             JSON.stringify({
-              type: "stateData",
+              type: "initialSyncState",
               syncKey: fullSyncKeyRef.current,
               data: data,
             })
@@ -201,25 +206,33 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
         break;
 
       case "updateStateInDb":
+        if (!handlers.updateState)
+          throw new Error("No updateState handler registered");
+        handlers.updateState(message.syncKey, message.data);
         setState((prev) => ({
           ...prev,
           data: message.data,
           lastUpdated: new Date(),
         }));
         break;
-
+      case "updateState":
+        setState((prev) => ({
+          ...prev,
+          data: message.data,
+          lastUpdated: new Date(),
+        }));
+        break;
       default:
         console.log("Unknown message type:", message.type);
     }
   };
 
   const updateState = (newData: UpdateTypeDetail) => {
-    console.log("enabledenabledenabledenabled", enabledRef.current);
     if (!enabledRef.current) return false;
 
     try {
-      console.log("updateState", wsRef.current);
       if (wsRef.current?.readyState === WebSocket.OPEN) {
+        console.log("updateState2222222222222222", newData, wsRef.current);
         wsRef.current.send(
           JSON.stringify({
             type: "queueUpdate",

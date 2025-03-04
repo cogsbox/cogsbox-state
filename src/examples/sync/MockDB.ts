@@ -44,82 +44,37 @@ const mockDatabase: Database = {
     { id: 2, userId: 2, theme: "light", notifications: false },
   ],
 };
-// Mock fetch function to simulate API requests
-export async function mockFetch(
-  url: string,
-  options?: RequestInit
-): Promise<Response> {
-  // Parse URL to determine endpoint
-  const urlParts = url.replace(/^https?:\/\/[^\/]+\/api\//, "").split("/");
-  const endpoint = urlParts[0];
-  console.log("endpoint", endpoint);
-  // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 100));
 
-  let responseData: any;
-  let status = 200;
+// Direct function to get state data
+export function getStateData(stateKey: string, stateId: string): any {
+  console.log("getStateData---------------------", stateKey, stateId);
 
-  switch (endpoint) {
-    case "state":
-      // Handle state endpoint: /api/state/{stateKey}/{stateId}
-      if (urlParts.length >= 3) {
-        const stateKey = urlParts[1]!;
-        const stateId = urlParts[2]!;
-
-        // GET request
-        if (!options || options.method === "GET" || !options.method) {
-          responseData = getStateData(stateKey, stateId);
-        }
-        // PUT request
-        else if (options.method === "PUT" && options.body) {
-          const newData = JSON.parse(options.body.toString());
-          responseData = updateStateData(stateKey, stateId, newData);
-        }
-      } else {
-        status = 400;
-        responseData = { error: "Invalid state endpoint URL" };
-      }
-      break;
-
-    default:
-      status = 404;
-      responseData = { error: "Endpoint not found" };
-  }
-
-  // Create mock response
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: async () => responseData,
-    text: async () => JSON.stringify(responseData),
-    headers: new Headers({ "Content-Type": "application/json" }),
-  } as Response;
-}
-
-// Helper function to get state data
-function getStateData(stateKey: string, stateId: string): any {
-  console.log("getStateData", stateKey, stateId, mockDatabase);
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
-    const item = mockDatabase[tableName!]!.find(
+    const item = mockDatabase[tableName]?.find(
       (item) => item[pk].toString() === stateId
     );
-
     return item || { error: "Item not found" };
   } else if (stateKey in mockDatabase) {
     return (mockDatabase as any)[stateKey];
   }
+
   return { error: "Unknown state key" };
 }
 
-// Helper function to update state data
-function updateStateData(stateKey: string, stateId: string, newData: any): any {
-  console.log("updateStateData", stateKey, stateId, newData, mockDatabase);
+// Direct function to update state data
+export function updateStateData(
+  stateKey: string,
+  stateId: string,
+  newData: any
+): any {
+  console.log("updateStateData", stateKey, stateId, newData);
+
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
-    const index = mockDatabase[tableName]!.findIndex(
+    const index = mockDatabase[tableName]?.findIndex(
       (item) => item[pk].toString() === stateId
-    );
+    )!;
 
     if (index !== -1) {
       // Update existing record
@@ -144,6 +99,7 @@ function updateStateData(stateKey: string, stateId: string, newData: any): any {
     };
     return (mockDatabase as any)[stateKey];
   }
+
   return { error: "Unknown state key" };
 }
 
@@ -152,6 +108,7 @@ export const initialUserState = {
   age: undefined,
   email: "",
 };
+
 export const { useCogsState } = createCogsState<{ testUser: User }>({
   testUser: initialUserState,
 });

@@ -160,6 +160,18 @@ export class WebSocketSyncEngine extends DurableObject {
 						);
 					}
 					break;
+				case 'initialSyncState':
+					if (data.syncKey && data.data) {
+						console.log('initialSyncState', data);
+						await this.ctx.storage.put(data.syncKey, data.data);
+						ws.send(
+							JSON.stringify({
+								type: 'syncReady',
+								syncKey: data.syncKey,
+							}),
+						);
+					}
+					break;
 
 				case 'queueUpdate':
 					if (data.syncKey && data.data) {
@@ -169,17 +181,10 @@ export class WebSocketSyncEngine extends DurableObject {
 						console.log('currentState start', currentState, data.syncKey);
 						if (currentState) {
 							currentState = this.applyPathUpdate(currentState, updateDetail);
-							console.log('currentState', currentState, data.syncKey);
+
 							await this.ctx.storage.put(data.syncKey, currentState);
 
 							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail);
-
-							ws.send(
-								JSON.stringify({
-									type: 'updateConfirmed',
-									syncKey: data.syncKey,
-								}),
-							);
 						} else {
 							ws.send(
 								JSON.stringify({
@@ -288,20 +293,28 @@ export class WebSocketSyncEngine extends DurableObject {
 			return;
 		}
 
-		const message = JSON.stringify({
-			type: 'stateData',
-			syncKey: syncKey,
-			data: currentState, // Just the state, no metadata
-		});
-
 		// Broadcast to all clients except the sender
 		for (const client of this.ctx.getWebSockets()) {
 			if (client !== sender && client.syncKeys?.has(syncKey)) {
 				try {
+					const message = JSON.stringify({
+						type: 'updateState',
+						syncKey: syncKey,
+						data: currentState, // Just the state, no metadata
+					});
+
 					client.send(message);
 				} catch (error) {
 					console.error('Error broadcasting state update:', error);
 				}
+			} else {
+				console.log('currentState2222222222222222222222', currentState);
+				const message = JSON.stringify({
+					type: 'updateStateInDb',
+					syncKey: syncKey,
+					data: currentState,
+				});
+				client.send(message);
 			}
 		}
 	}

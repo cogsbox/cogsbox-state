@@ -61,16 +61,16 @@ export function SyncProvider({
   });
 
   // Function to register handlers
-  const registerHandlers = useCallback(
-    (fetchState: FetchStateHandler, updateState: UpdateStateHandler) => {
-      // Store the handlers directly in the ref
-      handlersRef.current = {
-        fetchState,
-        updateState,
-      };
-    },
-    []
-  );
+  const registerHandlers = (
+    fetchState: FetchStateHandler,
+    updateState: UpdateStateHandler
+  ) => {
+    // Store the handlers directly in the ref
+    handlersRef.current = {
+      fetchState,
+      updateState,
+    };
+  };
 
   const contextValue = {
     serviceId,

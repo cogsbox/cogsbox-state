@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { initialUserState, mockFetch, useCogsState } from "./MockDB";
+import { initialUserState, useCogsState } from "./MockDB";
 import { useSync } from "./useSync";
 
 const SyncTest = () => {
