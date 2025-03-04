@@ -255,15 +255,6 @@ export type UpdateTypeDetail = {
   userId?: number;
 };
 
-//let globalStoreInstance: ReturnType<typeof getGlobalStore> | null = null;
-
-// export const getGlobalStore = <State extends GenericObject | GenericObject[]>(initialState?: State) => {
-//     if (!globalStoreInstance) {
-//         globalStoreInstance = cogStateGlobalStore(initialState ?? {});
-//     }
-//     return globalStoreInstance;
-// };
-
 export type ActionsType<T> = {
   type: "onChange";
   action: ({ state, actionType }: { state: T; actionType: string }) => void;

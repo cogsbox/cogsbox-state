@@ -133,10 +133,14 @@ export function useSync<T>(
     switch (message.type) {
       case "fetchState":
         try {
-          console.log("fetchStateHandler", message.syncKey);
           const data = await fetchStateHandler(message.syncKey);
-          console.log("data", data);
-
+          ws.send(
+            JSON.stringify({
+              type: "stateData",
+              syncKey: syncKey,
+              data: state,
+            })
+          );
           setState((prev) => ({
             ...prev,
             data,
@@ -161,10 +165,7 @@ export function useSync<T>(
       case "updateState":
         try {
           console.log("updateStateHandler", message.syncKey, message.data);
-          const result = await updateStateHandler(
-            message.syncKey,
-            message.data
-          );
+          await updateStateHandler(message.syncKey, message.data);
 
           setState((prev) => ({
             ...prev,
@@ -205,7 +206,7 @@ export function useSync<T>(
 
   // Send a local update to sync with all clients
   const updateState = (newData: UpdateTypeDetail) => {
-    console.log("updateState", newData);
+    console.log("updateState", newData, syncKey);
     try {
       wsRef.current?.send(
         JSON.stringify({

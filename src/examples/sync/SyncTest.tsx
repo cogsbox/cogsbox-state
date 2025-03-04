@@ -78,7 +78,7 @@ const SyncTest = () => {
     updateState,
     clearStorage,
   } = useSync("5-1-user-1", fetchStateHandler, updateStateHandler);
-  console.log("statestatestatestate", state);
+
   const user = useCogsState("testUser", {
     initState: {
       initialState: state ?? initialUserState,

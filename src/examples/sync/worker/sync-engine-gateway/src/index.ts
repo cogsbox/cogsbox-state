@@ -15,8 +15,8 @@ type SyncTokenPayload = {
 	tenantId: number;
 	serviceId: number;
 	scopes: string[];
-	exp: number; // Expiration timestamp
-	iat: number; // Issued at timestamp
+	exp: number;
+	iat: number;
 };
 
 declare global {
@@ -48,7 +48,6 @@ export class WebSocketSyncEngine extends DurableObject {
 	async fetch(request: Request) {
 		const url = new URL(request.url);
 
-		// Extract and validate JWT token
 		const token = url.searchParams.get('token');
 		if (!token) {
 			return new Response(
@@ -63,7 +62,6 @@ export class WebSocketSyncEngine extends DurableObject {
 			);
 		}
 
-		// Verify the token
 		let payload: SyncTokenPayload;
 		try {
 			const isValid = await verify(token, this.env.JWT_SECRET);
@@ -71,11 +69,9 @@ export class WebSocketSyncEngine extends DurableObject {
 				throw new Error('Invalid token');
 			}
 
-			// Decode the token payload
 			const decoded = JSON.parse(atob(token.split('.')[1]));
 			payload = decoded as SyncTokenPayload;
 
-			// Check if token is expired
 			if (payload.exp < Math.floor(Date.now() / 1000)) {
 				throw new Error('Token expired');
 			}
@@ -92,11 +88,9 @@ export class WebSocketSyncEngine extends DurableObject {
 			);
 		}
 
-		// Create WebSocket pair
 		const webSocketPair = new WebSocketPair();
 		const [client, server] = Object.values(webSocketPair);
 
-		// Initialize the WebSocket properties
 		server.syncKeys = new Set();
 		server.tenantId = payload.tenantId;
 		server.serviceId = payload.serviceId;
@@ -109,18 +103,14 @@ export class WebSocketSyncEngine extends DurableObject {
 		});
 	}
 
-	// Handle registration of a sync key
 	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
-		// Add to this WebSocket's registered keys
 		if (!ws.syncKeys) {
 			ws.syncKeys = new Set();
 		}
 		ws.syncKeys.add(syncKey);
 
-		// Check if we already have state for this syncKey
 		const state = await this.ctx.storage.get(syncKey);
 		if (!state) {
-			// We don't have state for this key, request it from the client
 			try {
 				ws.send(
 					JSON.stringify({
@@ -144,7 +134,6 @@ export class WebSocketSyncEngine extends DurableObject {
 	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
 		let data;
 		try {
-			// Parse the message
 			if (typeof message === 'string') {
 				data = JSON.parse(message);
 			} else {
@@ -152,20 +141,17 @@ export class WebSocketSyncEngine extends DurableObject {
 				data = JSON.parse(decoder.decode(message));
 			}
 
-			// Handle different message types
 			switch (data.type) {
 				case 'register':
-					// Client is registering interest in a sync key
 					if (data.syncKey) {
 						await this.handleSyncKeyRegistration(ws, data.syncKey);
 					}
 					break;
 
 				case 'unregister':
-					// Client wants to unregister from a sync key
 					if (data.syncKey && ws.syncKeys) {
 						ws.syncKeys.delete(data.syncKey);
-						// Confirm unregistration to client
+
 						ws.send(
 							JSON.stringify({
 								type: 'unregistered',
@@ -176,12 +162,10 @@ export class WebSocketSyncEngine extends DurableObject {
 					break;
 
 				case 'stateData':
-					// Client is providing state data in response to our fetchState request
 					if (data.syncKey && data.data) {
-						// Store the state data
+						console.log('stateDatastateDatastateData', data);
 						await this.ctx.storage.put(data.syncKey, data.data);
 
-						// Notify client that state is stored
 						ws.send(
 							JSON.stringify({
 								type: 'syncReady',
@@ -193,23 +177,17 @@ export class WebSocketSyncEngine extends DurableObject {
 				case 'queueUpdate':
 				case 'broadcastUpdate':
 					if (data.syncKey && data.data) {
-						// Get the update details from the data
 						const updateDetail = data.data;
-
-						// Get current state from storage
+						console.log('updateDetail', updateDetail, data.syncKey);
 						let currentState = await this.ctx.storage.get(data.syncKey);
-
+						console.log('currentState', currentState, data.syncKey);
 						if (currentState) {
-							// Apply the path-based update to the current state
 							currentState = this.applyPathUpdate(currentState, updateDetail);
 
-							// Store the updated state
 							await this.ctx.storage.put(data.syncKey, currentState);
 
-							// Broadcast only the update details to other clients (not the full state)
 							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail);
 
-							// Confirm to sender
 							ws.send(
 								JSON.stringify({
 									type: 'updateConfirmed',
@@ -330,7 +308,6 @@ export class WebSocketSyncEngine extends DurableObject {
 			data: currentState, // Just the state, no metadata
 		});
 
-		console.log('broadcastStateUpdate', message);
 		// Broadcast to all clients except the sender
 		for (const client of this.ctx.getWebSockets()) {
 			if (client !== sender && client.syncKeys?.has(syncKey)) {
