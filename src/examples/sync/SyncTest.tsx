@@ -2,50 +2,10 @@ import React, { useEffect, useState } from "react";
 
 import { initialUserState, mockFetch, useCogsState } from "./MockDB";
 import { useSync } from "./useSync";
+import { useSyncContext } from "./SyncProvider";
 
 const SyncTest = () => {
   const [response, setResponse] = useState("");
-
-  // Handler for fetching state
-  const fetchStateHandler = async (syncKey: string): Promise<any> => {
-    try {
-      // Parse the sync key to get components
-      const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
-
-      // Fetch data from your API
-      const response = await mockFetch(
-        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`
-      );
-
-      const data = await response.json();
-
-      return data;
-    } catch (error: any) {
-      throw error;
-    }
-  };
-
-  // Handler for updating state
-  const updateStateHandler = async (
-    syncKey: string,
-    newData: any
-  ): Promise<any> => {
-    try {
-      // Parse the sync key to get components
-      const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
-
-      // Update data via your API
-      const response = await mockFetch(
-        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`
-      );
-
-      const result = await response.json();
-
-      return result;
-    } catch (error: any) {
-      throw error;
-    }
-  };
 
   // Use our custom hook
   const {
@@ -56,7 +16,7 @@ const SyncTest = () => {
     disconnect,
     updateState,
     clearStorage,
-  } = useSync("5-1-user-1", fetchStateHandler, updateStateHandler);
+  } = useSync<typeof initialUserState>("5-1-user-1");
 
   const user = useCogsState("testUser", {
     initState: {
@@ -86,21 +46,6 @@ const SyncTest = () => {
     }
   }, [status, error]);
 
-  // Test function to send a sample update
-  const sendTestUpdate = () => {
-    if (state) {
-      const updatedData = {
-        ...state,
-        testUpdate: new Date().toISOString(),
-      };
-
-      updateState(updatedData);
-      setResponse((prev) => `${prev}\n\nSent test update to server`);
-    } else {
-      setResponse((prev) => `${prev}\n\nCannot send update: no current state`);
-    }
-  };
-
   return (
     <div className="p-6 max-w-xl mx-auto bg-white rounded-xl shadow-md">
       <h1 className="text-2xl font-bold mb-4">Sync Engine Test</h1>
@@ -127,13 +72,6 @@ const SyncTest = () => {
           className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded"
         >
           Disconnect
-        </button>
-
-        <button
-          onClick={sendTestUpdate}
-          className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded"
-        >
-          Send Test Update
         </button>
 
         <div className="ml-auto py-2 px-3 rounded bg-gray-100">

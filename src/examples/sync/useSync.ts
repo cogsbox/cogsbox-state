@@ -22,16 +22,11 @@ interface SyncOptions {
  * @param options - Configuration options
  * @returns An object with the sync state and control functions
  */
-export function useSync<T>(
-  syncKey: string,
-  fetchStateHandler: (syncKey: string) => Promise<T>,
-  updateStateHandler: (syncKey: string, data: T) => Promise<any>,
-  options: SyncOptions = {}
-) {
+export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
   const { autoConnect = false } = options;
 
   // Get session token and server URL from context
-  const { sessionToken, serverUrl } = useSyncContext();
+  const { sessionToken, serverUrl, handlers } = useSyncContext();
 
   const [state, setState] = useState<SyncState<T>>({
     data: null,
@@ -133,7 +128,9 @@ export function useSync<T>(
     switch (message.type) {
       case "fetchState":
         try {
-          const data = await fetchStateHandler(message.syncKey);
+          if (!handlers.fetchState)
+            throw new Error("No fetchState handler registered");
+          const data = await handlers.fetchState(message.syncKey);
           ws.send(
             JSON.stringify({
               type: "stateData",
@@ -165,7 +162,9 @@ export function useSync<T>(
       case "updateState":
         try {
           console.log("updateStateHandler", message.syncKey, message.data);
-          await updateStateHandler(message.syncKey, message.data);
+          if (!handlers.updateState)
+            throw new Error("No updateState handler registered");
+          await handlers.updateState(message.syncKey, message.data);
 
           setState((prev) => ({
             ...prev,
@@ -249,7 +248,7 @@ export function useSync<T>(
   }, [autoConnect, syncKey]);
 
   return {
-    state: state.data,
+    state: state.data as T,
     status: state.status,
     error: state.error,
     lastUpdated: state.lastUpdated,

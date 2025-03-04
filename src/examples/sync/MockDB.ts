@@ -8,7 +8,7 @@ type User = {
 };
 
 type Setting = {
-  id: number;
+  id?: number;
   userId: number;
   theme: string;
   notifications: boolean;
