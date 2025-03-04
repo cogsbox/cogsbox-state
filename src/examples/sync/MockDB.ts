@@ -1,3 +1,5 @@
+import { createCogsState } from "../../CogsState";
+
 type User = {
   id: number;
   name: string;
@@ -18,7 +20,9 @@ type Database = {
   [key: string]: any[];
 };
 
-type ConfigType = { [key: string]: { tableName: string; pk: string } };
+type ConfigType = {
+  [key: string]: { tableName: string; pk: string };
+};
 
 const config: ConfigType = {
   user: { tableName: "users", pk: "id" },
@@ -140,3 +144,12 @@ function updateStateData(stateKey: string, stateId: string, newData: any): any {
   }
   return { error: "Unknown state key" };
 }
+
+export const initialUserState = {
+  name: "",
+  age: undefined,
+  email: "",
+};
+export const { useCogsState } = createCogsState({
+  testUser: initialUserState,
+});

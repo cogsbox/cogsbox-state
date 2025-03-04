@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { useSyncContext } from "./SyncProvider";
+import type { UpdateTypeDetail } from "../../CogsState";
 
 interface SyncState<T> {
   data: T | null;
@@ -15,7 +16,7 @@ interface SyncOptions {
 /**
  * Custom hook for syncing state with backend via WebSocket
  *
- * @param syncKey - The unique key for the sync session (format: "serviceId_userId_stateKey_stateId")
+ * @param syncKey - The unique key for the sync session (format: "serviceId-userId-stateKey-stateId")
  * @param fetchStateHandler - Function to handle fetching initial state
  * @param updateStateHandler - Function to handle state updates
  * @param options - Configuration options
@@ -135,13 +136,6 @@ export function useSync<T>(
           console.log("fetchStateHandler", message.syncKey);
           const data = await fetchStateHandler(message.syncKey);
           console.log("data", data);
-          ws.send(
-            JSON.stringify({
-              type: "stateData",
-              syncKey: message.syncKey,
-              data: data,
-            })
-          );
 
           setState((prev) => ({
             ...prev,
@@ -166,18 +160,10 @@ export function useSync<T>(
 
       case "updateState":
         try {
+          console.log("updateStateHandler", message.syncKey, message.data);
           const result = await updateStateHandler(
             message.syncKey,
             message.data
-          );
-
-          ws.send(
-            JSON.stringify({
-              type: "stateUpdated",
-              syncKey: message.syncKey,
-              success: true,
-              result,
-            })
           );
 
           setState((prev) => ({
@@ -203,6 +189,8 @@ export function useSync<T>(
 
       case "stateData":
         // Update local state with received data
+
+        console.log("stateData", message.data);
         setState((prev) => ({
           ...prev,
           data: message.data,
@@ -216,12 +204,8 @@ export function useSync<T>(
   };
 
   // Send a local update to sync with all clients
-  const updateState = (newData: T) => {
-    if (!isConnected) {
-      console.error("Cannot update state: not connected");
-      return false;
-    }
-
+  const updateState = (newData: UpdateTypeDetail) => {
+    console.log("updateState", newData);
     try {
       wsRef.current?.send(
         JSON.stringify({
@@ -230,11 +214,6 @@ export function useSync<T>(
           data: newData,
         })
       );
-
-      setState((prev) => ({
-        ...prev,
-        data: newData,
-      }));
 
       return true;
     } catch (error) {

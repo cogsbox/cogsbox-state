@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 
-import { mockFetch } from "./MockDB";
+import { initialUserState, mockFetch, useCogsState } from "./MockDB";
 import { useSync } from "./useSync";
 
 const SyncTest = () => {
@@ -78,7 +78,20 @@ const SyncTest = () => {
     updateState,
     clearStorage,
   } = useSync("5-1-user-1", fetchStateHandler, updateStateHandler);
+  console.log("statestatestatestate", state);
+  const user = useCogsState("testUser", {
+    initState: {
+      initialState: state ?? initialUserState,
+      dependencies: [state],
+    },
+    validation: { key: "userValidation" },
+    middleware: ({ update }) => {
+      console.log("update", update);
+      updateState(update);
+    },
+  });
 
+  console.log("state", state);
   const handleClearStorage = () => {
     const success = clearStorage();
     setResponse(
@@ -113,6 +126,13 @@ const SyncTest = () => {
     <div className="p-6 max-w-xl mx-auto bg-white rounded-xl shadow-md">
       <h1 className="text-2xl font-bold mb-4">Sync Engine Test</h1>
 
+      {user.name.formElement((params) => (
+        <input
+          {...params.inputProps}
+          className="bg-white border border-gray-500 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-2 "
+        />
+      ))}
+      <div className="h-2" />
       <div className="flex space-x-2 mb-4">
         <button
           onClick={connect}

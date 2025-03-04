@@ -307,8 +307,8 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
+  localStorageKey?: string;
   initState?: {
-    localStorageKey?: string;
     ctx?: Record<string, any>;
     initialState: T;
     dependencies?: any[]; // Just like useEffect dependencies
@@ -476,6 +476,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
         initState: options?.initState,
+        localStorageKey: options?.localStorageKey,
       }
     );
 
@@ -527,7 +528,7 @@ const saveToLocalStorage = <T,>(
   currentInitialOptions: any,
   sessionId?: string
 ) => {
-  if (currentInitialOptions?.initState) {
+  if (currentInitialOptions.localStorageKey) {
     const data: LocalStorageData<T> = {
       state,
       lastUpdated: Date.now(),
@@ -537,7 +538,7 @@ const saveToLocalStorage = <T,>(
     };
 
     const storageKey = currentInitialOptions.initState
-      ? `${sessionId}-${thisKey}-${currentInitialOptions.initState.localStorageKey}`
+      ? `${sessionId}-${thisKey}-${currentInitialOptions.localStorageKey}`
       : thisKey;
 
     window.localStorage.setItem(storageKey, JSON.stringify(data));
@@ -620,6 +621,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     reactiveDeps,
     reactiveType,
     componentId,
+    localStorageKey,
     initState,
     syncUpdate,
   }: {
@@ -659,13 +661,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
     setAndMergeOptions(thisKey as string, {
       initState,
     });
-    const localData = loadFromLocalStorage(
-      sessionId + "-" + thisKey + "-" + initState?.localStorageKey
-    );
+    let localData = null;
+    if (localStorageKey) {
+      localData = loadFromLocalStorage(
+        sessionId + "-" + thisKey + "-" + localStorageKey
+      );
+    }
     let newState = null;
     if (initState?.initialState) {
       newState = initState?.initialState;
-
+      console.log("newState", newState);
       if (localData) {
         if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
           newState = localData.state;
@@ -679,9 +684,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
+      console.log("newState222", newState);
       forceUpdate({});
     }
-  }, [initState?.localStorageKey, ...(initState?.dependencies || [])]);
+  }, [localStorageKey, ...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
@@ -1064,14 +1070,14 @@ function createProxyHandler<T>(
           });
         }
         const initalOptionsGet = getInitialOptions(stateKey as string);
-        if (initalOptionsGet?.initState) {
+        if (initalOptionsGet?.localStorageKey) {
           localStorage.removeItem(
             initalOptionsGet?.initState
               ? sessionId +
                   "-" +
                   stateKey +
                   "-" +
-                  initalOptionsGet?.initState.localStorageKey
+                  initalOptionsGet?.localStorageKey
               : stateKey
           );
         }

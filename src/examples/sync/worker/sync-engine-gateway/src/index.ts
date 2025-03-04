@@ -26,6 +26,16 @@ declare global {
 		serviceId?: number;
 	}
 }
+export type UpdateTypeDetail = {
+	timeStamp: number;
+	stateKey: string;
+	updateType: 'update' | 'insert' | 'cut';
+	path: string[];
+	status: 'new' | 'sent' | 'synced';
+	oldValue: any;
+	newValue: any;
+	userId?: number;
+};
 
 export class WebSocketSyncEngine extends DurableObject {
 	constructor(
@@ -101,33 +111,6 @@ export class WebSocketSyncEngine extends DurableObject {
 
 	// Handle registration of a sync key
 	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
-		console.log('handleSyncKeyRegistration', syncKey);
-		const parts = syncKey.split('-');
-		if (parts.length < 4) {
-			ws.send(
-				JSON.stringify({
-					type: 'error',
-					message: 'Invalid syncKey format',
-					syncKey,
-				}),
-			);
-			return;
-		}
-
-		// Ensure the tenant and service IDs match those from the token
-		const [tenantId, userId] = parts;
-		console.log('handleSyncKeyRegistration', syncKey, parts, ws.serviceId);
-		if (parseInt(tenantId, 10) !== ws.serviceId) {
-			ws.send(
-				JSON.stringify({
-					type: 'error',
-					message: 'Unauthorized access to this sync key',
-					syncKey,
-				}),
-			);
-			return;
-		}
-
 		// Add to this WebSocket's registered keys
 		if (!ws.syncKeys) {
 			ws.syncKeys = new Set();
@@ -158,7 +141,6 @@ export class WebSocketSyncEngine extends DurableObject {
 			);
 		}
 	}
-
 	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
 		let data;
 		try {
@@ -196,20 +178,9 @@ export class WebSocketSyncEngine extends DurableObject {
 				case 'stateData':
 					// Client is providing state data in response to our fetchState request
 					if (data.syncKey && data.data) {
-						// Validate ownership of this syncKey
-						const parts = data.syncKey.split('-');
-						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
-							ws.send(
-								JSON.stringify({
-									type: 'error',
-									message: 'Unauthorized access to this sync key',
-									syncKey: data.syncKey,
-								}),
-							);
-							return;
-						}
-
+						// Store the state data
 						await this.ctx.storage.put(data.syncKey, data.data);
+
 						// Notify client that state is stored
 						ws.send(
 							JSON.stringify({
@@ -219,51 +190,46 @@ export class WebSocketSyncEngine extends DurableObject {
 						);
 					}
 					break;
-
+				case 'queueUpdate':
 				case 'broadcastUpdate':
 					if (data.syncKey && data.data) {
-						// Validate ownership of this syncKey
-						const parts = data.syncKey.split('-');
-						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
+						// Get the update details from the data
+						const updateDetail = data.data;
+
+						// Get current state from storage
+						let currentState = await this.ctx.storage.get(data.syncKey);
+
+						if (currentState) {
+							// Apply the path-based update to the current state
+							currentState = this.applyPathUpdate(currentState, updateDetail);
+
+							// Store the updated state
+							await this.ctx.storage.put(data.syncKey, currentState);
+
+							// Broadcast only the update details to other clients (not the full state)
+							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail);
+
+							// Confirm to sender
 							ws.send(
 								JSON.stringify({
-									type: 'error',
-									message: 'Unauthorized access to this sync key',
+									type: 'updateConfirmed',
 									syncKey: data.syncKey,
 								}),
 							);
-							return;
+						} else {
+							ws.send(
+								JSON.stringify({
+									type: 'error',
+									message: 'Cannot update non-existent state',
+									syncKey: data.syncKey,
+								}),
+							);
 						}
-
-						// Store the updated state
-						await this.ctx.storage.put(data.syncKey, data.data);
-						// Broadcast to other clients
-						await this.broadcastStateUpdate(ws, data.syncKey, data.data);
-						// Confirm to sender
-						ws.send(
-							JSON.stringify({
-								type: 'updateConfirmed',
-								syncKey: data.syncKey,
-							}),
-						);
 					}
 					break;
 
 				case 'clearStorage':
 					if (data.syncKey) {
-						// Validate ownership of this syncKey
-						const parts = data.syncKey.split('-');
-						if (parts.length < 4 || parseInt(parts[0], 10) !== ws.serviceId || parseInt(parts[1], 10) !== ws.tenantId) {
-							ws.send(
-								JSON.stringify({
-									type: 'error',
-									message: 'Unauthorized access to this sync key',
-									syncKey: data.syncKey,
-								}),
-							);
-							return;
-						}
-
 						await this.ctx.storage.delete(data.syncKey);
 						ws.send(
 							JSON.stringify({
@@ -287,17 +253,86 @@ export class WebSocketSyncEngine extends DurableObject {
 			);
 		}
 	}
+	// Apply a path-based update to a state object
+	applyPathUpdate(state: any, update: UpdateTypeDetail): any {
+		// Create a deep copy of the state
+		const newState = JSON.parse(JSON.stringify(state));
 
+		// Get the path and final property to update
+		const path = update.path;
+
+		// Handle empty path (update entire state)
+		if (path.length === 0) {
+			return update.updateType === 'update' ? update.newValue : state;
+		}
+
+		// Navigate to the correct position in the state
+		let current = newState;
+
+		// Navigate to parent object
+		for (let i = 0; i < path.length - 1; i++) {
+			const key = path[i];
+
+			// Create the path if it doesn't exist
+			if (current[key] === undefined) {
+				current[key] = {};
+			}
+
+			current = current[key];
+		}
+
+		// Get the final key
+		const finalKey = path[path.length - 1];
+
+		// Apply the update based on its type
+		switch (update.updateType) {
+			case 'update':
+				current[finalKey] = update.newValue;
+				break;
+
+			case 'insert':
+				if (Array.isArray(current)) {
+					const index = parseInt(finalKey, 10);
+					current.splice(index, 0, update.newValue);
+				} else {
+					current[finalKey] = update.newValue;
+				}
+				break;
+
+			case 'cut':
+				if (Array.isArray(current)) {
+					const index = parseInt(finalKey, 10);
+					current.splice(index, 1);
+				} else {
+					delete current[finalKey];
+				}
+				break;
+		}
+
+		// Mark the update as synced
+		update.status = 'synced';
+
+		return newState;
+	}
 	// Broadcast state updates to all connected clients with the same syncKey except sender
-	async broadcastStateUpdate(sender: WebSocket, syncKey: string, state: any) {
+	async broadcastStateUpdate(sender: WebSocket, syncKey: string, updateDetail: UpdateTypeDetail) {
+		// Get the current state from storage
+		const currentState = await this.ctx.storage.get(syncKey);
+
+		if (!currentState) {
+			console.error('Cannot broadcast: state not found for key', syncKey);
+			return;
+		}
+
 		const message = JSON.stringify({
-			type: 'stateUpdated',
+			type: 'stateData',
 			syncKey: syncKey,
-			data: state,
+			data: currentState, // Just the state, no metadata
 		});
 
+		console.log('broadcastStateUpdate', message);
+		// Broadcast to all clients except the sender
 		for (const client of this.ctx.getWebSockets()) {
-			// Check if this client has registered for this sync key
 			if (client !== sender && client.syncKeys?.has(syncKey)) {
 				try {
 					client.send(message);
@@ -307,7 +342,6 @@ export class WebSocketSyncEngine extends DurableObject {
 			}
 		}
 	}
-
 	async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
 		console.log(`WebSocket closed with code ${code} and reason: ${reason}`);
 		// Clean up any resources related to this WebSocket if needed
