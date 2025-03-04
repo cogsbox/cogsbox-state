@@ -42,13 +42,14 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
   const isConnected = state.status === "connected";
 
   useEffect(() => {
+    enabledRef.current = enabled;
     fullSyncKeyRef.current = `${serviceId}-${sessionId}-${syncKey}`;
+
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       const registerMsg = {
         type: "register",
         syncKey: fullSyncKeyRef.current,
       };
-      console.log("Sending:", JSON.stringify(registerMsg));
 
       wsRef.current.send(JSON.stringify(registerMsg));
 
@@ -58,12 +59,18 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
         lastUpdated: null,
       }));
     } else {
-      if (autoConnect && enabledRef.current) {
+      if (autoConnect && enabled) {
         console.log("Attempting to connect...");
         connect();
       }
     }
-  }, [syncKey]);
+
+    if (!enabled) {
+      if (isConnected) {
+        disconnect();
+      }
+    }
+  }, [syncKey, enabled]);
 
   const connect = () => {
     if (!enabledRef.current) {
@@ -255,13 +262,6 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
       }
     };
   }, [autoConnect, enabled]);
-
-  useEffect(() => {
-    enabledRef.current = enabled;
-    if (!enabled && isConnected) {
-      disconnect();
-    }
-  }, [enabled]);
 
   return {
     state: state.data as T,
