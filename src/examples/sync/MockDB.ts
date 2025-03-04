@@ -1,9 +1,9 @@
 import { createCogsState } from "../../CogsState";
 
 type User = {
-  id: number;
+  id?: number;
   name: string;
-  age: number;
+  age?: number;
   email: string;
 };
 
@@ -25,7 +25,7 @@ type ConfigType = {
 };
 
 const config: ConfigType = {
-  user: { tableName: "users", pk: "id" },
+  users: { tableName: "users", pk: "id" },
   settings: { tableName: "settings", pk: "id" },
 };
 
@@ -98,6 +98,7 @@ export async function mockFetch(
 
 // Helper function to get state data
 function getStateData(stateKey: string, stateId: string): any {
+  console.log("getStateData", stateKey, stateId, mockDatabase);
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
     const item = mockDatabase[tableName!]!.find(
@@ -113,6 +114,7 @@ function getStateData(stateKey: string, stateId: string): any {
 
 // Helper function to update state data
 function updateStateData(stateKey: string, stateId: string, newData: any): any {
+  console.log("updateStateData", stateKey, stateId, newData, mockDatabase);
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
     const index = mockDatabase[tableName]!.findIndex(
@@ -150,6 +152,6 @@ export const initialUserState = {
   age: undefined,
   email: "",
 };
-export const { useCogsState } = createCogsState({
+export const { useCogsState } = createCogsState<{ testUser: User }>({
   testUser: initialUserState,
 });

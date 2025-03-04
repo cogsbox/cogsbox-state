@@ -11,6 +11,7 @@ interface SyncState<T> {
 
 interface SyncOptions {
   autoConnect?: boolean;
+  enabled?: boolean;
 }
 
 /**
@@ -23,11 +24,13 @@ interface SyncOptions {
  * @returns An object with the sync state and control functions
  */
 export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
-  const { autoConnect = false } = options;
+  const { autoConnect = true, enabled = true } = options;
 
-  // Get session token and server URL from context
-  const { sessionToken, serverUrl, handlers } = useSyncContext();
-  console.log("handlers", handlers);
+  const { sessionToken, serverUrl, handlers, serviceId, sessionId } =
+    useSyncContext();
+  let fullSyncKeyRef = useRef(`${serviceId}-${sessionId}-${syncKey}`);
+  let enabledRef = useRef(enabled);
+
   const [state, setState] = useState<SyncState<T>>({
     data: null,
     status: "idle",
@@ -38,10 +41,37 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
   const wsRef = useRef<WebSocket | null>(null);
   const isConnected = state.status === "connected";
 
-  // Connect to WebSocket server
-  const connect = () => {
+  useEffect(() => {
+    fullSyncKeyRef.current = `${serviceId}-${sessionId}-${syncKey}`;
     if (wsRef.current?.readyState === WebSocket.OPEN) {
-      return; // Already connected
+      const registerMsg = {
+        type: "register",
+        syncKey: fullSyncKeyRef.current,
+      };
+      console.log("Sending:", JSON.stringify(registerMsg));
+
+      wsRef.current.send(JSON.stringify(registerMsg));
+
+      setState((prev) => ({
+        ...prev,
+        data: null,
+        lastUpdated: null,
+      }));
+    } else {
+      if (autoConnect && enabledRef.current) {
+        console.log("Attempting to connect...");
+        connect();
+      }
+    }
+  }, [syncKey]);
+
+  const connect = () => {
+    if (!enabledRef.current) {
+      return;
+    }
+
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      return;
     }
 
     try {
@@ -49,7 +79,6 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
 
       // Use the sessionToken from context
       const wsUrl = `${serverUrl}?token=${encodeURIComponent(sessionToken)}`;
-      console.log("Connecting to WebSocket:", wsUrl);
 
       const ws = new WebSocket(wsUrl);
       ws.onopen = () => {
@@ -57,7 +86,7 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
         ws.send(
           JSON.stringify({
             type: "register",
-            syncKey: syncKey,
+            syncKey: fullSyncKeyRef.current,
           })
         );
         setState((prev) => ({ ...prev, status: "connected", error: null }));
@@ -125,19 +154,22 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
 
   // Handle received WebSocket messages
   const handleWebSocketMessage = async (ws: WebSocket, message: any) => {
-    switch (message.type) {
-      case "fetchState":
-        try {
-          if (!handlers.fetchState)
-            throw new Error("No fetchState handler registered");
-          const data = await handlers.fetchState(message.syncKey);
+    if (!enabledRef.current) return; // Skip handling messages if not enabled
 
-          console.log("data", data);
+    switch (message.type) {
+      case "fetchStateFromDb":
+        try {
+          if (!handlers.fetchState) {
+            throw new Error("No fetchState handler registered");
+          }
+
+          const data = await handlers.fetchState(message.syncKey);
+          console.log("fetchStateFromDb", data, fullSyncKeyRef.current);
           ws.send(
             JSON.stringify({
               type: "stateData",
-              syncKey: syncKey,
-              data: data, // This is sending the entire state object
+              syncKey: fullSyncKeyRef.current,
+              data: data,
             })
           );
           setState((prev) => ({
@@ -161,38 +193,7 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
         }
         break;
 
-      case "updateState":
-        try {
-          console.log("updateStateHandler", message.syncKey, message.data);
-          if (!handlers.updateState)
-            throw new Error("No updateState handler registered");
-          await handlers.updateState(message.syncKey, message.data);
-
-          setState((prev) => ({
-            ...prev,
-            data: message.data,
-            lastUpdated: new Date(),
-          }));
-        } catch (error: any) {
-          ws.send(
-            JSON.stringify({
-              type: "stateUpdateError",
-              syncKey: message.syncKey,
-              message: error.message,
-            })
-          );
-
-          setState((prev) => ({
-            ...prev,
-            error: `Failed to update state: ${error.message}`,
-          }));
-        }
-        break;
-
-      case "stateData":
-        // Update local state with received data
-
-        console.log("stateData", message.data);
+      case "updateStateInDb":
         setState((prev) => ({
           ...prev,
           data: message.data,
@@ -205,49 +206,62 @@ export function useSync<T>(syncKey: string, options: SyncOptions = {}) {
     }
   };
 
-  // Send a local update to sync with all clients
   const updateState = (newData: UpdateTypeDetail) => {
-    console.log("updateState", newData, syncKey);
-    try {
-      wsRef.current?.send(
-        JSON.stringify({
-          type: "broadcastUpdate",
-          syncKey,
-          data: newData,
-        })
-      );
+    console.log("enabledenabledenabledenabled", enabledRef.current);
+    if (!enabledRef.current) return false;
 
-      return true;
+    try {
+      console.log("updateState", wsRef.current);
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.send(
+          JSON.stringify({
+            type: "queueUpdate",
+            syncKey: fullSyncKeyRef.current,
+            data: newData,
+          })
+        );
+        return true;
+      }
+      return false;
     } catch (error) {
       console.error("Failed to send update:", error);
       return false;
     }
   };
+
   const clearStorage = () => {
+    if (!enabledRef.current) return false;
+
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
       wsRef.current.send(
         JSON.stringify({
           type: "clearStorage",
-          syncKey,
+          syncKey: fullSyncKeyRef.current,
         })
       );
       return true;
     }
     return false;
   };
+
   // Auto-connect if enabled
   useEffect(() => {
-    if (autoConnect) {
+    if (autoConnect && enabledRef.current) {
       connect();
     }
-
-    // Cleanup on unmount
     return () => {
-      if (wsRef.current) {
+      if (wsRef.current && !enabledRef.current) {
         wsRef.current.close(1000, "Component unmounted");
       }
     };
-  }, [autoConnect, syncKey]);
+  }, [autoConnect, enabled]);
+
+  useEffect(() => {
+    enabledRef.current = enabled;
+    if (!enabled && isConnected) {
+      disconnect();
+    }
+  }, [enabled]);
 
   return {
     state: state.data as T,

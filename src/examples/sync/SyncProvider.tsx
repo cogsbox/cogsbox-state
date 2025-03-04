@@ -18,7 +18,8 @@ type UpdateStateHandler = (syncKey: string, data: any) => Promise<any>;
 interface SyncContextValue {
   sessionToken: string;
   serverUrl: string;
-
+  serviceId: string;
+  sessionId: string;
   // Stored handlers
   handlers: {
     fetchState: FetchStateHandler | null;
@@ -38,11 +39,15 @@ const SyncContext = createContext<SyncContextValue | null>(null);
 interface SyncProviderProps {
   children: ReactNode;
   sessionToken: string;
+  serviceId: string;
+  sessionId: string;
   serverUrl: string;
 }
 
 export function SyncProvider({
   children,
+  serviceId,
+  sessionId,
   sessionToken,
   serverUrl,
 }: SyncProviderProps) {
@@ -56,34 +61,23 @@ export function SyncProvider({
   });
 
   // Function to register handlers
-  const registerHandlers = useCallback(
-    (fetchState: FetchStateHandler, updateState: UpdateStateHandler) => {
-      // Store the handlers directly in the ref
-      handlersRef.current = {
-        fetchState,
-        updateState,
-      };
-    },
-    []
-  );
-
-  // Create a stable handlers object for the context value
-  const handlers = useMemo(
-    () => ({
-      get fetchState() {
-        return handlersRef.current.fetchState;
-      },
-      get updateState() {
-        return handlersRef.current.updateState;
-      },
-    }),
-    []
-  );
+  const registerHandlers = (
+    fetchState: FetchStateHandler,
+    updateState: UpdateStateHandler
+  ) => {
+    console.log("registerHandlers", fetchState, updateState);
+    handlersRef.current = {
+      fetchState,
+      updateState,
+    };
+  };
 
   const contextValue = {
+    serviceId,
+    sessionId,
     sessionToken,
     serverUrl,
-    handlers,
+    handlers: handlersRef.current,
     registerHandlers,
   };
 

@@ -114,7 +114,7 @@ export class WebSocketSyncEngine extends DurableObject {
 			try {
 				ws.send(
 					JSON.stringify({
-						type: 'fetchState',
+						type: 'fetchStateFromDb',
 						syncKey: syncKey,
 					}),
 				);
@@ -124,7 +124,7 @@ export class WebSocketSyncEngine extends DurableObject {
 		} else {
 			ws.send(
 				JSON.stringify({
-					type: 'stateData',
+					type: 'updateStateInDb',
 					syncKey: syncKey,
 					data: state,
 				}),
@@ -161,29 +161,15 @@ export class WebSocketSyncEngine extends DurableObject {
 					}
 					break;
 
-				case 'stateData':
-					if (data.syncKey && data.data) {
-						console.log('stateDatastateDatastateData', data);
-						await this.ctx.storage.put(data.syncKey, data.data);
-
-						ws.send(
-							JSON.stringify({
-								type: 'syncReady',
-								syncKey: data.syncKey,
-							}),
-						);
-					}
-					break;
 				case 'queueUpdate':
-				case 'broadcastUpdate':
 					if (data.syncKey && data.data) {
 						const updateDetail = data.data;
-						console.log('updateDetail', updateDetail, data.syncKey);
+
 						let currentState = await this.ctx.storage.get(data.syncKey);
-						console.log('currentState', currentState, data.syncKey);
+						console.log('currentState start', currentState, data.syncKey);
 						if (currentState) {
 							currentState = this.applyPathUpdate(currentState, updateDetail);
-
+							console.log('currentState', currentState, data.syncKey);
 							await this.ctx.storage.put(data.syncKey, currentState);
 
 							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail);

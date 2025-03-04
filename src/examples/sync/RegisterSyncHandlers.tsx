@@ -31,10 +31,11 @@ export default function RegisterSyncHandlers() {
     try {
       // Parse the sync key to get components
       const [serviceId, userId, stateKey, stateId] = syncKey.split("-");
-
+      console.log("updateStateHandler", serviceId, userId, stateKey, stateId);
       // Update data via your API
       const response = await mockFetch(
-        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`
+        `https://goot.co.uk:60002/api/state/${stateKey}/${stateId}`,
+        { body: JSON.stringify(newData) }
       );
 
       const result = await response.json();

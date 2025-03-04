@@ -2,10 +2,10 @@ import React, { useEffect, useState } from "react";
 
 import { initialUserState, mockFetch, useCogsState } from "./MockDB";
 import { useSync } from "./useSync";
-import { useSyncContext } from "./SyncProvider";
 
 const SyncTest = () => {
   const [response, setResponse] = useState("");
+  const [userId, setUserId] = useState<number | undefined>(undefined);
 
   // Use our custom hook
   const {
@@ -16,8 +16,9 @@ const SyncTest = () => {
     disconnect,
     updateState,
     clearStorage,
-  } = useSync<typeof initialUserState>("5-1-user-1");
-  console.log("state", state);
+  } = useSync<typeof initialUserState>(`users-${userId}`, {
+    enabled: Boolean(userId),
+  });
 
   const user = useCogsState("testUser", {
     initState: {
@@ -31,7 +32,6 @@ const SyncTest = () => {
     },
   });
 
-  console.log("state", state);
   const handleClearStorage = () => {
     const success = clearStorage();
     setResponse(
@@ -50,11 +50,42 @@ const SyncTest = () => {
   return (
     <div className="p-6 max-w-xl mx-auto bg-white rounded-xl shadow-md">
       <h1 className="text-2xl font-bold mb-4">Sync Engine Test</h1>
-
+      <div className="flex gap-2 items-center">
+        <button
+          className="bg-amber-400 text-white p-1 rounded cursor-pointer hover:bg-amber-600 px-2"
+          onClick={() => setUserId(undefined)}
+        >
+          Clear Storage
+        </button>
+        <button
+          onClick={() => setUserId(1)}
+          className="bg-gray-500 text-white p-1 rounded cursor-pointer hover:bg-amber-600 px-2"
+        >
+          User 1
+        </button>
+        <button
+          onClick={() => setUserId(2)}
+          className="bg-gray-500 text-white p-1 rounded cursor-pointer hover:bg-amber-600 px-2"
+        >
+          User 2
+        </button>
+      </div>
       {user.name.formElement((params) => (
         <input
           {...params.inputProps}
-          className="bg-white border border-gray-500 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-full p-2 "
+          className="bg-white border border-gray-500 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-[300px] p-2 "
+        />
+      ))}
+      {user.age.formElement((params) => (
+        <input
+          {...params.inputProps}
+          className="bg-white border border-gray-500 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-[300px] p-2 "
+        />
+      ))}
+      {user.email.formElement((params) => (
+        <input
+          {...params.inputProps}
+          className="bg-white border border-gray-500 text-gray-900 text-sm rounded focus:ring-blue-500 focus:border-blue-500 block w-[300px] p-2 "
         />
       ))}
       <div className="h-2" />

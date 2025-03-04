@@ -14,21 +14,20 @@ export default function SyncPage({
   } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
+  const AUTH_API_URL = "http://127.0.0.1:8787"; // Note: changed from ws:// to http://
+  const API_SECRET_KEY =
+    "dev_0494bb347d30cb7a_8c8b9f51814618700f53344139bb25fc3fcdc6a897b30b80";
+  const SERVICE_ID = "5";
   useEffect(() => {
     const fetchToken = async () => {
       try {
-        const AUTH_API_URL = "http://127.0.0.1:8787"; // Note: changed from ws:// to http://
-        const API_SECRET_KEY =
-          "dev_0494bb347d30cb7a_8c8b9f51814618700f53344139bb25fc3fcdc6a897b30b80";
-
         const response = await fetch(`${AUTH_API_URL}/sync-token`, {
           method: "POST",
           headers: {
             Authorization: `Bearer ${API_SECRET_KEY}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({ sessionId, service_id: 5 }),
+          body: JSON.stringify({ sessionId, service_id: SERVICE_ID }),
         });
         console.log("response", response);
         if (!response.ok) {
@@ -68,6 +67,8 @@ export default function SyncPage({
     <SyncProvider
       sessionToken={syncConfig.sessionToken}
       serverUrl={syncConfig.serverUrl}
+      serviceId={SERVICE_ID}
+      sessionId={sessionId}
     >
       {children}
     </SyncProvider>
