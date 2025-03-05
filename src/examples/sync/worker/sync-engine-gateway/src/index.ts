@@ -1,7 +1,45 @@
 import { DurableObject } from 'cloudflare:workers';
 
 import { sign, verify } from '@tsndr/cloudflare-worker-jwt';
+// Types for our enhanced sync engine store
 
+// Track state version for each sync key
+type StateVersionInfo = {
+	currentVersion: number;
+	lastBroadcastVersion: number;
+	lastUpdateTimestamp: number;
+};
+
+// Queue entry for pending updates
+type QueuedUpdate = {
+	id: string; // Unique ID for the update
+	syncKey: string;
+	updateDetail: UpdateTypeDetail;
+	timestamp: number;
+	senderSocketId?: string; // To avoid sending back to sender
+	processingStatus: 'queued' | 'processing' | 'completed' | 'failed';
+};
+
+// Expanded storage for the Durable Object
+type SyncEngineStore = {
+	// State storage (current)
+	states: Map<string, any>;
+
+	// Version tracking
+	stateVersions: Map<string, StateVersionInfo>;
+
+	// Update queue
+	pendingUpdates: Map<string, QueuedUpdate[]>;
+
+	// Client subscriptions (which clients are watching which keys)
+	subscriptions: Map<string, Set<string>>;
+
+	// Socket ID mapping (for identifying senders)
+	socketIds: Map<WebSocket, string>;
+
+	// Last activity timestamps (for cleanup)
+	lastActivity: Map<string, number>;
+};
 type AuthResult = {
 	success: boolean;
 	valid: boolean;
@@ -102,35 +140,93 @@ export class WebSocketSyncEngine extends DurableObject {
 			webSocket: client,
 		});
 	}
+	async initializeStateVersion(syncKey: string): Promise<StateVersionInfo> {
+		// Try to get existing version info or create a new one
+		const versionKey = `version:${syncKey}`;
+		let versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo | undefined;
 
-	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string) {
+		if (!versionInfo) {
+			versionInfo = {
+				currentVersion: 1,
+				lastBroadcastVersion: 0,
+				lastUpdateTimestamp: Date.now(),
+			};
+			await this.ctx.storage.put(versionKey, versionInfo);
+		}
+
+		return versionInfo;
+	}
+
+	// Increment version and update timestamp
+	async incrementStateVersion(syncKey: string): Promise<StateVersionInfo> {
+		const versionKey = `version:${syncKey}`;
+		let versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo | undefined;
+
+		if (!versionInfo) {
+			return this.initializeStateVersion(syncKey);
+		}
+
+		versionInfo.currentVersion += 1;
+		versionInfo.lastUpdateTimestamp = Date.now();
+
+		await this.ctx.storage.put(versionKey, versionInfo);
+		return versionInfo;
+	}
+
+	// Update the broadcast version after sending updates
+	async updateBroadcastVersion(syncKey: string): Promise<void> {
+		const versionKey = `version:${syncKey}`;
+		let versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo | undefined;
+
+		if (versionInfo) {
+			versionInfo.lastBroadcastVersion = versionInfo.currentVersion;
+			await this.ctx.storage.put(versionKey, versionInfo);
+		}
+	}
+
+	async handleSyncKeyRegistration(ws: WebSocket, syncKey: string, clientVersion?: number) {
 		if (!ws.syncKeys) {
 			ws.syncKeys = new Set();
 		}
 		ws.syncKeys.add(syncKey);
 
+		// Initialize version tracking for this key if needed
+		await this.initializeStateVersion(syncKey);
+
 		const state = await this.ctx.storage.get(syncKey);
+		const versionKey = `version:${syncKey}`;
+		const versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo;
+
 		if (!state) {
 			try {
 				ws.send(
 					JSON.stringify({
 						type: 'fetchStateFromDb',
 						syncKey: syncKey,
+						currentVersion: versionInfo.currentVersion,
 					}),
 				);
 			} catch (error) {
 				console.error('Error requesting state:', error);
 			}
 		} else {
+			// If client sent a version, check if they need the full state or just updates
+			if (clientVersion && clientVersion < versionInfo.currentVersion) {
+				// TODO: In the future, implement delta updates based on client version
+				// For now, just send the current full state
+			}
+
 			ws.send(
 				JSON.stringify({
 					type: 'updateStateInDb',
 					syncKey: syncKey,
 					data: state,
+					version: versionInfo.currentVersion,
 				}),
 			);
 		}
 	}
+
 	async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string) {
 		let data;
 		try {
@@ -144,30 +240,26 @@ export class WebSocketSyncEngine extends DurableObject {
 			switch (data.type) {
 				case 'register':
 					if (data.syncKey) {
-						await this.handleSyncKeyRegistration(ws, data.syncKey);
+						await this.handleSyncKeyRegistration(ws, data.syncKey, data.clientVersion);
 					}
 					break;
 
-				case 'unregister':
-					if (data.syncKey && ws.syncKeys) {
-						ws.syncKeys.delete(data.syncKey);
-
-						ws.send(
-							JSON.stringify({
-								type: 'unregistered',
-								syncKey: data.syncKey,
-							}),
-						);
-					}
-					break;
 				case 'initialSyncState':
 					if (data.syncKey && data.data) {
 						console.log('initialSyncState', data);
 						await this.ctx.storage.put(data.syncKey, data.data);
+
+						// Initialize version info for this new state
+						await this.initializeStateVersion(data.syncKey);
+
+						const versionKey = `version:${data.syncKey}`;
+						const versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo;
+
 						ws.send(
 							JSON.stringify({
 								type: 'syncReady',
 								syncKey: data.syncKey,
+								version: versionInfo.currentVersion,
 							}),
 						);
 					}
@@ -176,15 +268,39 @@ export class WebSocketSyncEngine extends DurableObject {
 				case 'queueUpdate':
 					if (data.syncKey && data.data) {
 						const updateDetail = data.data;
+						const clientVersion = data.clientVersion;
 
 						let currentState = await this.ctx.storage.get(data.syncKey);
 						console.log('currentState start', currentState, data.syncKey);
-						if (currentState) {
-							currentState = this.applyPathUpdate(currentState, updateDetail);
 
+						if (currentState) {
+							// Check version to prevent conflicts
+							const versionKey = `version:${data.syncKey}`;
+							const versionInfo = (await this.ctx.storage.get(versionKey)) as StateVersionInfo;
+
+							// If client is working with outdated state, reject update
+							if (clientVersion && clientVersion < versionInfo.currentVersion) {
+								ws.send(
+									JSON.stringify({
+										type: 'versionConflict',
+										message: 'Your client has an outdated version of the state',
+										syncKey: data.syncKey,
+										currentVersion: versionInfo.currentVersion,
+										clientVersion: clientVersion,
+									}),
+								);
+								return;
+							}
+
+							// Apply the update and increment version
+							currentState = this.applyPathUpdate(currentState, updateDetail);
 							await this.ctx.storage.put(data.syncKey, currentState);
 
-							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail);
+							// Update version information
+							const newVersionInfo = await this.incrementStateVersion(data.syncKey);
+
+							// Include version info in the update broadcast
+							await this.broadcastStateUpdate(ws, data.syncKey, updateDetail, newVersionInfo.currentVersion);
 						} else {
 							ws.send(
 								JSON.stringify({
@@ -284,7 +400,7 @@ export class WebSocketSyncEngine extends DurableObject {
 		return newState;
 	}
 	// Broadcast state updates to all connected clients with the same syncKey except sender
-	async broadcastStateUpdate(sender: WebSocket, syncKey: string, updateDetail: UpdateTypeDetail) {
+	async broadcastStateUpdate(sender: WebSocket, syncKey: string, updateDetail: UpdateTypeDetail, version: number) {
 		// Get the current state from storage
 		const currentState = await this.ctx.storage.get(syncKey);
 
@@ -300,31 +416,28 @@ export class WebSocketSyncEngine extends DurableObject {
 					const message = JSON.stringify({
 						type: 'updateState',
 						syncKey: syncKey,
-						data: currentState, // Just the state, no metadata
+						data: currentState,
+						version: version,
 					});
 
 					client.send(message);
 				} catch (error) {
 					console.error('Error broadcasting state update:', error);
 				}
-			} else {
+			} else if (client === sender) {
 				console.log('currentState2222222222222222222222', currentState);
 				const message = JSON.stringify({
 					type: 'updateStateInDb',
 					syncKey: syncKey,
 					data: currentState,
+					version: version,
 				});
 				client.send(message);
 			}
 		}
-	}
-	async webSocketClose(ws: WebSocket, code: number, reason: string, wasClean: boolean) {
-		console.log(`WebSocket closed with code ${code} and reason: ${reason}`);
-		// Clean up any resources related to this WebSocket if needed
-	}
 
-	async webSocketError(ws: WebSocket, error: Error) {
-		console.error('WebSocket error:', error);
+		// Mark this version as broadcast
+		await this.updateBroadcastVersion(syncKey);
 	}
 }
 

@@ -189,8 +189,8 @@ export type OptionsType<T extends unknown = unknown> = {
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
+    localStorageKey?: string;
     initState?: {
-        localStorageKey?: string;
         ctx?: Record<string, any>;
         initialState: T;
         dependencies?: any[];
@@ -278,7 +278,7 @@ type LocalStorageData<T> = {
     baseServerState?: T;
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initState, syncUpdate, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, localStorageKey, initState, syncUpdate, }?: {
     stateKey?: string;
     componentId?: string;
 } & OptionsType<TStateObject>): [TStateObject, StateObject<TStateObject>];

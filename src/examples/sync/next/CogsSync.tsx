@@ -22,7 +22,12 @@ export default async function SyncPage({
   const { sessionToken, serverUrl } = await response.json();
 
   return (
-    <SyncProvider sessionToken={sessionToken} serverUrl={serverUrl}>
+    <SyncProvider
+      sessionToken={sessionToken}
+      serverUrl={serverUrl}
+      serviceId={"5"}
+      sessionId="test"
+    >
       {children}
     </SyncProvider>
   );

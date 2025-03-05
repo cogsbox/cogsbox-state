@@ -47,7 +47,7 @@ const mockDatabase: Database = {
 
 // Direct function to get state data
 export function getStateData(stateKey: string, stateId: string): any {
-  console.log("getStateData---------------------", stateKey, stateId);
+  console.log("getStateData-", mockDatabase);
 
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
@@ -68,7 +68,7 @@ export function updateStateData(
   stateId: string,
   newData: any
 ): any {
-  console.log("updateStateData", stateKey, stateId, newData);
+  console.log("updateStateData--------------------", mockDatabase);
 
   if (config[stateKey]) {
     const { tableName, pk } = config[stateKey];
