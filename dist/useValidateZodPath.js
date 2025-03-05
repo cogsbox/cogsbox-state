@@ -1,4 +1,4 @@
-import "./node_modules/react/index.js";
+import "react";
 import { ZodArray as y, ZodObject as w, ZodOptional as u, ZodNullable as f, ZodEffects as l } from "zod";
 import { getGlobalStore as g } from "./store.js";
 import { create as m } from "./node_modules/zustand/esm/react.js";

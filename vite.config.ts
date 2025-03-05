@@ -27,7 +27,15 @@ export default defineConfig({
           return `${name.replace(/\.[^/.]+$/, "")}.js`;
         },
       },
-      external: ["zod", "zod-to-json-schema", "crypto"],
+      external: [
+        "zod",
+        "zod-to-json-schema",
+        "crypto",
+        "react",
+        "react-dom",
+        "react/jsx-runtime",
+        "@trpc/next",
+      ],
       plugins: [preserveDirectives()],
     },
     commonjsOptions: {
