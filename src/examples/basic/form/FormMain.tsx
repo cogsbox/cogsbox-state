@@ -256,20 +256,11 @@ export default function FormsMain() {
                         </label>
                         <input
                           type="text"
-                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 ${
-                            params.validationErrors().length > 0
-                              ? "border-red-500"
-                              : ""
-                          }`}
+                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
                           {...params.inputProps}
                         />
                       </div>
-                    ),
-                    {
-                      validation: {
-                        hideMessage: true,
-                      },
-                    }
+                    )
                   )}
                 </div>
 
@@ -282,24 +273,12 @@ export default function FormsMain() {
                     validation fails instead of using the default Zod error
                     messages.
                   </p>
-                  {user.email.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Email Address
-                        </label>
-                        <input
-                          {...params.inputProps}
+                  
+                  {user.email.formElement( (params) =>   
+                    <input {...params.inputProps}
                           type="email"
                           className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
-                        />
-                      </div>
-                    ),
-                    {
-                      validation: {
-                        message: "Please enter a valid email address",
-                      },
-                    }
+                        />  
                   )}
                 </div>
 

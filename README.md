@@ -1,5 +1,7 @@
 # Cogsbox State: A Practical Guide
 
+> **⚠️ WARNING**: This README is AI-generated based on the current implementation of Cogsbox State. The library is under active development and APIs are subject to change. Always refer to the official documentation or source code for the most up-to-date information.
+
 ## Getting Started
 
 Cogsbox State is a React state management library that provides a fluent interface for managing complex state.
@@ -25,16 +27,16 @@ export const { useCogsState } = createCogsState(InitialState);
 
 // 3. Use in your component
 function MyComponent() {
-  const [state, updater] = useCogsState("cart");
+  const cart = useCogsState("cart");
 
   // Access values
-  const cartItems = updater.items.get();
-  const total = updater.total.get();
+  const cartItems = cart.items.get();
+  const total = cart.total.get();
 
   // Update values
   const addItem = (item) => {
-    updater.items.insert(item);
-    updater.total.update(total + item.price);
+    cart.items.insert(item);
+    cart.total.update(total + item.price);
   };
 
   return (
@@ -49,26 +51,26 @@ function MyComponent() {
 
 ```typescript
 // Get the entire state object
-const entireCart = updater.get();
+const entireCart = cart.get();
 
 // Access a specific property
-const cartItems = updater.items.get();
+const cartItems = cart.items.get();
 
 // Access nested properties
-const firstItemPrice = updater.items[0].price.get();
+const firstItemPrice = cart.items.index(0).price.get();
 ```
 
 ### Updating State
 
 ```typescript
 // Direct update
-updater.settings.darkMode.update(true);
+cart.settings.darkMode.update(true);
 
 // Functional update (based on previous value)
-updater.cart.total.update((prev) => prev + 10);
+cart.cart.total.update((prev) => prev + 10);
 
 // Deep update
-updater.users.findWith("id", "123").name.update("New Name");
+cart.users.findWith("id", "123").name.update("New Name");
 ```
 
 ## Working with Arrays
@@ -77,23 +79,23 @@ updater.users.findWith("id", "123").name.update("New Name");
 
 ```typescript
 // Add an item
-updater.cart.items.insert({ id: "prod1", name: "Product 1", price: 29.99 });
+cart.cart.items.insert({ id: "prod1", name: "Product 1", price: 29.99 });
 
 // Remove an item at index
-updater.cart.items.cut(2);
+cart.cart.items.cut(2);
 
 // Find and update an item
-updater.cart.items.findWith("id", "prod1").quantity.update((prev) => prev + 1);
+cart.cart.items.findWith("id", "prod1").quantity.update((prev) => prev + 1);
 
 // Update item at specific index
-updater.cart.items.index(0).price.update(19.99);
+cart.cart.items.index(0).price.update(19.99);
 ```
 
 ### Advanced Array Methods
 
 ```typescript
 // Map with access to updaters
-updater.cart.items.stateMap((item, itemUpdater) => (
+cart.cart.items.stateMap((item, itemUpdater) => (
   <CartItem
     key={item.id}
     item={item}
@@ -102,16 +104,16 @@ updater.cart.items.stateMap((item, itemUpdater) => (
 ));
 
 // Filter items while maintaining updater capabilities
-const inStockItems = updater.products.stateFilter(product => product.stock > 0);
+const inStockItems = cart.products.stateFilter(product => product.stock > 0);
 
 // Insert only if the item doesn't exist
-updater.cart.items.uniqueInsert(
+cart.cart.items.uniqueInsert(
   { id: "prod1", quantity: 1 },
   ["id"] // fields to check for uniqueness
 );
 
 // Flatten nested arrays by property
-const allVariants = updater.products.stateFlattenOn("variants");
+const allVariants = cart.products.stateFlattenOn("variants");
 ```
 
 ## Reactivity Control
@@ -463,7 +465,7 @@ const products = useCogsState("products", {
 });
 
 // State is automatically synced with server after changes
-products.items[0].stock.update((prev) => prev - 1);
+products.items.index(0).stock.update((prev) => prev - 1);
 ```
 
 ## Local Storage Persistence
@@ -539,42 +541,88 @@ function ShoppingCart() {
 }
 ```
 
+## Session Support
+
+Cogsbox State supports session-based state management through the `useCogsConfig` hook, allowing you to isolate state for different user sessions:
+
+```typescript
+// Using session-specific state
+const cart = useCogsState("cart", {
+  localStorageKey: "user-cart", // Will be prefixed with sessionId
+  initState: {
+    initialState: {
+      items: [],
+      total: 0,
+    },
+  },
+});
+```
+
+## Performance Optimizations
+
+The library includes several performance optimizations:
+
+1. **Cache Management**: Cogsbox maintains a cache of proxy objects to reduce re-creation overhead.
+2. **Batched Updates**: State updates are batched where possible to minimize render cycles.
+3. **Signal-based DOM Updates**: Directly update DOM elements without re-rendering components.
+
 ## Common Patterns and Tips
 
 1. **Path-based Updates**: Always use the fluent API to update nested properties.
 
    ```typescript
    // Good
-   updater.users[0].address.city.update("New York");
+   user.users.index(0).address.city.update("New York");
 
    // Avoid
-   updater.update({ ...state, users: [...] });
+   user.update({ ...state, users: [...] });
    ```
 
 2. **Working with Arrays**: Use the built-in array methods instead of manually updating array state.
 
    ```typescript
    // Good
-   updater.users.insert(newUser);
-   updater.users.findWith("id", 123).active.update(true);
+   user.users.insert(newUser);
+   user.users.findWith("id", 123).active.update(true);
 
    // Avoid
-   updater.users.update([...users, newUser]);
+   user.users.update([...users, newUser]);
    ```
 
 3. **Optimization**: Use the appropriate reactivity type for your needs.
 
    ```typescript
    // For lists where only specific items change frequently
-   updater.items.stateMap((item) => (
+   user.items.stateMap((item) => (
      <div>{item.$get()}</div>  // Only this item re-renders when changed
    ));
    ```
 
 4. **Form Management**: Use formElement for all form inputs to get automatic validation and debouncing.
+
    ```typescript
    profile.name.formElement(
      ({ inputProps }) => <input {...inputProps} />,
      { debounceTime: 300 }
    );
    ```
+
+5. **Middleware Support**: Add middleware for logging, analytics, or custom state processing:
+
+   ```typescript
+   const user = useCogsState("user", {
+     middleware: ({ update, updateLog }) => {
+       // Log all state changes
+       console.log("State update:", update);
+
+       // Trigger analytics
+       if (update.path.includes("preferences")) {
+         analytics.track("preferences_changed", update.newValue);
+       }
+     },
+   });
+   ```
+
+## API Reference
+
+For a comprehensive API reference, see the TypeScript interfaces and examples in the source code.
