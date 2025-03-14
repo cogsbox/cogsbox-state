@@ -1,6 +1,6 @@
 # Cogsbox State: A Practical Guide
 
-> **⚠️ WARNING**: This README is AI-generated based on the current implementation of Cogsbox State. The library is under active development and APIs are subject to change. Always refer to the official documentation or source code for the most up-to-date information.
+> **⚠️ WARNING**: This README is AI-generated based on the current implementation of Cogsbox State. The library is under active development and APIs are subject to change.
 
 ## Getting Started
 
@@ -175,454 +175,53 @@ return (
 
 ## Form Integration
 
-Cogsbox State provides an intuitive form system to connect your state to form controls with built-in validation, error handling, and array support.
-
-### Basic Form Element Usage
-
-The `formElement` method serves as the bridge between state and UI:
+Cogsbox State provides a form system with Zod schema validation.
 
 ```typescript
-// Direct value/onChange pattern for complete control
-user.firstName.formElement((params) => (
-  <div>
-    <label className="block text-sm font-medium">First Name</label>
-    <input
-      type="text"
-      className="mt-1 block w-full rounded-md border-2 p-2"
-      value={params.get()}
-      onChange={(e) => params.set(e.target.value)}
-      onBlur={params.inputProps.onBlur}
-      ref={params.inputProps.ref}
-    />
-  </div>
-));
+import { z } from 'zod';
+import { createCogsState } from 'cogsbox-state';
 
-// Using inputProps shorthand for simpler binding
-user.lastName.formElement((params) => (
-  <div>
-    <label className="block text-sm font-medium">Last Name</label>
-    <input
-      type="text"
-      className="mt-1 block w-full rounded-md border-2 p-2"
-      {...params.inputProps}
-    />
-  </div>
-));
-```
+// 1. Define your schema and initial state
+const userSchema = z.object({
+  firstName: z.string().min(1, "First name is required"),
+  lastName: z.string().min(1, "Last name is required"),
+  email: z.string().email("Please enter a valid email"),
+  address: z.object({
+    street: z.string().min(1, "Street is required"),
+    city: z.string().min(1, "City is required"),
+    zipCode: z.string().min(5, "Zip code must be at least 5 characters")
+  })
+});
 
-### Form Validation Options
-
-Cogsbox provides several approaches to validation:
-
-```typescript
-// Custom validation message
-user.email.formElement(
-  (params) => (
-    <div>
-      <label>Email Address</label>
-      <input {...params.inputProps} type="email" />
-    </div>
-  ),
-  {
-    validation: {
-      message: "Please enter a valid email address"
-    }
-  }
-);
-
-// Hidden validation (show border but no message)
-user.lastName.formElement(
-  (params) => (
-    <div>
-      <label>Last Name</label>
-      <input
-        {...params.inputProps}
-        className={`input ${params.validationErrors().length > 0 ? 'border-red-500' : ''}`}
-      />
-    </div>
-  ),
-  {
-    validation: {
-      hideMessage: true
-    }
-  }
-);
-
-// Custom validation with onBlur
-user.phone.formElement((params) => (
-  <div>
-    <label>Phone Number</label>
-    <input
-      {...params.inputProps}
-      onBlur={(e) => {
-        if (e.target.value.length == 0 || isNaN(Number(e.target.value))) {
-          params.addValidationError("Please enter a valid phone number");
-        }
-      }}
-      placeholder="(555) 123-4567"
-    />
-  </div>
-));
-```
-
-### Working with Form Arrays
-
-For managing collections like addresses:
-
-```typescript
-function AddressesManager() {
-  const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
-  const user = useCogsState("user");
-
-  // Add new address
-  const addNewAddress = () => {
-    user.addresses.insert({
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      country: "USA",
-      isDefault: false,
-    });
-    setCurrentAddressIndex(user.addresses.get().length - 1);
-  };
-
-  return (
-    <div>
-      {/* Address tabs with validation indicators */}
-      <div className="flex space-x-2 mt-2">
-        {user.addresses.stateMap((_, setter, index) => {
-          const errorCount = setter.showValidationErrors().length;
-          return (
-            <button
-              key={index}
-              onClick={() => setCurrentAddressIndex(index)}
-              className={`rounded-lg flex items-center justify-center ${
-                errorCount > 0
-                  ? "border-red-500 bg-red-400"
-                  : currentAddressIndex === index
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-200"
-              }`}
-            >
-              {index + 1}
-              {errorCount > 0 && (
-                <div className="bg-red-500 text-white rounded-full">
-                  {errorCount}
-                </div>
-              )}
-            </button>
-          );
-        })}
-        <button onClick={addNewAddress}>Add</button>
-      </div>
-
-      {/* Current address form */}
-      {user.addresses.get().length > 0 && (
-        <div className="grid grid-cols-1 gap-4">
-          {/* Access fields with index() method */}
-          {user.addresses.index(currentAddressIndex).street.formElement(
-            (params) => (
-              <div>
-                <label>Street</label>
-                <input value={params.get()} onChange={(e) => params.set(e.target.value)} />
-              </div>
-            ),
-            {
-              validation: {
-                message: "Street address is required"
-              }
-            }
-          )}
-
-          {/* City and State in a row */}
-          <div className="grid grid-cols-2 gap-4">
-            {user.addresses.index(currentAddressIndex).city.formElement((params) => (
-              <div>
-                <label>City</label>
-                <input {...params.inputProps} />
-              </div>
-            ))}
-
-            {user.addresses.index(currentAddressIndex).state.formElement((params) => (
-              <div>
-                <label>State</label>
-                <input {...params.inputProps} />
-              </div>
-            ))}
-          </div>
-
-          {/* Boolean field handling */}
-          {user.addresses.index(currentAddressIndex).isDefault.formElement((params) => (
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                checked={params.get()}
-                onChange={(e) => params.set(e.target.checked)}
-                id={`default-address-${currentAddressIndex}`}
-              />
-              <label htmlFor={`default-address-${currentAddressIndex}`}>
-                Set as default address
-              </label>
-            </div>
-          ))}
-
-          {/* Remove address button */}
-          {user.addresses.get().length > 1 && (
-            <button
-              onClick={() => {
-                user.addresses.cut(currentAddressIndex);
-                setCurrentAddressIndex(Math.max(0, currentAddressIndex - 1));
-              }}
-            >
-              Remove Selected Address
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-```
-
-### Form Actions
-
-Cogsbox provides methods to manage form state:
-
-```typescript
-// Reset form to initial state
-const handleReset = () => {
-  user.revertToInitialState();
-};
-
-// Validate all fields using Zod schema
-const handleSubmit = () => {
-  if (user.validateZodSchema()) {
-    // All valid, proceed with submission
-    submitData(user.get());
-  }
-};
-```
-
-### Setting Up Zod Validation
-
-```typescript
-// Setting up validation at initialization
+// 2. Create the state hook with validation and global form elements
 export const { useCogsState } = createCogsState({
   user: {
     initialState: {
       firstName: "",
       lastName: "",
       email: "",
-      phone: "",
-      addresses: [
-        {
-          street: "",
-          city: "",
-          state: "",
-          zipCode: "",
-          country: "USA",
-          isDefault: false,
-        },
-      ],
+      address: {
+        street: "",
+        city: "",
+        zipCode: ""
+      }
     },
     validation: {
-      key: "userForm", // Used for error tracking
-      zodSchema: z.object({
-        firstName: z.string().min(1, "First name is required"),
-        lastName: z.string().min(1, "Last name is required"),
-        email: z.string().email("Please enter a valid email"),
-        phone: z.string().min(10, "Phone number must be at least 10 digits"),
-        addresses: z.array(
-          z.object({
-            street: z.string().min(1, "Street is required"),
-            city: z.string().min(1, "City is required"),
-            state: z.string().min(1, "State is required"),
-            zipCode: z
-              .string()
-              .min(5, "Zip code must be at least 5 characters"),
-            country: z.string(),
-            isDefault: z.boolean(),
-          })
-        ),
-      }),
+      key: "userForm",
+      zodSchema: userSchema,
+      onBlur: true
     },
-  },
-});
-```
-
-## Server Synchronization
-
-```typescript
-// Setting up server sync
-const products = useCogsState("products", {
-  serverSync: {
-    syncKey: "products",
-    syncFunction: ({ state }) => api.updateProducts(state),
-    debounce: 1000, // ms
-    mutation: useMutation(api.updateProducts),
-  },
-});
-
-// State is automatically synced with server after changes
-products.items.index(0).stock.update((prev) => prev - 1);
-```
-
-## Local Storage Persistence
-
-```typescript
-// Automatically save state to localStorage
-const cart = useCogsState("cart", {
-  localStorage: {
-    key: "shopping-cart",
-  },
-});
-```
-
-## Example: Shopping Cart
-
-```typescript
-function ShoppingCart() {
-  const cart = useCogsState("cart");
-  const products = useCogsState("products");
-
-  const addToCart = (productId) => {
-    const product = products.items.findWith("id", productId).get();
-
-    cart.items.uniqueInsert(
-      {
-        productId,
-        name: product.name,
-        price: product.price,
-        quantity: 1
-      },
-      ["productId"],
-      // If product exists, update quantity instead
-      (existingItem) => ({
-        ...existingItem,
-        quantity: existingItem.quantity + 1
-      })
-    );
-
-    // Update total
-    cart.total.update(prev => prev + product.price);
-  };
-
-  return (
-    <div>
-      <h2>Your Cart</h2>
-
-      {cart.items.stateMap((item, itemUpdater) => (
-        <div key={item.productId} className="cart-item">
-          <div>{item.name}</div>
-          <div>${item.price}</div>
-
-          <div className="quantity">
-            <button onClick={() =>
-              itemUpdater.quantity.update(prev => Math.max(prev - 1, 0))
-            }>-</button>
-
-            <span>{item.quantity}</span>
-
-            <button onClick={() =>
-              itemUpdater.quantity.update(prev => prev + 1)
-            }>+</button>
-          </div>
-
-          <button onClick={() => itemUpdater.cut()}>Remove</button>
+    formElements: {
+      validation: ({ children, active, message, path }) => (
+        <div className={`form-field ${active ? 'has-error' : ''}`}>
+          {children}
+          {active && message && (
+            <p className="text-red-500 text-sm mt-1">{message}</p>
+          )}
         </div>
-      ))}
-
-      <div className="cart-total">
-        <strong>Total:</strong> ${cart.total.get()}
-      </div>
-    </div>
-  );
-}
-```
-
-## Session Support
-
-Cogsbox State supports session-based state management through the `useCogsConfig` hook, allowing you to isolate state for different user sessions:
-
-```typescript
-// Using session-specific state
-const cart = useCogsState("cart", {
-  localStorageKey: "user-cart", // Will be prefixed with sessionId
-  initState: {
-    initialState: {
-      items: [],
-      total: 0,
-    },
-  },
+      )  // Inline validation wrapper
+    }
+  }
 });
+
 ```
-
-## Performance Optimizations
-
-The library includes several performance optimizations:
-
-1. **Cache Management**: Cogsbox maintains a cache of proxy objects to reduce re-creation overhead.
-2. **Batched Updates**: State updates are batched where possible to minimize render cycles.
-3. **Signal-based DOM Updates**: Directly update DOM elements without re-rendering components.
-
-## Common Patterns and Tips
-
-1. **Path-based Updates**: Always use the fluent API to update nested properties.
-
-   ```typescript
-   // Good
-   user.users.index(0).address.city.update("New York");
-
-   // Avoid
-   user.update({ ...state, users: [...] });
-   ```
-
-2. **Working with Arrays**: Use the built-in array methods instead of manually updating array state.
-
-   ```typescript
-   // Good
-   user.users.insert(newUser);
-   user.users.findWith("id", 123).active.update(true);
-
-   // Avoid
-   user.users.update([...users, newUser]);
-   ```
-
-3. **Optimization**: Use the appropriate reactivity type for your needs.
-
-   ```typescript
-   // For lists where only specific items change frequently
-   user.items.stateMap((item) => (
-     <div>{item.$get()}</div>  // Only this item re-renders when changed
-   ));
-   ```
-
-4. **Form Management**: Use formElement for all form inputs to get automatic validation and debouncing.
-
-   ```typescript
-   profile.name.formElement(
-     ({ inputProps }) => <input {...inputProps} />,
-     { debounceTime: 300 }
-   );
-   ```
-
-5. **Middleware Support**: Add middleware for logging, analytics, or custom state processing:
-
-   ```typescript
-   const user = useCogsState("user", {
-     middleware: ({ update, updateLog }) => {
-       // Log all state changes
-       console.log("State update:", update);
-
-       // Trigger analytics
-       if (update.path.includes("preferences")) {
-         analytics.track("preferences_changed", update.newValue);
-       }
-     },
-   });
-   ```
-
-## API Reference
-
-For a comprehensive API reference, see the TypeScript interfaces and examples in the source code.
