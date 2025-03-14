@@ -173,59 +173,6 @@ return (
 );
 ```
 
-## Form Integration
-
-Cogsbox State provides a form system with Zod schema validation.
-
-```typescript
-import { z } from 'zod';
-import { createCogsState } from 'cogsbox-state';
-
-// 1. Define your schema and initial state
-const userSchema = z.object({
-  firstName: z.string().min(1, "First name is required"),
-  lastName: z.string().min(1, "Last name is required"),
-  email: z.string().email("Please enter a valid email"),
-  address: z.object({
-    street: z.string().min(1, "Street is required"),
-    city: z.string().min(1, "City is required"),
-    zipCode: z.string().min(5, "Zip code must be at least 5 characters")
-  })
-});
-
-// 2. Create the state hook with validation and global form elements
-export const { useCogsState } = createCogsState({
-  user: {
-    initialState: {
-      firstName: "",
-      lastName: "",
-      email: "",
-      address: {
-        street: "",
-        city: "",
-        zipCode: ""
-      }
-    },
-    validation: {
-      key: "userForm",
-      zodSchema: userSchema,
-      onBlur: true
-    },
-    formElements: {
-      validation: ({ children, active, message, path }) => (
-        <div className={`form-field ${active ? 'has-error' : ''}`}>
-          {children}
-          {active && message && (
-            <p className="text-red-500 text-sm mt-1">{message}</p>
-          )}
-        </div>
-      )  // Inline validation wrapper
-    }
-  }
-});
-
-```
-
 # Cogsbox State: Simple Form Example
 
 The main benefit of Cogsbox State's form handling is its simplicity. Using `formElement` with the included `inputProps` makes creating forms incredibly easy:
