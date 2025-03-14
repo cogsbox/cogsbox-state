@@ -225,3 +225,90 @@ export const { useCogsState } = createCogsState({
 });
 
 ```
+
+# Cogsbox State: Simple Form Example
+
+The main benefit of Cogsbox State's form handling is its simplicity. Using `formElement` with the included `inputProps` makes creating forms incredibly easy:
+
+```typescript
+import { z } from 'zod';
+import { createCogsState } from 'cogsbox-state';
+
+// Define schema and initial state
+const userSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Valid email required"),
+  age: z.number().min(18, "Must be 18+")
+});
+
+// Create state with validation
+export const { useCogsState } = createCogsState({
+  user: {
+    initialState: {
+      name: "",
+      email: "",
+      age: 0
+    },
+    validation: {
+      key: "userForm",
+      zodSchema: userSchema
+    },
+    formElements: {
+      validation: ({ children, active, message }) => (
+        <div className="form-field">
+          {children}
+          {active && <p className="error">{message}</p>}
+        </div>
+      )
+    }
+  }
+});
+
+function UserForm() {
+  const user = useCogsState("user");
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (user.validateZodSchema()) {
+      console.log("Valid:", user.get());
+    }
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* Just spread inputProps - that's it! */}
+      {user.name.formElement((params) => (
+        <>
+          <label>Name</label>
+          <input {...params.inputProps} />
+        </>
+      ))}
+
+      {user.email.formElement((params) => (
+        <>
+          <label>Email</label>
+          <input {...params.inputProps} />
+        </>
+      ))}
+
+      {user.age.formElement((params) => (
+        <>
+          <label>Age</label>
+          <input type="number" {...params.inputProps} />
+        </>
+      ))}
+
+      <button type="submit">Submit</button>
+    </form>
+  );
+}
+```
+
+That's it! Cogsbox State handles:
+
+- State management
+- Validation
+- Error messages
+- Input binding
+
+All you need to do is spread `params.inputProps` and Cogsbox takes care of the rest.
