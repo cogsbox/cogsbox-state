@@ -253,10 +253,6 @@ export type InitialStateInnerType<T extends unknown = unknown> = {
 export type InitialStateType<T> = {
     [key: string]: InitialStateInnerType<T>;
 };
-export type FunctionsToPassDownType = {
-    getValidationErrors: (pathArray: string) => string[];
-    removeValidationError: (path: string) => void;
-};
 export type AllStateTypes<T extends unknown> = Record<string, T>;
 export type CogsInitialState<T> = {
     initialState: T;
@@ -265,8 +261,9 @@ export type CogsInitialState<T> = {
 export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
-export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opts?: {
-    reRenderType?: "get" | "state" | "none";
+export declare function addStateOptions<T extends unknown>(initialState: T, { formElements }: OptionsType<T>): T;
+export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opt?: {
+    formElements?: FormsElementsType;
 }) => {
     useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;

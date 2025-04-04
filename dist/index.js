@@ -1,26 +1,27 @@
-import { $cogsSignal as r, $cogsSignalStore as o, createCogsState as n, notifyComponent as s, useCogsStateFn as g } from "./CogsState.jsx";
-import { config as f, useCogsConfig as i } from "./CogsStateClient.jsx";
-import { debounce as p, deleteNestedProperty as u, getArrayLengthDifferences as y, getArrayLengthDifferencesArray as d, getDifferences as S, getDifferencesArray as l, getNestedValue as m, isArray as A, isDeepEqual as C, isFunction as D, isObject as x, transformStateFunc as F, updateNestedProperty as N } from "./utility.js";
+import { $cogsSignal as r, $cogsSignalStore as o, addStateOptions as n, createCogsState as s, notifyComponent as a, useCogsStateFn as g } from "./CogsState.jsx";
+import { config as i, useCogsConfig as c } from "./CogsStateClient.jsx";
+import { debounce as d, deleteNestedProperty as u, getArrayLengthDifferences as y, getArrayLengthDifferencesArray as S, getDifferences as l, getDifferencesArray as m, getNestedValue as A, isArray as C, isDeepEqual as D, isFunction as x, isObject as F, transformStateFunc as N, updateNestedProperty as b } from "./utility.js";
 export {
   r as $cogsSignal,
   o as $cogsSignalStore,
-  f as config,
-  n as createCogsState,
-  p as debounce,
+  n as addStateOptions,
+  i as config,
+  s as createCogsState,
+  d as debounce,
   u as deleteNestedProperty,
   y as getArrayLengthDifferences,
-  d as getArrayLengthDifferencesArray,
-  S as getDifferences,
-  l as getDifferencesArray,
-  m as getNestedValue,
-  A as isArray,
-  C as isDeepEqual,
-  D as isFunction,
-  x as isObject,
-  s as notifyComponent,
-  F as transformStateFunc,
-  N as updateNestedProperty,
-  i as useCogsConfig,
+  S as getArrayLengthDifferencesArray,
+  l as getDifferences,
+  m as getDifferencesArray,
+  A as getNestedValue,
+  C as isArray,
+  D as isDeepEqual,
+  x as isFunction,
+  F as isObject,
+  a as notifyComponent,
+  N as transformStateFunc,
+  b as updateNestedProperty,
+  c as useCogsConfig,
   g as useCogsStateFn
 };
 //# sourceMappingURL=index.js.map

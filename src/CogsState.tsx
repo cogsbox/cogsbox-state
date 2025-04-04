@@ -367,10 +367,6 @@ export type InitialStateInnerType<T extends unknown = unknown> = {
 export type InitialStateType<T> = {
   [key: string]: InitialStateInnerType<T>;
 };
-export type FunctionsToPassDownType = {
-  getValidationErrors: (pathArray: string) => string[];
-  removeValidationError: (path: string) => void;
-};
 
 export type AllStateTypes<T extends unknown> = Record<string, T>;
 
@@ -424,14 +420,36 @@ function setOptions<StateKey, Opt>({
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
 }
+export function addStateOptions<T extends unknown>(
+  initialState: T,
+  { formElements }: OptionsType<T>
+) {
+  return { initialState: initialState, formElements } as T;
+}
 
 export const createCogsState = <State extends Record<string, unknown>>(
-  initialState: State
+  initialState: State,
+  opt?: { formElements?: FormsElementsType }
 ) => {
   let newInitialState = initialState;
 
+  // Extract state parts and options using transformStateFunc
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
+
+  // Apply global formElements as defaults to each state key's options
+  if (opt?.formElements) {
+    Object.keys(initialOptionsPart).forEach((key) => {
+      // Get the existing options for this state key
+      initialOptionsPart[key] = initialOptionsPart[key] || {};
+
+      // Apply form elements with global as defaults
+      initialOptionsPart[key].formElements = {
+        ...opt.formElements, // Global defaults first
+        ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
+      };
+    });
+  }
 
   getGlobalStore.getState().setInitialStates(statePart);
   type StateKeys = keyof typeof statePart;
