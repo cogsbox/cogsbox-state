@@ -167,14 +167,15 @@ type CookieType<T> = {
 };
 export type CogsCookiesType<T extends string[] = string[]> = CookieType<ArrayToObject<T>>;
 export type ReactivityType = "none" | "component" | "deps" | "all";
+type ValidationOptionsType = {
+    key?: string;
+    zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+    onBlur?: boolean;
+};
 export type OptionsType<T extends unknown = unknown> = {
     componentId?: string;
     serverSync?: ServerSyncType<T>;
-    validation?: {
-        key?: string;
-        zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
-        onBlur?: boolean;
-    };
+    validation?: ValidationOptionsType;
     enableServerState?: boolean;
     middleware?: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
@@ -261,9 +262,10 @@ export type CogsInitialState<T> = {
 export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
-export declare function addStateOptions<T extends unknown>(initialState: T, { formElements }: OptionsType<T>): T;
+export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
 export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType;
+    validation?: ValidationOptionsType;
 }) => {
     useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
     setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;

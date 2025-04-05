@@ -273,15 +273,16 @@ export type CogsCookiesType<T extends string[] = string[]> = CookieType<
 >;
 export type ReactivityType = "none" | "component" | "deps" | "all";
 
+type ValidationOptionsType = {
+  key?: string;
+  zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+  onBlur?: boolean;
+};
+
 export type OptionsType<T extends unknown = unknown> = {
   componentId?: string;
   serverSync?: ServerSyncType<T>;
-  validation?: {
-    key?: string;
-    zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
-    onBlur?: boolean;
-  };
-
+  validation?: ValidationOptionsType;
   enableServerState?: boolean;
   middleware?: ({
     updateLog,
@@ -422,14 +423,14 @@ function setOptions<StateKey, Opt>({
 }
 export function addStateOptions<T extends unknown>(
   initialState: T,
-  { formElements }: OptionsType<T>
+  { formElements, validation }: OptionsType<T>
 ) {
-  return { initialState: initialState, formElements } as T;
+  return { initialState: initialState, formElements, validation } as T;
 }
 
 export const createCogsState = <State extends Record<string, unknown>>(
   initialState: State,
-  opt?: { formElements?: FormsElementsType }
+  opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
 ) => {
   let newInitialState = initialState;
 
@@ -438,7 +439,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     transformStateFunc<State>(newInitialState);
 
   // Apply global formElements as defaults to each state key's options
-  if (opt?.formElements) {
+  if (opt?.formElements || opt?.validation) {
     Object.keys(initialOptionsPart).forEach((key) => {
       // Get the existing options for this state key
       initialOptionsPart[key] = initialOptionsPart[key] || {};
@@ -446,6 +447,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
       // Apply form elements with global as defaults
       initialOptionsPart[key].formElements = {
         ...opt.formElements, // Global defaults first
+        ...opt?.validation,
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
     });
