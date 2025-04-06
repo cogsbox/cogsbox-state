@@ -681,7 +681,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     let newState = null;
     if (initState?.initialState) {
       newState = initState?.initialState;
-      console.log("newState", newState);
+
       if (localData) {
         if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
           newState = localData.state;
@@ -696,9 +696,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId
       );
       console.log("newState222", newState);
-      queueMicrotask(() => {
-        forceUpdate({});
-      });
+
+      forceUpdate({});
     }
   }, [localStorageKey, ...(initState?.dependencies || [])]);
 
@@ -878,10 +877,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           // Force update if "all" is specified
           if (reactiveTypes.includes("all")) {
-            queueMicrotask(() => {
-              component.forceUpdate();
-            });
-            continue;
+            console.log("reactiveTypes.includes(all) ", key);
+            component.forceUpdate();
+
             continue;
           }
 
