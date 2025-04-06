@@ -615,6 +615,7 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
 
     if (component) {
       // Force an update to ensure the current value is saved
+
       component.forceUpdate();
     }
   }
@@ -695,7 +696,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId
       );
       console.log("newState222", newState);
-      forceUpdate({});
+      queueMicrotask(() => {
+        forceUpdate({});
+      });
     }
   }, [localStorageKey, ...(initState?.dependencies || [])]);
 
@@ -875,7 +878,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           // Force update if "all" is specified
           if (reactiveTypes.includes("all")) {
-            component.forceUpdate();
+            queueMicrotask(() => {
+              component.forceUpdate();
+            });
+            continue;
             continue;
           }
 
@@ -979,7 +985,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
   };
   if (!getGlobalStore.getState().updaterState[thisKey]) {
-    console.log("Initializing state for", thisKey, stateObject); // Debug log
     setUpdaterState(
       thisKey,
       createProxyHandler(
