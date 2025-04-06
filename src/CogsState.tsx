@@ -1145,6 +1145,20 @@ function createProxyHandler<T>(
     // if (cachedEntry?.stateVersion === stateVersion) {
     //     return cachedEntry.proxy;
     // }
+    type CallableStateObject<T> = {
+      (): T;
+    } & {
+      [key: string]: any;
+    };
+
+    const baseFunction = function () {
+      return getGlobalStore().getNestedState(stateKey, path);
+    } as unknown as CallableStateObject<T>;
+
+    // Copy properties from baseObj to the function with type assertion
+    Object.keys(baseObj).forEach((key) => {
+      (baseFunction as any)[key] = (baseObj as any)[key];
+    });
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
@@ -1686,7 +1700,7 @@ function createProxyHandler<T>(
       },
     };
 
-    const proxyInstance = new Proxy(baseObj as StateObject<T>, handler);
+    const proxyInstance = new Proxy(baseFunction, handler);
 
     shapeCache.set(cacheKey, {
       proxy: proxyInstance,
