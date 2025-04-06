@@ -1147,6 +1147,10 @@ function createProxyHandler<T>(
     // }
 
     const handler = {
+      apply(target: any, thisArg: any, args: any[]) {
+        return getGlobalStore().getNestedState(stateKey, path);
+      },
+
       get(target: any, prop: string) {
         if (
           prop !== "then" &&
