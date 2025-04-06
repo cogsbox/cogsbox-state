@@ -696,7 +696,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId
       );
       console.log("newState222", newState);
-
+      notifyComponents(thisKey);
       forceUpdate({});
     }
   }, [localStorageKey, ...(initState?.dependencies || [])]);
@@ -859,10 +859,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           ? path.join(".")
           : [...path].slice(0, -1).join(".");
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-      if (stateKey == "cart") {
-        console.log("thisKey", thisKey);
-        console.log("stateEntry", stateEntry);
-      }
+
       if (stateEntry) {
         for (const [key, component] of stateEntry.components.entries()) {
           let shouldUpdate = false;
@@ -877,7 +874,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           // Force update if "all" is specified
           if (reactiveTypes.includes("all")) {
-            console.log("reactiveTypes.includes(all) ", key);
             component.forceUpdate();
 
             continue;
