@@ -25,12 +25,12 @@ function ee(r, e, n, o, t) {
   const s = a.getState().getNestedState(o, n);
   r(
     (i) => {
-      let l = !n || n.length == 0 ? i : R(i, [...n]), u = [...l];
-      return u.splice(
-        Number(t) == 0 ? t : l.length,
+      let u = !n || n.length == 0 ? i : R(i, [...n]), l = [...u];
+      return l.splice(
+        Number(t) == 0 ? t : u.length,
         0,
-        M(e) ? e(l) : e
-      ), n.length == 0 ? u : E([...n], i, u);
+        M(e) ? e(u) : e
+      ), n.length == 0 ? l : E([...n], i, l);
     },
     [
       ...n,
@@ -48,11 +48,11 @@ function te(r, e, n, o) {
       const i = R(s, [...e]);
       if (o < 0 || o >= i?.length)
         throw new Error(`Index ${o} does not exist in the array.`);
-      const l = o || Number(o) == 0 ? o : i.length - 1, u = [
-        ...i.slice(0, l),
-        ...i.slice(l + 1)
+      const u = o || Number(o) == 0 ? o : i.length - 1, l = [
+        ...i.slice(0, u),
+        ...i.slice(u + 1)
       ];
-      return console.log(o), e.length == 0 ? u : E([...e], s, u);
+      return console.log(o), e.length == 0 ? l : E([...e], s, l);
     },
     [
       ...e,
@@ -67,20 +67,23 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
   ), s = j(o), i = j(r);
   return F(() => {
     i.current = r, t(e(a.getState(), r));
-    const l = (d) => {
+    const u = (d) => {
       const g = e(d, i.current);
       n(s.current, g) || (s.current = g, t(g));
-    }, u = a.subscribe(l);
+    }, l = a.subscribe(u);
     return () => {
-      u();
+      l();
     };
   }, [r]), o;
 }, _ = (r, e, n) => {
   const o = r + "." + (e.length > 0 ? [e.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
-  return n?.length === 0 ? [] : T(
+  if (console.log("fullPath", o), n?.length === 0)
+    return [];
+  const t = T(
     o,
-    (t, s) => t.getValidationErrors(s) || []
+    (s, i) => s.getValidationErrors(i) || []
   );
+  return console.log("returnresult", t), t;
 }, q = (r, e) => {
   const n = `${r}:${e.join(".")}`;
   return T(
@@ -97,16 +100,16 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
   formOpts: o,
   stateKey: t
 }) => {
-  const [s, i] = b({}), { registerFormRef: l, getFormRef: u } = W.getState(), d = t + "." + e.join("."), g = j(null), S = u(d);
-  S || l(t + "." + e.join("."), g);
+  const [s, i] = b({}), { registerFormRef: u, getFormRef: l } = W.getState(), d = t + "." + e.join("."), g = j(null), S = l(d);
+  S || u(t + "." + e.join("."), g);
   const z = S || g, {
     getValidationErrors: I,
-    addValidationError: U,
-    getInitialOptions: A,
+    addValidationError: P,
+    getInitialOptions: U,
     removeValidationError: w
   } = a.getState(), y = H(t, e), [k, C] = b(
     a.getState().getNestedState(t, e)
-  ), m = A(t);
+  ), m = U(t);
   if (!m?.validation?.key)
     throw new Error(
       "Validation key not found. You need to set it in the options for the createCogsState function"
@@ -124,7 +127,7 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
       o?.debounceTime ?? (typeof y == "boolean" ? 20 : 200)
     );
   };
-  const J = async () => {
+  const A = async () => {
     if (m.validation?.zodSchema) {
       w(f + "." + e.join("."));
       try {
@@ -149,22 +152,22 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
   F(() => () => {
     v.current && clearTimeout(v.current);
   }, []);
-  const N = q(t, e), P = N ? {
+  const N = q(t, e), J = N ? {
     ...N,
     date: new Date(N.timeStamp)
   } : null, D = n({
     get: () => k || a.getState().getNestedState(t, e),
     set: $,
-    syncStatus: P,
+    syncStatus: J,
     path: e,
     validationErrors: () => I(f + "." + e.join(".")),
     addValidationError: (c) => {
-      w(f + "." + e.join(".")), U(f + "." + e.join("."), c ?? "");
+      w(f + "." + e.join(".")), P(f + "." + e.join("."), c ?? "");
     },
     inputProps: {
       value: k || a.getState().getNestedState(t, e) || "",
       onChange: (c) => $(c.target.value),
-      onBlur: J,
+      onBlur: A,
       ref: z
     }
   });
@@ -187,17 +190,17 @@ function L({
   children: t,
   validIndices: s
 }) {
-  const { getInitialOptions: i } = a.getState(), l = _(
+  const { getInitialOptions: i } = a.getState(), u = _(
     n,
     e,
     s
-  ), u = [];
-  if (l) {
-    const S = l.join(", ");
-    u.includes(S) || u.push(S);
+  ), l = [];
+  if (u) {
+    const S = u.join(", ");
+    l.includes(S) || l.push(S);
   }
   const d = i(o);
-  let g = d?.validation?.onBlur ? u?.length > 0 ? u?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
+  let g = d?.validation?.onBlur ? l?.length > 0 ? l?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
   return /* @__PURE__ */ V(G, { children: d?.formElements?.validation && !r?.validation?.disable ? d.formElements.validation({
     children: /* @__PURE__ */ V(B.Fragment, { children: t }, e.toString()),
     active: g != "",

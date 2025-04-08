@@ -165,15 +165,18 @@ export const useGetValidationErrors = (
     (path.length > 0 ? [path.join(".")] : []) +
     (validIndices && validIndices.length > 0 ? "." + validIndices : "");
 
+  console.log("fullPath", fullPath);
   // Skip subscription if we have empty indices
   if (validIndices?.length === 0) {
     return [];
   }
-
-  return useStoreSubscription(
+  const returnresult = useStoreSubscription(
     fullPath,
     (store, path) => store.getValidationErrors(path) || []
   );
+
+  console.log("returnresult", returnresult);
+  return returnresult;
 };
 
 export const useGetSyncInfo = (key: string, path: string[]) => {
