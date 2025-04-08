@@ -1,36 +1,38 @@
-import { o as l } from "./node_modules/@trpc/server/dist/observable-ade1bad8.js";
-import { getGlobalStore as p } from "./store.js";
+import { o as d } from "./node_modules/@trpc/server/dist/observable-ade1bad8.js";
+import { getGlobalStore as i } from "./store.js";
 const m = () => {
-  const s = p.getState().addValidationError;
-  return () => (b) => ({ next: i, op: e }) => l(
-    (n) => i(e).subscribe({
-      next(t) {
-        n.next(t);
+  const s = i.getState().addValidationError;
+  return () => (g) => ({ next: l, op: a }) => d(
+    (n) => l(a).subscribe({
+      next(o) {
+        n.next(o);
       },
-      error(t) {
-        console.log("link error1", t);
+      error(o) {
+        console.log("link error1", o);
         try {
-          const r = JSON.parse(t.message);
-          console.log("link error2", r), Array.isArray(r) ? r.forEach(
-            (o) => {
-              const a = `${e.path}.${o.path.join(".")}`;
-              s(
-                a,
-                o.message
+          const t = JSON.parse(o.message);
+          console.log("link error2", t), Array.isArray(t) ? t.forEach(
+            (r) => {
+              const e = `${a.path}.${r.path.join(".")}`;
+              console.log(
+                "Adding validation error",
+                e,
+                r.message
+              ), console.log(
+                "Current validation store before:",
+                i.getState().validationErrors
+              ), s(e, r.message), console.log(
+                "Current validation store after:",
+                i.getState().validationErrors
               );
             }
-          ) : typeof r == "object" && r !== null && Object.entries(r).forEach(
-            ([o, a]) => {
-              const c = `${e.path}.${o}`;
-              s(
-                c,
-                a
-              );
-            }
-          );
+          ) : typeof t == "object" && t !== null && Object.entries(t).forEach(([r, e]) => {
+            const c = `${a.path}.${r}`;
+            s(c, e);
+          });
         } catch {
         }
-        n.error(t);
+        n.error(o);
       },
       complete() {
         n.complete();
