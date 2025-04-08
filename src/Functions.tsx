@@ -392,7 +392,12 @@ export function ValidationWrapper({
         ? formOpts?.validation?.message
         : ""
     : "";
-
+  console.log(
+    "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+    validationErrors,
+    thisStateOpts?.formElements,
+    fullMessageString
+  );
   return (
     <>
       {thisStateOpts?.formElements?.validation &&

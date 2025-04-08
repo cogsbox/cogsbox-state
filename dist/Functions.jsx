@@ -67,8 +67,8 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
   ), s = j(o), i = j(r);
   return F(() => {
     i.current = r, t(e(a.getState(), r));
-    const u = (d) => {
-      const g = e(d, i.current);
+    const u = (v) => {
+      const g = e(v, i.current);
       n(s.current, g) || (s.current = g, t(g));
     }, l = a.subscribe(u);
     return () => {
@@ -100,47 +100,47 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
   formOpts: o,
   stateKey: t
 }) => {
-  const [s, i] = b({}), { registerFormRef: u, getFormRef: l } = W.getState(), d = t + "." + e.join("."), g = j(null), S = l(d);
-  S || u(t + "." + e.join("."), g);
-  const z = S || g, {
+  const [s, i] = b({}), { registerFormRef: u, getFormRef: l } = W.getState(), v = t + "." + e.join("."), g = j(null), m = l(v);
+  m || u(t + "." + e.join("."), g);
+  const z = m || g, {
     getValidationErrors: I,
     addValidationError: P,
     getInitialOptions: U,
     removeValidationError: w
   } = a.getState(), y = H(t, e), [k, C] = b(
     a.getState().getNestedState(t, e)
-  ), m = U(t);
-  if (!m?.validation?.key)
+  ), f = U(t);
+  if (!f?.validation?.key)
     throw new Error(
       "Validation key not found. You need to set it in the options for the createCogsState function"
     );
-  const f = m.validation.key;
-  m.validation.onBlur, F(() => {
+  const d = f.validation.key;
+  f.validation.onBlur, F(() => {
     C(y);
   }, [t, e.join("."), y]);
-  const v = j();
+  const S = j();
   let $ = (c, O) => {
-    C(c), v.current && clearTimeout(v.current), v.current = setTimeout(
+    C(c), S.current && clearTimeout(S.current), S.current = setTimeout(
       () => {
-        console.log(typeof y), Z(r, c, e, f);
+        console.log(typeof y), Z(r, c, e, d);
       },
       o?.debounceTime ?? (typeof y == "boolean" ? 20 : 200)
     );
   };
   const A = async () => {
-    if (m.validation?.zodSchema) {
-      w(f + "." + e.join("."));
+    if (f.validation?.zodSchema) {
+      w(d + "." + e.join("."));
       try {
         const c = a.getState().getNestedState(t, e);
         await Y(
-          f,
-          m.validation.zodSchema,
+          d,
+          f.validation.zodSchema,
           e,
           c
         ), console.log(
           "Validation",
           t,
-          m.validation.zodSchema,
+          f.validation.zodSchema,
           e,
           c
         ), i({});
@@ -150,7 +150,7 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
     }
   };
   F(() => () => {
-    v.current && clearTimeout(v.current);
+    S.current && clearTimeout(S.current);
   }, []);
   const N = q(t, e), J = N ? {
     ...N,
@@ -160,9 +160,9 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
     set: $,
     syncStatus: J,
     path: e,
-    validationErrors: () => I(f + "." + e.join(".")),
+    validationErrors: () => I(d + "." + e.join(".")),
     addValidationError: (c) => {
-      w(f + "." + e.join(".")), P(f + "." + e.join("."), c ?? "");
+      w(d + "." + e.join(".")), P(d + "." + e.join("."), c ?? "");
     },
     inputProps: {
       value: k || a.getState().getNestedState(t, e) || "",
@@ -176,7 +176,7 @@ const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
     {
       formOpts: o,
       path: e,
-      validationKey: f,
+      validationKey: d,
       stateKey: t,
       children: D
     }
@@ -196,12 +196,17 @@ function L({
     s
   ), l = [];
   if (u) {
-    const S = u.join(", ");
-    l.includes(S) || l.push(S);
+    const m = u.join(", ");
+    l.includes(m) || l.push(m);
   }
-  const d = i(o);
-  let g = d?.validation?.onBlur ? l?.length > 0 ? l?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
-  return /* @__PURE__ */ V(G, { children: d?.formElements?.validation && !r?.validation?.disable ? d.formElements.validation({
+  const v = i(o);
+  let g = v?.validation?.onBlur ? l?.length > 0 ? l?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
+  return console.log(
+    "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+    u,
+    v?.formElements,
+    g
+  ), /* @__PURE__ */ V(G, { children: v?.formElements?.validation && !r?.validation?.disable ? v.formElements.validation({
     children: /* @__PURE__ */ V(B.Fragment, { children: t }, e.toString()),
     active: g != "",
     message: r?.validation?.hideMessage ? "" : g,
