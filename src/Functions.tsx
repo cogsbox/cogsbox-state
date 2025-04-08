@@ -416,7 +416,7 @@ export function ValidationWrapper({
           children: (
             <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
-          active: fullMessageString != "" ? true : false,
+          active: thesMessages.length > 0 ? true : false,
           message: formOpts?.validation?.hideMessage ? "" : fullMessageString,
           path,
 

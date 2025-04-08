@@ -100,22 +100,22 @@ const b = (r, t, n = (o, e) => JSON.stringify(o) === JSON.stringify(e)) => {
   formOpts: o,
   stateKey: e
 }) => {
-  const [i, s] = T({}), { registerFormRef: u, getFormRef: l } = Y.getState(), v = e + "." + t.join("."), c = N(null), d = l(v);
-  d || u(e + "." + t.join("."), c);
-  const m = d || c, {
+  const [i, s] = T({}), { registerFormRef: u, getFormRef: l } = Y.getState(), v = e + "." + t.join("."), c = N(null), S = l(v);
+  S || u(e + "." + t.join("."), c);
+  const d = S || c, {
     getValidationErrors: F,
     addValidationError: U,
     getInitialOptions: A,
     removeValidationError: C
   } = g.getState(), y = I(e, t), [$, B] = T(
     g.getState().getNestedState(e, t)
-  ), S = A(e);
-  if (!S?.validation?.key)
+  ), m = A(e);
+  if (!m?.validation?.key)
     throw new Error(
       "Validation key not found. You need to set it in the options for the createCogsState function"
     );
-  const f = S.validation.key;
-  S.validation.onBlur, w(() => {
+  const f = m.validation.key;
+  m.validation.onBlur, w(() => {
     B(y);
   }, [e, t.join("."), y]);
   const V = N();
@@ -128,19 +128,19 @@ const b = (r, t, n = (o, e) => JSON.stringify(o) === JSON.stringify(e)) => {
     );
   };
   const J = async () => {
-    if (S.validation?.zodSchema) {
+    if (m.validation?.zodSchema) {
       C(f + "." + t.join("."));
       try {
         const a = g.getState().getNestedState(e, t);
         await Z(
           f,
-          S.validation.zodSchema,
+          m.validation.zodSchema,
           t,
           a
         ), console.log(
           "Validation",
           e,
-          S.validation.zodSchema,
+          m.validation.zodSchema,
           t,
           a
         ), s({});
@@ -168,7 +168,7 @@ const b = (r, t, n = (o, e) => JSON.stringify(o) === JSON.stringify(e)) => {
       value: $ || g.getState().getNestedState(e, t) || "",
       onChange: (a) => G(a.target.value),
       onBlur: J,
-      ref: m
+      ref: d
     }
   });
   return /* @__PURE__ */ E(P, { children: /* @__PURE__ */ E(
@@ -193,7 +193,7 @@ function L({
   const { getInitialOptions: s } = g.getState(), u = n + "." + (t.length > 0 ? [t.join(".")] : []) + (i && i.length > 0 ? "." + i : "");
   b(
     u,
-    (m, F) => m.getValidationErrors(F) || []
+    (d, F) => d.getValidationErrors(F) || []
   );
   const l = q(
     n,
@@ -201,20 +201,20 @@ function L({
     i
   ), v = [];
   if (l) {
-    const m = l.join(", ");
-    v.includes(m) || v.push(m);
+    const d = l.join(", ");
+    v.includes(d) || v.push(d);
   }
   const c = s(o);
-  let d = c?.validation?.onBlur ? v?.length > 0 ? v?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
+  let S = c?.validation?.onBlur ? v?.length > 0 ? v?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
   return console.log(
     "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
     l,
     c?.formElements,
-    d
+    S
   ), /* @__PURE__ */ E(P, { children: c?.formElements?.validation && !r?.validation?.disable ? c.formElements.validation({
     children: /* @__PURE__ */ E(M.Fragment, { children: e }, t.toString()),
-    active: d != "",
-    message: r?.validation?.hideMessage ? "" : d,
+    active: v.length > 0,
+    message: r?.validation?.hideMessage ? "" : S,
     path: t,
     ...r?.key && { key: r?.key }
   }) : /* @__PURE__ */ E(M.Fragment, { children: e }, t.toString()) });
