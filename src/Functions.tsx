@@ -404,6 +404,7 @@ export function ValidationWrapper({
     : "";
   console.log(
     "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
+    thesMessages,
     validationErrors,
     thisStateOpts?.formElements,
     fullMessageString
@@ -416,8 +417,10 @@ export function ValidationWrapper({
           children: (
             <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
-          active: thesMessages.length > 0 ? true : false,
-          message: formOpts?.validation?.hideMessage ? "" : fullMessageString,
+          active: validationErrors.length > 0 ? true : false,
+          message: formOpts?.validation?.hideMessage
+            ? ""
+            : thesMessages.map((m) => m).join(", "),
           path,
 
           ...(formOpts?.key && { key: formOpts?.key }),
