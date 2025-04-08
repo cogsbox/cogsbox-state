@@ -175,7 +175,7 @@ export const useGetValidationErrors = (
     (store, path) => store.getValidationErrors(path) || []
   );
 
-  console.log("returnresult", returnresult);
+  console.log("returnresult", returnresult); //i see this
   return returnresult;
 };
 
@@ -369,6 +369,16 @@ export function ValidationWrapper({
   validIndices?: number[];
 }) {
   const { getInitialOptions } = getGlobalStore.getState();
+  const fullPath =
+    validationKey +
+    "." +
+    (path.length > 0 ? [path.join(".")] : []) +
+    (validIndices && validIndices.length > 0 ? "." + validIndices : "");
+
+  const returnresult = useStoreSubscription(
+    fullPath,
+    (store, path) => store.getValidationErrors(path) || []
+  );
 
   const validationErrors = useGetValidationErrors(
     validationKey,

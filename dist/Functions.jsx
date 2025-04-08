@@ -1,19 +1,19 @@
-import { jsx as V, Fragment as G } from "react/jsx-runtime";
+import { jsx as E, Fragment as P } from "react/jsx-runtime";
 import "./CogsState.jsx";
-import { getNestedValue as R, isFunction as M, updateNestedProperty as E } from "./utility.js";
-import B, { useState as b, useRef as j, useEffect as F } from "react";
-import { getGlobalStore as a, formRefStore as W } from "./store.js";
-import { validateZodPathFunc as Y } from "./useValidateZodPath.js";
-function Z(r, e, n, o) {
+import { getNestedValue as k, isFunction as z, updateNestedProperty as j } from "./utility.js";
+import M, { useState as T, useRef as N, useEffect as w } from "react";
+import { getGlobalStore as g, formRefStore as Y } from "./store.js";
+import { validateZodPathFunc as Z } from "./useValidateZodPath.js";
+function _(r, t, n, o) {
   r(
-    (t) => {
-      if (M(e)) {
-        const s = e(R(t, n));
-        let i = E(n, t, s);
-        return typeof i == "string" && (i = i.trim()), i;
-      } else {
-        let s = !n || n.length == 0 ? e : E(n, t, e);
+    (e) => {
+      if (z(t)) {
+        const i = t(k(e, n));
+        let s = j(n, e, i);
         return typeof s == "string" && (s = s.trim()), s;
+      } else {
+        let i = !n || n.length == 0 ? t : j(n, e, t);
+        return typeof i == "string" && (i = i.trim()), i;
       }
     },
     n,
@@ -21,208 +21,213 @@ function Z(r, e, n, o) {
     o
   );
 }
-function ee(r, e, n, o, t) {
-  const s = a.getState().getNestedState(o, n);
+function tt(r, t, n, o, e) {
+  const i = g.getState().getNestedState(o, n);
   r(
-    (i) => {
-      let u = !n || n.length == 0 ? i : R(i, [...n]), l = [...u];
+    (s) => {
+      let u = !n || n.length == 0 ? s : k(s, [...n]), l = [...u];
       return l.splice(
-        Number(t) == 0 ? t : u.length,
+        Number(e) == 0 ? e : u.length,
         0,
-        M(e) ? e(u) : e
-      ), n.length == 0 ? l : E([...n], i, l);
+        z(t) ? t(u) : t
+      ), n.length == 0 ? l : j([...n], s, l);
     },
     [
       ...n,
-      (s.length - 1).toString()
+      (i.length - 1).toString()
     ],
     {
       updateType: "insert"
     }
   );
 }
-function te(r, e, n, o) {
-  const t = a.getState().getNestedState(n, e);
+function et(r, t, n, o) {
+  const e = g.getState().getNestedState(n, t);
   r(
-    (s) => {
-      const i = R(s, [...e]);
-      if (o < 0 || o >= i?.length)
+    (i) => {
+      const s = k(i, [...t]);
+      if (o < 0 || o >= s?.length)
         throw new Error(`Index ${o} does not exist in the array.`);
-      const u = o || Number(o) == 0 ? o : i.length - 1, l = [
-        ...i.slice(0, u),
-        ...i.slice(u + 1)
+      const u = o || Number(o) == 0 ? o : s.length - 1, l = [
+        ...s.slice(0, u),
+        ...s.slice(u + 1)
       ];
-      return console.log(o), e.length == 0 ? l : E([...e], s, l);
+      return console.log(o), t.length == 0 ? l : j([...t], i, l);
     },
     [
-      ...e,
-      o || o === 0 ? o?.toString() : (t.length - 1).toString()
+      ...t,
+      o || o === 0 ? o?.toString() : (e.length - 1).toString()
     ],
     { updateType: "cut" }
   );
 }
-const T = (r, e, n = (o, t) => JSON.stringify(o) === JSON.stringify(t)) => {
-  const [o, t] = b(
-    () => e(a.getState(), r)
-  ), s = j(o), i = j(r);
-  return F(() => {
-    i.current = r, t(e(a.getState(), r));
+const b = (r, t, n = (o, e) => JSON.stringify(o) === JSON.stringify(e)) => {
+  const [o, e] = T(
+    () => t(g.getState(), r)
+  ), i = N(o), s = N(r);
+  return w(() => {
+    s.current = r, e(t(g.getState(), r));
     const u = (v) => {
-      const g = e(v, i.current);
-      n(s.current, g) || (s.current = g, t(g));
-    }, l = a.subscribe(u);
+      const c = t(v, s.current);
+      n(i.current, c) || (i.current = c, e(c));
+    }, l = g.subscribe(u);
     return () => {
       l();
     };
   }, [r]), o;
-}, _ = (r, e, n) => {
-  const o = r + "." + (e.length > 0 ? [e.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
+}, q = (r, t, n) => {
+  const o = r + "." + (t.length > 0 ? [t.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
   if (console.log("fullPath", o), n?.length === 0)
     return [];
-  const t = T(
+  const e = b(
     o,
-    (s, i) => s.getValidationErrors(i) || []
+    (i, s) => i.getValidationErrors(s) || []
   );
-  return console.log("returnresult", t), t;
-}, q = (r, e) => {
-  const n = `${r}:${e.join(".")}`;
-  return T(
+  return console.log("returnresult", e), e;
+}, H = (r, t) => {
+  const n = `${r}:${t.join(".")}`;
+  return b(
     n,
-    (o, t) => o.getSyncInfo(t)
+    (o, e) => o.getSyncInfo(e)
   );
-}, H = (r, e) => T(
-  `${r}:${e.join(".")}`,
-  (n, o) => n.getNestedState(r, e)
-), ne = ({
+}, I = (r, t) => b(
+  `${r}:${t.join(".")}`,
+  (n, o) => n.getNestedState(r, t)
+), nt = ({
   setState: r,
-  path: e,
+  path: t,
   child: n,
   formOpts: o,
-  stateKey: t
+  stateKey: e
 }) => {
-  const [s, i] = b({}), { registerFormRef: u, getFormRef: l } = W.getState(), v = t + "." + e.join("."), g = j(null), m = l(v);
-  m || u(t + "." + e.join("."), g);
-  const z = m || g, {
-    getValidationErrors: I,
-    addValidationError: P,
-    getInitialOptions: U,
-    removeValidationError: w
-  } = a.getState(), y = H(t, e), [k, C] = b(
-    a.getState().getNestedState(t, e)
-  ), f = U(t);
-  if (!f?.validation?.key)
+  const [i, s] = T({}), { registerFormRef: u, getFormRef: l } = Y.getState(), v = e + "." + t.join("."), c = N(null), d = l(v);
+  d || u(e + "." + t.join("."), c);
+  const m = d || c, {
+    getValidationErrors: F,
+    addValidationError: U,
+    getInitialOptions: A,
+    removeValidationError: C
+  } = g.getState(), y = I(e, t), [$, B] = T(
+    g.getState().getNestedState(e, t)
+  ), S = A(e);
+  if (!S?.validation?.key)
     throw new Error(
       "Validation key not found. You need to set it in the options for the createCogsState function"
     );
-  const d = f.validation.key;
-  f.validation.onBlur, F(() => {
-    C(y);
-  }, [t, e.join("."), y]);
-  const S = j();
-  let $ = (c, O) => {
-    C(c), S.current && clearTimeout(S.current), S.current = setTimeout(
+  const f = S.validation.key;
+  S.validation.onBlur, w(() => {
+    B(y);
+  }, [e, t.join("."), y]);
+  const V = N();
+  let G = (a, O) => {
+    B(a), V.current && clearTimeout(V.current), V.current = setTimeout(
       () => {
-        console.log(typeof y), Z(r, c, e, d);
+        console.log(typeof y), _(r, a, t, f);
       },
       o?.debounceTime ?? (typeof y == "boolean" ? 20 : 200)
     );
   };
-  const A = async () => {
-    if (f.validation?.zodSchema) {
-      w(d + "." + e.join("."));
+  const J = async () => {
+    if (S.validation?.zodSchema) {
+      C(f + "." + t.join("."));
       try {
-        const c = a.getState().getNestedState(t, e);
-        await Y(
-          d,
-          f.validation.zodSchema,
-          e,
-          c
+        const a = g.getState().getNestedState(e, t);
+        await Z(
+          f,
+          S.validation.zodSchema,
+          t,
+          a
         ), console.log(
           "Validation",
-          t,
-          f.validation.zodSchema,
           e,
-          c
-        ), i({});
-      } catch (c) {
-        console.error("Validation error:", c);
+          S.validation.zodSchema,
+          t,
+          a
+        ), s({});
+      } catch (a) {
+        console.error("Validation error:", a);
       }
     }
   };
-  F(() => () => {
-    S.current && clearTimeout(S.current);
+  w(() => () => {
+    V.current && clearTimeout(V.current);
   }, []);
-  const N = q(t, e), J = N ? {
-    ...N,
-    date: new Date(N.timeStamp)
-  } : null, D = n({
-    get: () => k || a.getState().getNestedState(t, e),
-    set: $,
-    syncStatus: J,
-    path: e,
-    validationErrors: () => I(d + "." + e.join(".")),
-    addValidationError: (c) => {
-      w(d + "." + e.join(".")), P(d + "." + e.join("."), c ?? "");
+  const R = H(e, t), D = R ? {
+    ...R,
+    date: new Date(R.timeStamp)
+  } : null, W = n({
+    get: () => $ || g.getState().getNestedState(e, t),
+    set: G,
+    syncStatus: D,
+    path: t,
+    validationErrors: () => F(f + "." + t.join(".")),
+    addValidationError: (a) => {
+      C(f + "." + t.join(".")), U(f + "." + t.join("."), a ?? "");
     },
     inputProps: {
-      value: k || a.getState().getNestedState(t, e) || "",
-      onChange: (c) => $(c.target.value),
-      onBlur: A,
-      ref: z
+      value: $ || g.getState().getNestedState(e, t) || "",
+      onChange: (a) => G(a.target.value),
+      onBlur: J,
+      ref: m
     }
   });
-  return /* @__PURE__ */ V(G, { children: /* @__PURE__ */ V(
+  return /* @__PURE__ */ E(P, { children: /* @__PURE__ */ E(
     L,
     {
       formOpts: o,
-      path: e,
-      validationKey: d,
-      stateKey: t,
-      children: D
+      path: t,
+      validationKey: f,
+      stateKey: e,
+      children: W
     }
   ) });
 };
 function L({
   formOpts: r,
-  path: e,
+  path: t,
   validationKey: n,
   stateKey: o,
-  children: t,
-  validIndices: s
+  children: e,
+  validIndices: i
 }) {
-  const { getInitialOptions: i } = a.getState(), u = _(
+  const { getInitialOptions: s } = g.getState(), u = n + "." + (t.length > 0 ? [t.join(".")] : []) + (i && i.length > 0 ? "." + i : "");
+  b(
+    u,
+    (m, F) => m.getValidationErrors(F) || []
+  );
+  const l = q(
     n,
-    e,
-    s
-  ), l = [];
-  if (u) {
-    const m = u.join(", ");
-    l.includes(m) || l.push(m);
+    t,
+    i
+  ), v = [];
+  if (l) {
+    const m = l.join(", ");
+    v.includes(m) || v.push(m);
   }
-  const v = i(o);
-  let g = v?.validation?.onBlur ? l?.length > 0 ? l?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
+  const c = s(o);
+  let d = c?.validation?.onBlur ? v?.length > 0 ? v?.join(", ") : r?.validation?.message ? r?.validation?.message : "" : "";
   return console.log(
     "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
-    u,
-    v?.formElements,
-    g
-  ), /* @__PURE__ */ V(G, { children: v?.formElements?.validation && !r?.validation?.disable ? v.formElements.validation({
-    children: /* @__PURE__ */ V(B.Fragment, { children: t }, e.toString()),
-    active: g != "",
-    message: r?.validation?.hideMessage ? "" : g,
-    path: e,
+    l,
+    c?.formElements,
+    d
+  ), /* @__PURE__ */ E(P, { children: c?.formElements?.validation && !r?.validation?.disable ? c.formElements.validation({
+    children: /* @__PURE__ */ E(M.Fragment, { children: e }, t.toString()),
+    active: d != "",
+    message: r?.validation?.hideMessage ? "" : d,
+    path: t,
     ...r?.key && { key: r?.key }
-  }) : /* @__PURE__ */ V(B.Fragment, { children: t }, e.toString()) });
+  }) : /* @__PURE__ */ E(M.Fragment, { children: e }, t.toString()) });
 }
 export {
-  ne as FormControlComponent,
+  nt as FormControlComponent,
   L as ValidationWrapper,
-  te as cutFunc,
-  ee as pushFunc,
-  Z as updateFn,
-  H as useGetKeyState,
-  q as useGetSyncInfo,
-  _ as useGetValidationErrors,
-  T as useStoreSubscription
+  et as cutFunc,
+  tt as pushFunc,
+  _ as updateFn,
+  I as useGetKeyState,
+  H as useGetSyncInfo,
+  q as useGetValidationErrors,
+  b as useStoreSubscription
 };
 //# sourceMappingURL=Functions.jsx.map
