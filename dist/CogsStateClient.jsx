@@ -1,11 +1,18 @@
 "use client";
-import "react/jsx-runtime";
-import { createContext as o, useContext as t } from "react";
-const e = {
+import { jsx as n } from "react/jsx-runtime";
+import { createContext as s, useContext as i } from "react";
+const r = {
   sessionId: void 0
-}, s = o(e), c = () => t(s);
+}, o = s(r), u = () => i(o);
+function f({
+  children: t,
+  sessionId: e
+}) {
+  return /* @__PURE__ */ n(o.Provider, { value: { sessionId: e }, children: t });
+}
 export {
-  e as config,
-  c as useCogsConfig
+  f as CogsStateClient,
+  r as config,
+  u as useCogsConfig
 };
 //# sourceMappingURL=CogsStateClient.jsx.map

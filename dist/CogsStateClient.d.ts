@@ -5,7 +5,7 @@ type ConfigType = {
 };
 export declare const config: ConfigType;
 export declare const useCogsConfig: () => ConfigType;
-export default function CogsStateClient({ children, sessionId, }: {
+export declare function CogsStateClient({ children, sessionId, }: {
     children: React.ReactNode;
     sessionId?: string;
 }): import("react/jsx-runtime").JSX.Element;
