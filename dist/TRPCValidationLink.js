@@ -1,41 +1,30 @@
-import { o as d } from "./node_modules/@trpc/server/dist/observable-ade1bad8.js";
-import { getGlobalStore as i } from "./store.js";
+import { o as l } from "./node_modules/@trpc/server/dist/observable-ade1bad8.js";
+import { getGlobalStore as p } from "./store.js";
 const m = () => {
-  const s = i.getState().addValidationError;
-  return () => (g) => ({ next: l, op: a }) => d(
-    (n) => l(a).subscribe({
-      next(o) {
-        n.next(o);
+  const s = p.getState().addValidationError;
+  return () => (b) => ({ next: i, op: o }) => l(
+    (a) => i(o).subscribe({
+      next(r) {
+        a.next(r);
       },
-      error(o) {
-        console.log("link error1", o);
+      error(r) {
         try {
-          const t = JSON.parse(o.message);
-          console.log("link error2", t), Array.isArray(t) ? t.forEach(
-            (r) => {
-              const e = `${a.path}.${r.path.join(".")}`;
-              console.log(
-                "Adding validation error",
-                e,
-                r.message
-              ), console.log(
-                "Current validation store before:",
-                i.getState().validationErrors
-              ), s(e, r.message), console.log(
-                "Current validation store after:",
-                i.getState().validationErrors
-              );
+          const t = JSON.parse(r.message);
+          Array.isArray(t) ? t.forEach(
+            (e) => {
+              const n = `${o.path}.${e.path.join(".")}`;
+              s(n, e.message);
             }
-          ) : typeof t == "object" && t !== null && Object.entries(t).forEach(([r, e]) => {
-            const c = `${a.path}.${r}`;
-            s(c, e);
+          ) : typeof t == "object" && t !== null && Object.entries(t).forEach(([e, n]) => {
+            const c = `${o.path}.${e}`;
+            s(c, n);
           });
         } catch {
         }
-        n.error(o);
+        a.error(r);
       },
       complete() {
-        n.complete();
+        a.complete();
       }
     })
   );

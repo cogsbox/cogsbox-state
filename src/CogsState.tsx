@@ -695,7 +695,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
-      console.log("newState222", newState);
+
       notifyComponents(thisKey);
       forceUpdate({});
     }
@@ -1580,10 +1580,6 @@ function createProxyHandler<T>(
 
                     // Add the error to the store
                     addValidationError(fullErrorPath, errorMessage);
-
-                    console.log(
-                      `Validation error at ${fullErrorPath}: ${errorMessage}`
-                    );
                   });
 
                   notifyComponents(stateKey);
@@ -1747,7 +1743,7 @@ function SignalMapRenderer({
   ) => any;
 }) {
   const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
-  console.log("value", value);
+
   if (!Array.isArray(value)) {
     return null;
   }

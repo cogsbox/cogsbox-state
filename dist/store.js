@@ -1,5 +1,5 @@
 import { create as d } from "./node_modules/zustand/esm/react.js";
-const v = d((o, i) => ({
+const m = d((o, i) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, r) => o((t) => {
     const n = new Map(t.formRefs);
@@ -17,7 +17,7 @@ const v = d((o, i) => ({
       (a.startsWith(t) || a === e) && n.set(a, s);
     }), n;
   }
-})), m = d((o, i) => ({
+})), v = d((o, i) => ({
   stateComponents: /* @__PURE__ */ new Map(),
   subscribe: (e) => i().subscribe(e),
   reactiveDeps: {},
@@ -113,7 +113,7 @@ const v = d((o, i) => ({
     }));
   },
   addValidationError: (e, r) => {
-    console.log(r), o((t) => {
+    o((t) => {
       const n = new Map(t.validationErrors), s = n.get(e) || [];
       return n.set(e, [...s, r]), { validationErrors: n };
     });
@@ -121,7 +121,6 @@ const v = d((o, i) => ({
   removeValidationError: (e) => {
     o((r) => {
       const t = new Map(r.validationErrors);
-      console.log("updatedErrors", t);
       let n = !1;
       const s = e.split(".");
       return Array.from(t.keys()).forEach((a) => {
@@ -236,7 +235,7 @@ const v = d((o, i) => ({
   getSyncInfo: (e) => i().syncInfoStore.get(e) || null
 }));
 export {
-  v as formRefStore,
-  m as getGlobalStore
+  m as formRefStore,
+  v as getGlobalStore
 };
 //# sourceMappingURL=store.js.map

@@ -18,30 +18,16 @@ export const useCogsTrpcValidationLink = <TRouter extends AnyRouter>() => {
                 observer.next(value);
               },
               error(err: TRPCClientError<TRouter>) {
-                console.log("link error1", err);
                 try {
                   const errorObject = JSON.parse(err.message);
-                  console.log("link error2", errorObject);
 
                   if (Array.isArray(errorObject)) {
                     errorObject.forEach(
                       (error: { path: string[]; message: string }) => {
                         const fullpath = `${op.path}.${error.path.join(".")}`;
                         // In your TRPC link
-                        console.log(
-                          "Adding validation error",
-                          fullpath,
-                          error.message
-                        );
-                        console.log(
-                          "Current validation store before:",
-                          getGlobalStore.getState().validationErrors
-                        );
+
                         addValidationError(fullpath, error.message);
-                        console.log(
-                          "Current validation store after:",
-                          getGlobalStore.getState().validationErrors
-                        );
                       }
                     );
                   } else if (

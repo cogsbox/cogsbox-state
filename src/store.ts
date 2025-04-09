@@ -313,7 +313,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }));
   },
   addValidationError: (path, message) => {
-    console.log(message);
     set((prev) => {
       const updatedErrors = new Map(prev.validationErrors);
       const existingMessages = updatedErrors.get(path) || [];
@@ -325,7 +324,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   removeValidationError: (path) => {
     set((prev) => {
       const updatedErrors = new Map(prev.validationErrors);
-      console.log("updatedErrors", updatedErrors);
+
       let doSomething = false;
       const pathArray = path.split(".");
       Array.from(updatedErrors.keys()).forEach((key) => {

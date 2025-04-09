@@ -106,7 +106,6 @@ export function cutFunc<U>(
         ...arrayToUpdate.slice(indexToCut + 1),
       ] as U;
 
-      console.log(index);
       return path.length == 0
         ? updatedArray
         : updateNestedProperty([...path], prevState, updatedArray);
@@ -165,7 +164,6 @@ export const useGetValidationErrors = (
     (path.length > 0 ? [path.join(".")] : []) +
     (validIndices && validIndices.length > 0 ? "." + validIndices : "");
 
-  console.log("fullPath", fullPath);
   // Skip subscription if we have empty indices
   if (validIndices?.length === 0) {
     return [];
@@ -175,7 +173,6 @@ export const useGetValidationErrors = (
     (store, path) => store.getValidationErrors(path) || []
   );
 
-  console.log("returnresult", returnresult); //i see this
   return returnresult;
 };
 
@@ -260,7 +257,6 @@ export const FormControlComponent = <TStateObject,>({
 
     timeoutRef.current = setTimeout(
       () => {
-        console.log(typeof stateValue);
         updateFn(setState, payload, path, validationKey);
       },
       formOpts?.debounceTime ?? (typeof stateValue == "boolean" ? 20 : 200)
@@ -284,13 +280,7 @@ export const FormControlComponent = <TStateObject,>({
         path,
         fieldValue
       );
-      console.log(
-        "Validation",
-        stateKey,
-        initialOptions.validation.zodSchema,
-        path,
-        fieldValue
-      );
+
       forceUpdate({});
     } catch (error) {
       console.error("Validation error:", error);
@@ -402,13 +392,7 @@ export function ValidationWrapper({
         ? formOpts?.validation?.message
         : ""
     : "";
-  console.log(
-    "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv",
-    thesMessages,
-    validationErrors,
-    thisStateOpts?.formElements,
-    fullMessageString
-  );
+
   return (
     <>
       {thisStateOpts?.formElements?.validation &&

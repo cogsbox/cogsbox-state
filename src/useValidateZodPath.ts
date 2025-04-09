@@ -203,7 +203,7 @@ export async function validateZodPathFunc<T extends ZodRawShape, U>(
     const messages = result.error.issues
       .map((issue) => issue.message)
       .join(", ");
-    console.log("validateZodPathFunc", path.join("."), messages);
+
     const fullErrorPath = [validationKey, ...path].join(".");
     addValidationError(fullErrorPath, messages);
     return { success: false, message: messages };
