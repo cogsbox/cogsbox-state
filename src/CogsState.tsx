@@ -1433,9 +1433,11 @@ function createProxyHandler<T>(
               // ADDED: Clear cache for filter operation
               shapeCache.clear();
               stateVersion++;
+
+              // Always include validIndices, even if it's an empty array
               return rebuildStateShape(filteredArray as any, path, {
                 filtered: [...(meta?.filtered || []), path],
-                validIndices, // Pass through the meta
+                validIndices: validIndices, // Always pass validIndices, even if empty
               });
             };
           }

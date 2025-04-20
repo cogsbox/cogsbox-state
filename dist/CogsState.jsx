@@ -510,7 +510,7 @@ function H(t, i, f, g) {
               return d.clear(), E++, w(c, e, {
                 filtered: [...I?.filtered || [], e],
                 validIndices: o
-                // Pass through the meta
+                // Always pass validIndices, even if empty
               });
             };
         }
