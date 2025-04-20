@@ -157,17 +157,12 @@ export const useGetValidationErrors = (
   path: string[],
   validIndices?: number[]
 ) => {
-  // Construct the full path the same way as ValidationWrapper
   const fullPath =
     validationKey +
     "." +
     (path.length > 0 ? [path.join(".")] : []) +
     (validIndices && validIndices.length > 0 ? "." + validIndices : "");
 
-  // Skip subscription if we have empty indices
-  if (validIndices?.length === 0) {
-    return [];
-  }
   const returnresult = useStoreSubscription(
     fullPath,
     (store, path) => store.getValidationErrors(path) || []
@@ -359,21 +354,13 @@ export function ValidationWrapper({
   validIndices?: number[];
 }) {
   const { getInitialOptions } = getGlobalStore.getState();
-  const fullPath =
-    validationKey +
-    "." +
-    (path.length > 0 ? [path.join(".")] : []) +
-    (validIndices && validIndices.length > 0 ? "." + validIndices : "");
 
-  const returnresult = useStoreSubscription(
-    fullPath,
-    (store, path) => store.getValidationErrors(path) || []
-  );
-
+  // Always pass an empty array if validIndices is undefined
+  // This ensures the hook is called consistently
   const validationErrors = useGetValidationErrors(
     validationKey,
     path,
-    validIndices
+    validIndices || []
   );
 
   const thesMessages: string[] = [];
@@ -385,13 +372,6 @@ export function ValidationWrapper({
     }
   }
   const thisStateOpts = getInitialOptions(stateKey!);
-  let fullMessageString = thisStateOpts?.validation?.onBlur
-    ? thesMessages?.length > 0
-      ? thesMessages?.join(", ")
-      : formOpts?.validation?.message
-        ? formOpts?.validation?.message
-        : ""
-    : "";
 
   return (
     <>
