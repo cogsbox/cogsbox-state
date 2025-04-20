@@ -379,18 +379,21 @@ export function ValidationWrapper({
       !formOpts?.validation?.disable ? (
         thisStateOpts.formElements!.validation!({
           children: (
-            <React.Fragment key={path.toString()}>{children}</React.Fragment>
+            <React.Fragment key={`validation-${path.toString()}`}>
+              {children}
+            </React.Fragment>
           ),
           active: validationErrors.length > 0 ? true : false,
           message: formOpts?.validation?.hideMessage
             ? ""
             : thesMessages.map((m) => m).join(", "),
           path,
-
-          ...(formOpts?.key && { key: formOpts?.key }),
+          key: formOpts?.key || `validation-wrapper-${path.join("-")}`, // Always provide a key
         })
       ) : (
-        <React.Fragment key={path.toString()}>{children}</React.Fragment>
+        <React.Fragment key={`no-validation-${path.toString()}`}>
+          {children}
+        </React.Fragment>
       )}
     </>
   );
