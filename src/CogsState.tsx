@@ -387,7 +387,10 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     getGlobalStore.getState().setInitialStateOptions;
 
   const initialOptions = getInitialOptions(stateKey as string) || {};
-
+  if (newOptions.log) {
+    console.log("setAndMergeOptions", stateKey, newOptions);
+    console.log("setAndMergeOptions oldValue", initialOptions);
+  }
   setInitialStateOptions(stateKey as string, {
     ...initialOptions,
     ...newOptions,
@@ -678,6 +681,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
+  if (latestInitialOptionsRef.current.log) {
+    console.log(
+      "latestInitialOptionsRef.current ",
+      latestInitialOptionsRef.current
+    );
+    console.log("latestInitialOptionsRef.current localStorage", localStorage);
+  }
 
   useEffect(() => {
     const newOptions = setAndMergeOptions(thisKey as string, {
