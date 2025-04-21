@@ -420,27 +420,11 @@ function setOptions<StateKey, Opt>({
       if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
 
-        console.log(
-          "setOptions needToAdd",
-          key,
-          options[key as keyof typeof options]
-        );
-
         mergedOptions[key] = options[key as keyof typeof options];
       } else {
-        console.log(
-          "----------------------------------------",
-          key,
-          options[key as keyof typeof options]
-        );
-        if (key == "localStorage" && mergedOptions[key]) {
-          console.log(
-            "localStorage needToAdd",
-            key,
-            options[key as keyof typeof options]
-          );
+        if (key == "localStorage" && mergedOptions[key] !== options[key]) {
           needToAdd = true;
-          mergedOptions[key] = options[key as keyof typeof options];
+          mergedOptions[key] = options[key];
         }
       }
     }
@@ -495,15 +479,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
       options,
       initialOptionsPart,
     });
-    if (options && Object.keys(options).length > 0) {
-      console.log(
-        "useCogsState",
-        stateKey,
-        options,
-        initialOptionsPart,
-        merged
-      );
-    }
+
     const thiState =
       getGlobalStore.getState().cogsStateStore[stateKey as string] ||
       statePart[stateKey as string];
