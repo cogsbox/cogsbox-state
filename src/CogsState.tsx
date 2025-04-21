@@ -428,6 +428,11 @@ function setOptions<StateKey, Opt>({
 
         mergedOptions[key] = options[key as keyof typeof options];
       } else {
+        console.log(
+          "----------------------------------------",
+          key,
+          options[key as keyof typeof options]
+        );
         if (key == "localStorage" && mergedOptions[key]) {
           console.log(
             "localStorage needToAdd",
