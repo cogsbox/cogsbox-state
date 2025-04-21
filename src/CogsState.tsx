@@ -433,6 +433,8 @@ function setOptions<StateKey, Opt>({
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
+
+  return mergedOptions;
 }
 export function addStateOptions<T extends unknown>(
   initialState: T,
@@ -473,21 +475,19 @@ export const createCogsState = <State extends Record<string, unknown>>(
     options?: OptionsType<(typeof statePart)[StateKey]>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-    setOptions({
+    const merged = setOptions({
       stateKey,
       options,
       initialOptionsPart,
     });
-
+    console.log("useCogsState", stateKey, options, initialOptionsPart, merged);
     const thiState =
       getGlobalStore.getState().cogsStateStore[stateKey as string] ||
       statePart[stateKey as string];
     const partialState = options?.modifyState
       ? options.modifyState(thiState)
       : thiState;
-    if (options?.log) {
-      console.log("useCogsState", stateKey, options);
-    }
+
     const [state, updater] = useCogsStateFn<(typeof statePart)[StateKey]>(
       partialState,
       {
@@ -685,13 +685,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
-  if (latestInitialOptionsRef.current.log) {
-    console.log(
-      "latestInitialOptionsRef.current ",
-      latestInitialOptionsRef.current
-    );
-    console.log("latestInitialOptionsRef.current localStorage", localStorage);
-  }
 
   useEffect(() => {
     setAndMergeOptions(thisKey as string, {
