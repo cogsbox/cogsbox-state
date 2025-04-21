@@ -1,18 +1,18 @@
-import { jsx as V, Fragment as I } from "react/jsx-runtime";
+import { jsx as v, Fragment as I } from "react/jsx-runtime";
 import "./CogsState.jsx";
-import { getNestedValue as F, isFunction as B, updateNestedProperty as v } from "./utility.js";
+import { getNestedValue as F, isFunction as B, updateNestedProperty as V } from "./utility.js";
 import G, { useState as N, useRef as y, useEffect as b } from "react";
-import { getGlobalStore as l, formRefStore as D } from "./store.js";
-import { validateZodPathFunc as W } from "./useValidateZodPath.js";
-function Y(o, t, n, r) {
+import { getGlobalStore as l, formRefStore as W } from "./store.js";
+import { validateZodPathFunc as Y } from "./useValidateZodPath.js";
+function Z(o, t, n, r) {
   o(
     (e) => {
       if (B(t)) {
         const s = t(F(e, n));
-        let i = v(n, e, s);
+        let i = V(n, e, s);
         return typeof i == "string" && (i = i.trim()), i;
       } else {
-        let s = !n || n.length == 0 ? t : v(n, e, t);
+        let s = !n || n.length == 0 ? t : V(n, e, t);
         return typeof s == "string" && (s = s.trim()), s;
       }
     },
@@ -30,7 +30,7 @@ function tt(o, t, n, r, e) {
         Number(e) == 0 ? e : u.length,
         0,
         B(t) ? t(u) : t
-      ), n.length == 0 ? c : v([...n], i, c);
+      ), n.length == 0 ? c : V([...n], i, c);
     },
     [
       ...n,
@@ -52,7 +52,7 @@ function et(o, t, n, r) {
         ...i.slice(0, u),
         ...i.slice(u + 1)
       ];
-      return t.length == 0 ? c : v([...t], s, c);
+      return t.length == 0 ? c : V([...t], s, c);
     },
     [
       ...t,
@@ -75,19 +75,19 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
       c();
     };
   }, [o]), r;
-}, Z = (o, t, n) => {
+}, _ = (o, t, n) => {
   const r = o + "." + (t.length > 0 ? [t.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
   return R(
     r,
     (s, i) => s.getValidationErrors(i) || []
   );
-}, _ = (o, t) => {
+}, q = (o, t) => {
   const n = `${o}:${t.join(".")}`;
   return R(
     n,
     (r, e) => r.getSyncInfo(e)
   );
-}, q = (o, t) => R(
+}, H = (o, t) => R(
   `${o}:${t.join(".")}`,
   (n, r) => n.getNestedState(o, t)
 ), nt = ({
@@ -97,14 +97,14 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
   formOpts: r,
   stateKey: e
 }) => {
-  const [s, i] = N({}), { registerFormRef: u, getFormRef: c } = D.getState(), d = e + "." + t.join("."), a = y(null), T = c(d);
+  const [s, i] = N({}), { registerFormRef: u, getFormRef: c } = W.getState(), d = e + "." + t.join("."), a = y(null), T = c(d);
   T || u(e + "." + t.join("."), a);
   const M = T || a, {
     getValidationErrors: U,
     addValidationError: z,
     getInitialOptions: A,
     removeValidationError: w
-  } = l.getState(), E = q(e, t), [k, C] = N(
+  } = l.getState(), E = H(e, t), [k, C] = N(
     l.getState().getNestedState(e, t)
   ), m = A(e);
   if (!m?.validation?.key)
@@ -116,10 +116,10 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
     C(E);
   }, [e, t.join("."), E]);
   const S = y();
-  let $ = (g, L) => {
+  let $ = (g, O) => {
     C(g), S.current && clearTimeout(S.current), S.current = setTimeout(
       () => {
-        Y(o, g, t, f);
+        Z(o, g, t, f);
       },
       r?.debounceTime ?? (typeof E == "boolean" ? 20 : 200)
     );
@@ -129,7 +129,7 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
       w(f + "." + t.join("."));
       try {
         const g = l.getState().getNestedState(e, t);
-        await W(
+        await Y(
           f,
           m.validation.zodSchema,
           t,
@@ -143,13 +143,13 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
   b(() => () => {
     S.current && clearTimeout(S.current);
   }, []);
-  const j = _(e, t), O = j ? {
+  const j = q(e, t), P = j ? {
     ...j,
     date: new Date(j.timeStamp)
-  } : null, P = n({
+  } : null, D = n({
     get: () => k || l.getState().getNestedState(e, t),
     set: $,
-    syncStatus: O,
+    syncStatus: P,
     path: t,
     validationErrors: () => U(f + "." + t.join(".")),
     addValidationError: (g) => {
@@ -162,18 +162,18 @@ const R = (o, t, n = (r, e) => JSON.stringify(r) === JSON.stringify(e)) => {
       ref: M
     }
   });
-  return /* @__PURE__ */ V(I, { children: /* @__PURE__ */ V(
-    H,
+  return /* @__PURE__ */ v(I, { children: /* @__PURE__ */ v(
+    L,
     {
       formOpts: r,
       path: t,
       validationKey: f,
       stateKey: e,
-      children: P
+      children: D
     }
   ) });
 };
-function H({
+function L({
   formOpts: o,
   path: t,
   validationKey: n,
@@ -181,7 +181,7 @@ function H({
   children: e,
   validIndices: s
 }) {
-  const { getInitialOptions: i } = l.getState(), u = Z(
+  const { getInitialOptions: i } = l.getState(), u = _(
     n,
     t,
     s
@@ -191,23 +191,23 @@ function H({
     c.includes(a) || c.push(a);
   }
   const d = i(r);
-  return /* @__PURE__ */ V(I, { children: d?.formElements?.validation && !o?.validation?.disable ? d.formElements.validation({
-    children: /* @__PURE__ */ V(G.Fragment, { children: e }, t.toString()),
+  return /* @__PURE__ */ v(I, { children: d?.formElements?.validation && !o?.validation?.disable ? d.formElements.validation({
+    children: /* @__PURE__ */ v(G.Fragment, { children: e }, t.toString()),
     active: u.length > 0,
-    message: o?.validation?.hideMessage ? "" : c.map((a) => a).join(", "),
+    message: o?.validation?.hideMessage ? "" : o?.validation?.message ? o?.validation?.message : c.map((a) => a).join(", "),
     path: t,
     ...o?.key && { key: o?.key }
-  }) : /* @__PURE__ */ V(G.Fragment, { children: e }, t.toString()) });
+  }) : /* @__PURE__ */ v(G.Fragment, { children: e }, t.toString()) });
 }
 export {
   nt as FormControlComponent,
-  H as ValidationWrapper,
+  L as ValidationWrapper,
   et as cutFunc,
   tt as pushFunc,
-  Y as updateFn,
-  q as useGetKeyState,
-  _ as useGetSyncInfo,
-  Z as useGetValidationErrors,
+  Z as updateFn,
+  H as useGetKeyState,
+  q as useGetSyncInfo,
+  _ as useGetValidationErrors,
   R as useStoreSubscription
 };
 //# sourceMappingURL=Functions.jsx.map

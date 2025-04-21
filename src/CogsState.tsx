@@ -418,15 +418,13 @@ function setOptions<StateKey, Opt>({
 
   let needToAdd = false;
   if (options) {
-    // Simply merge all provided options, overwriting any existing values
-    Object.keys(options).forEach((key) => {
-      const optionValue = options[key as keyof typeof options];
-      // Only update if the value is actually different
-      if (mergedOptions[key] !== optionValue) {
-        mergedOptions[key] = optionValue;
+    for (const key in options) {
+      // Only add the option if it doesn't already exist in mergedOptions
+      if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
+        mergedOptions[key] = options[key as keyof typeof options];
       }
-    });
+    }
   }
 
   if (needToAdd) {

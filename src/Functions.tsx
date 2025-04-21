@@ -382,8 +382,10 @@ export function ValidationWrapper({
           active: validationErrors.length > 0 ? true : false,
           message: formOpts?.validation?.hideMessage
             ? ""
-            : thesMessages.map((m) => m).join(", "),
-          path,
+            : formOpts?.validation?.message
+              ? formOpts?.validation?.message
+              : thesMessages.map((m) => m).join(", "),
+          path: path,
 
           ...(formOpts?.key && { key: formOpts?.key }),
         })
