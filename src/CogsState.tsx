@@ -409,25 +409,30 @@ function setOptions<StateKey, Opt>({
 }: {
   stateKey: StateKey;
   options?: Opt;
-  initialOptionsPart: Record<string, any>;
+  initialOptionsPart?: Record<string, any>;
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
-  const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
-  const setInitialStateOptions =
-    getGlobalStore.getState().setInitialStateOptions;
+  const initialOptionsPartState =
+    initialOptionsPart?.[stateKey as string] || {};
   const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
 
   let needToAdd = false;
   if (options) {
-    for (const key in options) {
-      if (!mergedOptions.hasOwnProperty(key)) {
+    // Simply merge all provided options, overwriting any existing values
+    Object.keys(options).forEach((key) => {
+      const optionValue = options[key as keyof typeof options];
+      // Only update if the value is actually different
+      if (mergedOptions[key] !== optionValue) {
+        mergedOptions[key] = optionValue;
         needToAdd = true;
-        mergedOptions[key] = options[key as keyof typeof options];
       }
-    }
+    });
   }
+
   if (needToAdd) {
-    setInitialStateOptions(stateKey as string, mergedOptions);
+    getGlobalStore
+      .getState()
+      .setInitialStateOptions(stateKey as string, mergedOptions);
   }
 }
 export function addStateOptions<T extends unknown>(
@@ -472,7 +477,6 @@ export const createCogsState = <State extends Record<string, unknown>>(
     setOptions({
       stateKey,
       options,
-      initialOptionsPart,
     });
 
     const thiState =
