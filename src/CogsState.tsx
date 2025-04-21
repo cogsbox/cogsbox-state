@@ -405,7 +405,7 @@ function setOptions<StateKey, Opt>({
   initialOptionsPart,
 }: {
   stateKey: StateKey;
-  options?: Opt;
+  options?: OptionsType<any>;
   initialOptionsPart: Record<string, any>;
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
@@ -419,6 +419,13 @@ function setOptions<StateKey, Opt>({
     for (const key in options) {
       if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
+        if (options.log || mergedOptions.log) {
+          console.log(
+            "setOptions needToAdd",
+            key,
+            options[key as keyof typeof options]
+          );
+        }
         mergedOptions[key] = options[key as keyof typeof options];
       }
     }
@@ -687,19 +694,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }
 
   useEffect(() => {
-    const newOptions = setAndMergeOptions(thisKey as string, {
+    setAndMergeOptions(thisKey as string, {
       initState,
-      localStorage,
     });
-    latestInitialOptionsRef.current = newOptions;
+    const options = latestInitialOptionsRef.current;
     let localData = null;
-    if (newOptions.log) {
-      console.log("newoptions", newOptions);
+    if (options.log) {
+      console.log("newoptions", options);
     }
 
-    if (newOptions.localStorage?.key && sessionId) {
+    if (options.localStorage?.key && sessionId) {
       localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + newOptions.localStorage?.key
+        sessionId + "-" + thisKey + "-" + options.localStorage?.key
       );
     }
 
@@ -724,7 +730,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
       forceUpdate({});
     }
-  }, [localStorage?.key, ...(initState?.dependencies || [])]);
+  }, [...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
