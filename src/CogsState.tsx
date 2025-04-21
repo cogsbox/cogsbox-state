@@ -538,8 +538,7 @@ const saveToLocalStorage = <T,>(
   currentInitialOptions: any,
   sessionId?: string
 ) => {
-  console.log("saveToLocalStorage", state, thisKey, currentInitialOptions);
-  if (currentInitialOptions.localStorage?.key) {
+  if (currentInitialOptions.localStorage?.key && sessionId) {
     const data: LocalStorageData<T> = {
       state,
       lastUpdated: Date.now(),
@@ -548,9 +547,7 @@ const saveToLocalStorage = <T,>(
       baseServerState: getGlobalStore.getState().serverState[thisKey],
     };
 
-    const storageKey = currentInitialOptions.initState
-      ? `${sessionId}-${thisKey}-${currentInitialOptions.localStorage?.key}`
-      : thisKey;
+    const storageKey = `${sessionId}-${thisKey}-${currentInitialOptions.localStorage?.key}`;
 
     window.localStorage.setItem(storageKey, JSON.stringify(data));
   }
