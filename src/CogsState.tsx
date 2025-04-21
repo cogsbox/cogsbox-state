@@ -484,7 +484,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
       options,
       initialOptionsPart,
     });
-    if (options) {
+    if (options && Object.keys(options).length > 0) {
       console.log(
         "useCogsState",
         stateKey,

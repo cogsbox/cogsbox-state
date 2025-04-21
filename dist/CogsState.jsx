@@ -54,7 +54,7 @@ const qt = (t, a) => {
       options: u,
       initialOptionsPart: s
     });
-    u && console.log(
+    u && Object.keys(u).length > 0 && console.log(
       "useCogsState",
       y,
       u,
@@ -220,19 +220,19 @@ function jt(t, {
       P.current.add(m);
     }
     x(l, (m) => {
-      const E = ft(n) ? n(m) : n, M = `${l}-${r.join(".")}`;
-      if (M) {
-        let b = !1, I = o.getState().signalDomElements.get(M);
+      const E = ft(n) ? n(m) : n, O = `${l}-${r.join(".")}`;
+      if (O) {
+        let M = !1, I = o.getState().signalDomElements.get(O);
         if ((!I || I.size === 0) && (d.updateType === "insert" || d.updateType === "cut")) {
           const h = r.slice(0, -1), C = L(E, h);
           if (Array.isArray(C)) {
-            b = !0;
+            M = !0;
             const N = `${l}-${h.join(".")}`;
             I = o.getState().signalDomElements.get(N);
           }
         }
         if (I) {
-          const h = b ? L(E, r.slice(0, -1)) : L(E, r);
+          const h = M ? L(E, r.slice(0, -1)) : L(E, r);
           I.forEach(({ parentId: C, position: N, effect: D }) => {
             const T = document.querySelector(
               `[data-parent-id="${C}"]`
@@ -262,9 +262,9 @@ function jt(t, {
           k(I), At(N, h);
         }
       });
-      const O = L(m, r), j = L(E, r), W = d.updateType === "update" ? r.join(".") : [...r].slice(0, -1).join("."), rt = o.getState().stateComponents.get(l);
+      const b = L(m, r), j = L(E, r), W = d.updateType === "update" ? r.join(".") : [...r].slice(0, -1).join("."), rt = o.getState().stateComponents.get(l);
       if (rt)
-        for (const [b, I] of rt.components.entries()) {
+        for (const [M, I] of rt.components.entries()) {
           let h = !1;
           const C = Array.isArray(I.reactiveType) ? I.reactiveType : [I.reactiveType || "component"];
           if (!C.includes("none")) {
@@ -285,11 +285,11 @@ function jt(t, {
         path: r,
         updateType: d.updateType,
         status: "new",
-        oldValue: O,
+        oldValue: b,
         newValue: j
       };
-      if (ht(l, (b) => {
-        const h = [...b ?? [], ot].reduce((C, N) => {
+      if (ht(l, (M) => {
+        const h = [...M ?? [], ot].reduce((C, N) => {
           const D = `${N.stateKey}:${JSON.stringify(N.path)}`, T = C.get(D);
           return T ? (T.timeStamp = Math.max(T.timeStamp, N.timeStamp), T.newValue = N.newValue, T.oldValue = T.oldValue ?? N.oldValue, T.updateType = N.updateType) : C.set(D, { ...N }), C;
         }, /* @__PURE__ */ new Map());
@@ -303,10 +303,10 @@ function jt(t, {
         updateLog: U,
         update: ot
       }), $.current?.serverSync) {
-        const b = o.getState().serverState[l], I = $.current?.serverSync;
+        const M = o.getState().serverState[l], I = $.current?.serverSync;
         Ct(l, {
           syncKey: typeof I.syncKey == "string" ? I.syncKey : I.syncKey({ state: E }),
-          rollBackState: b,
+          rollBackState: M,
           actionTimeStamp: Date.now() + (I.debounce ?? 3e3),
           status: "waiting"
         });
@@ -432,14 +432,14 @@ function Z(t, a, f, g) {
                 (S) => S.join(".") === e.join(".")
               ), d = r ? c : o.getState().getNestedState(t, e);
               return i !== "stateMapNoRender" && (s.clear(), p++), d.map((S, m) => {
-                const E = r && S.__origIndex ? S.__origIndex : m, M = w(
+                const E = r && S.__origIndex ? S.__origIndex : m, O = w(
                   S,
                   [...e, E.toString()],
                   v
                 );
                 return n(
                   S,
-                  M,
+                  O,
                   m,
                   c,
                   w(c, e, v)
@@ -447,7 +447,7 @@ function Z(t, a, f, g) {
               });
             };
           if (i === "$stateMap")
-            return (n) => H(Mt, {
+            return (n) => H(Ot, {
               proxy: {
                 _stateKey: t,
                 _path: e,
@@ -501,15 +501,15 @@ function Z(t, a, f, g) {
                   );
                   return j && (E = A), j;
                 }
-                const O = G(A, m);
-                return O && (E = A), O;
+                const b = G(A, m);
+                return b && (E = A), b;
               }))
                 _(e), st(a, m, e, t);
               else if (d && E) {
-                const A = d(E), O = S.map(
+                const A = d(E), b = S.map(
                   (j) => G(j, E) ? A : j
                 );
-                _(e), q(a, O, e);
+                _(e), q(a, b, e);
               }
             };
           if (i === "cut")
@@ -594,9 +594,9 @@ function Z(t, a, f, g) {
                   E && E.startsWith(n.key) && k(E);
                 });
                 const m = n.zodSchema.safeParse(d);
-                return m.success ? !0 : (m.error.errors.forEach((M) => {
-                  const A = M.path, O = M.message, j = [n.key, ...A].join(".");
-                  r(j, O);
+                return m.success ? !0 : (m.error.errors.forEach((O) => {
+                  const A = O.path, b = O.message, j = [n.key, ...A].join(".");
+                  r(j, b);
                 }), mt(t), !1);
               } catch (S) {
                 return console.error("Zod schema validation failed", S), !1;
@@ -678,9 +678,9 @@ function Z(t, a, f, g) {
   );
 }
 function X(t) {
-  return H(Ot, { proxy: t });
+  return H(bt, { proxy: t });
 }
-function Mt({
+function Ot({
   proxy: t,
   rebuildStateShape: a
 }) {
@@ -692,7 +692,7 @@ function Mt({
     (s, p, _, y, u) => t._mapFn(s, p, _, y, u)
   ) : null;
 }
-function Ot({
+function bt({
   proxy: t
 }) {
   const a = z(null), f = `${t._stateKey}-${t._path.join(".")}`;
