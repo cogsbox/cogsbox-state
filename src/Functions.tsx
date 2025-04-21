@@ -355,12 +355,10 @@ export function ValidationWrapper({
 }) {
   const { getInitialOptions } = getGlobalStore.getState();
 
-  // Always pass an empty array if validIndices is undefined
-  // This ensures the hook is called consistently
   const validationErrors = useGetValidationErrors(
     validationKey,
     path,
-    validIndices || []
+    validIndices
   );
 
   const thesMessages: string[] = [];
@@ -379,21 +377,18 @@ export function ValidationWrapper({
       !formOpts?.validation?.disable ? (
         thisStateOpts.formElements!.validation!({
           children: (
-            <React.Fragment key={`validation-${path.toString()}`}>
-              {children}
-            </React.Fragment>
+            <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
           active: validationErrors.length > 0 ? true : false,
           message: formOpts?.validation?.hideMessage
             ? ""
             : thesMessages.map((m) => m).join(", "),
           path,
-          key: formOpts?.key || `validation-wrapper-${path.join("-")}`, // Always provide a key
+
+          ...(formOpts?.key && { key: formOpts?.key }),
         })
       ) : (
-        <React.Fragment key={`no-validation-${path.toString()}`}>
-          {children}
-        </React.Fragment>
+        <React.Fragment key={path.toString()}>{children}</React.Fragment>
       )}
     </>
   );

@@ -538,6 +538,7 @@ const saveToLocalStorage = <T,>(
   currentInitialOptions: any,
   sessionId?: string
 ) => {
+  console.log("saveToLocalStorage", state, thisKey, currentInitialOptions);
   if (currentInitialOptions.localStorageKey) {
     const data: LocalStorageData<T> = {
       state,
