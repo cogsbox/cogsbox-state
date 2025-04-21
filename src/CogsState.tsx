@@ -670,9 +670,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
       initState,
     });
     let localData = null;
-    if (localStorageKey) {
+    if (latestInitialOptionsRef.current?.localStorage?.key) {
       localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + localStorageKey
+        sessionId +
+          "-" +
+          thisKey +
+          "-" +
+          latestInitialOptionsRef.current?.localStorage?.key
       );
     }
     let newState = null;
