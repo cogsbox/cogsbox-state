@@ -414,23 +414,24 @@ function setOptions<StateKey, Opt>({
   const initialOptions = getInitialOptions(stateKey as string) || {};
   const initialOptionsPartState =
     initialOptionsPart?.[stateKey as string] || {};
+  const setInitialStateOptions =
+    getGlobalStore.getState().setInitialStateOptions;
   const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
-
+  if (mergedOptions.log || initialOptions.log) {
+    console.log("setOptions mergedOptions", mergedOptions);
+    console.log("setOptions initialOptions", initialOptions);
+  }
   let needToAdd = false;
   if (options) {
     for (const key in options) {
-      // Only add the option if it doesn't already exist in mergedOptions
       if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
         mergedOptions[key] = options[key as keyof typeof options];
       }
     }
   }
-
   if (needToAdd) {
-    getGlobalStore
-      .getState()
-      .setInitialStateOptions(stateKey as string, mergedOptions);
+    setInitialStateOptions(stateKey as string, mergedOptions);
   }
 }
 export function addStateOptions<T extends unknown>(
@@ -695,7 +696,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const newOptions = setAndMergeOptions(thisKey as string, {
       initState,
     });
-
+    latestInitialOptionsRef.current = newOptions;
     let localData = null;
     if (newOptions.log) {
       console.log("newoptions", newOptions);
