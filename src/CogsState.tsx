@@ -387,7 +387,7 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     getGlobalStore.getState().setInitialStateOptions;
 
   const initialOptions = getInitialOptions(stateKey as string) || {};
-
+  console.log("setAndMergeOptions", stateKey, initialOptions, newOptions);
   setInitialStateOptions(stateKey as string, {
     ...initialOptions,
     ...newOptions,
@@ -419,13 +419,13 @@ function setOptions<StateKey, Opt>({
     for (const key in options) {
       if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
-        if (options.log || mergedOptions.log) {
-          console.log(
-            "setOptions needToAdd",
-            key,
-            options[key as keyof typeof options]
-          );
-        }
+
+        console.log(
+          "setOptions needToAdd",
+          key,
+          options[key as keyof typeof options]
+        );
+
         mergedOptions[key] = options[key as keyof typeof options];
       }
     }
