@@ -173,6 +173,7 @@ type ValidationOptionsType = {
     onBlur?: boolean;
 };
 export type OptionsType<T extends unknown = unknown> = {
+    log?: boolean;
     componentId?: string;
     serverSync?: ServerSyncType<T>;
     validation?: ValidationOptionsType;

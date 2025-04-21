@@ -280,6 +280,7 @@ type ValidationOptionsType = {
 };
 
 export type OptionsType<T extends unknown = unknown> = {
+  log?: boolean;
   componentId?: string;
   serverSync?: ServerSyncType<T>;
   validation?: ValidationOptionsType;
@@ -391,6 +392,11 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...initialOptions,
     ...newOptions,
   });
+
+  return {
+    ...initialOptions,
+    ...newOptions,
+  };
 }
 
 function setOptions<StateKey, Opt>({
@@ -536,6 +542,14 @@ const saveToLocalStorage = <T,>(
   currentInitialOptions: any,
   sessionId?: string
 ) => {
+  if (currentInitialOptions.log) {
+    console.log(
+      "saving to localstorage",
+      thisKey,
+      currentInitialOptions.localStorage?.key,
+      sessionId
+    );
+  }
   if (currentInitialOptions.localStorage?.key && sessionId) {
     const data: LocalStorageData<T> = {
       state,
@@ -664,20 +678,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    setAndMergeOptions(thisKey as string, {
+    const newOptions = setAndMergeOptions(thisKey as string, {
       initState,
       localStorage,
     });
 
     let localData = null;
+    if (newOptions.log) {
+      console.log("newoptions", newOptions);
+    }
 
-    const currentKey = latestInitialOptionsRef.current?.localStorage?.key;
-    const passedKey = localStorage?.key;
-    const keyToUse = currentKey !== passedKey ? passedKey : currentKey;
-
-    if (keyToUse) {
+    if (newOptions.localStorage?.key && sessionId) {
       localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + keyToUse
+        sessionId + "-" + thisKey + "-" + newOptions.localStorage?.key
       );
     }
 
