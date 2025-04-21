@@ -666,17 +666,21 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useEffect(() => {
     setAndMergeOptions(thisKey as string, {
       initState,
+      localStorage,
     });
+
     let localData = null;
-    if (latestInitialOptionsRef.current?.localStorage?.key) {
+
+    const currentKey = latestInitialOptionsRef.current?.localStorage?.key;
+    const passedKey = localStorage?.key;
+    const keyToUse = currentKey !== passedKey ? passedKey : currentKey;
+
+    if (keyToUse) {
       localData = loadFromLocalStorage(
-        sessionId +
-          "-" +
-          thisKey +
-          "-" +
-          latestInitialOptionsRef.current?.localStorage?.key
+        sessionId + "-" + thisKey + "-" + keyToUse
       );
     }
+
     let newState = null;
     if (initState?.initialState) {
       newState = initState?.initialState;
