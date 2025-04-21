@@ -387,10 +387,7 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     getGlobalStore.getState().setInitialStateOptions;
 
   const initialOptions = getInitialOptions(stateKey as string) || {};
-  if (newOptions.log) {
-    console.log("setAndMergeOptions", stateKey, newOptions);
-    console.log("setAndMergeOptions oldValue", initialOptions);
-  }
+
   setInitialStateOptions(stateKey as string, {
     ...initialOptions,
     ...newOptions,
@@ -409,18 +406,14 @@ function setOptions<StateKey, Opt>({
 }: {
   stateKey: StateKey;
   options?: Opt;
-  initialOptionsPart?: Record<string, any>;
+  initialOptionsPart: Record<string, any>;
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
-  const initialOptionsPartState =
-    initialOptionsPart?.[stateKey as string] || {};
+  const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
   const setInitialStateOptions =
     getGlobalStore.getState().setInitialStateOptions;
   const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
-  if (mergedOptions.log || initialOptions.log) {
-    console.log("setOptions mergedOptions", mergedOptions);
-    console.log("setOptions initialOptions", initialOptions);
-  }
+
   let needToAdd = false;
   if (options) {
     for (const key in options) {
@@ -476,6 +469,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     setOptions({
       stateKey,
       options,
+      initialOptionsPart,
     });
 
     const thiState =
@@ -695,6 +689,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useEffect(() => {
     const newOptions = setAndMergeOptions(thisKey as string, {
       initState,
+      localStorage,
     });
     latestInitialOptionsRef.current = newOptions;
     let localData = null;
@@ -729,7 +724,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
       forceUpdate({});
     }
-  }, [...(initState?.dependencies || [])]);
+  }, [localStorage?.key, ...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
