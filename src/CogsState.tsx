@@ -299,7 +299,7 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
-  localStorageKey?: string;
+
   initState?: {
     ctx?: Record<string, any>;
     initialState: T;
@@ -485,7 +485,6 @@ export const createCogsState = <State extends Record<string, unknown>>(
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
         initState: options?.initState,
-        localStorageKey: options?.localStorageKey,
       }
     );
 
@@ -629,7 +628,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     reactiveDeps,
     reactiveType,
     componentId,
-    localStorageKey,
     initState,
     syncUpdate,
   }: {
@@ -700,7 +698,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
       forceUpdate({});
     }
-  }, [localStorageKey, ...(initState?.dependencies || [])]);
+  }, [localStorage?.key, ...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
@@ -1080,14 +1078,14 @@ function createProxyHandler<T>(
           });
         }
         const initalOptionsGet = getInitialOptions(stateKey as string);
-        if (initalOptionsGet?.localStorageKey) {
+        if (initalOptionsGet?.localStorage?.key) {
           localStorage.removeItem(
             initalOptionsGet?.initState
               ? sessionId +
                   "-" +
                   stateKey +
                   "-" +
-                  initalOptionsGet?.localStorageKey
+                  initalOptionsGet?.localStorage?.key
               : stateKey
           );
         }
