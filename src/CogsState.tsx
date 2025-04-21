@@ -392,11 +392,6 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...initialOptions,
     ...newOptions,
   });
-
-  return {
-    ...initialOptions,
-    ...newOptions,
-  };
 }
 
 function setOptions<StateKey, Opt>({
@@ -422,7 +417,11 @@ function setOptions<StateKey, Opt>({
 
         mergedOptions[key] = options[key as keyof typeof options];
       } else {
-        if (key == "localStorage" && mergedOptions[key] !== options[key]) {
+        if (
+          key == "localStorage" &&
+          options[key] &&
+          mergedOptions[key].key !== options[key]?.key
+        ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
         }
@@ -432,8 +431,6 @@ function setOptions<StateKey, Opt>({
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
-
-  return mergedOptions;
 }
 export function addStateOptions<T extends unknown>(
   initialState: T,
@@ -474,7 +471,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     options?: OptionsType<(typeof statePart)[StateKey]>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-    const merged = setOptions({
+    setOptions({
       stateKey,
       options,
       initialOptionsPart,
