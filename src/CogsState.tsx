@@ -444,7 +444,6 @@ export const createCogsState = <State extends Record<string, unknown>>(
       // Get the existing options for this state key
       initialOptionsPart[key] = initialOptionsPart[key] || {};
 
-      // Apply form elements with global as defaults
       initialOptionsPart[key].formElements = {
         ...opt.formElements, // Global defaults first
         ...opt?.validation,
