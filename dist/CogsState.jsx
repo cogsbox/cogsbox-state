@@ -9,7 +9,7 @@ import { useCogsConfig as Vt } from "./CogsStateClient.jsx";
 import tt from "./node_modules/uuid/dist/esm-browser/v4.js";
 function dt(t, o) {
   const u = a.getState().getInitialOptions, g = a.getState().setInitialStateOptions, d = u(t) || {};
-  console.log("setAndMergeOptions", t, d, o), g(t, {
+  g(t, {
     ...d,
     ...o
   });
@@ -77,7 +77,7 @@ const qt = (t, o) => {
   setStateLog: ht,
   updateInitialStateGlobal: nt,
   addValidationError: At,
-  removeValidationError: b,
+  removeValidationError: k,
   setServerSyncActions: Ct
 } = a.getState(), St = (t) => {
   if (!t) return null;
@@ -147,7 +147,7 @@ function jt(t, {
   syncUpdate: s
 } = {}) {
   const [e, I] = Y({}), { sessionId: V } = Vt();
-  let k = !o;
+  let M = !o;
   const [c] = Y(o ?? tt()), U = a.getState().stateLog[c], P = z(/* @__PURE__ */ new Set()), i = z(f ?? tt()), $ = z(null);
   $.current = et(c), K(() => {
     if (s && s.stateKey === c && s.path?.[0]) {
@@ -180,7 +180,7 @@ function jt(t, {
       V
     ), mt(c), I({}));
   }, [...w?.dependencies || []]), vt(() => {
-    k && dt(c, {
+    M && dt(c, {
       serverSync: u,
       formElements: d,
       initState: w,
@@ -209,17 +209,17 @@ function jt(t, {
     x(c, (m) => {
       const E = ft(n) ? n(m) : n, j = `${c}-${r.join(".")}`;
       if (j) {
-        let O = !1, v = a.getState().signalDomElements.get(j);
+        let b = !1, v = a.getState().signalDomElements.get(j);
         if ((!v || v.size === 0) && (l.updateType === "insert" || l.updateType === "cut")) {
           const h = r.slice(0, -1), C = L(E, h);
           if (Array.isArray(C)) {
-            O = !0;
+            b = !0;
             const N = `${c}-${h.join(".")}`;
             v = a.getState().signalDomElements.get(N);
           }
         }
         if (v) {
-          const h = O ? L(E, r.slice(0, -1)) : L(E, r);
+          const h = b ? L(E, r.slice(0, -1)) : L(E, r);
           v.forEach(({ parentId: C, position: N, effect: D }) => {
             const T = document.querySelector(
               `[data-parent-id="${C}"]`
@@ -234,11 +234,11 @@ function jt(t, {
           });
         }
       }
-      l.updateType === "update" && (S || $.current?.validationKey) && r && b(
+      l.updateType === "update" && (S || $.current?.validationKey) && r && k(
         (S || $.current?.validationKey) + "." + r.join(".")
       );
       const A = r.slice(0, r.length - 1);
-      l.updateType === "cut" && $.current?.validationKey && b(
+      l.updateType === "cut" && $.current?.validationKey && k(
         $.current?.validationKey + "." + A.join(".")
       ), l.updateType === "insert" && $.current?.validationKey && $t(
         $.current?.validationKey + "." + A.join(".")
@@ -246,12 +246,12 @@ function jt(t, {
         let C = v?.split(".").length;
         if (v == A.join(".") && C == A.length - 1) {
           let N = v + "." + A;
-          b(v), At(N, h);
+          k(v), At(N, h);
         }
       });
-      const M = L(m, r), F = L(E, r), W = l.updateType === "update" ? r.join(".") : [...r].slice(0, -1).join("."), rt = a.getState().stateComponents.get(c);
+      const O = L(m, r), F = L(E, r), W = l.updateType === "update" ? r.join(".") : [...r].slice(0, -1).join("."), rt = a.getState().stateComponents.get(c);
       if (rt)
-        for (const [O, v] of rt.components.entries()) {
+        for (const [b, v] of rt.components.entries()) {
           let h = !1;
           const C = Array.isArray(v.reactiveType) ? v.reactiveType : [v.reactiveType || "component"];
           if (!C.includes("none")) {
@@ -272,11 +272,11 @@ function jt(t, {
         path: r,
         updateType: l.updateType,
         status: "new",
-        oldValue: M,
+        oldValue: O,
         newValue: F
       };
-      if (ht(c, (O) => {
-        const h = [...O ?? [], at].reduce((C, N) => {
+      if (ht(c, (b) => {
+        const h = [...b ?? [], at].reduce((C, N) => {
           const D = `${N.stateKey}:${JSON.stringify(N.path)}`, T = C.get(D);
           return T ? (T.timeStamp = Math.max(T.timeStamp, N.timeStamp), T.newValue = N.newValue, T.oldValue = T.oldValue ?? N.oldValue, T.updateType = N.updateType) : C.set(D, { ...N }), C;
         }, /* @__PURE__ */ new Map());
@@ -290,10 +290,10 @@ function jt(t, {
         updateLog: U,
         update: at
       }), $.current?.serverSync) {
-        const O = a.getState().serverState[c], v = $.current?.serverSync;
+        const b = a.getState().serverState[c], v = $.current?.serverSync;
         Ct(c, {
           syncKey: typeof v.syncKey == "string" ? v.syncKey : v.syncKey({ state: E }),
-          rollBackState: O,
+          rollBackState: b,
           actionTimeStamp: Date.now() + (v.debounce ?? 3e3),
           status: "waiting"
         });
@@ -328,18 +328,18 @@ function Z(t, o, u, g) {
     _++;
   }, y = /* @__PURE__ */ new Map(), f = {
     removeValidation: (s) => {
-      s?.validationKey && b(s.validationKey);
+      s?.validationKey && k(s.validationKey);
     },
     revertToInitialState: (s) => {
       const e = a.getState().getInitialOptions(t)?.validation;
-      e?.key && b(e?.key), s?.validationKey && b(s.validationKey);
+      e?.key && k(e?.key), s?.validationKey && k(s.validationKey);
       const I = a.getState().initialStateGlobal[t];
       d.clear(), _++;
       const V = w(I, []);
       J(() => {
         B(t, V), x(t, I);
-        const k = a.getState().stateComponents.get(t);
-        k && k.components.forEach((U) => {
+        const M = a.getState().stateComponents.get(t);
+        M && M.components.forEach((U) => {
           U.forceUpdate();
         });
         const c = et(t);
@@ -377,15 +377,15 @@ function Z(t, o, u, g) {
   function w(s, e = [], I) {
     const V = e.map(String).join(".");
     d.get(V);
-    const k = function() {
-      return a().getNestedState(t, e);
+    const M = function() {
+      return a.getState().getNestedState(t, e);
     };
     Object.keys(f).forEach((P) => {
-      k[P] = f[P];
+      M[P] = f[P];
     });
     const c = {
       apply(P, i, $) {
-        return a().getNestedState(t, e);
+        return a.getState().getNestedState(t, e);
       },
       get(P, i) {
         if (i !== "then" && !i.startsWith("$") && i !== "stateMapNoRender") {
@@ -434,7 +434,7 @@ function Z(t, o, u, g) {
               });
             };
           if (i === "$stateMap")
-            return (n) => H(Mt, {
+            return (n) => H(Ot, {
               proxy: {
                 _stateKey: t,
                 _path: e,
@@ -488,15 +488,15 @@ function Z(t, o, u, g) {
                   );
                   return F && (E = A), F;
                 }
-                const M = G(A, m);
-                return M && (E = A), M;
+                const O = G(A, m);
+                return O && (E = A), O;
               }))
                 p(e), st(o, m, e, t);
               else if (l && E) {
-                const A = l(E), M = S.map(
+                const A = l(E), O = S.map(
                   (F) => G(F, E) ? A : F
                 );
-                p(e), q(o, M, e);
+                p(e), q(o, O, e);
               }
             };
           if (i === "cut")
@@ -573,17 +573,17 @@ function Z(t, o, u, g) {
                 throw new Error("Zod schema not found");
               if (!n?.key)
                 throw new Error("Validation key not found");
-              b(n.key);
+              k(n.key);
               const l = a.getState().cogsStateStore[t];
               try {
                 const S = a.getState().getValidationErrors(n.key);
                 S && S.length > 0 && S.forEach(([E]) => {
-                  E && E.startsWith(n.key) && b(E);
+                  E && E.startsWith(n.key) && k(E);
                 });
                 const m = n.zodSchema.safeParse(l);
                 return m.success ? !0 : (m.error.errors.forEach((j) => {
-                  const A = j.path, M = j.message, F = [n.key, ...A].join(".");
-                  r(F, M);
+                  const A = j.path, O = j.message, F = [n.key, ...A].join(".");
+                  r(F, O);
                 }), mt(t), !1);
               } catch (S) {
                 return console.error("Zod schema validation failed", S), !1;
@@ -654,7 +654,7 @@ function Z(t, o, u, g) {
         const R = [...e, i], Q = a.getState().getNestedState(t, R);
         return w(Q, R, I);
       }
-    }, U = new Proxy(k, c);
+    }, U = new Proxy(M, c);
     return d.set(V, {
       proxy: U,
       stateVersion: _
@@ -665,9 +665,9 @@ function Z(t, o, u, g) {
   );
 }
 function X(t) {
-  return H(Ot, { proxy: t });
+  return H(bt, { proxy: t });
 }
-function Mt({
+function Ot({
   proxy: t,
   rebuildStateShape: o
 }) {
@@ -679,7 +679,7 @@ function Mt({
     (d, _, p, y, f) => t._mapFn(d, _, p, y, f)
   ) : null;
 }
-function Ot({
+function bt({
   proxy: t
 }) {
   const o = z(null), u = `${t._stateKey}-${t._path.join(".")}`;

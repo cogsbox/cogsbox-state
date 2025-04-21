@@ -387,7 +387,7 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     getGlobalStore.getState().setInitialStateOptions;
 
   const initialOptions = getInitialOptions(stateKey as string) || {};
-  console.log("setAndMergeOptions", stateKey, initialOptions, newOptions);
+
   setInitialStateOptions(stateKey as string, {
     ...initialOptions,
     ...newOptions,
@@ -1172,7 +1172,7 @@ function createProxyHandler<T>(
     };
 
     const baseFunction = function () {
-      return getGlobalStore().getNestedState(stateKey, path);
+      return getGlobalStore.getState().getNestedState(stateKey, path);
     } as unknown as CallableStateObject<T>;
 
     // Copy properties from baseObj to the function with type assertion
@@ -1182,7 +1182,7 @@ function createProxyHandler<T>(
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
-        return getGlobalStore().getNestedState(stateKey, path);
+        return getGlobalStore.getState().getNestedState(stateKey, path);
       },
 
       get(target: any, prop: string) {
