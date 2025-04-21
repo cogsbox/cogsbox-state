@@ -378,14 +378,14 @@ function Z(t, o, u, g) {
     const V = e.map(String).join(".");
     d.get(V);
     const M = function() {
-      return a.getState().getNestedState(t, e);
+      return a().getNestedState(t, e);
     };
     Object.keys(f).forEach((P) => {
       M[P] = f[P];
     });
     const c = {
       apply(P, i, $) {
-        return a.getState().getNestedState(t, e);
+        return a().getNestedState(t, e);
       },
       get(P, i) {
         if (i !== "then" && !i.startsWith("$") && i !== "stateMapNoRender") {
