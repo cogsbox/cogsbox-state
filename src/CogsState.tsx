@@ -696,9 +696,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useEffect(() => {
     const newOptions = setAndMergeOptions(thisKey as string, {
       initState,
-      localStorage,
     });
-    latestInitialOptionsRef.current = newOptions;
+
     let localData = null;
     if (newOptions.log) {
       console.log("newoptions", newOptions);
@@ -731,7 +730,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
       forceUpdate({});
     }
-  }, [localStorage?.key, ...(initState?.dependencies || [])]);
+  }, [...(initState?.dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
