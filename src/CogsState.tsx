@@ -427,6 +427,10 @@ function setOptions<StateKey, Opt>({
         );
 
         mergedOptions[key] = options[key as keyof typeof options];
+      } else {
+        if (key == "localStorage" && mergedOptions[key]) {
+          mergedOptions[key] = options[key as keyof typeof options];
+        }
       }
     }
   }
@@ -480,7 +484,15 @@ export const createCogsState = <State extends Record<string, unknown>>(
       options,
       initialOptionsPart,
     });
-    console.log("useCogsState", stateKey, options, initialOptionsPart, merged);
+    if (options) {
+      console.log(
+        "useCogsState",
+        stateKey,
+        options,
+        initialOptionsPart,
+        merged
+      );
+    }
     const thiState =
       getGlobalStore.getState().cogsStateStore[stateKey as string] ||
       statePart[stateKey as string];
