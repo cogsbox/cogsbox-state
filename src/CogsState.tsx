@@ -478,7 +478,9 @@ export const createCogsState = <State extends Record<string, unknown>>(
     const partialState = options?.modifyState
       ? options.modifyState(thiState)
       : thiState;
-
+    if (options?.log) {
+      console.log("useCogsState", stateKey, options);
+    }
     const [state, updater] = useCogsStateFn<(typeof statePart)[StateKey]>(
       partialState,
       {
@@ -682,7 +684,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       initState,
       localStorage,
     });
-
+    latestInitialOptionsRef.current = newOptions;
     let localData = null;
     if (newOptions.log) {
       console.log("newoptions", newOptions);
