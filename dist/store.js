@@ -1,5 +1,5 @@
-import { create as d } from "./node_modules/zustand/esm/react.js";
-const v = d((o, i) => ({
+import { create as u } from "./node_modules/zustand/esm/react.js";
+const v = u((o, i) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, r) => o((t) => {
     const n = new Map(t.formRefs);
@@ -13,11 +13,11 @@ const v = d((o, i) => ({
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
     const r = i().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
-    return r.forEach((s, a) => {
-      (a.startsWith(t) || a === e) && n.set(a, s);
+    return r.forEach((a, s) => {
+      (s.startsWith(t) || s === e) && n.set(s, a);
     }), n;
   }
-})), m = d((o, i) => ({
+})), m = u((o, i) => ({
   stateComponents: /* @__PURE__ */ new Map(),
   subscribe: (e) => i().subscribe(e),
   reactiveDeps: {},
@@ -43,8 +43,8 @@ const v = d((o, i) => ({
   },
   removeSignalElement: (e, r) => {
     const t = i().signalDomElements, n = t.get(e);
-    n && n.forEach((s) => {
-      s.instanceId === r && n.delete(s);
+    n && n.forEach((a) => {
+      a.instanceId === r && n.delete(a);
     }), o({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
@@ -87,11 +87,11 @@ const v = d((o, i) => ({
   },
   setStateLog: (e, r) => {
     o((t) => {
-      const n = t.stateLog[e] ?? [], s = r(n);
+      const n = t.stateLog[e] ?? [], a = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: s
+          [e]: a
         }
       };
     });
@@ -113,55 +113,55 @@ const v = d((o, i) => ({
     }));
   },
   addValidationError: (e, r) => {
-    o((t) => {
-      const n = new Map(t.validationErrors), s = n.get(e) || [];
-      return console.log("addValidationError", e, r, s), n.set(e, [...s, r]), { validationErrors: n };
+    console.log("addValidationError---"), o((t) => {
+      const n = new Map(t.validationErrors), a = n.get(e) || [];
+      return console.log("addValidationError", e, r, a), n.set(e, [...a, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
     o((r) => {
       const t = new Map(r.validationErrors);
       let n = !1;
-      const s = e.split(".");
-      return Array.from(t.keys()).forEach((a) => {
-        const c = a.split(".");
-        if (c.length >= s.length) {
+      const a = e.split(".");
+      return Array.from(t.keys()).forEach((s) => {
+        const c = s.split(".");
+        if (c.length >= a.length) {
           let f = !0;
-          for (let l = 0; l < s.length; l++)
-            if (c[l] !== s[l]) {
+          for (let l = 0; l < a.length; l++)
+            if (c[l] !== a[l]) {
               f = !1;
               break;
             }
-          f && (n = !0, t.delete(a));
+          f && (n = !0, t.delete(s));
         }
       }), n ? { validationErrors: t } : r;
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = i().validationErrors, n = e.split("."), s = (a, c) => a === "[*]" ? !0 : Array.isArray(a) ? a.includes(parseInt(c)) : a === c;
-    return Array.from(t.keys()).forEach((a) => {
-      const c = a.split(".");
+    const r = [], t = i().validationErrors, n = e.split("."), a = (s, c) => s === "[*]" ? !0 : Array.isArray(s) ? s.includes(parseInt(c)) : s === c;
+    return Array.from(t.keys()).forEach((s) => {
+      const c = s.split(".");
       if (c.length >= n.length) {
         let f = !0;
         for (let l = 0; l < n.length; l++) {
-          const S = n[l], u = c[l];
+          const S = n[l], d = c[l];
           if (S === "[*]" || Array.isArray(S)) {
-            const g = parseInt(u);
+            const g = parseInt(d);
             if (isNaN(g)) {
               f = !1;
               break;
             }
-            if (!s(S, u)) {
+            if (!a(S, d)) {
               f = !1;
               break;
             }
-          } else if (S !== u) {
+          } else if (S !== d) {
             f = !1;
             break;
           }
         }
         if (f) {
-          const l = t.get(a);
+          const l = t.get(s);
           l && r.push(...l);
         }
       }
@@ -169,21 +169,21 @@ const v = d((o, i) => ({
   },
   getInitialOptions: (e) => i().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = i().cogsStateStore[e], n = (s, a) => {
-      if (a.length === 0) return s;
-      const c = a[0], f = a.slice(1);
+    const t = i().cogsStateStore[e], n = (a, s) => {
+      if (s.length === 0) return a;
+      const c = s[0], f = s.slice(1);
       if (c === "[*]") {
-        if (!Array.isArray(s)) {
+        if (!Array.isArray(a)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (f.length === 0) return s;
-        const S = s.map(
-          (u) => n(u, f)
+        if (f.length === 0) return a;
+        const S = a.map(
+          (d) => n(d, f)
         );
         return Array.isArray(S[0]) ? S.flat() : S;
       }
-      const l = s[c];
+      const l = a[c];
       if (l !== void 0)
         return n(l, f);
     };

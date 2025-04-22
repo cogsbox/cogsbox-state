@@ -313,6 +313,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }));
   },
   addValidationError: (path, message) => {
+    console.log("addValidationError---");
     set((prev) => {
       const updatedErrors = new Map(prev.validationErrors);
       const existingMessages = updatedErrors.get(path) || [];
