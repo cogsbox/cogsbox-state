@@ -15,7 +15,6 @@ import {
   debounce,
   getNestedValue,
   isFunction,
-  updateNestedProperty,
   type GenericObject,
 } from "./utility.js";
 import {
@@ -28,7 +27,7 @@ import {
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { v4 as uuidv4 } from "uuid";
-import { boolean, ZodArray, ZodObject, type ZodRawShape } from "zod";
+import { ZodArray, ZodObject, type ZodRawShape } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";

@@ -21,10 +21,9 @@ const SyncTest = () => {
   });
 
   const user = useCogsState("testUser", {
-    initState: {
-      initialState: state ?? initialUserState,
-      dependencies: [state],
-    },
+    initialState: state ?? initialUserState,
+    dependencies: [state],
+
     validation: { key: "userValidation" },
     middleware: ({ update }) => {
       console.log("update", update);
