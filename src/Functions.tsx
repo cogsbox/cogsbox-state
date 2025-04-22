@@ -360,7 +360,12 @@ export function ValidationWrapper({
     path,
     validIndices
   );
-
+  console.log(
+    "validationErrors ValidationWrapper",
+    stateKey,
+    path,
+    validationErrors
+  );
   const thesMessages: string[] = [];
 
   if (validationErrors) {

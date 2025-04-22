@@ -1,5 +1,5 @@
 import { create as d } from "./node_modules/zustand/esm/react.js";
-const m = d((o, i) => ({
+const v = d((o, i) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, r) => o((t) => {
     const n = new Map(t.formRefs);
@@ -17,7 +17,7 @@ const m = d((o, i) => ({
       (a.startsWith(t) || a === e) && n.set(a, s);
     }), n;
   }
-})), v = d((o, i) => ({
+})), m = d((o, i) => ({
   stateComponents: /* @__PURE__ */ new Map(),
   subscribe: (e) => i().subscribe(e),
   reactiveDeps: {},
@@ -115,7 +115,7 @@ const m = d((o, i) => ({
   addValidationError: (e, r) => {
     o((t) => {
       const n = new Map(t.validationErrors), s = n.get(e) || [];
-      return n.set(e, [...s, r]), { validationErrors: n };
+      return console.log("addValidationError", e, r, s), n.set(e, [...s, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
@@ -235,7 +235,7 @@ const m = d((o, i) => ({
   getSyncInfo: (e) => i().syncInfoStore.get(e) || null
 }));
 export {
-  m as formRefStore,
-  v as getGlobalStore
+  v as formRefStore,
+  m as getGlobalStore
 };
 //# sourceMappingURL=store.js.map
