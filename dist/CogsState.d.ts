@@ -128,7 +128,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     _serverState: T;
     revertToInitialState: (obj?: {
         validationKey?: string;
-    }) => void;
+    }) => T;
     middleware: (middles: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;

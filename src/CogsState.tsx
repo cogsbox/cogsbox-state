@@ -217,7 +217,7 @@ export type StateObject<T> = (T extends any[]
     };
     _isLoading: boolean;
     _serverState: T;
-    revertToInitialState: (obj?: { validationKey?: string }) => void;
+    revertToInitialState: (obj?: { validationKey?: string }) => T;
     middleware: (
       middles: ({
         updateLog,
@@ -1110,6 +1110,8 @@ function createProxyHandler<T>(
           localStorage.removeItem(localKey);
         }
       });
+
+      return initialState;
     },
     updateInitialState: (newState: T) => {
       // ADDED: Clear cache on initial state update
