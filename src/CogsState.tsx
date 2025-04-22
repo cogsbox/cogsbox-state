@@ -301,11 +301,8 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
 
-  initState?: {
-    ctx?: Record<string, any>;
-    initialState: T;
-    dependencies?: any[]; // Just like useEffect dependencies
-  };
+  initialState?: T;
+  dependencies?: any[]; // Just like useEffect dependencies
 };
 export type ServerSyncType<T> = {
   testKey?: string;
@@ -495,7 +492,8 @@ export const createCogsState = <State extends Record<string, unknown>>(
         enabledSync: options?.enabledSync,
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
-        initState: options?.initState,
+        initialState: options?.initialState,
+        dependencies: options?.dependencies,
       }
     );
 
@@ -650,8 +648,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
     reactiveDeps,
     reactiveType,
     componentId,
-    initState,
+    initialState,
     syncUpdate,
+    dependencies,
   }: {
     stateKey?: string;
     componentId?: string;
@@ -687,7 +686,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   useEffect(() => {
     setAndMergeOptions(thisKey as string, {
-      initState,
+      initialState,
     });
     const options = latestInitialOptionsRef.current;
     let localData = null;
@@ -695,7 +694,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       console.log("newoptions", options);
     }
     const localkey = isFunction(options.localStorage?.key)
-      ? options.localStorage?.key(initState)
+      ? options.localStorage?.key(initialState)
       : options.localStorage?.key;
 
     if (localkey && sessionId) {
@@ -705,8 +704,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
 
     let newState = null;
-    if (initState?.initialState) {
-      newState = initState?.initialState;
+    if (initialState) {
+      newState = initialState;
 
       if (localData) {
         if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
@@ -715,7 +714,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       updateGlobalState(
         thisKey,
-        initState?.initialState,
+        initialState,
         newState,
         effectiveSetState,
         componentIdRef.current,
@@ -725,14 +724,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
       forceUpdate({});
     }
-  }, [...(initState?.dependencies || [])]);
+  }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
         serverSync,
         formElements,
-        initState,
+        initialState,
         localStorage,
         middleware,
       });
@@ -1105,18 +1104,12 @@ function createProxyHandler<T>(
           });
         }
         const initalOptionsGet = getInitialOptions(stateKey as string);
-        if (initalOptionsGet?.localStorage?.key) {
-          localStorage.removeItem(
-            initalOptionsGet?.initState
-              ? sessionId +
-                  "-" +
-                  stateKey +
-                  "-" +
-                  initalOptionsGet?.localStorage?.key
-              : stateKey
-          );
+        const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+          ? initalOptionsGet?.localStorage?.key(initialState)
+          : initalOptionsGet?.localStorage?.key;
+        if (localKey) {
+          localStorage.removeItem(localKey);
         }
-        localStorage.removeItem(stateKey);
       });
     },
     updateInitialState: (newState: T) => {
