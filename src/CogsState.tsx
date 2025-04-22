@@ -555,7 +555,10 @@ const saveToLocalStorage = <T,>(
       sessionId
     );
   }
-  if (currentInitialOptions.localStorage?.key && sessionId) {
+  const key = isFunction(currentInitialOptions.localStorage?.key)
+    ? currentInitialOptions.localStorage?.key(state)
+    : currentInitialOptions.localStorage?.key;
+  if (key && sessionId) {
     const data: LocalStorageData<T> = {
       state,
       lastUpdated: Date.now(),
@@ -564,7 +567,7 @@ const saveToLocalStorage = <T,>(
       baseServerState: getGlobalStore.getState().serverState[thisKey],
     };
 
-    const storageKey = `${sessionId}-${thisKey}-${currentInitialOptions.localStorage?.key}`;
+    const storageKey = `${sessionId}-${thisKey}-${key}`;
 
     window.localStorage.setItem(storageKey, JSON.stringify(data));
   }
@@ -691,10 +694,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
     if (options.log) {
       console.log("newoptions", options);
     }
+    const localkey = isFunction(options.localStorage?.key)
+      ? options.localStorage?.key(initState)
+      : options.localStorage?.key;
 
-    if (options.localStorage?.key && sessionId) {
+    if (localkey && sessionId) {
       localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + options.localStorage?.key
+        sessionId + "-" + thisKey + "-" + localkey
       );
     }
 
