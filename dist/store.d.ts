@@ -29,6 +29,9 @@ export type FormRefStoreState = {
 };
 export declare const formRefStore: import('zustand').UseBoundStore<import('zustand').StoreApi<FormRefStoreState>>;
 export type CogsGlobalState = {
+    selectedIndicesMap: Map<string, Map<string, number>>;
+    getSelectedIndex: (stateKey: string, parentPath: string) => number | undefined;
+    setSelectedIndex: (stateKey: string, parentPath: string, index: number | undefined) => void;
     updaterState: {
         [key: string]: any;
     };

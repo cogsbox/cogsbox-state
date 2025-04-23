@@ -1231,7 +1231,9 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === "getSelected") {
             return () => {
-              const selectedIndex = selectedIndexMap.get(path.join("."));
+              const selectedIndex = getGlobalStore
+                .getState()
+                .getSelectedIndex(stateKey, path.join("."));
               if (selectedIndex === undefined) return undefined;
               return rebuildStateShape(
                 currentState[selectedIndex],
@@ -1240,7 +1242,6 @@ function createProxyHandler<T>(
               );
             };
           }
-
           if (prop === "stateMap" || prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -1536,6 +1537,10 @@ function createProxyHandler<T>(
           return getGlobalStore.getState().getSyncInfo(syncKey);
         }
 
+        if (prop == "getLocalStorage") {
+          return (key: string) =>
+            loadFromLocalStorage(sessionId + "-" + stateKey + "-" + key);
+        }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
           const parentKey = parentPath.join(".");
@@ -1544,36 +1549,38 @@ function createProxyHandler<T>(
             .getNestedState(stateKey, parentPath);
           if (Array.isArray(parent)) {
             const currentIndex = Number(path[path.length - 1]);
-            return currentIndex === selectedIndexMap.get(parentKey);
+            return (
+              currentIndex ===
+              getGlobalStore.getState().getSelectedIndex(stateKey, parentKey)
+            );
           }
           return undefined;
         }
-        if (prop == "getLocalStorage") {
-          return (key: string) =>
-            loadFromLocalStorage(sessionId + "-" + stateKey + "-" + key);
-        }
-
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
             const thisIndex = Number(path[path.length - 1]);
             const parentKey = parentPath.join(".");
+
             if (value) {
-              selectedIndexMap.set(parentKey, thisIndex);
+              getGlobalStore
+                .getState()
+                .setSelectedIndex(stateKey, parentKey, thisIndex);
             } else {
-              // Optional: clear selection if false
-              selectedIndexMap.delete(parentKey);
+              getGlobalStore
+                .getState()
+                .setSelectedIndex(stateKey, parentKey, undefined);
             }
+
             const nested = getGlobalStore
               .getState()
               .getNestedState(stateKey, [...parentPath]);
             updateFn(effectiveSetState, nested, parentPath);
 
-            // ADDED: Invalidate cache for parent path
+            // Invalidate cache for this path
             invalidateCachePath(parentPath);
           };
         }
-
         if (path.length == 0) {
           if (prop === "validateZodSchema") {
             return () => {

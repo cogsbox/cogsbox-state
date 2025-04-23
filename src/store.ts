@@ -82,6 +82,18 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
   },
 }));
 export type CogsGlobalState = {
+  selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
+
+  // Add these new methods
+  getSelectedIndex: (
+    stateKey: string,
+    parentPath: string
+  ) => number | undefined;
+  setSelectedIndex: (
+    stateKey: string,
+    parentPath: string,
+    index: number | undefined
+  ) => void;
   updaterState: { [key: string]: any };
   initialStateOptions: { [key: string]: OptionsType };
   cogsStateStore: { [key: string]: StateValue };
@@ -180,6 +192,41 @@ export type CogsGlobalState = {
 };
 
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  selectedIndicesMap: new Map<string, Map<string, number>>(),
+
+  // Add the new methods
+  getSelectedIndex: (stateKey: string, parentPath: string) => {
+    const stateMap = get().selectedIndicesMap.get(stateKey);
+    if (!stateMap) return undefined;
+    return stateMap.get(parentPath);
+  },
+
+  setSelectedIndex: (
+    stateKey: string,
+    parentPath: string,
+    index: number | undefined
+  ) => {
+    set((state) => {
+      const newMap = new Map(state.selectedIndicesMap);
+      let stateMap = newMap.get(stateKey);
+
+      if (!stateMap) {
+        stateMap = new Map<string, number>();
+        newMap.set(stateKey, stateMap);
+      }
+
+      if (index === undefined) {
+        stateMap.delete(parentPath);
+      } else {
+        stateMap.set(parentPath, index);
+      }
+
+      return {
+        ...state,
+        selectedIndicesMap: newMap,
+      };
+    });
+  },
   stateComponents: new Map(),
   subscribe: (listener: () => void) => {
     // zustand's subscribe returns an unsubscribe function
