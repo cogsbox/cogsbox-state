@@ -50,6 +50,8 @@ export type ArrayEndType<TShape extends unknown> = {
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>>;
     cut: CutFunctionType;
+    cutByValue: (value: string | number | boolean) => void;
+    toggleByValue: (value: string | number | boolean) => void;
     stateMapNoRender: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;

@@ -96,6 +96,8 @@ export type ArrayEndType<TShape extends unknown> = {
   } & EndType<InferArrayElement<TShape>>;
   insert: PushArgs<InferArrayElement<TShape>>;
   cut: CutFunctionType;
+  cutByValue: (value: string | number | boolean) => void;
+  toggleByValue: (value: string | number | boolean) => void;
   stateMapNoRender: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1425,6 +1427,27 @@ function createProxyHandler<T>(
               // ADDED: Invalidate cache on cut
               invalidateCachePath(path);
               cutFunc(effectiveSetState, path, stateKey, index);
+            };
+          }
+          if (prop === "cutByValue") {
+            return (value: string | number | boolean) => {
+              for (let index = 0; index < currentState.length; index++) {
+                if (currentState[index] === value) {
+                  cutFunc(effectiveSetState, path, stateKey, index);
+                }
+              }
+            };
+          }
+          if (prop === "toggleByValue") {
+            return (value: string | number | boolean) => {
+              const index = currentState.findIndex((item) => item === value);
+              if (index > -1) {
+                // Value exists, so cut it
+                cutFunc(effectiveSetState, path, stateKey, index);
+              } else {
+                // Value doesn't exist, so insert it
+                pushFunc(effectiveSetState, value as any, path, stateKey);
+              }
             };
           }
 
