@@ -98,6 +98,13 @@ export type ArrayEndType<TShape extends unknown> = {
   cut: CutFunctionType;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
+  stateSort: (
+    compareFn: (
+      a: InferArrayElement<TShape>,
+      b: InferArrayElement<TShape>
+    ) => number
+  ) => ArrayEndType<TShape>;
+
   stateMapNoRender: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1240,6 +1247,39 @@ function createProxyHandler<T>(
                 [...path, selectedIndex.toString()],
                 meta
               );
+            };
+          }
+          if (prop === "stateSort") {
+            return (
+              compareFn: (
+                a: InferArrayElement<T>,
+                b: InferArrayElement<T>
+              ) => number
+            ) => {
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+
+              // Create a shallow copy with original indices
+              const arrayCopy = currentArray.map((v: any, i: number) => ({
+                ...v,
+                __origIndex: i.toString(),
+              }));
+
+              // Sort the copy using the provided compare function
+              const sortedArray = [...arrayCopy].sort(compareFn);
+
+              // ADDED: Clear cache for sort operation
+              shapeCache.clear();
+              stateVersion++;
+
+              // Return the sorted array with state objects
+              return rebuildStateShape(sortedArray as any, path, {
+                filtered: [...(meta?.filtered || []), path],
+                validIndices: sortedArray.map((item) =>
+                  parseInt(item.__origIndex as string)
+                ),
+              });
             };
           }
           if (prop === "stateMap" || prop === "stateMapNoRender") {
