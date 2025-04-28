@@ -13,6 +13,7 @@ import {
 
 import {
   debounce,
+  getDifferences,
   getNestedValue,
   isFunction,
   type GenericObject,
@@ -189,6 +190,7 @@ export type EndType<T, IsArrayElement = false> = {
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
   _status: "fresh" | "stale" | "synced";
+  useStatus: () => "fresh" | "stale";
   showValidationErrors: () => string[];
   setValidation: (ctx: string) => void;
   removeValidation: (ctx: string) => void;
@@ -1070,8 +1072,6 @@ function createProxyHandler<T>(
     stateVersion++;
   };
 
-  const selectedIndexMap = new Map<string, number>();
-
   const baseObj = {
     removeValidation: (obj?: { validationKey?: string }) => {
       if (obj?.validationKey) {
@@ -1099,7 +1099,13 @@ function createProxyHandler<T>(
       stateVersion++;
 
       const newProxy = rebuildStateShape(initialState, []);
-
+      const initalOptionsGet = getInitialOptions(stateKey as string);
+      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+        ? initalOptionsGet?.localStorage?.key(initialState)
+        : initalOptionsGet?.localStorage?.key;
+      if (localKey) {
+        localStorage.removeItem(localKey);
+      }
       startTransition(() => {
         setUpdaterState(stateKey, newProxy);
         setState(stateKey, initialState);
@@ -1111,13 +1117,6 @@ function createProxyHandler<T>(
             component.forceUpdate();
           });
         }
-        const initalOptionsGet = getInitialOptions(stateKey as string);
-        const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-          ? initalOptionsGet?.localStorage?.key(initialState)
-          : initalOptionsGet?.localStorage?.key;
-        if (localKey) {
-          localStorage.removeItem(localKey);
-        }
       });
 
       return initialState;
@@ -1126,7 +1125,15 @@ function createProxyHandler<T>(
       // ADDED: Clear cache on initial state update
       shapeCache.clear();
       stateVersion++;
-
+      const initialState =
+        getGlobalStore.getState().initialStateGlobal[stateKey];
+      const initalOptionsGet = getInitialOptions(stateKey as string);
+      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+        ? initalOptionsGet?.localStorage?.key(initialState)
+        : initalOptionsGet?.localStorage?.key;
+      if (localKey) {
+        localStorage.removeItem(localKey);
+      }
       const newUpdaterState = createProxyHandler(
         stateKey,
         effectiveSetState,
@@ -1145,8 +1152,8 @@ function createProxyHandler<T>(
             component.forceUpdate();
           });
         }
-        localStorage.removeItem(stateKey);
       });
+
       return {
         fetchId: (field: keyof T) => newUpdaterState.get()[field],
       };
@@ -1218,6 +1225,45 @@ function createProxyHandler<T>(
             } else {
             }
           }
+        }
+        if (prop === "_status") {
+          // Get current state at this path (non-reactive version)
+          const thisReactiveState = getGlobalStore
+            .getState()
+            .getNestedState(stateKey, path);
+
+          // Get initial state at this path
+          const initialState =
+            getGlobalStore.getState().initialStateGlobal[stateKey];
+          const initialStateAtPath = getNestedValue(initialState, path);
+
+          // Simply compare current state with initial state
+          if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
+            return "fresh"; // Matches initial state
+          } else {
+            return "stale"; // Different from initial state
+          }
+        }
+        if (prop === "useStatus") {
+          return function () {
+            // Get current state at this path (reactive version)
+            const thisReactiveState = getGlobalStore().getNestedState(
+              stateKey,
+              path
+            );
+
+            // Get initial state at this path
+            const initialState =
+              getGlobalStore.getState().initialStateGlobal[stateKey];
+            const initialStateAtPath = getNestedValue(initialState, path);
+
+            // Simply compare current state with initial state
+            if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
+              return "fresh"; // Matches initial state
+            } else {
+              return "stale"; // Different from initial state
+            }
+          };
         }
         if (prop === "showValidationErrors") {
           return () => {
