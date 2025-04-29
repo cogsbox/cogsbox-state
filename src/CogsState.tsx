@@ -1198,6 +1198,10 @@ function createProxyHandler<T>(
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
+        console.log(
+          `PROXY APPLY TRAP HIT: stateKey=${stateKey}, path=${path.join(".")}`
+        ); // <--- ADD LOGGING
+        console.trace("Apply trap stack trace");
         return getGlobalStore().getNestedState(stateKey, path);
       },
 
