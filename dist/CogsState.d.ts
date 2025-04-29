@@ -99,7 +99,7 @@ export type EndType<T, IsArrayElement = false> = {
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
     _status: "fresh" | "stale" | "synced";
-    useStatus: () => "fresh" | "stale";
+    getStatus: () => "fresh" | "stale";
     showValidationErrors: () => string[];
     setValidation: (ctx: string) => void;
     removeValidation: (ctx: string) => void;

@@ -190,7 +190,7 @@ export type EndType<T, IsArrayElement = false> = {
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
   _status: "fresh" | "stale" | "synced";
-  useStatus: () => "fresh" | "stale";
+  getStatus: () => "fresh" | "stale";
   showValidationErrors: () => string[];
   setValidation: (ctx: string) => void;
   removeValidation: (ctx: string) => void;
@@ -1244,7 +1244,7 @@ function createProxyHandler<T>(
             return "stale"; // Different from initial state
           }
         }
-        if (prop === "useStatus") {
+        if (prop === "getStatus") {
           return function () {
             // Get current state at this path (reactive version)
             const thisReactiveState = getGlobalStore().getNestedState(
