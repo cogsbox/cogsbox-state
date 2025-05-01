@@ -107,6 +107,7 @@ export type EndType<T, IsArrayElement = false> = {
     _selected: boolean;
     setSelected: (value: boolean) => void;
     getFormRef: () => React.RefObject<any> | undefined;
+    removeStorage: () => void;
     validationWrapper: ({ children, hideMessage, }: {
         children: React.ReactNode;
         hideMessage?: boolean;

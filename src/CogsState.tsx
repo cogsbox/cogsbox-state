@@ -198,6 +198,7 @@ export type EndType<T, IsArrayElement = false> = {
   _selected: boolean;
   setSelected: (value: boolean) => void;
   getFormRef: () => React.RefObject<any> | undefined;
+  removeStorage: () => void;
   validationWrapper: ({
     children,
     hideMessage,
@@ -1266,6 +1267,19 @@ function createProxyHandler<T>(
               return "fresh"; // Matches initial state
             } else {
               return "stale"; // Different from initial state
+            }
+          };
+        }
+        if (prop === "removeStorage") {
+          return () => {
+            const initialState =
+              getGlobalStore.getState().initialStateGlobal[stateKey];
+            const initalOptionsGet = getInitialOptions(stateKey as string);
+            const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+              ? initalOptionsGet?.localStorage?.key(initialState)
+              : initalOptionsGet?.localStorage?.key;
+            if (localKey) {
+              localStorage.removeItem(localKey);
             }
           };
         }
