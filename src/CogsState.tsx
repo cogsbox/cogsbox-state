@@ -1129,17 +1129,7 @@ function createProxyHandler<T>(
       // ADDED: Clear cache on initial state update
       shapeCache.clear();
       stateVersion++;
-      const initialState =
-        getGlobalStore.getState().initialStateGlobal[stateKey];
-      const initalOptionsGet = getInitialOptions(stateKey as string);
-      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-        ? initalOptionsGet?.localStorage?.key(initialState)
-        : initalOptionsGet?.localStorage?.key;
-      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
 
-      if (storageKey) {
-        localStorage.removeItem(storageKey);
-      }
       const newUpdaterState = createProxyHandler(
         stateKey,
         effectiveSetState,
