@@ -1104,8 +1104,11 @@ function createProxyHandler<T>(
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
         ? initalOptionsGet?.localStorage?.key(initialState)
         : initalOptionsGet?.localStorage?.key;
-      if (localKey) {
-        localStorage.removeItem(localKey);
+
+      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
       }
       startTransition(() => {
         setUpdaterState(stateKey, newProxy);
@@ -1132,8 +1135,10 @@ function createProxyHandler<T>(
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
         ? initalOptionsGet?.localStorage?.key(initialState)
         : initalOptionsGet?.localStorage?.key;
-      if (localKey) {
-        localStorage.removeItem(localKey);
+      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
       }
       const newUpdaterState = createProxyHandler(
         stateKey,
@@ -1278,8 +1283,11 @@ function createProxyHandler<T>(
             const localKey = isFunction(initalOptionsGet?.localStorage?.key)
               ? initalOptionsGet?.localStorage?.key(initialState)
               : initalOptionsGet?.localStorage?.key;
-            if (localKey) {
-              localStorage.removeItem(localKey);
+
+            const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+
+            if (storageKey) {
+              localStorage.removeItem(storageKey);
             }
           };
         }
