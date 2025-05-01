@@ -1275,7 +1275,7 @@ function createProxyHandler<T>(
               : initalOptionsGet?.localStorage?.key;
 
             const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
+            console.log("removing storage", storageKey);
             if (storageKey) {
               localStorage.removeItem(storageKey);
             }

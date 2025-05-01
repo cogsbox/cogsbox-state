@@ -414,7 +414,7 @@ function X(t, i, m, y) {
         if (s === "removeStorage")
           return () => {
             const n = r.getState().initialStateGlobal[t], a = Y(t), c = L(a?.localStorage?.key) ? a?.localStorage?.key(n) : a?.localStorage?.key, o = `${y}-${t}-${c}`;
-            o && localStorage.removeItem(o);
+            console.log("removing storage", o), o && localStorage.removeItem(o);
           };
         if (s === "showValidationErrors")
           return () => {
