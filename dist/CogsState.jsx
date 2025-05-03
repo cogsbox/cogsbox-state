@@ -89,7 +89,7 @@ const zt = (t, i) => {
     return console.error("Error loading from localStorage:", i), null;
   }
 }, pt = (t, i, m, y) => {
-  m.log && console.log(
+  m?.log && console.log(
     "saving to localstorage",
     i,
     m.localStorage?.key,
@@ -171,8 +171,8 @@ function jt(t, {
     });
     const c = C.current;
     let o = null;
-    c.log && console.log("newoptions", c);
-    const d = L(c.localStorage?.key) ? c.localStorage?.key(f) : c.localStorage?.key;
+    c?.log && console.log("newoptions", c);
+    const d = L(c?.localStorage?.key) ? c?.localStorage?.key(f) : c?.localStorage?.key;
     d && p && (o = ft(
       p + "-" + u + "-" + d
     ));

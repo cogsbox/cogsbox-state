@@ -557,7 +557,7 @@ const saveToLocalStorage = <T,>(
   currentInitialOptions: any,
   sessionId?: string
 ) => {
-  if (currentInitialOptions.log) {
+  if (currentInitialOptions?.log) {
     console.log(
       "saving to localstorage",
       thisKey,
@@ -702,12 +702,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
     const options = latestInitialOptionsRef.current;
     let localData = null;
-    if (options.log) {
+    if (options?.log) {
       console.log("newoptions", options);
     }
-    const localkey = isFunction(options.localStorage?.key)
-      ? options.localStorage?.key(initialState)
-      : options.localStorage?.key;
+    const localkey = isFunction(options?.localStorage?.key)
+      ? options?.localStorage?.key(initialState)
+      : options?.localStorage?.key;
 
     if (localkey && sessionId) {
       localData = loadFromLocalStorage(
