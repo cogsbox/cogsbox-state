@@ -60,7 +60,7 @@ export type ArrayEndType<TShape extends unknown> = {
     uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[], onMatch?: (existingItem: any) => any) => void;
     stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
     getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
-    getSelectedIndex: () => number | undefined;
+    getSelectedIndex: () => number;
 } & EndType<TShape> & {
     [K in keyof (any[] extends infer T ? T : never)]: never;
 };

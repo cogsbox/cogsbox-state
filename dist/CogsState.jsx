@@ -435,11 +435,7 @@ function X(t, i, m, y) {
                 );
             };
           if (s === "getSelectedIndex")
-            return () => {
-              const n = r.getState().getSelectedIndex(t, e.join("."));
-              if (n !== void 0)
-                return n;
-            };
+            return () => r.getState().getSelectedIndex(t, e.join(".")) ?? -1;
           if (s === "stateSort")
             return (n) => {
               const o = [...r.getState().getNestedState(t, e).map((d, E) => ({

@@ -145,7 +145,7 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (value: InferArrayElement<TShape>, index: number) => void
   ) => ArrayEndType<TShape>;
   getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
-  getSelectedIndex: () => number | undefined;
+  getSelectedIndex: () => number;
 } & EndType<TShape> & {
     [K in keyof (any[] extends infer T ? T : never)]: never;
   };
@@ -1317,8 +1317,8 @@ function createProxyHandler<T>(
               const selectedIndex = getGlobalStore
                 .getState()
                 .getSelectedIndex(stateKey, path.join("."));
-              if (selectedIndex === undefined) return undefined;
-              return selectedIndex;
+
+              return selectedIndex ?? -1;
             };
           }
           if (prop === "stateSort") {
