@@ -21,10 +21,12 @@ type User = {
 
 type StateType = {
   user: User;
+  addresses: Address[];
 };
 
 // Initial state with user and nested addresses
 const initialState: StateType = {
+  addresses: [],
   user: {
     firstName: "",
     lastName: "",

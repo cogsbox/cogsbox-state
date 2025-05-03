@@ -11,7 +11,8 @@ export default function FormsMain() {
   const user = useCogsState("user", {
     reactiveDeps: (state) => [state.addresses],
   });
-
+  const addresses = useCogsState("addresses");
+  addresses.index(0);
   const addNewAddress = () => {
     user.addresses.insert({
       street: "",
@@ -248,20 +249,18 @@ export default function FormsMain() {
                     without showing error messages. Notice the red border that
                     appears when validation fails.
                   </p>
-                  {user.lastName.formElement(
-                    (params) => (
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700">
-                          Last Name
-                        </label>
-                        <input
-                          type="text"
-                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
-                          {...params.inputProps}
-                        />
-                      </div>
-                    )
-                  )}
+                  {user.lastName.formElement((params) => (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700">
+                        Last Name
+                      </label>
+                      <input
+                        type="text"
+                        className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
+                        {...params.inputProps}
+                      />
+                    </div>
+                  ))}
                 </div>
 
                 {/* Email Field with explanation */}
@@ -273,13 +272,14 @@ export default function FormsMain() {
                     validation fails instead of using the default Zod error
                     messages.
                   </p>
-                  
-                  {user.email.formElement( (params) =>   
-                    <input {...params.inputProps}
-                          type="email"
-                          className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
-                        />  
-                  )}
+
+                  {user.email.formElement((params) => (
+                    <input
+                      {...params.inputProps}
+                      type="email"
+                      className={`mt-1 block w-full rounded-md border-2 border-amber-400 p-2 focus:border-amber-600 focus:ring-amber-600 `}
+                    />
+                  ))}
                 </div>
 
                 {/* Phone Field with explanation */}
