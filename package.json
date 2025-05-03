@@ -37,6 +37,20 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   },
+  "peerDependenciesMeta": {
+  "@trpc/next": {
+    "optional": true
+  },
+  "@types/react": {
+    "optional": true
+  },
+  "react": {
+    "optional": false
+  },
+  "react-dom": {
+    "optional": false
+  }
+},
   "devDependencies": {
     "@types/node": "^22.14.0",
     "@types/react": "^18.2.0",
