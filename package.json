@@ -32,24 +32,10 @@
     "zustand": "^5.0.3"
   },
   "peerDependencies": {
-    "@trpc/next": "^10.0.0",
+    "@trpc/next": "^10.0.0 || ^11.0.0",
     "@types/react": "^18.0.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
-  },
-  "peerDependenciesMeta": {
-    "@trpc/next": {
-      "optional": true
-    },
-    "@types/react": {
-      "optional": true
-    },
-    "react": {
-      "optional": false
-    },
-    "react-dom": {
-      "optional": false
-    }
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
