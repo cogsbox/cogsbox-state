@@ -567,7 +567,7 @@ const saveToLocalStorage = <T,>(
   }
   const key = isFunction(currentInitialOptions?.localStorage?.key)
     ? currentInitialOptions.localStorage?.key(state)
-    : currentInitialOptions.localStorage?.key;
+    : currentInitialOptions?.localStorage?.key;
   if (key && sessionId) {
     const data: LocalStorageData<T> = {
       state,

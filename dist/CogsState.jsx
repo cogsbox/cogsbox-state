@@ -95,7 +95,7 @@ const zt = (t, i) => {
     m.localStorage?.key,
     y
   );
-  const g = L(m?.localStorage?.key) ? m.localStorage?.key(t) : m.localStorage?.key;
+  const g = L(m?.localStorage?.key) ? m.localStorage?.key(t) : m?.localStorage?.key;
   if (g && y) {
     const $ = {
       state: t,
