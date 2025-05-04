@@ -743,6 +743,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
 
     if (newState) {
+      console.log("newState thius is newstate", newState);
       updateGlobalState(
         thisKey,
         initialState,
