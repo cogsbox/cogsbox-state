@@ -435,6 +435,7 @@ function setOptions<StateKey, Opt>({
       }
     }
   }
+  console.log("existingOptions", needToAdd, options, initialOptionsPart);
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
@@ -457,13 +458,16 @@ export const createCogsState = <State extends Record<string, unknown>>(
     transformStateFunc<State>(newInitialState);
 
   // Apply global formElements as defaults to each state key's options
-  if (opt?.formElements || opt?.validation) {
+  if (
+    Object.keys(initialOptionsPart).length > 0 ||
+    (opt && Object.keys(opt).length > 0)
+  ) {
     Object.keys(initialOptionsPart).forEach((key) => {
       // Get the existing options for this state key
       initialOptionsPart[key] = initialOptionsPart[key] || {};
 
       initialOptionsPart[key].formElements = {
-        ...opt.formElements, // Global defaults first
+        ...opt?.formElements, // Global defaults first
         ...opt?.validation,
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
