@@ -725,6 +725,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
       localData = loadFromLocalStorage(
         sessionId + "-" + thisKey + "-" + localkey
       );
+      if (!initialState) {
+        updateGlobalState(
+          thisKey,
+          initialState,
+          localData,
+          effectiveSetState,
+          componentIdRef.current,
+          sessionId
+        );
+
+        notifyComponents(thisKey);
+        forceUpdate({});
+      }
     }
 
     let newState = null;
