@@ -225,6 +225,7 @@ export const FormControlComponent = <TStateObject,>({
   );
 
   const initialOptions = getInitialOptions(stateKey);
+
   if (!initialOptions?.validation?.key) {
     throw new Error(
       "Validation key not found. You need to set it in the options for the createCogsState function"
