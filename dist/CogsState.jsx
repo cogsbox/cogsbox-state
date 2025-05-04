@@ -1,7 +1,7 @@
 "use client";
 import { jsx as lt } from "react/jsx-runtime";
 import { useState as et, useRef as Z, useEffect as nt, useLayoutEffect as _t, useMemo as Et, createElement as Q, useSyncExternalStore as $t, startTransition as H } from "react";
-import { transformStateFunc as wt, isFunction as L, getNestedValue as U, isDeepEqual as M, debounce as Nt } from "./utility.js";
+import { transformStateFunc as wt, isFunction as D, getNestedValue as U, isDeepEqual as M, debounce as Nt } from "./utility.js";
 import { pushFunc as K, updateFn as B, cutFunc as J, ValidationWrapper as Vt, FormControlComponent as At } from "./Functions.jsx";
 import "zod";
 import { getGlobalStore as r, formRefStore as dt } from "./store.js";
@@ -73,7 +73,7 @@ const zt = (t, i) => {
   return { useCogsState: $, setCogsOptions: _ };
 }, {
   setUpdaterState: Y,
-  setState: D,
+  setState: L,
   getInitialOptions: q,
   getKeyState: St,
   getValidationErrors: xt,
@@ -97,7 +97,7 @@ const zt = (t, i) => {
     m.localStorage?.key,
     y
   );
-  const g = L(m?.localStorage?.key) ? m.localStorage?.key(t) : m?.localStorage?.key;
+  const g = D(m?.localStorage?.key) ? m.localStorage?.key(t) : m?.localStorage?.key;
   if (g && y) {
     const $ = {
       state: t,
@@ -119,7 +119,7 @@ const zt = (t, i) => {
     state: m
   };
   H(() => {
-    at(t, _.initialState), Y(t, _.updaterState), D(t, _.state);
+    at(t, _.initialState), Y(t, _.updaterState), L(t, _.state);
   });
 }, ot = (t) => {
   const i = r.getState().stateComponents.get(t);
@@ -157,7 +157,7 @@ function Tt(t, {
   const [d] = et(i ?? rt()), s = r.getState().stateLog[d], G = Z(/* @__PURE__ */ new Set()), j = Z(l ?? rt()), x = Z(null);
   x.current = q(d), nt(() => {
     if (e && e.stateKey === d && e.path?.[0]) {
-      D(d, (o) => ({
+      L(d, (o) => ({
         ...o,
         [e.path[0]]: e.newValue
       }));
@@ -173,10 +173,14 @@ function Tt(t, {
     });
     const c = x.current;
     let o = null;
-    const u = L(c?.localStorage?.key) ? c?.localStorage?.key(f) : c?.localStorage?.key;
+    const u = D(c?.localStorage?.key) ? c?.localStorage?.key(f) : c?.localStorage?.key;
     c?.log && (console.log("newoptions", c), console.log("localkey", u), console.log("initialState", f)), u && k && (o = mt(
       k + "-" + d + "-" + u
-    ), f || (ft(
+    ), f || (c?.log && console.log(
+      "localData",
+      o,
+      k + "-" + d + "-" + u
+    ), ft(
       d,
       f,
       o,
@@ -220,8 +224,8 @@ function Tt(t, {
       const O = `${d}-${o.join(".")}`;
       G.current.add(O);
     }
-    D(d, (O) => {
-      const N = L(c) ? c(O) : c, b = `${d}-${o.join(".")}`;
+    L(d, (O) => {
+      const N = D(c) ? c(O) : c, b = `${d}-${o.join(".")}`;
       if (b) {
         let F = !1, I = r.getState().signalDomElements.get(b);
         if ((!I || I.size === 0) && (u.updateType === "insert" || u.updateType === "cut")) {
@@ -323,7 +327,7 @@ function Tt(t, {
       j.current,
       k
     )
-  ), r.getState().cogsStateStore[d] || D(d, t), r.getState().initialStateGlobal[d] || at(d, t));
+  ), r.getState().cogsStateStore[d] || L(d, t), r.getState().initialStateGlobal[d] || at(d, t));
   const a = Et(() => X(
     d,
     n,
@@ -349,9 +353,9 @@ function X(t, i, m, y) {
       e?.key && P(e?.key), f?.validationKey && P(f.validationKey);
       const S = r.getState().initialStateGlobal[t];
       g.clear(), $++;
-      const C = l(S, []), V = q(t), k = L(V?.localStorage?.key) ? V?.localStorage?.key(S) : V?.localStorage?.key, R = `${y}-${t}-${k}`;
+      const C = l(S, []), V = q(t), k = D(V?.localStorage?.key) ? V?.localStorage?.key(S) : V?.localStorage?.key, R = `${y}-${t}-${k}`;
       return R && localStorage.removeItem(R), H(() => {
-        Y(t, C), D(t, S);
+        Y(t, C), L(t, S);
         const d = r.getState().stateComponents.get(t);
         d && d.components.forEach((s) => {
           s.forceUpdate();
@@ -367,7 +371,7 @@ function X(t, i, m, y) {
         y
       );
       return H(() => {
-        at(t, f), Y(t, e), D(t, f);
+        at(t, f), Y(t, e), L(t, f);
         const S = r.getState().stateComponents.get(t);
         S && S.components.forEach((C) => {
           C.forceUpdate();
@@ -421,7 +425,7 @@ function X(t, i, m, y) {
           };
         if (s === "removeStorage")
           return () => {
-            const n = r.getState().initialStateGlobal[t], a = q(t), c = L(a?.localStorage?.key) ? a?.localStorage?.key(n) : a?.localStorage?.key, o = `${y}-${t}-${c}`;
+            const n = r.getState().initialStateGlobal[t], a = q(t), c = D(a?.localStorage?.key) ? a?.localStorage?.key(n) : a?.localStorage?.key, o = `${y}-${t}-${c}`;
             console.log("removing storage", o), o && localStorage.removeItem(o);
           };
         if (s === "showValidationErrors")
@@ -523,7 +527,7 @@ function X(t, i, m, y) {
             ));
           if (s === "uniqueInsert")
             return (n, a, c) => {
-              const o = r.getState().getNestedState(t, e), u = L(n) ? n(o) : n;
+              const o = r.getState().getNestedState(t, e), u = D(n) ? n(o) : n;
               let E = null;
               if (!o.some((N) => {
                 if (a) {

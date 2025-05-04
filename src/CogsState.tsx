@@ -726,6 +726,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId + "-" + thisKey + "-" + localkey
       );
       if (!initialState) {
+        if (options?.log) {
+          console.log(
+            "localData",
+            localData,
+            sessionId + "-" + thisKey + "-" + localkey
+          );
+        }
+
         updateGlobalState(
           thisKey,
           initialState,
