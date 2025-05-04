@@ -402,7 +402,6 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...newOptions,
   });
 }
-
 function setOptions<StateKey, Opt>({
   stateKey,
   options,
@@ -416,22 +415,13 @@ function setOptions<StateKey, Opt>({
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
   const setInitialStateOptions =
     getGlobalStore.getState().setInitialStateOptions;
-
-  // This is the key fix - merge in the correct order
-  const mergedOptions = {
-    ...initialOptionsPartState, // Options from createCogsState
-    ...initialOptions, // Currently stored options
-    ...options, // New options passed to useCogsState
-  };
-
-  // Set the merged options
+  const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
 
   let needToAdd = false;
   if (options) {
     for (const key in options) {
       if (!mergedOptions.hasOwnProperty(key)) {
         needToAdd = true;
-
         mergedOptions[key] = options[key as keyof typeof options];
       } else {
         if (
@@ -478,6 +468,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
       const existingOptions = getInitialOptions(key);
+      console.log("existingOptions", existingOptions, initialOptionsPart[key]);
       if (!existingOptions) {
         getGlobalStore
           .getState()
@@ -494,6 +485,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     options?: OptionsType<(typeof statePart)[StateKey]>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
+
     setOptions({
       stateKey,
       options,
