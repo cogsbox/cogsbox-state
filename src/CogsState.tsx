@@ -725,50 +725,28 @@ export function useCogsStateFn<TStateObject extends unknown>(
       localData = loadFromLocalStorage(
         sessionId + "-" + thisKey + "-" + localkey
       );
-      if (!initialState) {
-        if (options?.log) {
-          console.log(
-            "localData",
-            localData,
-            sessionId + "-" + thisKey + "-" + localkey
-          );
-        }
-
-        updateGlobalState(
-          thisKey,
-          initialState,
-          localData,
-          effectiveSetState,
-          componentIdRef.current,
-          sessionId
-        );
-
-        notifyComponents(thisKey);
-        forceUpdate({});
-      }
     }
 
     let newState = null;
     if (initialState) {
       newState = initialState;
-
-      if (localData) {
-        if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-          newState = localData.state;
-        }
-      }
-      updateGlobalState(
-        thisKey,
-        initialState,
-        newState,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
-
-      notifyComponents(thisKey);
-      forceUpdate({});
     }
+    if (localData) {
+      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+        newState = localData.state;
+      }
+    }
+    updateGlobalState(
+      thisKey,
+      initialState,
+      newState,
+      effectiveSetState,
+      componentIdRef.current,
+      sessionId
+    );
+
+    notifyComponents(thisKey);
+    forceUpdate({});
   }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
