@@ -435,7 +435,7 @@ function setOptions<StateKey, Opt>({
       }
     }
   }
-  console.log("existingOptions", needToAdd, options, initialOptionsPart);
+  console.log("existingOptions", mergedOptions, options, initialOptionsPart);
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
