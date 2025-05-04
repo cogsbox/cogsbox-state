@@ -416,7 +416,15 @@ function setOptions<StateKey, Opt>({
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
   const setInitialStateOptions =
     getGlobalStore.getState().setInitialStateOptions;
-  const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
+
+  // This is the key fix - merge in the correct order
+  const mergedOptions = {
+    ...initialOptionsPartState, // Options from createCogsState
+    ...initialOptions, // Currently stored options
+    ...options, // New options passed to useCogsState
+  };
+
+  // Set the merged options
 
   let needToAdd = false;
   if (options) {
@@ -469,6 +477,9 @@ export const createCogsState = <State extends Record<string, unknown>>(
         ...opt?.validation,
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
+      getGlobalStore
+        .getState()
+        .setInitialStateOptions(key, initialOptionsPart[key]);
     });
   }
 

@@ -19,7 +19,14 @@ function ut({
   options: i,
   initialOptionsPart: m
 }) {
-  const y = Y(t) || {}, g = m[t] || {}, $ = r.getState().setInitialStateOptions, _ = { ...g, ...y };
+  const y = Y(t) || {}, g = m[t] || {}, $ = r.getState().setInitialStateOptions, _ = {
+    ...g,
+    // Options from createCogsState
+    ...y,
+    // Currently stored options
+    ...i
+    // New options passed to useCogsState
+  };
   let v = !1;
   if (i)
     for (const l in i)
@@ -39,7 +46,7 @@ const zt = (t, i) => {
       ...i?.validation,
       ...g[v].formElements || {}
       // State-specific overrides
-    };
+    }, r.getState().setInitialStateOptions(v, g[v]);
   }), r.getState().setInitialStates(y);
   const $ = (v, l) => {
     const [f] = et(l?.componentId ?? rt());
@@ -74,10 +81,10 @@ const zt = (t, i) => {
   setState: D,
   getInitialOptions: Y,
   getKeyState: gt,
-  getValidationErrors: kt,
-  setStateLog: Ct,
+  getValidationErrors: Ct,
+  setStateLog: Tt,
   updateInitialStateGlobal: ot,
-  addValidationError: Tt,
+  addValidationError: kt,
   removeValidationError: P,
   setServerSyncActions: ht
 } = r.getState(), ft = (t) => {
@@ -152,8 +159,8 @@ function jt(t, {
 } = {}) {
   const [h, A] = et({}), { sessionId: p } = At();
   let R = !i;
-  const [u] = et(i ?? rt()), s = r.getState().stateLog[u], G = J(/* @__PURE__ */ new Set()), b = J(l ?? rt()), C = J(null);
-  C.current = Y(u), nt(() => {
+  const [u] = et(i ?? rt()), s = r.getState().stateLog[u], G = J(/* @__PURE__ */ new Set()), b = J(l ?? rt()), T = J(null);
+  T.current = Y(u), nt(() => {
     if (e && e.stateKey === u && e.path?.[0]) {
       D(u, (o) => ({
         ...o,
@@ -169,7 +176,7 @@ function jt(t, {
     dt(u, {
       initialState: f
     });
-    const c = C.current;
+    const c = T.current;
     let o = null;
     c?.log && console.log("newoptions", c);
     const d = L(c?.localStorage?.key) ? c?.localStorage?.key(f) : c?.localStorage?.key;
@@ -217,8 +224,8 @@ function jt(t, {
       if (F) {
         let O = !1, I = r.getState().signalDomElements.get(F);
         if ((!I || I.size === 0) && (d.updateType === "insert" || d.updateType === "cut")) {
-          const V = o.slice(0, -1), k = U(N, V);
-          if (Array.isArray(k)) {
+          const V = o.slice(0, -1), C = U(N, V);
+          if (Array.isArray(C)) {
             O = !0;
             const w = `${u}-${V.join(".")}`;
             I = r.getState().signalDomElements.get(w);
@@ -226,9 +233,9 @@ function jt(t, {
         }
         if (I) {
           const V = O ? U(N, o.slice(0, -1)) : U(N, o);
-          I.forEach(({ parentId: k, position: w, effect: W }) => {
+          I.forEach(({ parentId: C, position: w, effect: W }) => {
             const j = document.querySelector(
-              `[data-parent-id="${k}"]`
+              `[data-parent-id="${C}"]`
             );
             if (j) {
               const st = Array.from(j.childNodes);
@@ -240,32 +247,32 @@ function jt(t, {
           });
         }
       }
-      d.updateType === "update" && (E || C.current?.validationKey) && o && P(
-        (E || C.current?.validationKey) + "." + o.join(".")
+      d.updateType === "update" && (E || T.current?.validationKey) && o && P(
+        (E || T.current?.validationKey) + "." + o.join(".")
       );
-      const T = o.slice(0, o.length - 1);
-      d.updateType === "cut" && C.current?.validationKey && P(
-        C.current?.validationKey + "." + T.join(".")
-      ), d.updateType === "insert" && C.current?.validationKey && kt(
-        C.current?.validationKey + "." + T.join(".")
+      const k = o.slice(0, o.length - 1);
+      d.updateType === "cut" && T.current?.validationKey && P(
+        T.current?.validationKey + "." + k.join(".")
+      ), d.updateType === "insert" && T.current?.validationKey && Ct(
+        T.current?.validationKey + "." + k.join(".")
       ).filter(([I, V]) => {
-        let k = I?.split(".").length;
-        if (I == T.join(".") && k == T.length - 1) {
-          let w = I + "." + T;
-          P(I), Tt(w, V);
+        let C = I?.split(".").length;
+        if (I == k.join(".") && C == k.length - 1) {
+          let w = I + "." + k;
+          P(I), kt(w, V);
         }
       });
       const q = U(x, o), mt = U(N, o), yt = d.updateType === "update" ? o.join(".") : [...o].slice(0, -1).join("."), at = r.getState().stateComponents.get(u);
       if (at)
         for (const [O, I] of at.components.entries()) {
           let V = !1;
-          const k = Array.isArray(I.reactiveType) ? I.reactiveType : [I.reactiveType || "component"];
-          if (!k.includes("none")) {
-            if (k.includes("all")) {
+          const C = Array.isArray(I.reactiveType) ? I.reactiveType : [I.reactiveType || "component"];
+          if (!C.includes("none")) {
+            if (C.includes("all")) {
               I.forceUpdate();
               continue;
             }
-            if (k.includes("component") && I.paths && (I.paths.has(yt) || I.paths.has("")) && (V = !0), !V && k.includes("deps") && I.depsFunction) {
+            if (C.includes("component") && I.paths && (I.paths.has(yt) || I.paths.has("")) && (V = !0), !V && C.includes("deps") && I.depsFunction) {
               const w = I.depsFunction(N);
               typeof w == "boolean" ? w && (V = !0) : M(I.deps, w) || (I.deps = w, V = !0);
             }
@@ -281,22 +288,22 @@ function jt(t, {
         oldValue: q,
         newValue: mt
       };
-      if (Ct(u, (O) => {
-        const V = [...O ?? [], it].reduce((k, w) => {
-          const W = `${w.stateKey}:${JSON.stringify(w.path)}`, j = k.get(W);
-          return j ? (j.timeStamp = Math.max(j.timeStamp, w.timeStamp), j.newValue = w.newValue, j.oldValue = j.oldValue ?? w.oldValue, j.updateType = w.updateType) : k.set(W, { ...w }), k;
+      if (Tt(u, (O) => {
+        const V = [...O ?? [], it].reduce((C, w) => {
+          const W = `${w.stateKey}:${JSON.stringify(w.path)}`, j = C.get(W);
+          return j ? (j.timeStamp = Math.max(j.timeStamp, w.timeStamp), j.newValue = w.newValue, j.oldValue = j.oldValue ?? w.oldValue, j.updateType = w.updateType) : C.set(W, { ...w }), C;
         }, /* @__PURE__ */ new Map());
         return Array.from(V.values());
       }), pt(
         N,
         u,
-        C.current,
+        T.current,
         p
       ), $ && $({
         updateLog: s,
         update: it
-      }), C.current?.serverSync) {
-        const O = r.getState().serverState[u], I = C.current?.serverSync;
+      }), T.current?.serverSync) {
+        const O = r.getState().serverState[u], I = T.current?.serverSync;
         ht(u, {
           syncKey: typeof I.syncKey == "string" ? I.syncKey : I.syncKey({ state: N }),
           rollBackState: O,
@@ -519,10 +526,10 @@ function X(t, i, m, y) {
               let E = null;
               if (!o.some((N) => {
                 if (a) {
-                  const T = a.every(
+                  const k = a.every(
                     (q) => M(N[q], d[q])
                   );
-                  return T && (E = N), T;
+                  return k && (E = N), k;
                 }
                 const F = M(N, d);
                 return F && (E = N), F;
@@ -530,7 +537,7 @@ function X(t, i, m, y) {
                 _(e), K(i, d, e, t);
               else if (c && E) {
                 const N = c(E), F = o.map(
-                  (T) => M(T, E) ? N : T
+                  (k) => M(k, E) ? N : k
                 );
                 _(e), z(i, F, e);
               }
@@ -628,8 +635,8 @@ function X(t, i, m, y) {
                 });
                 const d = n.zodSchema.safeParse(c);
                 return d.success ? !0 : (d.error.errors.forEach((x) => {
-                  const N = x.path, F = x.message, T = [n.key, ...N].join(".");
-                  a(T, F);
+                  const N = x.path, F = x.message, k = [n.key, ...N].join(".");
+                  a(k, F);
                 }), St(t), !1);
               } catch (o) {
                 return console.error("Zod schema validation failed", o), !1;
@@ -697,8 +704,8 @@ function X(t, i, m, y) {
               formOpts: a
             }
           );
-        const b = [...e, s], C = r.getState().getNestedState(t, b);
-        return l(C, b, S);
+        const b = [...e, s], T = r.getState().getNestedState(t, b);
+        return l(T, b, S);
       }
     }, R = new Proxy(A, p);
     return g.set(h, {
