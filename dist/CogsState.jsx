@@ -176,14 +176,14 @@ function Ot(t, {
       T + "-" + g + "-" + d
     ));
     let _ = null, k = !1;
-    f && (_ = f), o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (_ = o.state, k = !0), Tt(
+    f && (_ = f), o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (_ = o.state, k = !0), _ || (Tt(
       g,
       f,
       _,
       n,
       b.current,
       T
-    ), k && c?.localStorage?.onChange && c?.localStorage?.onChange(_), St(g), A({});
+    ), k && c?.localStorage?.onChange && c?.localStorage?.onChange(_), St(g), A({}));
   }, [f, ...S || []]), It(() => {
     R && dt(g, {
       serverSync: m,

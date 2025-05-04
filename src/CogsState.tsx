@@ -741,20 +741,23 @@ export function useCogsStateFn<TStateObject extends unknown>(
         loadingLocalData = true;
       }
     }
-    updateGlobalState(
-      thisKey,
-      initialState,
-      newState,
-      effectiveSetState,
-      componentIdRef.current,
-      sessionId
-    );
-    if (loadingLocalData && options?.localStorage?.onChange) {
-      options?.localStorage?.onChange(newState);
-    }
 
-    notifyComponents(thisKey);
-    forceUpdate({});
+    if (!newState) {
+      updateGlobalState(
+        thisKey,
+        initialState,
+        newState,
+        effectiveSetState,
+        componentIdRef.current,
+        sessionId
+      );
+      if (loadingLocalData && options?.localStorage?.onChange) {
+        options?.localStorage?.onChange(newState);
+      }
+
+      notifyComponents(thisKey);
+      forceUpdate({});
+    }
   }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
