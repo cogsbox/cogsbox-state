@@ -477,9 +477,12 @@ export const createCogsState = <State extends Record<string, unknown>>(
         ...opt?.validation,
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
-      getGlobalStore
-        .getState()
-        .setInitialStateOptions(key, initialOptionsPart[key]);
+      const existingOptions = getInitialOptions(key);
+      if (!existingOptions) {
+        getGlobalStore
+          .getState()
+          .setInitialStateOptions(key, initialOptionsPart[key]);
+      }
     });
   }
 
