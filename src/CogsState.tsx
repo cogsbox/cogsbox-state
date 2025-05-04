@@ -306,7 +306,10 @@ export type OptionsType<T extends unknown = unknown> = {
   }) => void;
 
   modifyState?: (state: T) => T;
-  localStorage?: { key: string | ((state: T) => string) };
+  localStorage?: {
+    key: string | ((state: T) => string);
+    onChange?: (state: T) => void;
+  };
   formElements?: FormsElementsType;
   enabledSync?: (state: T) => boolean;
   reactiveDeps?: (state: T) => any[] | true;
@@ -435,7 +438,7 @@ function setOptions<StateKey, Opt>({
       }
     }
   }
-  console.log("existingOptions-------", mergedOptions);
+
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
@@ -472,7 +475,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
       };
       const existingOptions = getInitialOptions(key);
-      console.log("existingOptions", existingOptions, initialOptionsPart[key]);
+
       if (!existingOptions) {
         getGlobalStore
           .getState()
@@ -728,12 +731,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
 
     let newState = null;
+    let loadingLocalData = false;
     if (initialState) {
       newState = initialState;
     }
     if (localData) {
       if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
         newState = localData.state;
+        loadingLocalData = true;
       }
     }
     updateGlobalState(
@@ -744,6 +749,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
       componentIdRef.current,
       sessionId
     );
+    if (loadingLocalData && options?.localStorage?.onChange) {
+      options?.localStorage?.onChange(newState);
+    }
 
     notifyComponents(thisKey);
     forceUpdate({});

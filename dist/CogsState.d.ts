@@ -191,6 +191,7 @@ export type OptionsType<T extends unknown = unknown> = {
     modifyState?: (state: T) => T;
     localStorage?: {
         key: string | ((state: T) => string);
+        onChange?: (state: T) => void;
     };
     formElements?: FormsElementsType;
     enabledSync?: (state: T) => boolean;
