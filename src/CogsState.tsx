@@ -435,7 +435,7 @@ function setOptions<StateKey, Opt>({
       }
     }
   }
-  console.log("existingOptions", mergedOptions, options, initialOptionsPart);
+  console.log("existingOptions-------", mergedOptions);
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
@@ -712,13 +712,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
     const options = latestInitialOptionsRef.current;
     let localData = null;
-    if (options?.log) {
-      console.log("newoptions", options);
-    }
+
     const localkey = isFunction(options?.localStorage?.key)
       ? options?.localStorage?.key(initialState)
       : options?.localStorage?.key;
-
+    if (options?.log) {
+      console.log("newoptions", options);
+      console.log("localkey", localkey);
+      console.log("initialState", initialState);
+    }
     if (localkey && sessionId) {
       localData = loadFromLocalStorage(
         sessionId + "-" + thisKey + "-" + localkey
