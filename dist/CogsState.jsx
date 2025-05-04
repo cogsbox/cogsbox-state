@@ -176,7 +176,7 @@ function Ot(t, {
       T + "-" + g + "-" + d
     ));
     let _ = null, k = !1;
-    f && (_ = f), o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (_ = o.state, k = !0), _ || (Tt(
+    f && (_ = f), o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (_ = o.state, k = !0), _ && (Tt(
       g,
       f,
       _,

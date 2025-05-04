@@ -742,7 +742,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
 
-    if (!newState) {
+    if (newState) {
       updateGlobalState(
         thisKey,
         initialState,
