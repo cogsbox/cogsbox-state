@@ -435,6 +435,14 @@ function setOptions<StateKey, Opt>({
           needToAdd = true;
           mergedOptions[key] = options[key];
         }
+        if (
+          key == "initialState" &&
+          options[key] &&
+          mergedOptions[key] !== options[key]
+        ) {
+          needToAdd = true;
+          mergedOptions[key] = options[key];
+        }
       }
     }
   }
@@ -706,12 +714,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    if (!initialState) {
-      return;
+    if (initialState) {
+      setAndMergeOptions(thisKey as string, {
+        initialState,
+      });
     }
-    setAndMergeOptions(thisKey as string, {
-      initialState,
-    });
 
     const options = latestInitialOptionsRef.current;
     let localData = null;
@@ -732,17 +739,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     let newState = null;
     let loadingLocalData = false;
-    if (localData) {
-      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-        newState = localData.state;
-        loadingLocalData = true;
-      }
-    }
+
     if (initialState) {
       newState = initialState;
-    }
 
-    if (newState) {
+      if (localData) {
+        if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+          newState = localData.state;
+          if (options?.localStorage?.onChange) {
+            options?.localStorage?.onChange(newState);
+          }
+        }
+      }
       console.log("newState thius is newstate", newState);
 
       updateGlobalState(
@@ -753,10 +761,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
-
-      if (loadingLocalData && options?.localStorage?.onChange) {
-        options?.localStorage?.onChange(newState);
-      }
 
       notifyComponents(thisKey);
       forceUpdate({});
