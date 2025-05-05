@@ -706,9 +706,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    setAndMergeOptions(thisKey as string, {
-      initialState,
-    });
+    if (initialState) {
+      setAndMergeOptions(thisKey as string, {
+        initialState,
+      });
+    }
     const options = latestInitialOptionsRef.current;
     let localData = null;
 
@@ -740,16 +742,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     if (newState) {
       console.log("newState thius is newstate", newState);
-      if (initialState) {
-        updateGlobalState(
-          thisKey,
-          initialState,
-          newState,
-          effectiveSetState,
-          componentIdRef.current,
-          sessionId
-        );
-      }
+
+      updateGlobalState(
+        thisKey,
+        initialState,
+        newState,
+        effectiveSetState,
+        componentIdRef.current,
+        sessionId
+      );
+
       if (loadingLocalData && options?.localStorage?.onChange) {
         options?.localStorage?.onChange(newState);
       }
@@ -1277,10 +1279,7 @@ function createProxyHandler<T>(
             // Get initial state at this path
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
-            console.log("initialStateAtPath initialState", initialState, path);
             const initialStateAtPath = getNestedValue(initialState, path);
-            console.log("initialStateAtPath", initialStateAtPath);
-            console.log("thisReactiveState", thisReactiveState);
             // Simply compare current state with initial state
             if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
               return "fresh"; // Matches initial state
