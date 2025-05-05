@@ -1134,18 +1134,17 @@ function createProxyHandler<T>(
       if (storageKey) {
         localStorage.removeItem(storageKey);
       }
-      startTransition(() => {
-        setUpdaterState(stateKey, newProxy);
-        setState(stateKey, initialState);
-        const stateEntry = getGlobalStore
-          .getState()
-          .stateComponents.get(stateKey);
-        if (stateEntry) {
-          stateEntry.components.forEach((component) => {
-            component.forceUpdate();
-          });
-        }
-      });
+
+      setUpdaterState(stateKey, newProxy);
+      setState(stateKey, initialState);
+      const stateEntry = getGlobalStore
+        .getState()
+        .stateComponents.get(stateKey);
+      if (stateEntry) {
+        stateEntry.components.forEach((component) => {
+          component.forceUpdate();
+        });
+      }
 
       return initialState;
     },

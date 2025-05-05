@@ -1,12 +1,12 @@
 "use client";
 import { jsx as ct } from "react/jsx-runtime";
-import { useState as et, useRef as Z, useEffect as nt, useLayoutEffect as It, useMemo as _t, createElement as Q, useSyncExternalStore as Et, startTransition as H } from "react";
+import { useState as tt, useRef as Z, useEffect as et, useLayoutEffect as It, useMemo as _t, createElement as X, useSyncExternalStore as Et, startTransition as rt } from "react";
 import { transformStateFunc as wt, isFunction as L, getNestedValue as U, isDeepEqual as M, debounce as $t } from "./utility.js";
-import { pushFunc as K, updateFn as B, cutFunc as J, ValidationWrapper as Nt, FormControlComponent as Vt } from "./Functions.jsx";
+import { pushFunc as Q, updateFn as B, cutFunc as J, ValidationWrapper as Nt, FormControlComponent as Vt } from "./Functions.jsx";
 import "zod";
 import { getGlobalStore as r, formRefStore as lt } from "./store.js";
 import { useCogsConfig as At } from "./CogsStateClient.jsx";
-import rt from "./node_modules/uuid/dist/esm-browser/v4.js";
+import nt from "./node_modules/uuid/dist/esm-browser/v4.js";
 function dt(t, i) {
   const m = r.getState().getInitialOptions, y = r.getState().setInitialStateOptions, u = m(t) || {};
   y(t, {
@@ -42,7 +42,7 @@ const zt = (t, i) => {
     }, q(v) || r.getState().setInitialStateOptions(v, u[v]);
   }), r.getState().setInitialStates(y);
   const w = (v, l) => {
-    const [f] = et(l?.componentId ?? rt());
+    const [f] = tt(l?.componentId ?? nt());
     ut({
       stateKey: v,
       options: l,
@@ -70,7 +70,7 @@ const zt = (t, i) => {
   }
   return { useCogsState: w, setCogsOptions: E };
 }, {
-  setUpdaterState: Y,
+  setUpdaterState: H,
   setState: D,
   getInitialOptions: q,
   getKeyState: gt,
@@ -108,7 +108,7 @@ const zt = (t, i) => {
 }, Tt = (t, i, m, y, u, w) => {
   const E = {
     initialState: i,
-    updaterState: X(
+    updaterState: Y(
       t,
       y,
       u,
@@ -116,8 +116,8 @@ const zt = (t, i) => {
     ),
     state: m
   };
-  H(() => {
-    ot(t, E.initialState), Y(t, E.updaterState), D(t, E.state);
+  rt(() => {
+    ot(t, E.initialState), H(t, E.updaterState), D(t, E.state);
   });
 }, St = (t) => {
   const i = r.getState().stateComponents.get(t);
@@ -126,7 +126,7 @@ const zt = (t, i) => {
   i.components.forEach((y) => {
     m.add(() => y.forceUpdate());
   }), queueMicrotask(() => {
-    H(() => {
+    rt(() => {
       m.forEach((y) => y());
     });
   });
@@ -150,10 +150,10 @@ function Ot(t, {
   syncUpdate: e,
   dependencies: S
 } = {}) {
-  const [x, A] = et({}), { sessionId: T } = At();
+  const [x, A] = tt({}), { sessionId: T } = At();
   let R = !i;
-  const [g] = et(i ?? rt()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), b = Z(l ?? rt()), C = Z(null);
-  C.current = q(g), nt(() => {
+  const [g] = tt(i ?? nt()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), b = Z(l ?? nt()), C = Z(null);
+  C.current = q(g), et(() => {
     if (e && e.stateKey === g && e.path?.[0]) {
       D(g, (o) => ({
         ...o,
@@ -165,7 +165,7 @@ function Ot(t, {
         userId: e.userId
       });
     }
-  }, [e]), nt(() => {
+  }, [e]), et(() => {
     dt(g, {
       initialState: f
     });
@@ -306,16 +306,16 @@ function Ot(t, {
       return N;
     });
   };
-  r.getState().updaterState[g] || (Y(
+  r.getState().updaterState[g] || (H(
     g,
-    X(
+    Y(
       g,
       n,
       b.current,
       T
     )
   ), r.getState().cogsStateStore[g] || D(g, t), r.getState().initialStateGlobal[g] || ot(g, t));
-  const a = _t(() => X(
+  const a = _t(() => Y(
     g,
     n,
     b.current,
@@ -323,7 +323,7 @@ function Ot(t, {
   ), [g]);
   return [gt(g), a];
 }
-function X(t, i, m, y) {
+function Y(t, i, m, y) {
   const u = /* @__PURE__ */ new Map();
   let w = 0;
   const E = (f) => {
@@ -341,24 +341,22 @@ function X(t, i, m, y) {
       const S = r.getState().initialStateGlobal[t];
       u.clear(), w++;
       const x = l(S, []), A = q(t), T = L(A?.localStorage?.key) ? A?.localStorage?.key(S) : A?.localStorage?.key, R = `${y}-${t}-${T}`;
-      return R && localStorage.removeItem(R), H(() => {
-        Y(t, x), D(t, S);
-        const g = r.getState().stateComponents.get(t);
-        g && g.components.forEach((s) => {
-          s.forceUpdate();
-        });
+      R && localStorage.removeItem(R), H(t, x), D(t, S);
+      const g = r.getState().stateComponents.get(t);
+      return g && g.components.forEach((s) => {
+        s.forceUpdate();
       }), S;
     },
     updateInitialState: (f) => {
       u.clear(), w++;
-      const e = X(
+      const e = Y(
         t,
         i,
         m,
         y
       );
-      return H(() => {
-        ot(t, f), Y(t, e), D(t, f);
+      return rt(() => {
+        ot(t, f), H(t, e), D(t, f);
         const S = r.getState().stateComponents.get(t);
         S && S.components.forEach((x) => {
           x.forceUpdate();
@@ -469,7 +467,7 @@ function X(t, i, m, y) {
               });
             };
           if (s === "$stateMap")
-            return (n) => Q(jt, {
+            return (n) => X(jt, {
               proxy: {
                 _stateKey: t,
                 _path: e,
@@ -508,7 +506,7 @@ function X(t, i, m, y) {
               return l(a, [...e, n.toString()]);
             };
           if (s === "insert")
-            return (n) => (E(e), K(i, n, e, t), l(
+            return (n) => (E(e), Q(i, n, e, t), l(
               r.getState().cogsStateStore[t],
               []
             ));
@@ -526,7 +524,7 @@ function X(t, i, m, y) {
                 const j = M(N, d);
                 return j && (I = N), j;
               }))
-                E(e), K(i, d, e, t);
+                E(e), Q(i, d, e, t);
               else if (c && I) {
                 const N = c(I), j = o.map(
                   (p) => M(p, I) ? N : p
@@ -546,7 +544,7 @@ function X(t, i, m, y) {
           if (s === "toggleByValue")
             return (n) => {
               const a = f.findIndex((c) => c === n);
-              a > -1 ? J(i, e, t, a) : K(i, n, e, t);
+              a > -1 ? J(i, e, t, a) : Q(i, n, e, t);
             };
           if (s === "stateFilter")
             return (n) => {
@@ -577,19 +575,19 @@ function X(t, i, m, y) {
         if (s === "get")
           return () => r.getState().getNestedState(t, e);
         if (s === "$derive")
-          return (n) => tt({
+          return (n) => K({
             _stateKey: t,
             _path: e,
             _effect: n.toString()
           });
         if (s === "$derive")
-          return (n) => tt({
+          return (n) => K({
             _stateKey: t,
             _path: e,
             _effect: n.toString()
           });
         if (s === "$get")
-          return () => tt({
+          return () => K({
             _stateKey: t,
             _path: e
           });
@@ -709,8 +707,8 @@ function X(t, i, m, y) {
     r.getState().getNestedState(t, [])
   );
 }
-function tt(t) {
-  return Q(bt, { proxy: t });
+function K(t) {
+  return X(bt, { proxy: t });
 }
 function jt({
   proxy: t,
@@ -728,7 +726,7 @@ function bt({
   proxy: t
 }) {
   const i = Z(null), m = `${t._stateKey}-${t._path.join(".")}`;
-  return nt(() => {
+  return et(() => {
     const y = i.current;
     if (!y || !y.parentElement) return;
     const u = y.parentElement, E = Array.from(u.childNodes).indexOf(y);
@@ -757,7 +755,7 @@ function bt({
     S !== null && typeof S == "object" && (S = JSON.stringify(S));
     const x = document.createTextNode(String(S));
     y.replaceWith(x);
-  }, [t._stateKey, t._path.join("."), t._effect]), Q("span", {
+  }, [t._stateKey, t._path.join("."), t._effect]), X("span", {
     ref: i,
     style: { display: "none" },
     "data-signal-id": m
@@ -776,10 +774,10 @@ function Jt(t) {
     },
     () => r.getState().getNestedState(t._stateKey, t._path)
   );
-  return Q("text", {}, String(i));
+  return X("text", {}, String(i));
 }
 export {
-  tt as $cogsSignal,
+  K as $cogsSignal,
   Jt as $cogsSignalStore,
   qt as addStateOptions,
   zt as createCogsState,
