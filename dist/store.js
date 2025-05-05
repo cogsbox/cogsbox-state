@@ -13,8 +13,8 @@ const v = u((a, i) => ({
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
     const r = i().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
-    return r.forEach((s, o) => {
-      (o.startsWith(t) || o === e) && n.set(o, s);
+    return r.forEach((o, s) => {
+      (s.startsWith(t) || s === e) && n.set(s, o);
     }), n;
   }
 })), m = u((a, i) => ({
@@ -27,11 +27,11 @@ const v = u((a, i) => ({
   },
   setSelectedIndex: (e, r, t) => {
     a((n) => {
-      const s = new Map(n.selectedIndicesMap);
-      let o = s.get(e);
-      return o || (o = /* @__PURE__ */ new Map(), s.set(e, o)), t === void 0 ? o.delete(r) : o.set(r, t), {
+      const o = new Map(n.selectedIndicesMap);
+      let s = o.get(e);
+      return s || (s = /* @__PURE__ */ new Map(), o.set(e, s)), t === void 0 ? s.delete(r) : s.set(r, t), {
         ...n,
-        selectedIndicesMap: s
+        selectedIndicesMap: o
       };
     });
   },
@@ -68,8 +68,8 @@ const v = u((a, i) => ({
   },
   removeSignalElement: (e, r) => {
     const t = i().signalDomElements, n = t.get(e);
-    n && n.forEach((s) => {
-      s.instanceId === r && n.delete(s);
+    n && n.forEach((o) => {
+      o.instanceId === r && n.delete(o);
     }), a({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
@@ -79,6 +79,15 @@ const v = u((a, i) => ({
   stateLog: {},
   isLoadingGlobal: {},
   initialStateGlobal: {},
+  iniitialCreatedState: {},
+  updateInitialCreatedState: (e, r) => {
+    a((t) => ({
+      iniitialCreatedState: {
+        ...t.iniitialCreatedState,
+        [e]: r
+      }
+    }));
+  },
   validationErrors: /* @__PURE__ */ new Map(),
   serverState: {},
   serverSyncActions: {},
@@ -112,11 +121,11 @@ const v = u((a, i) => ({
   },
   setStateLog: (e, r) => {
     a((t) => {
-      const n = t.stateLog[e] ?? [], s = r(n);
+      const n = t.stateLog[e] ?? [], o = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: s
+          [e]: o
         }
       };
     });
@@ -139,78 +148,78 @@ const v = u((a, i) => ({
   },
   addValidationError: (e, r) => {
     console.log("addValidationError---"), a((t) => {
-      const n = new Map(t.validationErrors), s = n.get(e) || [];
-      return console.log("addValidationError", e, r, s), n.set(e, [...s, r]), { validationErrors: n };
+      const n = new Map(t.validationErrors), o = n.get(e) || [];
+      return console.log("addValidationError", e, r, o), n.set(e, [...o, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
     a((r) => {
       const t = new Map(r.validationErrors);
       let n = !1;
-      const s = e.split(".");
-      return Array.from(t.keys()).forEach((o) => {
-        const l = o.split(".");
-        if (l.length >= s.length) {
+      const o = e.split(".");
+      return Array.from(t.keys()).forEach((s) => {
+        const c = s.split(".");
+        if (c.length >= o.length) {
           let d = !0;
-          for (let c = 0; c < s.length; c++)
-            if (l[c] !== s[c]) {
+          for (let l = 0; l < o.length; l++)
+            if (c[l] !== o[l]) {
               d = !1;
               break;
             }
-          d && (n = !0, t.delete(o));
+          d && (n = !0, t.delete(s));
         }
       }), n ? { validationErrors: t } : r;
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = i().validationErrors, n = e.split("."), s = (o, l) => o === "[*]" ? !0 : Array.isArray(o) ? o.includes(parseInt(l)) : o === l;
-    return Array.from(t.keys()).forEach((o) => {
-      const l = o.split(".");
-      if (l.length >= n.length) {
+    const r = [], t = i().validationErrors, n = e.split("."), o = (s, c) => s === "[*]" ? !0 : Array.isArray(s) ? s.includes(parseInt(c)) : s === c;
+    return Array.from(t.keys()).forEach((s) => {
+      const c = s.split(".");
+      if (c.length >= n.length) {
         let d = !0;
-        for (let c = 0; c < n.length; c++) {
-          const f = n[c], S = l[c];
-          if (f === "[*]" || Array.isArray(f)) {
-            const p = parseInt(S);
+        for (let l = 0; l < n.length; l++) {
+          const S = n[l], f = c[l];
+          if (S === "[*]" || Array.isArray(S)) {
+            const p = parseInt(f);
             if (isNaN(p)) {
               d = !1;
               break;
             }
-            if (!s(f, S)) {
+            if (!o(S, f)) {
               d = !1;
               break;
             }
-          } else if (f !== S) {
+          } else if (S !== f) {
             d = !1;
             break;
           }
         }
         if (d) {
-          const c = t.get(o);
-          c && r.push(...c);
+          const l = t.get(s);
+          l && r.push(...l);
         }
       }
     }), r;
   },
   getInitialOptions: (e) => i().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = i().cogsStateStore[e], n = (s, o) => {
-      if (o.length === 0) return s;
-      const l = o[0], d = o.slice(1);
-      if (l === "[*]") {
-        if (!Array.isArray(s)) {
+    const t = i().cogsStateStore[e], n = (o, s) => {
+      if (s.length === 0) return o;
+      const c = s[0], d = s.slice(1);
+      if (c === "[*]") {
+        if (!Array.isArray(o)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (d.length === 0) return s;
-        const f = s.map(
-          (S) => n(S, d)
+        if (d.length === 0) return o;
+        const S = o.map(
+          (f) => n(f, d)
         );
-        return Array.isArray(f[0]) ? f.flat() : f;
+        return Array.isArray(S[0]) ? S.flat() : S;
       }
-      const c = s[l];
-      if (c !== void 0)
-        return n(c, d);
+      const l = o[c];
+      if (l !== void 0)
+        return n(l, d);
     };
     return n(t, r);
   },
@@ -247,6 +256,14 @@ const v = u((a, i) => ({
   setInitialStates: (e) => {
     a((r) => ({
       cogsStateStore: {
+        ...r.cogsStateStore,
+        ...e
+      }
+    }));
+  },
+  setCreatedState: (e) => {
+    a((r) => ({
+      iniitialCreatedState: {
         ...r.cogsStateStore,
         ...e
       }

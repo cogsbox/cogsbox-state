@@ -101,6 +101,7 @@ export type CogsGlobalState = {
   isLoadingGlobal: { [key: string]: boolean };
 
   initialStateGlobal: { [key: string]: StateValue };
+  iniitialCreatedState: { [key: string]: StateValue };
   validationErrors: Map<string, string[]>;
 
   serverState: { [key: string]: StateValue };
@@ -122,6 +123,7 @@ export type CogsGlobalState = {
   addValidationError: (path: string, message: string) => void;
   getValidationErrors: (path: string) => string[];
   updateInitialStateGlobal: (key: string, newState: StateValue) => void;
+  updateInitialCreatedState: (key: string, newState: StateValue) => void;
   getInitialOptions: (key: string) => OptionsType | undefined;
   getUpdaterState: (key: string) => StateUpdater<StateValue>;
   setUpdaterState: (key: string, newUpdater: any) => void;
@@ -135,6 +137,7 @@ export type CogsGlobalState = {
     value: StateUpdater<StateValue>
   ) => void;
   setInitialStates: (initialState: StateValue) => void;
+  setCreatedState: (initialState: StateValue) => void;
   stateLog: { [key: string]: UpdateTypeDetail[] };
   setStateLog: (
     key: string,
@@ -300,6 +303,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   isLoadingGlobal: {},
 
   initialStateGlobal: {},
+  iniitialCreatedState: {},
+  updateInitialCreatedState: (key, newState) => {
+    set((prev) => ({
+      iniitialCreatedState: {
+        ...prev.iniitialCreatedState,
+        [key]: newState,
+      },
+    }));
+  },
+
   validationErrors: new Map(),
 
   serverState: {},
@@ -557,6 +570,15 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       },
     }));
   },
+  setCreatedState: (initialState: StateValue) => {
+    set((prev) => ({
+      iniitialCreatedState: {
+        ...prev.cogsStateStore,
+        ...initialState,
+      },
+    }));
+  },
+
   syncInfoStore: new Map<string, SyncInfo>(),
   setSyncInfo: (key: string, syncInfo: SyncInfo) =>
     set((state) => {

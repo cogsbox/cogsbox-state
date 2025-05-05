@@ -48,6 +48,9 @@ export type CogsGlobalState = {
     initialStateGlobal: {
         [key: string]: StateValue;
     };
+    iniitialCreatedState: {
+        [key: string]: StateValue;
+    };
     validationErrors: Map<string, string[]>;
     serverState: {
         [key: string]: StateValue;
@@ -70,6 +73,7 @@ export type CogsGlobalState = {
     addValidationError: (path: string, message: string) => void;
     getValidationErrors: (path: string) => string[];
     updateInitialStateGlobal: (key: string, newState: StateValue) => void;
+    updateInitialCreatedState: (key: string, newState: StateValue) => void;
     getInitialOptions: (key: string) => OptionsType | undefined;
     getUpdaterState: (key: string) => StateUpdater<StateValue>;
     setUpdaterState: (key: string, newUpdater: any) => void;
@@ -77,6 +81,7 @@ export type CogsGlobalState = {
     getNestedState: <StateKey extends StateKeys>(key: StateKey, path: string[]) => StateValue;
     setState: <StateKey extends StateKeys>(key: StateKey, value: StateUpdater<StateValue>) => void;
     setInitialStates: (initialState: StateValue) => void;
+    setCreatedState: (initialState: StateValue) => void;
     stateLog: {
         [key: string]: UpdateTypeDetail[];
     };

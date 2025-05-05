@@ -32,6 +32,7 @@ import { ZodArray, ZodObject, type ZodRawShape } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
+import { get } from "http";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -493,6 +494,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
   }
 
   getGlobalStore.getState().setInitialStates(statePart);
+  getGlobalStore.getState().setCreatedState(statePart);
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
@@ -737,34 +739,30 @@ export function useCogsStateFn<TStateObject extends unknown>(
       );
     }
 
-    let newState = null;
-    let loadingLocalData = false;
+    let newState =
+      initialState ?? getGlobalStore.getState().iniitialCreatedState[thisKey];
 
-    if (initialState) {
-      newState = initialState;
-
-      if (localData) {
-        if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-          newState = localData.state;
-          if (options?.localStorage?.onChange) {
-            options?.localStorage?.onChange(newState);
-          }
+    if (localData) {
+      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+        newState = localData.state;
+        if (options?.localStorage?.onChange) {
+          options?.localStorage?.onChange(newState);
         }
       }
-      console.log("newState thius is newstate", newState);
-
-      updateGlobalState(
-        thisKey,
-        initialState,
-        newState,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
-
-      notifyComponents(thisKey);
-      forceUpdate({});
     }
+    console.log("newState thius is newstate", newState);
+
+    updateGlobalState(
+      thisKey,
+      initialState,
+      newState,
+      effectiveSetState,
+      componentIdRef.current,
+      sessionId
+    );
+
+    notifyComponents(thisKey);
+    forceUpdate({});
   }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
