@@ -1106,14 +1106,14 @@ function createProxyHandler<T>(
       if (init?.key) {
         removeValidationError(init?.key);
       }
-
+      console.log("revert to initial state");
       if (obj?.validationKey) {
         removeValidationError(obj.validationKey);
       }
 
       const initialState =
         getGlobalStore.getState().initialStateGlobal[stateKey];
-
+      console.log("revert initialState", initialState);
       // ADDED: Clear cache on revert
       shapeCache.clear();
       stateVersion++;
@@ -1125,7 +1125,8 @@ function createProxyHandler<T>(
         : initalOptionsGet?.localStorage?.key;
 
       const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
+      console.log("revert storageKey", storageKey);
+      console.log("revert initalOptionsGet", initalOptionsGet);
       if (storageKey) {
         localStorage.removeItem(storageKey);
       }
@@ -1274,7 +1275,8 @@ function createProxyHandler<T>(
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
             const initialStateAtPath = getNestedValue(initialState, path);
-
+            console.log("initialStateAtPath", initialStateAtPath);
+            console.log("thisReactiveState", thisReactiveState);
             // Simply compare current state with initial state
             if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
               return "fresh"; // Matches initial state
