@@ -719,11 +719,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const localkey = isFunction(options?.localStorage?.key)
       ? options?.localStorage?.key(initialState)
       : options?.localStorage?.key;
-    if (options?.log) {
-      console.log("newoptions", options);
-      console.log("localkey", localkey);
-      console.log("initialState", initialState);
-    }
+
+    console.log("newoptions", options);
+    console.log("localkey", localkey);
+    console.log("initialState", initialState);
+
     if (localkey && sessionId) {
       localData = loadFromLocalStorage(
         sessionId + "-" + thisKey + "-" + localkey

@@ -172,7 +172,7 @@ function Ot(t, {
     const c = C.current;
     let o = null;
     const d = L(c?.localStorage?.key) ? c?.localStorage?.key(f) : c?.localStorage?.key;
-    c?.log && (console.log("newoptions", c), console.log("localkey", d), console.log("initialState", f)), d && T && (o = ft(
+    console.log("newoptions", c), console.log("localkey", d), console.log("initialState", f), d && T && (o = ft(
       T + "-" + g + "-" + d
     ));
     let I = null, k = !1;
