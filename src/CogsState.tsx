@@ -32,7 +32,6 @@ import { ZodArray, ZodObject, type ZodRawShape } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
-import { get } from "http";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -738,31 +737,37 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId + "-" + thisKey + "-" + localkey
       );
     }
+    const createdState =
+      getGlobalStore.getState().iniitialCreatedState[thisKey];
+    console.log("createdState - intiual", createdState, initialState);
+    let newState = null;
+    let loadingLocalData = false;
 
-    let newState =
-      initialState ?? getGlobalStore.getState().iniitialCreatedState[thisKey];
+    if (initialState) {
+      newState = initialState;
 
-    if (localData) {
-      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-        newState = localData.state;
-        if (options?.localStorage?.onChange) {
-          options?.localStorage?.onChange(newState);
+      if (localData) {
+        if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+          newState = localData.state;
+          if (options?.localStorage?.onChange) {
+            options?.localStorage?.onChange(newState);
+          }
         }
       }
+      console.log("newState thius is newstate", newState);
+
+      updateGlobalState(
+        thisKey,
+        initialState,
+        newState,
+        effectiveSetState,
+        componentIdRef.current,
+        sessionId
+      );
+
+      notifyComponents(thisKey);
+      forceUpdate({});
     }
-    console.log("newState thius is newstate", newState);
-
-    updateGlobalState(
-      thisKey,
-      initialState,
-      newState,
-      effectiveSetState,
-      componentIdRef.current,
-      sessionId
-    );
-
-    notifyComponents(thisKey);
-    forceUpdate({});
   }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
