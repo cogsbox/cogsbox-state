@@ -185,16 +185,13 @@ function Ot(t, {
       T
     ), k && c?.localStorage?.onChange && c?.localStorage?.onChange(I), St(g), A({}));
   }, [f, ...S || []]), It(() => {
-    R && dt(
-      g,
-      {
-        serverSync: m,
-        formElements: u,
-        initialState: f,
-        localStorage: y,
-        middleware: w
-      }
-    );
+    R && dt(g, {
+      serverSync: m,
+      formElements: u,
+      initialState: f,
+      localStorage: y,
+      middleware: w
+    });
     const c = `${g}////${b.current}`, o = r.getState().stateComponents.get(g) || {
       components: /* @__PURE__ */ new Map()
     };

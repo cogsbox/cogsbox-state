@@ -198,8 +198,6 @@ export type OptionsType<T extends unknown = unknown> = {
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
-    pk?: keyof T;
-    currrentPk?: string | number;
     initialState?: T;
     dependencies?: any[];
 };

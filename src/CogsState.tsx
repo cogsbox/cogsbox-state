@@ -315,8 +315,7 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
-  pk?: keyof T;
-  currrentPk?: string | number;
+
   initialState?: T;
   dependencies?: any[]; // Just like useEffect dependencies
 };
@@ -394,10 +393,7 @@ export type TransformedStateType<T> = {
   [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 
-function setAndMergeOptions(
-  stateKey: string,
-  newOptions: OptionsType<unknown>
-) {
+function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
   const getInitialOptions = getGlobalStore.getState().getInitialOptions;
   const setInitialStateOptions =
     getGlobalStore.getState().setInitialStateOptions;
@@ -767,16 +763,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   useLayoutEffect(() => {
     if (noStateKey) {
-      setAndMergeOptions(
-        thisKey as string,
-        {
-          serverSync,
-          formElements,
-          initialState,
-          localStorage,
-          middleware,
-        } as OptionsType<unknown>
-      );
+      setAndMergeOptions(thisKey as string, {
+        serverSync,
+        formElements,
+        initialState,
+        localStorage,
+        middleware,
+      });
     }
 
     const depsKey = `${thisKey}////${componentIdRef.current}`;
