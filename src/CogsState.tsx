@@ -771,7 +771,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
       let localData = loadFromLocalStorage(
         sessionId + "-" + thisKey + "-" + localkey
       );
-      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+      if (
+        localData &&
+        localData.lastUpdated > (localData.lastSyncedWithServer || 0)
+      ) {
         updateGlobalState(
           thisKey,
           initialState,

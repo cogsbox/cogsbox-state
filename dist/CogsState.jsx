@@ -201,7 +201,7 @@ function Ot(t, {
       let N = mt(
         x + "-" + d + "-" + $
       );
-      N.lastUpdated > (N.lastSyncedWithServer || 0) && (ft(
+      N && N.lastUpdated > (N.lastSyncedWithServer || 0) && (ft(
         d,
         f,
         N.state,
