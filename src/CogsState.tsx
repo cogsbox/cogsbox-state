@@ -713,10 +713,33 @@ export function useCogsStateFn<TStateObject extends unknown>(
     setAndMergeOptions(thisKey as string, {
       initialState,
     });
-    let newState = null;
+    const options = latestInitialOptionsRef.current;
+    let localData = null;
 
+    const localkey = isFunction(options?.localStorage?.key)
+      ? options?.localStorage?.key(initialState)
+      : options?.localStorage?.key;
+    if (options?.log) {
+      console.log("newoptions", options);
+      console.log("localkey", localkey);
+      console.log("initialState", initialState);
+    }
+    if (localkey && sessionId) {
+      localData = loadFromLocalStorage(
+        sessionId + "-" + thisKey + "-" + localkey
+      );
+    }
+
+    let newState = null;
+    let loadingLocalData = false;
     if (initialState) {
       newState = initialState;
+    }
+    if (localData) {
+      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+        newState = localData.state;
+        loadingLocalData = true;
+      }
     }
 
     if (newState) {
@@ -729,6 +752,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
+      if (loadingLocalData && options?.localStorage?.onChange) {
+        options?.localStorage?.onChange(newState);
+      }
 
       notifyComponents(thisKey);
       forceUpdate({});
@@ -762,39 +788,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
     });
 
     getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-    const options = latestInitialOptionsRef.current;
-    const localkey = isFunction(options?.localStorage?.key)
-      ? options?.localStorage?.key(initialState)
-      : options?.localStorage?.key;
-
-    if (localkey && sessionId) {
-      let localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + localkey
-      );
-      if (
-        localData &&
-        localData.lastUpdated &&
-        localData.lastUpdated > (localData.lastSyncedWithServer || 0)
-      ) {
-        updateGlobalState(
-          thisKey,
-          initialState,
-          localData.state,
-          effectiveSetState,
-          componentIdRef.current,
-          sessionId
-        );
-        if (options?.localStorage?.onChange) {
-          options?.localStorage?.onChange(localData.state);
-        }
-
-        notifyComponents(thisKey);
-      }
-    }
-
     //need to force update to create the stateUpdates references
     forceUpdate({});
-
     return () => {
       const depsKey = `${thisKey}////${componentIdRef.current}`;
 
