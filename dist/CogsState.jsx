@@ -48,7 +48,7 @@ const zt = (t, i) => {
       options: l,
       initialOptionsPart: g
     });
-    const e = r.getState().cogsStateStore[v] || y[v], S = l?.modifyState ? l.modifyState(e) : e, [x, A] = Ot(
+    const e = r.getState().cogsStateStore[v] || y[v], S = l?.modifyState ? l.modifyState(e) : e, [p, A] = Ot(
       S,
       {
         stateKey: v,
@@ -79,7 +79,7 @@ const zt = (t, i) => {
   updateInitialStateGlobal: rt,
   addValidationError: kt,
   removeValidationError: P,
-  setServerSyncActions: pt
+  setServerSyncActions: xt
 } = r.getState(), ut = (t) => {
   if (!t) return null;
   try {
@@ -88,7 +88,7 @@ const zt = (t, i) => {
   } catch (i) {
     return console.error("Error loading from localStorage:", i), null;
   }
-}, xt = (t, i, m, y) => {
+}, pt = (t, i, m, y) => {
   m?.log && console.log(
     "saving to localstorage",
     i,
@@ -146,7 +146,7 @@ function Ot(t, {
   syncUpdate: e,
   dependencies: S
 } = {}) {
-  const [x, A] = tt({}), { sessionId: T } = At();
+  const [p, A] = tt({}), { sessionId: T } = At();
   let R = !i;
   const [u] = tt(i ?? nt()), s = r.getState().stateLog[u], G = Z(/* @__PURE__ */ new Set()), b = Z(l ?? nt()), C = Z(null);
   C.current = q(u), et(() => {
@@ -238,15 +238,15 @@ function Ot(t, {
       d.updateType === "update" && (I || C.current?.validationKey) && o && P(
         (I || C.current?.validationKey) + "." + o.join(".")
       );
-      const p = o.slice(0, o.length - 1);
+      const x = o.slice(0, o.length - 1);
       d.updateType === "cut" && C.current?.validationKey && P(
-        C.current?.validationKey + "." + p.join(".")
+        C.current?.validationKey + "." + x.join(".")
       ), d.updateType === "insert" && C.current?.validationKey && ht(
-        C.current?.validationKey + "." + p.join(".")
+        C.current?.validationKey + "." + x.join(".")
       ).filter(([_, V]) => {
         let h = _?.split(".").length;
-        if (_ == p.join(".") && h == p.length - 1) {
-          let $ = _ + "." + p;
+        if (_ == x.join(".") && h == x.length - 1) {
+          let $ = _ + "." + x;
           P(_), kt($, V);
         }
       });
@@ -282,7 +282,7 @@ function Ot(t, {
           return O ? (O.timeStamp = Math.max(O.timeStamp, $.timeStamp), O.newValue = $.newValue, O.oldValue = O.oldValue ?? $.oldValue, O.updateType = $.updateType) : h.set(W, { ...$ }), h;
         }, /* @__PURE__ */ new Map());
         return Array.from(V.values());
-      }), xt(
+      }), pt(
         N,
         u,
         C.current,
@@ -292,7 +292,7 @@ function Ot(t, {
         update: at
       }), C.current?.serverSync) {
         const F = r.getState().serverState[u], _ = C.current?.serverSync;
-        pt(u, {
+        xt(u, {
           syncKey: typeof _.syncKey == "string" ? _.syncKey : _.syncKey({ state: N }),
           rollBackState: F,
           actionTimeStamp: Date.now() + (_.debounce ?? 3e3),
@@ -336,8 +336,8 @@ function Y(t, i, m, y) {
       e?.key && P(e?.key), f?.validationKey && P(f.validationKey);
       const S = r.getState().initialStateGlobal[t];
       r.getState().clearSelectedIndexesForState(t), g.clear(), w++;
-      const x = l(S, []), A = q(t), T = L(A?.localStorage?.key) ? A?.localStorage?.key(S) : A?.localStorage?.key, R = `${y}-${t}-${T}`;
-      R && localStorage.removeItem(R), H(t, x), D(t, S);
+      const p = l(S, []), A = q(t), T = L(A?.localStorage?.key) ? A?.localStorage?.key(S) : A?.localStorage?.key, R = `${y}-${t}-${T}`;
+      R && localStorage.removeItem(R), H(t, p), D(t, S);
       const u = r.getState().stateComponents.get(t);
       return u && u.components.forEach((s) => {
         s.forceUpdate();
@@ -354,8 +354,8 @@ function Y(t, i, m, y) {
       return Et(() => {
         rt(t, f), H(t, e), D(t, f);
         const S = r.getState().stateComponents.get(t);
-        S && S.components.forEach((x) => {
-          x.forceUpdate();
+        S && S.components.forEach((p) => {
+          p.forceUpdate();
         });
       }), {
         fetchId: (S) => e.get()[S]
@@ -370,8 +370,8 @@ function Y(t, i, m, y) {
     }
   };
   function l(f, e = [], S) {
-    const x = e.map(String).join(".");
-    g.get(x);
+    const p = e.map(String).join(".");
+    g.get(p);
     const A = function() {
       return r().getNestedState(t, e);
     };
@@ -401,7 +401,9 @@ function Y(t, i, m, y) {
             const n = r().getNestedState(
               t,
               e
-            ), a = r.getState().initialStateGlobal[t], c = U(a, e);
+            ), a = r.getState().initialStateGlobal[t];
+            console.log("initialStateAtPath initialState", a, e);
+            const c = U(a, e);
             return console.log("initialStateAtPath", c), console.log("thisReactiveState", n), M(n, c) ? "fresh" : "stale";
           };
         if (s === "removeStorage")
@@ -512,10 +514,10 @@ function Y(t, i, m, y) {
               let I = null;
               if (!o.some((N) => {
                 if (a) {
-                  const p = a.every(
+                  const x = a.every(
                     (z) => M(N[z], d[z])
                   );
-                  return p && (I = N), p;
+                  return x && (I = N), x;
                 }
                 const j = M(N, d);
                 return j && (I = N), j;
@@ -523,7 +525,7 @@ function Y(t, i, m, y) {
                 E(e), Q(i, d, e, t);
               else if (c && I) {
                 const N = c(I), j = o.map(
-                  (p) => M(p, I) ? N : p
+                  (x) => M(x, I) ? N : x
                 );
                 E(e), B(i, j, e);
               }
@@ -621,8 +623,8 @@ function Y(t, i, m, y) {
                 });
                 const d = n.zodSchema.safeParse(c);
                 return d.success ? !0 : (d.error.errors.forEach((k) => {
-                  const N = k.path, j = k.message, p = [n.key, ...N].join(".");
-                  a(p, j);
+                  const N = k.path, j = k.message, x = [n.key, ...N].join(".");
+                  a(x, j);
                 }), ft(t), !1);
               } catch (o) {
                 return console.error("Zod schema validation failed", o), !1;
@@ -694,7 +696,7 @@ function Y(t, i, m, y) {
         return l(C, b, S);
       }
     }, R = new Proxy(A, T);
-    return g.set(x, {
+    return g.set(p, {
       proxy: R,
       stateVersion: w
     }), R;
@@ -749,8 +751,8 @@ function bt({
     else
       S = e;
     S !== null && typeof S == "object" && (S = JSON.stringify(S));
-    const x = document.createTextNode(String(S));
-    y.replaceWith(x);
+    const p = document.createTextNode(String(S));
+    y.replaceWith(p);
   }, [t._stateKey, t._path.join("."), t._effect]), X("span", {
     ref: i,
     style: { display: "none" },

@@ -1275,6 +1275,7 @@ function createProxyHandler<T>(
             // Get initial state at this path
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
+            console.log("initialStateAtPath initialState", initialState, path);
             const initialStateAtPath = getNestedValue(initialState, path);
             console.log("initialStateAtPath", initialStateAtPath);
             console.log("thisReactiveState", thisReactiveState);
