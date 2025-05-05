@@ -732,14 +732,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     let newState = null;
     let loadingLocalData = false;
-    if (initialState) {
-      newState = initialState;
-    }
     if (localData) {
       if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
         newState = localData.state;
         loadingLocalData = true;
       }
+    }
+    if (initialState) {
+      newState = initialState;
     }
 
     if (newState) {
