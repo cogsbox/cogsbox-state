@@ -315,7 +315,8 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
-
+  pk?: keyof T;
+  currrentPk?: string | number;
   initialState?: T;
   dependencies?: any[]; // Just like useEffect dependencies
 };
@@ -393,7 +394,10 @@ export type TransformedStateType<T> = {
   [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 
-function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
+function setAndMergeOptions(
+  stateKey: string,
+  newOptions: OptionsType<unknown>
+) {
   const getInitialOptions = getGlobalStore.getState().getInitialOptions;
   const setInitialStateOptions =
     getGlobalStore.getState().setInitialStateOptions;
@@ -568,31 +572,41 @@ const saveToLocalStorage = <T,>(
   state: T,
   thisKey: string,
   currentInitialOptions: any,
-  sessionId?: string
+  sessionId?: string,
+  baseStateToSave?: T
 ) => {
-  if (currentInitialOptions?.log) {
-    console.log(
-      "saving to localstorage",
-      thisKey,
-      currentInitialOptions.localStorage?.key,
-      sessionId
-    );
-  }
+  // --- Keep existing logic to calculate storageKey ---
   const key = isFunction(currentInitialOptions?.localStorage?.key)
     ? currentInitialOptions.localStorage?.key(state)
     : currentInitialOptions?.localStorage?.key;
-  if (key && sessionId) {
-    const data: LocalStorageData<T> = {
-      state,
-      lastUpdated: Date.now(),
-      lastSyncedWithServer:
-        getGlobalStore.getState().serverSyncLog[thisKey]?.[0]?.timeStamp,
-      baseServerState: getGlobalStore.getState().serverState[thisKey],
-    };
+  if (!key || !sessionId) {
+    return;
+  }
+  const storageKey = `${sessionId}-${thisKey}-${key}`;
+  // --- End existing logic ---
 
-    const storageKey = `${sessionId}-${thisKey}-${key}`;
-
+  try {
+    let data: LocalStorageData<T>;
+    if (baseStateToSave !== undefined) {
+      // Case 1: Base state is provided (initial save/refresh)
+      data = {
+        state: state,
+        baseServerState: baseStateToSave, // Use provided base
+        lastUpdated: Date.now(),
+      };
+    } else {
+      // Case 2: Base state is NOT provided (user edit) - preserve existing base
+      const existingData = loadFromLocalStorage(storageKey); // Reuse load function
+      data = {
+        state: state,
+        // !!! --- REMOVED '?? null' --- !!!
+        baseServerState: existingData?.baseServerState, // Preserve existing base (will be T | null | undefined)
+        lastUpdated: Date.now(),
+      };
+    }
     window.localStorage.setItem(storageKey, JSON.stringify(data));
+  } catch (error) {
+    console.error("Error saving to localStorage:", storageKey, error);
   }
 };
 
@@ -709,67 +723,107 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
   }, [syncUpdate]);
 
+  // Find the main useEffect that depends on initialState
   useEffect(() => {
-    setAndMergeOptions(thisKey as string, {
-      initialState,
-    });
+    // --- Keep existing setup ---
+    // setAndMergeOptions(...)
     const options = latestInitialOptionsRef.current;
-    let localData = null;
-
+    const currentInitialState = initialState; // Capture prop for use in this effect run
+    let localData: LocalStorageData<TStateObject> | null = null;
     const localkey = isFunction(options?.localStorage?.key)
-      ? options?.localStorage?.key(initialState)
+      ? options?.localStorage?.key(currentInitialState ?? stateObject) // Use currentInitialState for key calc
       : options?.localStorage?.key;
-
-    console.log("newoptions", options);
-    console.log("localkey", localkey);
-    console.log("initialState", initialState);
+    // --- End existing setup ---
 
     if (localkey && sessionId) {
       localData = loadFromLocalStorage(
+        // Call existing load function
         sessionId + "-" + thisKey + "-" + localkey
       );
     }
 
-    let newState = null;
-    let loadingLocalData = false;
+    let newStateToUse: TStateObject | null = null;
+    let baseStateForStorage: TStateObject | undefined =
+      currentInitialState ?? undefined; // Default base is current initial
+    let isUsingLocalState = false;
+
     if (localData) {
-      if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-        newState = localData.state;
-        loadingLocalData = true;
+      // Compare incoming initialState with the base stored locally
+      if (
+        !isDeepEqual(
+          currentInitialState as Record<string, unknown>,
+          localData.baseServerState as Record<string, unknown>
+        )
+      ) {
+        // Base mismatch: initialState is different from what local was based on. Use initialState.
+        newStateToUse = currentInitialState ?? stateObject; // Use fresh or fallback
+        baseStateForStorage = currentInitialState ?? undefined; // Base is the fresh one
+        console.warn(
+          "Initial state differs from localStorage base. Using initialState."
+        ); // Minimal warning
+      } else {
+        // Base matches: Local edits are based on the correct version. Use local state.
+        newStateToUse = localData.state;
+        baseStateForStorage = localData.baseServerState; // Keep the existing base
+        isUsingLocalState = true;
       }
-    }
-    if (initialState) {
-      newState = initialState;
+    } else {
+      // No local data: Use initialState.
+      newStateToUse = currentInitialState ?? stateObject; // Use initial or fallback
+      baseStateForStorage = currentInitialState ?? undefined; // Base is the initial one
     }
 
-    if (newState) {
-      console.log("newState thius is newstate", newState);
-      updateGlobalState(
-        thisKey,
-        initialState,
-        newState,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
-      if (loadingLocalData && options?.localStorage?.onChange) {
-        options?.localStorage?.onChange(newState);
-      }
+    // --- Keep existing update logic ---
+    if (newStateToUse !== null) {
+      // Check if we determined a state to use
+      const currentGlobalState = getKeyState(thisKey);
+      // Only update if needed
+      if (
+        !currentGlobalState ||
+        !isDeepEqual(currentGlobalState, newStateToUse)
+      ) {
+        updateGlobalState(
+          thisKey,
+          currentInitialState ?? stateObject, // Pass the *actual* initialState prop reference
+          newStateToUse,
+          effectiveSetState,
+          componentIdRef.current,
+          sessionId
+        );
+        // *** SAVE TO LOCAL STORAGE WITH BASE STATE ***
+        saveToLocalStorage(
+          newStateToUse,
+          thisKey,
+          options,
+          sessionId,
+          baseStateForStorage
+        );
 
-      notifyComponents(thisKey);
-      forceUpdate({});
+        if (isUsingLocalState && options?.localStorage?.onChange) {
+          // Only call onChange if we loaded local
+          options.localStorage.onChange(newStateToUse);
+        }
+        notifyComponents(thisKey);
+        forceUpdate({}); // Keep if original had this
+      }
     }
+    // --- End existing update logic ---
+
+    // Keep original dependency array structure (use JSON.stringify for object stability if needed)
   }, [initialState, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
-      setAndMergeOptions(thisKey as string, {
-        serverSync,
-        formElements,
-        initialState,
-        localStorage,
-        middleware,
-      });
+      setAndMergeOptions(
+        thisKey as string,
+        {
+          serverSync,
+          formElements,
+          initialState,
+          localStorage,
+          middleware,
+        } as OptionsType<unknown>
+      );
     }
 
     const depsKey = `${thisKey}////${componentIdRef.current}`;
