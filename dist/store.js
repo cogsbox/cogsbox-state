@@ -13,8 +13,8 @@ const v = u((a, i) => ({
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
     const r = i().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
-    return r.forEach((o, s) => {
-      (s.startsWith(t) || s === e) && n.set(s, o);
+    return r.forEach((s, o) => {
+      (o.startsWith(t) || o === e) && n.set(o, s);
     }), n;
   }
 })), m = u((a, i) => ({
@@ -27,12 +27,20 @@ const v = u((a, i) => ({
   },
   setSelectedIndex: (e, r, t) => {
     a((n) => {
-      const o = new Map(n.selectedIndicesMap);
-      let s = o.get(e);
-      return s || (s = /* @__PURE__ */ new Map(), o.set(e, s)), t === void 0 ? s.delete(r) : s.set(r, t), {
+      const s = new Map(n.selectedIndicesMap);
+      let o = s.get(e);
+      return o || (o = /* @__PURE__ */ new Map(), s.set(e, o)), t === void 0 ? o.delete(r) : o.set(r, t), {
         ...n,
-        selectedIndicesMap: o
+        selectedIndicesMap: s
       };
+    });
+  },
+  clearSelectedIndexesForState: (e) => {
+    a((r) => {
+      const t = new Map(r.selectedIndicesMap);
+      return t.delete(e) ? (console.log(
+        `Cleared selected indices map entry for stateKey: ${e}`
+      ), { selectedIndicesMap: t }) : {};
     });
   },
   stateComponents: /* @__PURE__ */ new Map(),
@@ -60,8 +68,8 @@ const v = u((a, i) => ({
   },
   removeSignalElement: (e, r) => {
     const t = i().signalDomElements, n = t.get(e);
-    n && n.forEach((o) => {
-      o.instanceId === r && n.delete(o);
+    n && n.forEach((s) => {
+      s.instanceId === r && n.delete(s);
     }), a({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
@@ -104,11 +112,11 @@ const v = u((a, i) => ({
   },
   setStateLog: (e, r) => {
     a((t) => {
-      const n = t.stateLog[e] ?? [], o = r(n);
+      const n = t.stateLog[e] ?? [], s = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: o
+          [e]: s
         }
       };
     });
@@ -131,78 +139,78 @@ const v = u((a, i) => ({
   },
   addValidationError: (e, r) => {
     console.log("addValidationError---"), a((t) => {
-      const n = new Map(t.validationErrors), o = n.get(e) || [];
-      return console.log("addValidationError", e, r, o), n.set(e, [...o, r]), { validationErrors: n };
+      const n = new Map(t.validationErrors), s = n.get(e) || [];
+      return console.log("addValidationError", e, r, s), n.set(e, [...s, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
     a((r) => {
       const t = new Map(r.validationErrors);
       let n = !1;
-      const o = e.split(".");
-      return Array.from(t.keys()).forEach((s) => {
-        const c = s.split(".");
-        if (c.length >= o.length) {
-          let f = !0;
-          for (let l = 0; l < o.length; l++)
-            if (c[l] !== o[l]) {
-              f = !1;
+      const s = e.split(".");
+      return Array.from(t.keys()).forEach((o) => {
+        const l = o.split(".");
+        if (l.length >= s.length) {
+          let d = !0;
+          for (let c = 0; c < s.length; c++)
+            if (l[c] !== s[c]) {
+              d = !1;
               break;
             }
-          f && (n = !0, t.delete(s));
+          d && (n = !0, t.delete(o));
         }
       }), n ? { validationErrors: t } : r;
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = i().validationErrors, n = e.split("."), o = (s, c) => s === "[*]" ? !0 : Array.isArray(s) ? s.includes(parseInt(c)) : s === c;
-    return Array.from(t.keys()).forEach((s) => {
-      const c = s.split(".");
-      if (c.length >= n.length) {
-        let f = !0;
-        for (let l = 0; l < n.length; l++) {
-          const S = n[l], d = c[l];
-          if (S === "[*]" || Array.isArray(S)) {
-            const g = parseInt(d);
-            if (isNaN(g)) {
-              f = !1;
+    const r = [], t = i().validationErrors, n = e.split("."), s = (o, l) => o === "[*]" ? !0 : Array.isArray(o) ? o.includes(parseInt(l)) : o === l;
+    return Array.from(t.keys()).forEach((o) => {
+      const l = o.split(".");
+      if (l.length >= n.length) {
+        let d = !0;
+        for (let c = 0; c < n.length; c++) {
+          const f = n[c], S = l[c];
+          if (f === "[*]" || Array.isArray(f)) {
+            const p = parseInt(S);
+            if (isNaN(p)) {
+              d = !1;
               break;
             }
-            if (!o(S, d)) {
-              f = !1;
+            if (!s(f, S)) {
+              d = !1;
               break;
             }
-          } else if (S !== d) {
-            f = !1;
+          } else if (f !== S) {
+            d = !1;
             break;
           }
         }
-        if (f) {
-          const l = t.get(s);
-          l && r.push(...l);
+        if (d) {
+          const c = t.get(o);
+          c && r.push(...c);
         }
       }
     }), r;
   },
   getInitialOptions: (e) => i().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = i().cogsStateStore[e], n = (o, s) => {
-      if (s.length === 0) return o;
-      const c = s[0], f = s.slice(1);
-      if (c === "[*]") {
-        if (!Array.isArray(o)) {
+    const t = i().cogsStateStore[e], n = (s, o) => {
+      if (o.length === 0) return s;
+      const l = o[0], d = o.slice(1);
+      if (l === "[*]") {
+        if (!Array.isArray(s)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (f.length === 0) return o;
-        const S = o.map(
-          (d) => n(d, f)
+        if (d.length === 0) return s;
+        const f = s.map(
+          (S) => n(S, d)
         );
-        return Array.isArray(S[0]) ? S.flat() : S;
+        return Array.isArray(f[0]) ? f.flat() : f;
       }
-      const l = o[c];
-      if (l !== void 0)
-        return n(l, f);
+      const c = s[l];
+      if (c !== void 0)
+        return n(c, d);
     };
     return n(t, r);
   },
