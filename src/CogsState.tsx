@@ -773,6 +773,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       );
       if (
         localData &&
+        localData.lastUpdated &&
         localData.lastUpdated > (localData.lastSyncedWithServer || 0)
       ) {
         updateGlobalState(
