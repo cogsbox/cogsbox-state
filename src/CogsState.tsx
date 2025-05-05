@@ -706,11 +706,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    if (initialState) {
-      setAndMergeOptions(thisKey as string, {
-        initialState,
-      });
+    if (!initialState) {
+      return;
     }
+    setAndMergeOptions(thisKey as string, {
+      initialState,
+    });
+
     const options = latestInitialOptionsRef.current;
     let localData = null;
 

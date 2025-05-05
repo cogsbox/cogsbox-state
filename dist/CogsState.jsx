@@ -162,7 +162,9 @@ function Ot(t, {
       });
     }
   }, [e]), et(() => {
-    f && lt(g, {
+    if (!f)
+      return;
+    lt(g, {
       initialState: f
     });
     const c = C.current;
