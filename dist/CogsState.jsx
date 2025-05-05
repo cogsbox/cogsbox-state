@@ -172,7 +172,7 @@ function Ot(t, {
       T + "-" + u + "-" + d
     ));
     let I = null, k = !1;
-    o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (I = o.state, k = !0), f && (I = f), I && (console.log("newState thius is newstate", I), Tt(
+    o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (I = o.state, k = !0), f && (I = f), I && (console.log("newState thius is newstate", I), f && Tt(
       u,
       f,
       I,

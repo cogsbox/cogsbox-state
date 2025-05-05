@@ -740,14 +740,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     if (newState) {
       console.log("newState thius is newstate", newState);
-      updateGlobalState(
-        thisKey,
-        initialState,
-        newState,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
+      if (initialState) {
+        updateGlobalState(
+          thisKey,
+          initialState,
+          newState,
+          effectiveSetState,
+          componentIdRef.current,
+          sessionId
+        );
+      }
       if (loadingLocalData && options?.localStorage?.onChange) {
         options?.localStorage?.onChange(newState);
       }
