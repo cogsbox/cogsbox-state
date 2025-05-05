@@ -623,11 +623,9 @@ const updateGlobalState = (
     state: newState,
   };
 
-  startTransition(() => {
-    updateInitialStateGlobal(thisKey, updates.initialState);
-    setUpdaterState(thisKey, updates.updaterState);
-    setState(thisKey, updates.state);
-  });
+  updateInitialStateGlobal(thisKey, updates.initialState);
+  setUpdaterState(thisKey, updates.updaterState);
+  setState(thisKey, updates.state);
 };
 
 const notifyComponents = (thisKey: string) => {
@@ -641,11 +639,8 @@ const notifyComponents = (thisKey: string) => {
   });
 
   // Schedule updates in the next tick to allow batching
-  queueMicrotask(() => {
-    startTransition(() => {
-      updates.forEach((update) => update());
-    });
-  });
+
+  updates.forEach((update) => update());
 };
 
 export const notifyComponent = (stateKey: string, componentId: string) => {
