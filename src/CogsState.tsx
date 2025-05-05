@@ -784,8 +784,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
           componentIdRef.current,
           sessionId
         );
-
-        options?.localStorage?.onChange(localData.state);
+        if (options?.localStorage?.onChange) {
+          options?.localStorage?.onChange(localData.state);
+        }
 
         notifyComponents(thisKey);
       }
