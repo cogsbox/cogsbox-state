@@ -953,14 +953,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
           ? path.join(".")
           : [...path].slice(0, -1).join(".");
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-
+      console.log(
+        "pathetocaheck.............................",
+        pathToCheck,
+        stateEntry
+      );
       if (stateEntry) {
         for (const [key, component] of stateEntry.components.entries()) {
           let shouldUpdate = false;
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
-
+          console.log("component.............................", key, component);
           // Skip if reactivity is disabled
           if (reactiveTypes.includes("none")) {
             continue;
@@ -979,15 +983,29 @@ export function useCogsStateFn<TStateObject extends unknown>(
               component.paths &&
               (component.paths.has(pathToCheck) || component.paths.has(""))
             ) {
+              console.log(
+                "component.............................includes(component",
+                key,
+                component
+              );
               shouldUpdate = true;
             }
           }
 
           // Check dependency-based reactivity
           if (!shouldUpdate && reactiveTypes.includes("deps")) {
+            console.log(
+              "component.............................includes(deps",
+              key,
+              component
+            );
             if (component.depsFunction) {
               const depsResult = component.depsFunction(payload);
-
+              console.log(
+                "depsResult.............................includes(deps",
+                component.deps,
+                depsResult
+              );
               if (typeof depsResult === "boolean") {
                 if (depsResult) {
                   shouldUpdate = true;
