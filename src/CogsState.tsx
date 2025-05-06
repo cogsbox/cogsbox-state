@@ -852,6 +852,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(prevValue as TStateObject)
         : newStateOrFunction;
+      const changedPaths = getDifferences(prevValue, payload); // Returns array of path strings like "a.b.c"
+      const changedPathsSet = new Set(changedPaths); // For efficient lookup
 
       const signalId = `${thisKey}-${path.join(".")}`;
       if (signalId) {
@@ -955,77 +957,73 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
       console.log(
         "pathetocaheck.............................",
+        path,
         updateObj,
         pathToCheck ?? "NONE",
         stateEntry
       );
       if (stateEntry) {
-        for (const [key, component] of stateEntry.components.entries()) {
+        for (const [
+          componentKey,
+          component,
+        ] of stateEntry.components.entries()) {
           let shouldUpdate = false;
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
-          console.log("component.............................", key, component);
-          // Skip if reactivity is disabled
+
           if (reactiveTypes.includes("none")) {
             continue;
           }
 
-          // Force update if "all" is specified
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
-
             continue;
           }
 
-          // Check component-level path reactivity
           if (reactiveTypes.includes("component")) {
-            console.log(
-              "component.............................includes(component1111",
-              key,
-              component.paths,
-              pathToCheck
-            );
-            if (
-              component.paths &&
-              (component.paths.has(pathToCheck) || component.paths.has(""))
-            ) {
-              console.log(
-                "component.............................includes(component22222",
-                key,
-                component
-              );
-              shouldUpdate = true;
-            }
-          }
-
-          // Check dependency-based reactivity
-          if (!shouldUpdate && reactiveTypes.includes("deps")) {
-            console.log(
-              "component.............................includes(deps",
-              key,
-              component
-            );
-            if (component.depsFunction) {
-              const depsResult = component.depsFunction(payload);
-              console.log(
-                "depsResult.............................includes(deps",
-                component.deps,
-                depsResult
-              );
-              if (typeof depsResult === "boolean") {
-                if (depsResult) {
-                  shouldUpdate = true;
-                }
-              } else if (!isDeepEqual(component.deps, depsResult)) {
-                component.deps = depsResult;
+            for (const changedPath of changedPathsSet) {
+              if (component.paths.has(changedPath)) {
                 shouldUpdate = true;
+                break;
+              }
+              // Check parent paths
+              let parentPath = changedPath;
+              while (parentPath.includes(".")) {
+                parentPath = parentPath.substring(
+                  0,
+                  parentPath.lastIndexOf(".")
+                );
+                if (component.paths.has(parentPath)) {
+                  shouldUpdate = true;
+                  break;
+                }
+              }
+              if (shouldUpdate) break;
+
+              if (component.paths.has("")) {
+                shouldUpdate = true;
+                break;
               }
             }
-          }
 
-          if (shouldUpdate) {
-            component.forceUpdate();
+            if (!shouldUpdate && reactiveTypes.includes("deps")) {
+              if (component.depsFunction) {
+                const depsResult = component.depsFunction(payload);
+                if (typeof depsResult === "boolean") {
+                  if (depsResult) {
+                    shouldUpdate = true;
+                  }
+                } else if (!isDeepEqual(component.deps, depsResult)) {
+                  component.deps = depsResult; // Update deps state for next time
+                  shouldUpdate = true;
+                }
+              }
+            }
+
+            if (shouldUpdate) {
+              component.forceUpdate();
+            }
           }
         }
       }
