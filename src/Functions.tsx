@@ -235,6 +235,7 @@ export const FormControlComponent = <TStateObject,>({
     return () => {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null; // Explicitly nullify
         isCurrentlyDebouncing.current = false;
       }
     };
@@ -242,25 +243,32 @@ export const FormControlComponent = <TStateObject,>({
 
   const debouncedUpdater = (payload: UpdateArg<TStateObject>) => {
     setLocalValue(payload); // Update local state immediately
-    isCurrentlyDebouncing.current = true; // Mark as debouncing
+    isCurrentlyDebouncing.current = true;
 
+    if (payload === "") {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current); // Clear pending timer
+        debounceTimeoutRef.current = null;
+      }
+      updateFn(setState, payload, path, validationKey); // Update global state NOW
+      isCurrentlyDebouncing.current = false; // No longer debouncing
+      return; // Don't proceed to set another timeout
+    }
+
+    // If not empty, proceed with normal debouncing
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
     }
 
     debounceTimeoutRef.current = setTimeout(
       () => {
-        isCurrentlyDebouncing.current = false; // Debounce finished
-        // Use the state value AT THE TIME OF THE SETTIMEOUT FIRING
-        // which `payload` captured via closure is correct.
+        isCurrentlyDebouncing.current = false;
         updateFn(setState, payload, path, validationKey);
       },
       formOpts?.debounceTime ??
         (typeof globalStateValue == "boolean" ? 20 : 200)
     );
   };
-
-  // --- END CHANGES ---
 
   const initialOptions = getInitialOptions(stateKey);
   if (!initialOptions?.validation?.key) {
@@ -272,9 +280,11 @@ export const FormControlComponent = <TStateObject,>({
   const handleBlur = async () => {
     // --- Ensure latest value is flushed if debouncing ---
     if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+      clearTimeout(debounceTimeoutRef.current); // Clear pending timer
+      debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
-      updateFn(setState, localValue, path, validationKey); // Use current localValue
+      // Ensure the absolute latest local value is committed on blur
+      updateFn(setState, localValue, path, validationKey);
     }
     // --- End modification ---
 
