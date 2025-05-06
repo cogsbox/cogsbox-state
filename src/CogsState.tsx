@@ -963,6 +963,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
         stateEntry
       );
       if (stateEntry) {
+        const changedPaths = getDifferences(prevValue, payload);
+        const changedPathsSet = new Set(changedPaths);
+        const primaryPathToCheck =
+          updateObj.updateType === "update"
+            ? path.join(".")
+            : path.slice(0, -1).join(".") || "";
+
         for (const [
           componentKey,
           component,
@@ -972,58 +979,75 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ? component.reactiveType
             : [component.reactiveType || "component"];
 
-          if (reactiveTypes.includes("none")) {
-            continue;
-          }
-
+          if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
             continue;
           }
 
           if (reactiveTypes.includes("component")) {
-            for (const changedPath of changedPathsSet) {
-              if (component.paths.has(changedPath)) {
-                shouldUpdate = true;
-                break;
-              }
-              // Check parent paths
-              let parentPath = changedPath;
-              while (parentPath.includes(".")) {
-                parentPath = parentPath.substring(
-                  0,
-                  parentPath.lastIndexOf(".")
-                );
-                if (component.paths.has(parentPath)) {
-                  shouldUpdate = true;
-                  break;
-                }
-              }
-              if (shouldUpdate) break;
-
-              if (component.paths.has("")) {
-                shouldUpdate = true;
-                break;
-              }
+            if (
+              component.paths.has(primaryPathToCheck) ||
+              component.paths.has("")
+            ) {
+              shouldUpdate = true;
             }
 
-            if (!shouldUpdate && reactiveTypes.includes("deps")) {
-              if (component.depsFunction) {
-                const depsResult = component.depsFunction(payload);
-                if (typeof depsResult === "boolean") {
-                  if (depsResult) {
+            if (!shouldUpdate) {
+              for (const changedPath of changedPathsSet) {
+                let currentPathToCheck = changedPath;
+                while (true) {
+                  if (component.paths.has(currentPathToCheck)) {
                     shouldUpdate = true;
+                    break;
                   }
-                } else if (!isDeepEqual(component.deps, depsResult)) {
-                  component.deps = depsResult; // Update deps state for next time
-                  shouldUpdate = true;
+                  const lastDotIndex = currentPathToCheck.lastIndexOf(".");
+                  if (lastDotIndex !== -1) {
+                    const parentPath = currentPathToCheck.substring(
+                      0,
+                      lastDotIndex
+                    );
+                    if (
+                      !isNaN(
+                        Number(currentPathToCheck.substring(lastDotIndex + 1))
+                      )
+                    ) {
+                      if (component.paths.has(parentPath)) {
+                        shouldUpdate = true;
+                        break;
+                      }
+                    }
+                    currentPathToCheck = parentPath;
+                  } else {
+                    currentPathToCheck = "";
+                  }
+                  if (currentPathToCheck === "") {
+                    break;
+                  }
                 }
+                if (shouldUpdate) break;
               }
             }
+          }
 
-            if (shouldUpdate) {
-              component.forceUpdate();
+          if (!shouldUpdate && reactiveTypes.includes("deps")) {
+            if (component.depsFunction) {
+              const depsResult = component.depsFunction(payload);
+              let depsChanged = false;
+              if (typeof depsResult === "boolean") {
+                if (depsResult) depsChanged = true;
+              } else if (!isDeepEqual(component.deps, depsResult)) {
+                component.deps = depsResult;
+                depsChanged = true;
+              }
+              if (depsChanged) {
+                shouldUpdate = true;
+              }
             }
+          }
+
+          if (shouldUpdate) {
+            component.forceUpdate();
           }
         }
       }
