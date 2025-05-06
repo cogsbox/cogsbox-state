@@ -794,84 +794,47 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
   }, [initialState, ...(dependencies || [])]);
-  const initialReactiveType = useRef(
-    reactiveType ?? ["component", "deps"]
-  ).current;
 
-  const initialDepsFunc = useRef(reactiveDeps).current;
+  useLayoutEffect(() => {
+    if (noStateKey) {
+      setAndMergeOptions(thisKey as string, {
+        serverSync,
+        formElements,
+        initialState,
+        localStorage,
+        middleware,
+      });
+    }
 
-  // --- NEW SECTION: Pre-register component structure ---
-  useState(() => {
     const depsKey = `${thisKey}////${componentIdRef.current}`;
     const stateEntry = getGlobalStore
       .getState()
       .stateComponents.get(thisKey) || {
       components: new Map(),
     };
-    // Only create if it doesn't exist (prevents issues in StrictMode/HMR)
-    if (!stateEntry.components.has(depsKey)) {
-      stateEntry.components.set(depsKey, {
-        forceUpdate: () => {}, // Placeholder, replaced in useLayoutEffect
-        paths: new Set<string>(), // Initialize paths Set
-        deps: [],
-        depsFunction: initialDepsFunc || undefined,
-        reactiveType: Array.isArray(initialReactiveType)
-          ? initialReactiveType
-          : [initialReactiveType],
-      });
-      // Put the updated structure into the global store
-      getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-    }
-  });
-  useLayoutEffect(() => {
-    const depsKey = `${thisKey}////${componentIdRef.current}`;
-    const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey); // Should exist now
 
-    if (stateEntry) {
-      const componentData = stateEntry.components.get(depsKey);
-      if (componentData) {
-        // Ensure the real forceUpdate function is set
-        // Update reactive options if they have changed
-        const currentReactiveType = Array.isArray(reactiveType)
-          ? reactiveType
-          : [reactiveType || "component"];
-        if (
-          componentData.forceUpdate.toString() === (() => {}).toString() || // Check if it's placeholder
-          !isDeepEqual([componentData.reactiveType], currentReactiveType) ||
-          componentData.depsFunction !== reactiveDeps
-        ) {
-          stateEntry.components.set(depsKey, {
-            ...componentData,
-            forceUpdate: () => forceUpdate({}), // Set the REAL forceUpdate
-            reactiveType: currentReactiveType,
-            depsFunction: reactiveDeps || undefined,
-          });
-        }
-      } else {
-        console.error(
-          `[${thisKey}/${componentIdRef.current}] Component data missing in useLayoutEffect!`
-        );
-      }
-    } else {
-      console.error(
-        `[${thisKey}/${componentIdRef.current}] State entry missing in useLayoutEffect!`
-      );
-    }
+    stateEntry.components.set(depsKey, {
+      forceUpdate: () => forceUpdate({}),
+      paths: new Set(),
+      deps: [],
+      depsFunction: reactiveDeps || undefined,
+      reactiveType: reactiveType ?? ["component", "deps"],
+    });
 
-    // Cleanup function remains essential
+    getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
+    //need to force update to create the stateUpdates references
+    forceUpdate({});
     return () => {
-      const currentEntry = getGlobalStore
-        .getState()
-        .stateComponents.get(thisKey);
-      if (currentEntry) {
-        currentEntry.components.delete(depsKey);
-        if (currentEntry.components.size === 0) {
-          // Optional: getGlobalStore.getState().stateComponents.delete(thisKey);
+      const depsKey = `${thisKey}////${componentIdRef.current}`;
+
+      if (stateEntry) {
+        stateEntry.components.delete(depsKey);
+        if (stateEntry.components.size === 0) {
+          getGlobalStore.getState().stateComponents.delete(thisKey);
         }
       }
     };
-    // Dependencies for the effect
-  }, [thisKey, reactiveDeps, reactiveType]); // Add other relevant options if they affect registration details
+  }, []);
 
   const effectiveSetState = (
     newStateOrFunction:
@@ -1016,12 +979,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           // Check component-level path reactivity
           if (reactiveTypes.includes("component")) {
+            console.log(
+              "component.............................includes(component1111",
+              key,
+              component.paths,
+              pathToCheck
+            );
             if (
               component.paths &&
               (component.paths.has(pathToCheck) || component.paths.has(""))
             ) {
               console.log(
-                "component.............................includes(component",
+                "component.............................includes(component22222",
                 key,
                 component
               );
