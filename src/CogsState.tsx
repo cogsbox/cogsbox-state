@@ -539,6 +539,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
     options: OptionsType<(typeof statePart)[StateKey]>
   ) {
     setOptions({ stateKey, options, initialOptionsPart });
+    notifyComponents(stateKey as string);
   }
 
   return { useCogsState, setCogsOptions };
