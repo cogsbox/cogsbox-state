@@ -659,6 +659,16 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
   if (stateEntry) {
     const fullComponentId = `${stateKey}////${componentId}`;
     const component = stateEntry.components.get(fullComponentId);
+    const reactiveTypes = component
+      ? Array.isArray(component.reactiveType)
+        ? component.reactiveType
+        : [component.reactiveType || "component"]
+      : null;
+
+    // Skip if reactivity is disabled
+    if (reactiveTypes?.includes("none")) {
+      return;
+    }
 
     if (component) {
       // Force an update to ensure the current value is saved
