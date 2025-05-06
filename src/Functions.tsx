@@ -190,120 +190,124 @@ interface FormControlComponentProps<TStateObject> {
   formOpts?: FormOptsType;
   stateKey: string;
 }
+// Find FormControlComponent in your Functions.ts or equivalent file
 
 export const FormControlComponent = <TStateObject,>({
-  setState,
+  setState, // This is the real effectiveSetState from the hook
   path,
   child,
   formOpts,
   stateKey,
 }: FormControlComponentProps<TStateObject>) => {
-  const [_, forceUpdate] = useState({});
   const { registerFormRef, getFormRef } = formRefStore.getState();
-  const refKey = stateKey + "." + path.join(".");
-
-  // Create a local ref
-  const localFormRef = useRef<HTMLInputElement>(null);
-
-  // Get existing ref from the store (if any)
-  const existingRef = getFormRef(refKey);
-  if (!existingRef) {
-    registerFormRef(stateKey + "." + path.join("."), localFormRef);
-  }
-  // Use the existing ref if available, otherwise use the local one
-  const formRef = existingRef || localFormRef;
-
   const {
     getValidationErrors,
     addValidationError,
     getInitialOptions,
     removeValidationError,
   } = getGlobalStore.getState();
-  const stateValue = useGetKeyState(stateKey, path);
-  const [inputValue, setInputValue] = useState<any>(
-    getGlobalStore.getState().getNestedState(stateKey, path)
-  );
 
-  const initialOptions = getInitialOptions(stateKey);
-
-  if (!initialOptions?.validation?.key) {
-    throw new Error(
-      "Validation key not found. You need to set it in the options for the createCogsState function"
-    );
+  const refKey = stateKey + "." + path.join(".");
+  const localFormRef = useRef<HTMLInputElement>(null);
+  const existingRef = getFormRef(refKey);
+  if (!existingRef) {
+    registerFormRef(refKey, localFormRef);
   }
-  const validationKey = initialOptions.validation.key;
-  const validateOnBlur = initialOptions.validation.onBlur === true;
-  initialOptions;
+  const formRef = existingRef || localFormRef;
+
+  // --- START CHANGES ---
+
+  const globalStateValue = useGetKeyState(stateKey, path);
+  const [localValue, setLocalValue] = useState<any>(globalStateValue);
+  const isCurrentlyDebouncing = useRef(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Effect to sync local state if global state changes externally
   useEffect(() => {
-    setInputValue(stateValue);
-  }, [stateKey, path.join("."), stateValue]);
+    // Only update local if not actively debouncing a local change
+    if (!isCurrentlyDebouncing.current && globalStateValue !== localValue) {
+      setLocalValue(globalStateValue);
+    }
+  }, [globalStateValue]); // Removed localValue dependency
 
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  // Effect for cleanup
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        isCurrentlyDebouncing.current = false;
+      }
+    };
+  }, []);
 
-  // Standard updater function (unchanged)
-  let updater = (
-    payload: UpdateArg<TStateObject>,
-    opts?: UpdateOpts<TStateObject>
-  ) => {
-    setInputValue(payload);
+  const debouncedUpdater = (payload: UpdateArg<TStateObject>) => {
+    setLocalValue(payload); // Update local state immediately
+    isCurrentlyDebouncing.current = true; // Mark as debouncing
 
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
     }
 
-    timeoutRef.current = setTimeout(
+    debounceTimeoutRef.current = setTimeout(
       () => {
+        isCurrentlyDebouncing.current = false; // Debounce finished
+        // Use the state value AT THE TIME OF THE SETTIMEOUT FIRING
+        // which `payload` captured via closure is correct.
         updateFn(setState, payload, path, validationKey);
       },
-      formOpts?.debounceTime ?? (typeof stateValue == "boolean" ? 20 : 200)
+      formOpts?.debounceTime ??
+        (typeof globalStateValue == "boolean" ? 20 : 200)
     );
   };
 
-  // Handle blur event
+  // --- END CHANGES ---
+
+  const initialOptions = getInitialOptions(stateKey);
+  if (!initialOptions?.validation?.key) {
+    throw new Error("Validation key not found.");
+  }
+  const validationKey = initialOptions.validation.key;
+  const validateOnBlur = initialOptions.validation.onBlur === true;
+
   const handleBlur = async () => {
-    if (!initialOptions.validation?.zodSchema) return;
+    // --- Ensure latest value is flushed if debouncing ---
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+      isCurrentlyDebouncing.current = false;
+      updateFn(setState, localValue, path, validationKey); // Use current localValue
+    }
+    // --- End modification ---
+
+    if (!initialOptions.validation?.zodSchema || !validateOnBlur) return;
     removeValidationError(validationKey + "." + path.join("."));
     try {
-      // Get the current field value
+      // Use the potentially just flushed value
       const fieldValue = getGlobalStore
         .getState()
         .getNestedState(stateKey, path);
-
-      // Use your existing validateZodPathFunc
       await validateZodPathFunc(
         validationKey,
         initialOptions.validation.zodSchema,
         path,
         fieldValue
       );
-
-      forceUpdate({});
+      // forceUpdate might be needed if validation state update doesn't trigger render
+      // Consider using useGetValidationErrors hook result directly for validation display
     } catch (error) {
-      console.error("Validation error:", error);
+      console.error("Validation error on blur:", error);
     }
   };
 
-  // Clear timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-
   const rawSyncStatus = useGetSyncInfo(stateKey, path);
   const syncStatus = rawSyncStatus
-    ? {
-        ...rawSyncStatus,
-        date: new Date(rawSyncStatus.timeStamp),
-      }
+    ? { ...rawSyncStatus, date: new Date(rawSyncStatus.timeStamp) }
     : null;
 
   const childElement = child({
-    get: () =>
-      inputValue || getGlobalStore.getState().getNestedState(stateKey, path),
-    set: updater,
+    // --- START CHANGES ---
+    get: () => localValue, // Get should return the immediate local value
+    set: debouncedUpdater, // Use the new debounced updater
+    // --- END CHANGES ---
     syncStatus,
     path: path,
     validationErrors: () =>
@@ -312,13 +316,11 @@ export const FormControlComponent = <TStateObject,>({
       removeValidationError(validationKey + "." + path.join("."));
       addValidationError(validationKey + "." + path.join("."), message ?? "");
     },
-
     inputProps: {
-      value:
-        inputValue ||
-        getGlobalStore.getState().getNestedState(stateKey, path) ||
-        "",
-      onChange: (e: any) => updater(e.target.value),
+      // --- START CHANGES ---
+      value: localValue ?? "", // Input value is always the local state
+      onChange: (e: any) => debouncedUpdater(e.target.value), // Use debounced updater
+      // --- END CHANGES ---
       onBlur: handleBlur,
       ref: formRef,
     },
@@ -326,14 +328,7 @@ export const FormControlComponent = <TStateObject,>({
 
   return (
     <>
-      <ValidationWrapper
-        {...{
-          formOpts,
-          path,
-          validationKey,
-          stateKey,
-        }}
-      >
+      <ValidationWrapper {...{ formOpts, path, validationKey, stateKey }}>
         {childElement}
       </ValidationWrapper>
     </>
