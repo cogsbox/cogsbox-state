@@ -16,7 +16,10 @@
   "files": [
     "dist"
   ],
-  "repository": "github:cogsbox/cogsbox-state",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/cogsbox/cogsbox-state.git"
+  },
   "scripts": {
     "build": "vite build && rimraf dist/examples",
     "lint": "eslint src --ext ts,tsx",
