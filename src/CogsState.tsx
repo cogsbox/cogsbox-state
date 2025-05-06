@@ -645,7 +645,14 @@ const notifyComponents = (thisKey: string) => {
   // Batch component updates
   const updates = new Set<() => void>();
   stateEntry.components.forEach((component) => {
-    updates.add(() => component.forceUpdate());
+    const reactiveTypes = component
+      ? Array.isArray(component.reactiveType)
+        ? component.reactiveType
+        : [component.reactiveType || "component"]
+      : null;
+    if (!reactiveTypes?.includes("none")) {
+      updates.add(() => component.forceUpdate());
+    }
   });
 
   // Schedule updates in the next tick to allow batching
