@@ -781,7 +781,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const reactiveTypes = Array.isArray(reactiveType)
         ? reactiveType
         : [reactiveType || "component"];
-
+      console.log("reactiveTypes.............................", reactiveTypes);
       if (!reactiveTypes.includes("none")) {
         forceUpdate({});
       }
