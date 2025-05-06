@@ -2,14 +2,14 @@
 import { jsx as ct } from "react/jsx-runtime";
 import { useState as tt, useRef as Z, useEffect as et, useLayoutEffect as vt, useMemo as It, createElement as X, useSyncExternalStore as _t, startTransition as Et } from "react";
 import { transformStateFunc as wt, isFunction as L, getNestedValue as U, isDeepEqual as M, debounce as $t } from "./utility.js";
-import { pushFunc as Q, updateFn as B, cutFunc as J, ValidationWrapper as Nt, FormControlComponent as Vt } from "./Functions.jsx";
+import { pushFunc as Q, updateFn as B, cutFunc as J, ValidationWrapper as At, FormControlComponent as Nt } from "./Functions.jsx";
 import "zod";
 import { getGlobalStore as r, formRefStore as lt } from "./store.js";
-import { useCogsConfig as At } from "./CogsStateClient.jsx";
+import { useCogsConfig as Vt } from "./CogsStateClient.jsx";
 import nt from "./node_modules/uuid/dist/esm-browser/v4.js";
 function dt(t, i) {
-  const m = r.getState().getInitialOptions, y = r.getState().setInitialStateOptions, d = m(t) || {};
-  y(t, {
+  const y = r.getState().getInitialOptions, v = r.getState().setInitialStateOptions, d = y(t) || {};
+  v(t, {
     ...d,
     ...i
   });
@@ -17,41 +17,41 @@ function dt(t, i) {
 function ut({
   stateKey: t,
   options: i,
-  initialOptionsPart: m
+  initialOptionsPart: y
 }) {
-  const y = q(t) || {}, d = m[t] || {}, E = r.getState().setInitialStateOptions, _ = { ...d, ...y };
-  let v = !1;
+  const v = q(t) || {}, d = y[t] || {}, E = r.getState().setInitialStateOptions, _ = { ...d, ...v };
+  let S = !1;
   if (i)
     for (const c in i)
-      _.hasOwnProperty(c) ? (c == "localStorage" && i[c] && _[c].key !== i[c]?.key && (v = !0, _[c] = i[c]), c == "initialState" && i[c] && _[c] !== i[c] && (v = !0, _[c] = i[c])) : (v = !0, _[c] = i[c]);
-  v && E(t, _);
+      _.hasOwnProperty(c) ? (c == "localStorage" && i[c] && _[c].key !== i[c]?.key && (S = !0, _[c] = i[c]), c == "initialState" && i[c] && _[c] !== i[c] && (S = !0, _[c] = i[c])) : (S = !0, _[c] = i[c]);
+  S && E(t, _);
 }
-function qt(t, { formElements: i, validation: m }) {
-  return { initialState: t, formElements: i, validation: m };
+function qt(t, { formElements: i, validation: y }) {
+  return { initialState: t, formElements: i, validation: y };
 }
 const zt = (t, i) => {
-  let m = t;
-  const [y, d] = wt(m);
-  (Object.keys(d).length > 0 || i && Object.keys(i).length > 0) && Object.keys(d).forEach((v) => {
-    d[v] = d[v] || {}, d[v].formElements = {
+  let y = t;
+  const [v, d] = wt(y);
+  (Object.keys(d).length > 0 || i && Object.keys(i).length > 0) && Object.keys(d).forEach((S) => {
+    d[S] = d[S] || {}, d[S].formElements = {
       ...i?.formElements,
       // Global defaults first
       ...i?.validation,
-      ...d[v].formElements || {}
+      ...d[S].formElements || {}
       // State-specific overrides
-    }, q(v) || r.getState().setInitialStateOptions(v, d[v]);
-  }), r.getState().setInitialStates(y), r.getState().setCreatedState(y);
-  const E = (v, c) => {
+    }, q(S) || r.getState().setInitialStateOptions(S, d[S]);
+  }), r.getState().setInitialStates(v), r.getState().setCreatedState(v);
+  const E = (S, c) => {
     const [f] = tt(c?.componentId ?? nt());
     ut({
-      stateKey: v,
+      stateKey: S,
       options: c,
       initialOptionsPart: d
     });
-    const e = r.getState().cogsStateStore[v] || y[v], S = c?.modifyState ? c.modifyState(e) : e, [k, T] = Ot(
-      S,
+    const e = r.getState().cogsStateStore[S] || v[S], m = c?.modifyState ? c.modifyState(e) : e, [k, p] = Ot(
+      m,
       {
-        stateKey: v,
+        stateKey: S,
         syncUpdate: c?.syncUpdate,
         componentId: f,
         localStorage: c?.localStorage,
@@ -63,10 +63,10 @@ const zt = (t, i) => {
         dependencies: c?.dependencies
       }
     );
-    return T;
+    return p;
   };
-  function _(v, c) {
-    ut({ stateKey: v, options: c, initialOptionsPart: d }), ot(v);
+  function _(S, c) {
+    ut({ stateKey: S, options: c, initialOptionsPart: d }), ot(S);
   }
   return { useCogsState: E, setCogsOptions: _ };
 }, {
@@ -74,10 +74,10 @@ const zt = (t, i) => {
   setState: D,
   getInitialOptions: q,
   getKeyState: gt,
-  getValidationErrors: Tt,
-  setStateLog: pt,
+  getValidationErrors: pt,
+  setStateLog: Ct,
   updateInitialStateGlobal: rt,
-  addValidationError: Ct,
+  addValidationError: Tt,
   removeValidationError: P,
   setServerSyncActions: ht
 } = r.getState(), ft = (t) => {
@@ -88,48 +88,48 @@ const zt = (t, i) => {
   } catch (i) {
     return console.error("Error loading from localStorage:", i), null;
   }
-}, kt = (t, i, m, y) => {
-  m?.log && console.log(
+}, kt = (t, i, y, v) => {
+  y?.log && console.log(
     "saving to localstorage",
     i,
-    m.localStorage?.key,
-    y
+    y.localStorage?.key,
+    v
   );
-  const d = L(m?.localStorage?.key) ? m.localStorage?.key(t) : m?.localStorage?.key;
-  if (d && y) {
+  const d = L(y?.localStorage?.key) ? y.localStorage?.key(t) : y?.localStorage?.key;
+  if (d && v) {
     const E = {
       state: t,
       lastUpdated: Date.now(),
       lastSyncedWithServer: r.getState().serverSyncLog[i]?.[0]?.timeStamp,
       baseServerState: r.getState().serverState[i]
-    }, _ = `${y}-${i}-${d}`;
+    }, _ = `${v}-${i}-${d}`;
     window.localStorage.setItem(_, JSON.stringify(E));
   }
-}, xt = (t, i, m, y, d, E) => {
+}, xt = (t, i, y, v, d, E) => {
   const _ = {
     initialState: i,
     updaterState: Y(
       t,
-      y,
+      v,
       d,
       E
     ),
-    state: m
+    state: y
   };
   rt(t, _.initialState), H(t, _.updaterState), D(t, _.state);
 }, ot = (t) => {
   const i = r.getState().stateComponents.get(t);
   if (!i) return;
-  const m = /* @__PURE__ */ new Set();
-  i.components.forEach((y) => {
-    m.add(() => y.forceUpdate());
+  const y = /* @__PURE__ */ new Set();
+  i.components.forEach((v) => {
+    y.add(() => v.forceUpdate());
   }), queueMicrotask(() => {
-    m.forEach((y) => y());
+    y.forEach((v) => v());
   });
 }, Bt = (t, i) => {
-  const m = r.getState().stateComponents.get(t);
-  if (m) {
-    const y = `${t}////${i}`, d = m.components.get(y);
+  const y = r.getState().stateComponents.get(t);
+  if (y) {
+    const v = `${t}////${i}`, d = y.components.get(v);
     if ((d ? Array.isArray(d.reactiveType) ? d.reactiveType : [d.reactiveType || "component"] : null)?.includes("none"))
       return;
     d && d.forceUpdate();
@@ -137,21 +137,21 @@ const zt = (t, i) => {
 };
 function Ot(t, {
   stateKey: i,
-  serverSync: m,
-  localStorage: y,
+  serverSync: y,
+  localStorage: v,
   formElements: d,
   middleware: E,
   reactiveDeps: _,
-  reactiveType: v,
+  reactiveType: S,
   componentId: c,
   initialState: f,
   syncUpdate: e,
-  dependencies: S
+  dependencies: m
 } = {}) {
-  const [k, T] = tt({}), { sessionId: x } = At();
+  const [k, p] = tt({}), { sessionId: x } = Vt();
   let R = !i;
-  const [g] = tt(i ?? nt()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), b = Z(c ?? nt()), C = Z(null);
-  C.current = q(g), et(() => {
+  const [g] = tt(i ?? nt()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), b = Z(c ?? nt()), T = Z(null);
+  T.current = q(g), et(() => {
     if (e && e.stateKey === g && e.path?.[0]) {
       D(g, (o) => ({
         ...o,
@@ -167,7 +167,7 @@ function Ot(t, {
     f && dt(g, {
       initialState: f
     });
-    const l = C.current;
+    const l = T.current;
     let o = null;
     const u = L(l?.localStorage?.key) ? l?.localStorage?.key(f) : l?.localStorage?.key;
     console.log("newoptions", l), console.log("localkey", u), console.log("initialState", f), u && x && (o = ft(
@@ -175,100 +175,100 @@ function Ot(t, {
     ));
     const w = r.getState().iniitialCreatedState[g];
     console.log("createdState - intiual", w, f);
-    let V = null;
-    f && (V = f, o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (V = o.state, l?.localStorage?.onChange && l?.localStorage?.onChange(V)), console.log("newState thius is newstate", V), xt(
+    let N = null;
+    f && (N = f, o && o.lastUpdated > (o.lastSyncedWithServer || 0) && (N = o.state, l?.localStorage?.onChange && l?.localStorage?.onChange(N)), console.log("newState thius is newstate", N), xt(
       g,
       f,
-      V,
+      N,
       n,
       b.current,
       x
-    ), ot(g), T({}));
-  }, [f, ...S || []]), vt(() => {
+    ), ot(g), (Array.isArray(S) ? S : [S || "component"]).includes("none") || p({}));
+  }, [f, ...m || []]), vt(() => {
     R && dt(g, {
-      serverSync: m,
+      serverSync: y,
       formElements: d,
       initialState: f,
-      localStorage: y,
+      localStorage: v,
       middleware: E
     });
     const l = `${g}////${b.current}`, o = r.getState().stateComponents.get(g) || {
       components: /* @__PURE__ */ new Map()
     };
     return o.components.set(l, {
-      forceUpdate: () => T({}),
+      forceUpdate: () => p({}),
       paths: /* @__PURE__ */ new Set(),
       deps: [],
       depsFunction: _ || void 0,
-      reactiveType: v ?? ["component", "deps"]
-    }), r.getState().stateComponents.set(g, o), T({}), () => {
+      reactiveType: S ?? ["component", "deps"]
+    }), r.getState().stateComponents.set(g, o), p({}), () => {
       const u = `${g}////${b.current}`;
       o && (o.components.delete(u), o.components.size === 0 && r.getState().stateComponents.delete(g));
     };
   }, []);
   const n = (l, o, u, w) => {
     if (Array.isArray(o)) {
-      const V = `${g}-${o.join(".")}`;
-      G.current.add(V);
+      const N = `${g}-${o.join(".")}`;
+      G.current.add(N);
     }
-    D(g, (V) => {
-      const N = L(l) ? l(V) : l, j = `${g}-${o.join(".")}`;
+    D(g, (N) => {
+      const A = L(l) ? l(N) : l, j = `${g}-${o.join(".")}`;
       if (j) {
         let F = !1, I = r.getState().signalDomElements.get(j);
         if ((!I || I.size === 0) && (u.updateType === "insert" || u.updateType === "cut")) {
-          const A = o.slice(0, -1), p = U(N, A);
-          if (Array.isArray(p)) {
+          const V = o.slice(0, -1), C = U(A, V);
+          if (Array.isArray(C)) {
             F = !0;
-            const $ = `${g}-${A.join(".")}`;
+            const $ = `${g}-${V.join(".")}`;
             I = r.getState().signalDomElements.get($);
           }
         }
         if (I) {
-          const A = F ? U(N, o.slice(0, -1)) : U(N, o);
-          I.forEach(({ parentId: p, position: $, effect: W }) => {
+          const V = F ? U(A, o.slice(0, -1)) : U(A, o);
+          I.forEach(({ parentId: C, position: $, effect: W }) => {
             const O = document.querySelector(
-              `[data-parent-id="${p}"]`
+              `[data-parent-id="${C}"]`
             );
             if (O) {
               const st = Array.from(O.childNodes);
               if (st[$]) {
-                const yt = W ? new Function("state", `return (${W})(state)`)(A) : A;
+                const yt = W ? new Function("state", `return (${W})(state)`)(V) : V;
                 st[$].textContent = String(yt);
               }
             }
           });
         }
       }
-      u.updateType === "update" && (w || C.current?.validationKey) && o && P(
-        (w || C.current?.validationKey) + "." + o.join(".")
+      u.updateType === "update" && (w || T.current?.validationKey) && o && P(
+        (w || T.current?.validationKey) + "." + o.join(".")
       );
       const h = o.slice(0, o.length - 1);
-      u.updateType === "cut" && C.current?.validationKey && P(
-        C.current?.validationKey + "." + h.join(".")
-      ), u.updateType === "insert" && C.current?.validationKey && Tt(
-        C.current?.validationKey + "." + h.join(".")
-      ).filter(([I, A]) => {
-        let p = I?.split(".").length;
-        if (I == h.join(".") && p == h.length - 1) {
+      u.updateType === "cut" && T.current?.validationKey && P(
+        T.current?.validationKey + "." + h.join(".")
+      ), u.updateType === "insert" && T.current?.validationKey && pt(
+        T.current?.validationKey + "." + h.join(".")
+      ).filter(([I, V]) => {
+        let C = I?.split(".").length;
+        if (I == h.join(".") && C == h.length - 1) {
           let $ = I + "." + h;
-          P(I), Ct($, A);
+          P(I), Tt($, V);
         }
       });
-      const z = U(V, o), St = U(N, o), mt = u.updateType === "update" ? o.join(".") : [...o].slice(0, -1).join("."), at = r.getState().stateComponents.get(g);
+      const z = U(N, o), St = U(A, o), mt = u.updateType === "update" ? o.join(".") : [...o].slice(0, -1).join("."), at = r.getState().stateComponents.get(g);
       if (at)
         for (const [F, I] of at.components.entries()) {
-          let A = !1;
-          const p = Array.isArray(I.reactiveType) ? I.reactiveType : [I.reactiveType || "component"];
-          if (!p.includes("none")) {
-            if (p.includes("all")) {
+          let V = !1;
+          const C = Array.isArray(I.reactiveType) ? I.reactiveType : [I.reactiveType || "component"];
+          if (!C.includes("none")) {
+            if (C.includes("all")) {
               I.forceUpdate();
               continue;
             }
-            if (p.includes("component") && I.paths && (I.paths.has(mt) || I.paths.has("")) && (A = !0), !A && p.includes("deps") && I.depsFunction) {
-              const $ = I.depsFunction(N);
-              typeof $ == "boolean" ? $ && (A = !0) : M(I.deps, $) || (I.deps = $, A = !0);
+            if (C.includes("component") && I.paths && (I.paths.has(mt) || I.paths.has("")) && (V = !0), !V && C.includes("deps") && I.depsFunction) {
+              const $ = I.depsFunction(A);
+              typeof $ == "boolean" ? $ && (V = !0) : M(I.deps, $) || (I.deps = $, V = !0);
             }
-            A && I.forceUpdate();
+            V && I.forceUpdate();
           }
         }
       const it = {
@@ -280,30 +280,30 @@ function Ot(t, {
         oldValue: z,
         newValue: St
       };
-      if (pt(g, (F) => {
-        const A = [...F ?? [], it].reduce((p, $) => {
-          const W = `${$.stateKey}:${JSON.stringify($.path)}`, O = p.get(W);
-          return O ? (O.timeStamp = Math.max(O.timeStamp, $.timeStamp), O.newValue = $.newValue, O.oldValue = O.oldValue ?? $.oldValue, O.updateType = $.updateType) : p.set(W, { ...$ }), p;
+      if (Ct(g, (F) => {
+        const V = [...F ?? [], it].reduce((C, $) => {
+          const W = `${$.stateKey}:${JSON.stringify($.path)}`, O = C.get(W);
+          return O ? (O.timeStamp = Math.max(O.timeStamp, $.timeStamp), O.newValue = $.newValue, O.oldValue = O.oldValue ?? $.oldValue, O.updateType = $.updateType) : C.set(W, { ...$ }), C;
         }, /* @__PURE__ */ new Map());
-        return Array.from(A.values());
+        return Array.from(V.values());
       }), kt(
-        N,
+        A,
         g,
-        C.current,
+        T.current,
         x
       ), E && E({
         updateLog: s,
         update: it
-      }), C.current?.serverSync) {
-        const F = r.getState().serverState[g], I = C.current?.serverSync;
+      }), T.current?.serverSync) {
+        const F = r.getState().serverState[g], I = T.current?.serverSync;
         ht(g, {
-          syncKey: typeof I.syncKey == "string" ? I.syncKey : I.syncKey({ state: N }),
+          syncKey: typeof I.syncKey == "string" ? I.syncKey : I.syncKey({ state: A }),
           rollBackState: F,
           actionTimeStamp: Date.now() + (I.debounce ?? 3e3),
           status: "waiting"
         });
       }
-      return N;
+      return A;
     });
   };
   r.getState().updaterState[g] || (H(
@@ -323,46 +323,46 @@ function Ot(t, {
   ), [g]);
   return [gt(g), a];
 }
-function Y(t, i, m, y) {
+function Y(t, i, y, v) {
   const d = /* @__PURE__ */ new Map();
   let E = 0;
   const _ = (f) => {
     const e = f.join(".");
-    for (const [S] of d)
-      (S === e || S.startsWith(e + ".")) && d.delete(S);
+    for (const [m] of d)
+      (m === e || m.startsWith(e + ".")) && d.delete(m);
     E++;
-  }, v = {
+  }, S = {
     removeValidation: (f) => {
       f?.validationKey && P(f.validationKey);
     },
     revertToInitialState: (f) => {
       const e = r.getState().getInitialOptions(t)?.validation;
       e?.key && P(e?.key), f?.validationKey && P(f.validationKey);
-      const S = r.getState().initialStateGlobal[t];
+      const m = r.getState().initialStateGlobal[t];
       r.getState().clearSelectedIndexesForState(t), d.clear(), E++;
-      const k = c(S, []), T = q(t), x = L(T?.localStorage?.key) ? T?.localStorage?.key(S) : T?.localStorage?.key, R = `${y}-${t}-${x}`;
-      R && localStorage.removeItem(R), H(t, k), D(t, S);
+      const k = c(m, []), p = q(t), x = L(p?.localStorage?.key) ? p?.localStorage?.key(m) : p?.localStorage?.key, R = `${v}-${t}-${x}`;
+      R && localStorage.removeItem(R), H(t, k), D(t, m);
       const g = r.getState().stateComponents.get(t);
       return g && g.components.forEach((s) => {
         s.forceUpdate();
-      }), S;
+      }), m;
     },
     updateInitialState: (f) => {
       d.clear(), E++;
       const e = Y(
         t,
         i,
-        m,
-        y
+        y,
+        v
       );
       return Et(() => {
         rt(t, f), H(t, e), D(t, f);
-        const S = r.getState().stateComponents.get(t);
-        S && S.components.forEach((k) => {
+        const m = r.getState().stateComponents.get(t);
+        m && m.components.forEach((k) => {
           k.forceUpdate();
         });
       }), {
-        fetchId: (S) => e.get()[S]
+        fetchId: (m) => e.get()[m]
       };
     },
     _initialState: r.getState().initialStateGlobal[t],
@@ -373,14 +373,14 @@ function Y(t, i, m, y) {
       return !!(f && M(f, gt(t)));
     }
   };
-  function c(f, e = [], S) {
+  function c(f, e = [], m) {
     const k = e.map(String).join(".");
     d.get(k);
-    const T = function() {
+    const p = function() {
       return r().getNestedState(t, e);
     };
-    Object.keys(v).forEach((g) => {
-      T[g] = v[g];
+    Object.keys(S).forEach((g) => {
+      p[g] = S[g];
     });
     const x = {
       apply(g, s, G) {
@@ -390,7 +390,7 @@ function Y(t, i, m, y) {
       },
       get(g, s) {
         if (s !== "then" && !s.startsWith("$") && s !== "stateMapNoRender") {
-          const n = e.join("."), a = `${t}////${m}`, l = r.getState().stateComponents.get(t);
+          const n = e.join("."), a = `${t}////${y}`, l = r.getState().stateComponents.get(t);
           if (l) {
             const o = l.components.get(a);
             o && (e.length > 0 || s === "get") && o.paths.add(n);
@@ -410,7 +410,7 @@ function Y(t, i, m, y) {
           };
         if (s === "removeStorage")
           return () => {
-            const n = r.getState().initialStateGlobal[t], a = q(t), l = L(a?.localStorage?.key) ? a?.localStorage?.key(n) : a?.localStorage?.key, o = `${y}-${t}-${l}`;
+            const n = r.getState().initialStateGlobal[t], a = q(t), l = L(a?.localStorage?.key) ? a?.localStorage?.key(n) : a?.localStorage?.key, o = `${v}-${t}-${l}`;
             console.log("removing storage", o), o && localStorage.removeItem(o);
           };
         if (s === "showValidationErrors")
@@ -428,7 +428,7 @@ function Y(t, i, m, y) {
                 return c(
                   f[n],
                   [...e, n.toString()],
-                  S
+                  m
                 );
             };
           if (s === "getSelectedIndex")
@@ -440,7 +440,7 @@ function Y(t, i, m, y) {
                 __origIndex: w.toString()
               }))].sort(n);
               return d.clear(), E++, c(o, e, {
-                filtered: [...S?.filtered || [], e],
+                filtered: [...m?.filtered || [], e],
                 validIndices: o.map(
                   (u) => parseInt(u.__origIndex)
                 )
@@ -448,21 +448,21 @@ function Y(t, i, m, y) {
             };
           if (s === "stateMap" || s === "stateMapNoRender")
             return (n) => {
-              const a = S?.filtered?.some(
+              const a = m?.filtered?.some(
                 (o) => o.join(".") === e.join(".")
               ), l = a ? f : r.getState().getNestedState(t, e);
               return s !== "stateMapNoRender" && (d.clear(), E++), l.map((o, u) => {
-                const w = a && o.__origIndex ? o.__origIndex : u, V = c(
+                const w = a && o.__origIndex ? o.__origIndex : u, N = c(
                   o,
                   [...e, w.toString()],
-                  S
+                  m
                 );
                 return n(
                   o,
-                  V,
+                  N,
                   u,
                   f,
-                  c(f, e, S)
+                  c(f, e, m)
                 );
               });
             };
@@ -478,7 +478,7 @@ function Y(t, i, m, y) {
             });
           if (s === "stateFlattenOn")
             return (n) => {
-              const l = S?.filtered?.some(
+              const l = m?.filtered?.some(
                 (u) => u.join(".") === e.join(".")
               ) ? f : r.getState().getNestedState(t, e);
               d.clear(), E++;
@@ -488,7 +488,7 @@ function Y(t, i, m, y) {
               return c(
                 o,
                 [...e, "[*]", n],
-                S
+                m
               );
             };
           if (s === "findWith")
@@ -514,20 +514,20 @@ function Y(t, i, m, y) {
             return (n, a, l) => {
               const o = r.getState().getNestedState(t, e), u = L(n) ? n(o) : n;
               let w = null;
-              if (!o.some((N) => {
+              if (!o.some((A) => {
                 if (a) {
                   const h = a.every(
-                    (z) => M(N[z], u[z])
+                    (z) => M(A[z], u[z])
                   );
-                  return h && (w = N), h;
+                  return h && (w = A), h;
                 }
-                const j = M(N, u);
-                return j && (w = N), j;
+                const j = M(A, u);
+                return j && (w = A), j;
               }))
                 _(e), Q(i, u, e, t);
               else if (l && w) {
-                const N = l(w), j = o.map(
-                  (h) => M(h, w) ? N : h
+                const A = l(w), j = o.map(
+                  (h) => M(h, w) ? A : h
                 );
                 _(e), B(i, j, e);
               }
@@ -555,7 +555,7 @@ function Y(t, i, m, y) {
               for (let u = 0; u < a.length; u++)
                 n(a[u], u) && (l.push(u), o.push(a[u]));
               return d.clear(), E++, c(o, e, {
-                filtered: [...S?.filtered || [], e],
+                filtered: [...m?.filtered || [], e],
                 validIndices: l
                 // Always pass validIndices, even if empty
               });
@@ -596,7 +596,7 @@ function Y(t, i, m, y) {
           return r.getState().getSyncInfo(n);
         }
         if (s == "getLocalStorage")
-          return (n) => ft(y + "-" + t + "-" + n);
+          return (n) => ft(v + "-" + t + "-" + n);
         if (s === "_selected") {
           const n = e.slice(0, -1), a = n.join("."), l = r.getState().getNestedState(t, n);
           return Array.isArray(l) ? Number(e[e.length - 1]) === r.getState().getSelectedIndex(t, a) : void 0;
@@ -624,15 +624,15 @@ function Y(t, i, m, y) {
                   w && w.startsWith(n.key) && P(w);
                 });
                 const u = n.zodSchema.safeParse(l);
-                return u.success ? !0 : (u.error.errors.forEach((V) => {
-                  const N = V.path, j = V.message, h = [n.key, ...N].join(".");
+                return u.success ? !0 : (u.error.errors.forEach((N) => {
+                  const A = N.path, j = N.message, h = [n.key, ...A].join(".");
                   a(h, j);
                 }), ot(t), !1);
               } catch (o) {
                 return console.error("Zod schema validation failed", o), !1;
               }
             };
-          if (s === "_componentId") return m;
+          if (s === "_componentId") return y;
           if (s === "getComponents")
             return () => r().stateComponents.get(t);
           if (s === "getAllFormRefs")
@@ -644,9 +644,9 @@ function Y(t, i, m, y) {
           if (s === "_isLoading")
             return r.getState().isLoadingGlobal[t];
           if (s === "revertToInitialState")
-            return v.revertToInitialState;
-          if (s === "updateInitialState") return v.updateInitialState;
-          if (s === "removeValidation") return v.removeValidation;
+            return S.revertToInitialState;
+          if (s === "updateInitialState") return S.updateInitialState;
+          if (s === "removeValidation") return S.removeValidation;
         }
         if (s === "getFormRef")
           return () => lt.getState().getFormRef(t + "." + e.join("."));
@@ -655,19 +655,19 @@ function Y(t, i, m, y) {
             children: n,
             hideMessage: a
           }) => /* @__PURE__ */ ct(
-            Nt,
+            At,
             {
               formOpts: a ? { validation: { message: "" } } : void 0,
               path: e,
               validationKey: r.getState().getInitialOptions(t)?.validation?.key || "",
               stateKey: t,
-              validIndices: S?.validIndices,
+              validIndices: m?.validIndices,
               children: n
             }
           );
         if (s === "_stateKey") return t;
         if (s === "_path") return e;
-        if (s === "_isServerSynced") return v._isServerSynced;
+        if (s === "_isServerSynced") return S._isServerSynced;
         if (s === "update")
           return (n, a) => {
             if (a?.debounce)
@@ -685,7 +685,7 @@ function Y(t, i, m, y) {
           };
         if (s === "formElement")
           return (n, a) => /* @__PURE__ */ ct(
-            Vt,
+            Nt,
             {
               setState: i,
               stateKey: t,
@@ -694,10 +694,10 @@ function Y(t, i, m, y) {
               formOpts: a
             }
           );
-        const b = [...e, s], C = r.getState().getNestedState(t, b);
-        return c(C, b, S);
+        const b = [...e, s], T = r.getState().getNestedState(t, b);
+        return c(T, b, m);
       }
-    }, R = new Proxy(T, x);
+    }, R = new Proxy(p, x);
     return d.set(k, {
       proxy: R,
       stateVersion: E
@@ -714,63 +714,63 @@ function jt({
   proxy: t,
   rebuildStateShape: i
 }) {
-  const m = r().getNestedState(t._stateKey, t._path);
-  return Array.isArray(m) ? i(
-    m,
+  const y = r().getNestedState(t._stateKey, t._path);
+  return Array.isArray(y) ? i(
+    y,
     t._path
   ).stateMapNoRender(
-    (d, E, _, v, c) => t._mapFn(d, E, _, v, c)
+    (d, E, _, S, c) => t._mapFn(d, E, _, S, c)
   ) : null;
 }
 function bt({
   proxy: t
 }) {
-  const i = Z(null), m = `${t._stateKey}-${t._path.join(".")}`;
+  const i = Z(null), y = `${t._stateKey}-${t._path.join(".")}`;
   return et(() => {
-    const y = i.current;
-    if (!y || !y.parentElement) return;
-    const d = y.parentElement, _ = Array.from(d.childNodes).indexOf(y);
-    let v = d.getAttribute("data-parent-id");
-    v || (v = `parent-${crypto.randomUUID()}`, d.setAttribute("data-parent-id", v));
+    const v = i.current;
+    if (!v || !v.parentElement) return;
+    const d = v.parentElement, _ = Array.from(d.childNodes).indexOf(v);
+    let S = d.getAttribute("data-parent-id");
+    S || (S = `parent-${crypto.randomUUID()}`, d.setAttribute("data-parent-id", S));
     const f = {
       instanceId: `instance-${crypto.randomUUID()}`,
-      parentId: v,
+      parentId: S,
       position: _,
       effect: t._effect
     };
-    r.getState().addSignalElement(m, f);
+    r.getState().addSignalElement(y, f);
     const e = r.getState().getNestedState(t._stateKey, t._path);
-    let S;
+    let m;
     if (t._effect)
       try {
-        S = new Function(
+        m = new Function(
           "state",
           `return (${t._effect})(state)`
         )(e);
-      } catch (T) {
-        console.error("Error evaluating effect function during mount:", T), S = e;
+      } catch (p) {
+        console.error("Error evaluating effect function during mount:", p), m = e;
       }
     else
-      S = e;
-    S !== null && typeof S == "object" && (S = JSON.stringify(S));
-    const k = document.createTextNode(String(S));
-    y.replaceWith(k);
+      m = e;
+    m !== null && typeof m == "object" && (m = JSON.stringify(m));
+    const k = document.createTextNode(String(m));
+    v.replaceWith(k);
   }, [t._stateKey, t._path.join("."), t._effect]), X("span", {
     ref: i,
     style: { display: "none" },
-    "data-signal-id": m
+    "data-signal-id": y
   });
 }
 function Jt(t) {
   const i = _t(
-    (m) => {
-      const y = r.getState().stateComponents.get(t._stateKey) || {
+    (y) => {
+      const v = r.getState().stateComponents.get(t._stateKey) || {
         components: /* @__PURE__ */ new Map()
       };
-      return y.components.set(t._stateKey, {
-        forceUpdate: m,
+      return v.components.set(t._stateKey, {
+        forceUpdate: y,
         paths: /* @__PURE__ */ new Set([t._path.join(".")])
-      }), () => y.components.delete(t._stateKey);
+      }), () => v.components.delete(t._stateKey);
     },
     () => r.getState().getNestedState(t._stateKey, t._path)
   );

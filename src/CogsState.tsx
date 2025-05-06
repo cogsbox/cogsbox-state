@@ -777,7 +777,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
       );
 
       notifyComponents(thisKey);
-      forceUpdate({});
+
+      const reactiveTypes = Array.isArray(reactiveType)
+        ? reactiveType
+        : [reactiveType || "component"];
+
+      if (!reactiveTypes.includes("none")) {
+        forceUpdate({});
+      }
     }
   }, [initialState, ...(dependencies || [])]);
 
