@@ -150,7 +150,7 @@ function Oe(e, {
 } = {}) {
   const [x, T] = ne({}), { sessionId: O } = Ne();
   let R = !i;
-  const [g] = ne(i ?? oe()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), F = Z(c ?? oe()), h = Z(null);
+  const [g] = ne(i ?? oe()), s = r.getState().stateLog[g], G = Z(/* @__PURE__ */ new Set()), b = Z(c ?? oe()), h = Z(null);
   h.current = q(g), re(() => {
     if (t && t.stateKey === g && t.path?.[0]) {
       D(g, (o) => ({
@@ -182,7 +182,7 @@ function Oe(e, {
         f,
         A,
         n,
-        F.current,
+        b.current,
         O
       ), ie(g);
       const w = Array.isArray(m) ? m : [m || "component"];
@@ -196,7 +196,7 @@ function Oe(e, {
       localStorage: S,
       middleware: E
     });
-    const l = `${g}////${F.current}`, o = r.getState().stateComponents.get(g) || {
+    const l = `${g}////${b.current}`, o = r.getState().stateComponents.get(g) || {
       components: /* @__PURE__ */ new Map()
     };
     return o.components.set(l, {
@@ -206,7 +206,7 @@ function Oe(e, {
       depsFunction: _ || void 0,
       reactiveType: m ?? ["component", "deps"]
     }), r.getState().stateComponents.set(g, o), T({}), () => {
-      const u = `${g}////${F.current}`;
+      const u = `${g}////${b.current}`;
       o && (o.components.delete(u), o.components.size === 0 && r.getState().stateComponents.delete(g));
     };
   }, []);
@@ -216,9 +216,9 @@ function Oe(e, {
       G.current.add(A);
     }
     D(g, (A) => {
-      const w = L(l) ? l(A) : l, b = `${g}-${o.join(".")}`;
-      if (b) {
-        let k = !1, I = r.getState().signalDomElements.get(b);
+      const w = L(l) ? l(A) : l, F = `${g}-${o.join(".")}`;
+      if (F) {
+        let k = !1, I = r.getState().signalDomElements.get(F);
         if ((!I || I.size === 0) && (u.updateType === "insert" || u.updateType === "cut")) {
           const N = o.slice(0, -1), V = U(w, N);
           if (Array.isArray(V)) {
@@ -261,7 +261,8 @@ function Oe(e, {
       const z = U(A, o), me = U(w, o), Q = u.updateType === "update" ? o.join(".") : [...o].slice(0, -1).join("."), K = r.getState().stateComponents.get(g);
       if (console.log(
         "pathetocaheck.............................",
-        Q,
+        u,
+        Q ?? "NONE",
         K
       ), K)
         for (const [k, I] of K.components.entries()) {
@@ -336,14 +337,14 @@ function Oe(e, {
     Y(
       g,
       n,
-      F.current,
+      b.current,
       O
     )
   ), r.getState().cogsStateStore[g] || D(g, e), r.getState().initialStateGlobal[g] || ae(g, e));
   const a = Ie(() => Y(
     g,
     n,
-    F.current,
+    b.current,
     O
   ), [g]);
   return [fe(g), a];
@@ -546,15 +547,15 @@ function Y(e, i, v, S) {
                   );
                   return C && (p = w), C;
                 }
-                const b = M(w, u);
-                return b && (p = w), b;
+                const F = M(w, u);
+                return F && (p = w), F;
               }))
                 _(t), ee(i, u, t, e);
               else if (l && p) {
-                const w = l(p), b = o.map(
+                const w = l(p), F = o.map(
                   (C) => M(C, p) ? w : C
                 );
-                _(t), B(i, b, t);
+                _(t), B(i, F, t);
               }
             };
           if (s === "cut")
@@ -650,8 +651,8 @@ function Y(e, i, v, S) {
                 });
                 const u = n.zodSchema.safeParse(l);
                 return u.success ? !0 : (u.error.errors.forEach((A) => {
-                  const w = A.path, b = A.message, C = [n.key, ...w].join(".");
-                  a(C, b);
+                  const w = A.path, F = A.message, C = [n.key, ...w].join(".");
+                  a(C, F);
                 }), ie(e), !1);
               } catch (o) {
                 return console.error("Zod schema validation failed", o), !1;
@@ -719,8 +720,8 @@ function Y(e, i, v, S) {
               formOpts: a
             }
           );
-        const F = [...t, s], h = r.getState().getNestedState(e, F);
-        return c(h, F, y);
+        const b = [...t, s], h = r.getState().getNestedState(e, b);
+        return c(h, b, y);
       }
     }, R = new Proxy(T, O);
     return d.set(x, {
@@ -733,7 +734,7 @@ function Y(e, i, v, S) {
   );
 }
 function te(e) {
-  return X(be, { proxy: e });
+  return X(Fe, { proxy: e });
 }
 function je({
   proxy: e,
@@ -747,7 +748,7 @@ function je({
     (d, E, _, m, c) => e._mapFn(d, E, _, m, c)
   ) : null;
 }
-function be({
+function Fe({
   proxy: e
 }) {
   const i = Z(null), v = `${e._stateKey}-${e._path.join(".")}`;

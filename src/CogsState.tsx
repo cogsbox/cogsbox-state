@@ -955,7 +955,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
       console.log(
         "pathetocaheck.............................",
-        pathToCheck,
+        updateObj,
+        pathToCheck ?? "NONE",
         stateEntry
       );
       if (stateEntry) {
