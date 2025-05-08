@@ -126,7 +126,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;
-    _initialState: T;
+    _initialState: T | ((state: T) => T);
     updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;
     };

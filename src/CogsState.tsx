@@ -224,7 +224,7 @@ export type StateObject<T> = (T extends any[]
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;
-    _initialState: T;
+    _initialState: T | ((state: T) => T);
     updateInitialState: (newState: T | null) => {
       fetchId: (field: keyof T) => string | number;
     };
@@ -733,42 +733,44 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    if (initialState) {
+    if (typeof initialState !== "undefined") {
+      let resolvedInitialStateValue: TStateObject;
+
+      if (isFunction(initialState)) {
+        const currentStateForFunc = getGlobalStore.getState().cogsStateStore[
+          thisKey
+        ] as TStateObject | undefined;
+        resolvedInitialStateValue = (
+          initialState as (prevState?: TStateObject) => TStateObject
+        )(currentStateForFunc);
+      } else {
+        resolvedInitialStateValue = initialState as TStateObject;
+      }
+
       setAndMergeOptions(thisKey as string, {
-        initialState,
+        initialState: resolvedInitialStateValue,
       });
-    }
 
-    const options = latestInitialOptionsRef.current;
-    let localData = null;
+      const currentGlobalOptions = getInitialOptions(thisKey as string);
+      let localData = null;
 
-    const localkey = isFunction(options?.localStorage?.key)
-      ? options?.localStorage?.key(initialState)
-      : options?.localStorage?.key;
+      const localkey = isFunction(currentGlobalOptions?.localStorage?.key)
+        ? currentGlobalOptions?.localStorage?.key(resolvedInitialStateValue)
+        : currentGlobalOptions?.localStorage?.key;
 
-    console.log("newoptions", options);
-    console.log("localkey", localkey);
-    console.log("initialState", initialState);
+      if (localkey && sessionId) {
+        localData = loadFromLocalStorage(
+          sessionId + "-" + thisKey + "-" + localkey
+        );
+      }
 
-    if (localkey && sessionId) {
-      localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + localkey
-      );
-    }
-    const createdState =
-      getGlobalStore.getState().iniitialCreatedState[thisKey];
-    console.log("createdState - intiual", createdState, initialState);
-    let newState = null;
-    let loadingLocalData = false;
-
-    if (initialState) {
-      newState = initialState;
+      let newState = resolvedInitialStateValue;
 
       if (localData) {
         if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-          newState = localData.state;
-          if (options?.localStorage?.onChange) {
-            options?.localStorage?.onChange(newState);
+          newState = localData.state as TStateObject;
+          if (currentGlobalOptions?.localStorage?.onChange) {
+            currentGlobalOptions?.localStorage?.onChange(newState);
           }
         }
       }
@@ -776,7 +778,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       updateGlobalState(
         thisKey,
-        initialState,
+        resolvedInitialStateValue,
         newState,
         effectiveSetState,
         componentIdRef.current,
@@ -788,13 +790,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const reactiveTypes = Array.isArray(reactiveType)
         ? reactiveType
         : [reactiveType || "component"];
-      console.log("reactiveTypes.............................", reactiveTypes);
+
       if (!reactiveTypes.includes("none")) {
         forceUpdate({});
       }
     }
   }, [initialState, ...(dependencies || [])]);
-
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
