@@ -437,8 +437,8 @@ function setOptions<StateKey, Opt>({
         }
         if (
           key == "initialState" &&
-          options[key] !== undefined && // Check if new value is provided
-          !isDeepEqual(mergedOptions[key], options[key]) // DEEP EQUAL HERE
+          options[key] &&
+          mergedOptions[key] !== options[key]
         ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
@@ -502,6 +502,24 @@ export const createCogsState = <State extends Record<string, unknown>>(
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
 
+    if (
+      options &&
+      typeof options.initialState !== "undefined" &&
+      isFunction(options.initialState)
+    ) {
+      const currentStateFromStore =
+        getGlobalStore.getState().cogsStateStore[stateKey as string] ||
+        statePart[stateKey as string];
+
+      const resolvedInitialValue = (options.initialState as Function)(
+        currentStateFromStore
+      );
+
+      options = {
+        ...options,
+        initialState: resolvedInitialValue,
+      };
+    }
     setOptions({
       stateKey,
       options,
@@ -733,44 +751,36 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [syncUpdate]);
 
   useEffect(() => {
-    if (typeof initialState !== "undefined") {
-      let resolvedInitialStateValue: TStateObject;
-
-      if (isFunction(initialState)) {
-        const currentStateForFunc = getGlobalStore.getState().cogsStateStore[
-          thisKey
-        ] as TStateObject | undefined;
-        resolvedInitialStateValue = (
-          initialState as (prevState?: TStateObject) => TStateObject
-        )(currentStateForFunc);
-      } else {
-        resolvedInitialStateValue = initialState as TStateObject;
-      }
-
+    if (initialState) {
       setAndMergeOptions(thisKey as string, {
-        initialState: resolvedInitialStateValue,
+        initialState,
       });
+    }
 
-      const currentGlobalOptions = getInitialOptions(thisKey as string);
-      let localData = null;
+    const options = latestInitialOptionsRef.current;
+    let localData = null;
 
-      const localkey = isFunction(currentGlobalOptions?.localStorage?.key)
-        ? currentGlobalOptions?.localStorage?.key(resolvedInitialStateValue)
-        : currentGlobalOptions?.localStorage?.key;
+    const localkey = isFunction(options?.localStorage?.key)
+      ? options?.localStorage?.key(initialState)
+      : options?.localStorage?.key;
 
-      if (localkey && sessionId) {
-        localData = loadFromLocalStorage(
-          sessionId + "-" + thisKey + "-" + localkey
-        );
-      }
+    if (localkey && sessionId) {
+      localData = loadFromLocalStorage(
+        sessionId + "-" + thisKey + "-" + localkey
+      );
+    }
+    const createdState =
+      getGlobalStore.getState().iniitialCreatedState[thisKey];
 
-      let newState = resolvedInitialStateValue;
+    let newState = null;
+    if (initialState) {
+      newState = initialState;
 
       if (localData) {
         if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-          newState = localData.state as TStateObject;
-          if (currentGlobalOptions?.localStorage?.onChange) {
-            currentGlobalOptions?.localStorage?.onChange(newState);
+          newState = localData.state;
+          if (options?.localStorage?.onChange) {
+            options?.localStorage?.onChange(newState);
           }
         }
       }
@@ -778,7 +788,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       updateGlobalState(
         thisKey,
-        resolvedInitialStateValue,
+        initialState,
         newState,
         effectiveSetState,
         componentIdRef.current,
@@ -796,6 +806,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
   }, [initialState, ...(dependencies || [])]);
+
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
