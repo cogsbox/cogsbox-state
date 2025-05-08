@@ -405,6 +405,8 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...newOptions,
   });
 }
+
+// Fix for the setOptions function
 function setOptions<StateKey, Opt>({
   stateKey,
   options,
@@ -438,8 +440,8 @@ function setOptions<StateKey, Opt>({
         if (
           key == "initialState" &&
           options[key] &&
-          mergedOptions[key] !== options[key] &&
-          isDeepEqual(mergedOptions[key], options[key])
+          mergedOptions[key] !== options[key] && // Different references
+          !isDeepEqual(mergedOptions[key], options[key]) // And different values
         ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
@@ -751,64 +753,60 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
-
   useEffect(() => {
     if (initialState) {
       setAndMergeOptions(thisKey as string, {
         initialState,
       });
-    }
 
-    const options = latestInitialOptionsRef.current;
-    let localData = null;
+      const options = latestInitialOptionsRef.current;
+      let localData = null;
 
-    const localkey = isFunction(options?.localStorage?.key)
-      ? options?.localStorage?.key(initialState)
-      : options?.localStorage?.key;
+      // Handle localStorage properly
+      const localkey = isFunction(options?.localStorage?.key)
+        ? options?.localStorage?.key(initialState)
+        : options?.localStorage?.key;
 
-    if (localkey && sessionId) {
-      localData = loadFromLocalStorage(
-        sessionId + "-" + thisKey + "-" + localkey
-      );
-    }
+      if (localkey && sessionId) {
+        localData = loadFromLocalStorage(
+          sessionId + "-" + thisKey + "-" + localkey
+        );
+      }
 
-    let newState = null;
-    if (initialState) {
       const currentGloballyStoredInitialState =
         getGlobalStore.getState().initialStateGlobal[thisKey];
 
-      if (isDeepEqual(currentGloballyStoredInitialState, initialState)) {
-        return;
-      }
-      newState = initialState;
+      // Only update if the deep contents have actually changed
+      if (!isDeepEqual(currentGloballyStoredInitialState, initialState)) {
+        let newState = initialState;
 
-      if (localData) {
-        if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-          newState = localData.state;
-          if (options?.localStorage?.onChange) {
-            options?.localStorage?.onChange(newState);
+        if (localData) {
+          if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
+            newState = localData.state;
+            if (options?.localStorage?.onChange) {
+              options?.localStorage?.onChange(newState);
+            }
           }
         }
-      }
-      console.log("newState thius is newstate", newState);
 
-      updateGlobalState(
-        thisKey,
-        initialState,
-        newState,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
+        updateGlobalState(
+          thisKey,
+          initialState,
+          newState,
+          effectiveSetState,
+          componentIdRef.current,
+          sessionId
+        );
 
-      notifyComponents(thisKey);
+        notifyComponents(thisKey);
 
-      const reactiveTypes = Array.isArray(reactiveType)
-        ? reactiveType
-        : [reactiveType || "component"];
+        const reactiveTypes = Array.isArray(reactiveType)
+          ? reactiveType
+          : [reactiveType || "component"];
 
-      if (!reactiveTypes.includes("none")) {
-        forceUpdate({});
+        if (!reactiveTypes.includes("none")) {
+          forceUpdate({});
+        }
       }
     }
   }, [initialState, ...(dependencies || [])]);
