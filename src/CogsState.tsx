@@ -437,8 +437,8 @@ function setOptions<StateKey, Opt>({
         }
         if (
           key == "initialState" &&
-          options[key] &&
-          mergedOptions[key] !== options[key]
+          options[key] !== undefined && // Check if new value is provided
+          !isDeepEqual(mergedOptions[key], options[key]) // DEEP EQUAL HERE
         ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
