@@ -775,9 +775,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       const currentGloballyStoredInitialState =
         getGlobalStore.getState().initialStateGlobal[thisKey];
-
+      console.log(
+        "currentGloballyStoredInitialState",
+        currentGloballyStoredInitialState,
+        initialState,
+        isDeepEqual(currentGloballyStoredInitialState, initialState)
+      );
       // Only update if the deep contents have actually changed
-      if (!isDeepEqual(currentGloballyStoredInitialState, initialState)) {
+      if (
+        (currentGloballyStoredInitialState &&
+          !isDeepEqual(currentGloballyStoredInitialState, initialState)) ||
+        !currentGloballyStoredInitialState
+      ) {
         let newState = initialState;
 
         if (localData) {
