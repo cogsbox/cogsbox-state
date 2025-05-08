@@ -1562,9 +1562,12 @@ function createProxyHandler<T>(
               thisKey: keyof InferArrayElement<T>,
               thisValue: InferArrayElement<T>[keyof InferArrayElement<T>]
             ) => {
-              const foundIndex = currentState.findIndex(
-                (obj: any) => obj[thisKey] === thisValue
-              );
+              const foundIndex = currentState.findIndex((obj: any) => {
+                console.log("findWith-----------11-----------", obj, thisValue);
+                return obj[thisKey] === thisValue;
+              });
+
+              console.log("findWith---------22--------------", foundIndex);
               if (foundIndex === -1) return undefined;
               const foundValue = currentState[foundIndex];
               const newPath = [...path, foundIndex.toString()];
