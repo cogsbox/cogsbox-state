@@ -438,7 +438,8 @@ function setOptions<StateKey, Opt>({
         if (
           key == "initialState" &&
           options[key] &&
-          mergedOptions[key] !== options[key]
+          mergedOptions[key] !== options[key] &&
+          isDeepEqual(mergedOptions[key], options[key])
         ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
@@ -1563,11 +1564,9 @@ function createProxyHandler<T>(
               thisValue: InferArrayElement<T>[keyof InferArrayElement<T>]
             ) => {
               const foundIndex = currentState.findIndex((obj: any) => {
-                console.log("findWith-----------11-----------", obj, thisValue);
                 return obj[thisKey] === thisValue;
               });
 
-              console.log("findWith---------22--------------", foundIndex);
               if (foundIndex === -1) return undefined;
               const foundValue = currentState[foundIndex];
               const newPath = [...path, foundIndex.toString()];
@@ -1580,9 +1579,6 @@ function createProxyHandler<T>(
               shapeCache.clear();
               stateVersion++;
 
-              // ADDED: Clear cache for find operation
-              shapeCache.clear();
-              stateVersion++;
               // Try returning without spread
               return rebuildStateShape(foundValue, newPath);
             };
