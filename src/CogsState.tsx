@@ -224,7 +224,7 @@ export type StateObject<T> = (T extends any[]
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;
-    _initialState: T | ((state: T) => T);
+    _initialState: T;
     updateInitialState: (newState: T | null) => {
       fetchId: (field: keyof T) => string | number;
     };
@@ -316,7 +316,7 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
 
-  initialState?: T;
+  initialState?: T | ((state: T) => T);
   dependencies?: any[]; // Just like useEffect dependencies
 };
 export type ServerSyncType<T> = {

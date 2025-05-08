@@ -126,7 +126,7 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     _componentId: string | null;
     getComponents: () => ComponentsType;
     validateZodSchema: () => void;
-    _initialState: T | ((state: T) => T);
+    _initialState: T;
     updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;
     };
@@ -198,7 +198,7 @@ export type OptionsType<T extends unknown = unknown> = {
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
-    initialState?: T;
+    initialState?: T | ((state: T) => T);
     dependencies?: any[];
 };
 export type ServerSyncType<T> = {
