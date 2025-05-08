@@ -545,7 +545,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         enabledSync: options?.enabledSync,
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
-        initialState: options?.initialState,
+        initialState: options?.initialState as any,
         dependencies: options?.dependencies,
       }
     );
@@ -721,6 +721,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }: {
     stateKey?: string;
     componentId?: string;
+    initialState?: TStateObject;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -770,11 +771,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId + "-" + thisKey + "-" + localkey
       );
     }
-    const createdState =
-      getGlobalStore.getState().iniitialCreatedState[thisKey];
 
     let newState = null;
     if (initialState) {
+      const currentGloballyStoredInitialState =
+        getGlobalStore.getState().initialStateGlobal[thisKey];
+
+      if (isDeepEqual(currentGloballyStoredInitialState, initialState)) {
+        return;
+      }
       newState = initialState;
 
       if (localData) {

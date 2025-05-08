@@ -284,6 +284,7 @@ export declare const notifyComponent: (stateKey: string, componentId: string) =>
 export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initialState, syncUpdate, dependencies, }?: {
     stateKey?: string;
     componentId?: string;
+    initialState?: TStateObject;
 } & OptionsType<TStateObject>): [TStateObject, StateObject<TStateObject>];
 export declare function $cogsSignal(proxy: {
     _path: string[];
