@@ -36,7 +36,7 @@ export type FormElementParams<T> = {
 };
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
-export type PushArgs<U> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => void;
+export type PushArgs<U, T> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => T;
 type CutFunctionType = (index?: number, options?: {
     waitForSync?: boolean;
 }) => void;
@@ -44,11 +44,11 @@ export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
 export type ArrayEndType<TShape extends unknown> = {
     findWith: findWithFuncType<InferArrayElement<TShape>>;
     index: (index: number) => StateObject<InferArrayElement<TShape>> & {
-        insert: PushArgs<InferArrayElement<TShape>>;
+        insert: PushArgs<InferArrayElement<TShape>, TShape>;
         cut: CutFunctionType;
         _index: number;
     } & EndType<InferArrayElement<TShape>>;
-    insert: PushArgs<InferArrayElement<TShape>>;
+    insert: PushArgs<InferArrayElement<TShape>, TShape>;
     cut: CutFunctionType;
     cutByValue: (value: string | number | boolean) => void;
     toggleByValue: (value: string | number | boolean) => void;
@@ -61,6 +61,7 @@ export type ArrayEndType<TShape extends unknown> = {
     stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
     getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
     getSelectedIndex: () => number;
+    last: () => StateObject<InferArrayElement<TShape>> | undefined;
 } & EndType<TShape> & {
     [K in keyof (any[] extends infer T ? T : never)]: never;
 };
