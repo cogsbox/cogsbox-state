@@ -36,7 +36,7 @@ export type FormElementParams<T> = {
 };
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
-export type PushArgs<U, T> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => T;
+export type PushArgs<U, T> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => StateObject<T>;
 type CutFunctionType = (index?: number, options?: {
     waitForSync?: boolean;
 }) => void;

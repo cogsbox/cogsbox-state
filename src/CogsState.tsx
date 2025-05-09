@@ -79,7 +79,7 @@ export type PushArgs<U, T> = (
     | Prettify<U>
     | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>),
   opts?: UpdateOpts<U>
-) => T;
+) => StateObject<T>;
 
 type CutFunctionType = (
   index?: number,
