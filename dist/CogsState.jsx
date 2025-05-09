@@ -565,10 +565,7 @@ function Q(e, i, v, S) {
             };
           if (c === "last")
             return () => {
-              const n = r().getNestedState(
-                e,
-                t
-              );
+              const n = r.getState().getNestedState(e, t);
               if (n.length === 0) return;
               const o = n.length - 1, l = n[o], a = [...t, o.toString()];
               return s(l, a);

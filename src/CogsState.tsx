@@ -1606,10 +1606,9 @@ function createProxyHandler<T>(
           if (prop === "last") {
             // Added handler for 'last'
             return () => {
-              const currentArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
               if (currentArray.length === 0) return undefined;
               const lastIndex = currentArray.length - 1;
               const lastValue = currentArray[lastIndex];
