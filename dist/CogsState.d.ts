@@ -185,6 +185,19 @@ export type OptionsType<T extends unknown = unknown> = {
     serverSync?: ServerSyncType<T>;
     validation?: ValidationOptionsType;
     enableServerState?: boolean;
+    sync?: {
+        action: (state: T) => Promise<{
+            success: boolean;
+            data?: any;
+            error?: any;
+            validation_errors?: Array<{
+                path: string[];
+                message: string;
+            }>;
+        }>;
+        onSuccess?: (data: any) => void;
+        onError?: (error: any) => void;
+    };
     middleware?: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;

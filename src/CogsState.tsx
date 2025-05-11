@@ -298,6 +298,19 @@ export type OptionsType<T extends unknown = unknown> = {
   serverSync?: ServerSyncType<T>;
   validation?: ValidationOptionsType;
   enableServerState?: boolean;
+  sync?: {
+    action: (state: T) => Promise<{
+      success: boolean;
+      data?: any;
+      error?: any;
+      validation_errors?: Array<{
+        path: string[];
+        message: string;
+      }>;
+    }>;
+    onSuccess?: (data: any) => void;
+    onError?: (error: any) => void;
+  };
   middleware?: ({
     updateLog,
     update,
@@ -1356,6 +1369,76 @@ function createProxyHandler<T>(
             } else {
             }
           }
+        }
+        if (prop === "sync" && path.length === 0) {
+          return async function () {
+            // Get the options for this state key
+            const options = getGlobalStore
+              .getState()
+              .getInitialOptions(stateKey);
+            const sync = options?.sync;
+
+            if (!sync) {
+              console.error(`No mutation defined for state key "${stateKey}"`);
+              return { success: false, error: `No mutation defined` };
+            }
+
+            // Get the root state
+            const state = getGlobalStore
+              .getState()
+              .getNestedState(stateKey, []);
+
+            // Get validation key
+            const validationKey = options?.validation?.key;
+
+            try {
+              // Execute the mutation action
+              const response = await sync.action(state);
+
+              // Handle validation errors
+              if (
+                response &&
+                !response.success &&
+                response.validation_errors &&
+                validationKey
+              ) {
+                // Clear existing errors
+                getGlobalStore.getState().removeValidationError(validationKey);
+
+                // Add new validation errors
+                response.validation_errors.forEach((error) => {
+                  const errorPath = [validationKey, ...error.path].join(".");
+                  getGlobalStore
+                    .getState()
+                    .addValidationError(errorPath, error.message);
+                });
+
+                // Notify components to update
+                const stateEntry = getGlobalStore
+                  .getState()
+                  .stateComponents.get(stateKey);
+                if (stateEntry) {
+                  stateEntry.components.forEach((component) => {
+                    component.forceUpdate();
+                  });
+                }
+              }
+
+              // Call success/error callbacks
+              if (response?.success && sync.onSuccess) {
+                sync.onSuccess(response.data);
+              } else if (!response?.success && sync.onError) {
+                sync.onError(response.error);
+              }
+
+              return response;
+            } catch (error) {
+              if (sync.onError) {
+                sync.onError(error);
+              }
+              return { success: false, error };
+            }
+          };
         }
         if (prop === "_status") {
           // Get current state at this path (non-reactive version)
