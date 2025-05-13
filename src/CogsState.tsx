@@ -209,9 +209,7 @@ export type EndType<T, IsArrayElement = false> = {
     hideMessage?: boolean;
   }) => JSX.Element;
   lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cut: () => void } : {}) & {
-    [K in keyof (any extends infer T ? T : never)]: never;
-  };
+} & (IsArrayElement extends true ? { cut: () => void } : {});
 
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
