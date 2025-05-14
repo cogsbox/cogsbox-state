@@ -191,7 +191,7 @@ export type OptionsType<T extends unknown = unknown> = {
             success: boolean;
             data?: any;
             error?: any;
-            validation_errors?: Array<{
+            errors?: Array<{
                 path: string[];
                 message: string;
             }>;

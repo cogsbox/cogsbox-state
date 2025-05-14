@@ -304,7 +304,7 @@ export type OptionsType<T extends unknown = unknown> = {
       success: boolean;
       data?: any;
       error?: any;
-      validation_errors?: Array<{
+      errors?: Array<{
         path: string[];
         message: string;
       }>;
@@ -1394,14 +1394,14 @@ function createProxyHandler<T>(
               if (
                 response &&
                 !response.success &&
-                response.validation_errors &&
+                response.errors &&
                 validationKey
               ) {
                 // Clear existing errors
                 getGlobalStore.getState().removeValidationError(validationKey);
 
                 // Add new validation errors
-                response.validation_errors.forEach((error) => {
+                response.errors.forEach((error) => {
                   const errorPath = [validationKey, ...error.path].join(".");
                   getGlobalStore
                     .getState()
