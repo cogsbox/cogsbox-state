@@ -192,7 +192,7 @@ export type OptionsType<T extends unknown = unknown> = {
             data?: any;
             error?: any;
             errors?: Array<{
-                path: string[];
+                path: (string | number)[];
                 message: string;
             }>;
         }>;

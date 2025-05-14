@@ -305,7 +305,7 @@ export type OptionsType<T extends unknown = unknown> = {
       data?: any;
       error?: any;
       errors?: Array<{
-        path: string[];
+        path: (string | number)[];
         message: string;
       }>;
     }>;
@@ -1385,11 +1385,11 @@ function createProxyHandler<T>(
 
             // Get validation key
             const validationKey = options?.validation?.key;
-            console.log("validationKey", validationKey);
+
             try {
               // Execute the mutation action
               const response = await sync.action(state);
-              console.log("response ss", response, response.errors);
+
               // Handle validation errors
               if (
                 response &&
@@ -1399,11 +1399,11 @@ function createProxyHandler<T>(
               ) {
                 // Clear existing errors
                 getGlobalStore.getState().removeValidationError(validationKey);
-                console.log("        response.errors ", response.errors);
+
                 // Add new validation errors
                 response.errors.forEach((error) => {
                   const errorPath = [validationKey, ...error.path].join(".");
-                  console.log("   errorPath ", errorPath, error.message);
+
                   getGlobalStore
                     .getState()
                     .addValidationError(errorPath, error.message);
