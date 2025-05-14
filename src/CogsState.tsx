@@ -201,6 +201,7 @@ export type EndType<T, IsArrayElement = false> = {
   setSelected: (value: boolean) => void;
   getFormRef: () => React.RefObject<any> | undefined;
   removeStorage: () => void;
+  sync: () => void;
   validationWrapper: ({
     children,
     hideMessage,
@@ -209,7 +210,9 @@ export type EndType<T, IsArrayElement = false> = {
     hideMessage?: boolean;
   }) => JSX.Element;
   lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cut: () => void } : {});
+} & (IsArrayElement extends true ? { cut: () => void } : {}) & {
+    [k: string]: never;
+  };
 
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
@@ -992,13 +995,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           ? path.join(".")
           : [...path].slice(0, -1).join(".");
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-      console.log(
-        "pathetocaheck.............................",
-        path,
-        updateObj,
-        pathToCheck ?? "NONE",
-        stateEntry
-      );
+
       if (stateEntry) {
         const changedPaths = getDifferences(prevValue, payload);
         const changedPathsSet = new Set(changedPaths);
@@ -1392,7 +1389,7 @@ function createProxyHandler<T>(
             try {
               // Execute the mutation action
               const response = await sync.action(state);
-
+              console.log("response ss", response);
               // Handle validation errors
               if (
                 response &&

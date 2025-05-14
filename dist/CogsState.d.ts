@@ -110,6 +110,7 @@ export type EndType<T, IsArrayElement = false> = {
     setSelected: (value: boolean) => void;
     getFormRef: () => React.RefObject<any> | undefined;
     removeStorage: () => void;
+    sync: () => void;
     validationWrapper: ({ children, hideMessage, }: {
         children: React.ReactNode;
         hideMessage?: boolean;
@@ -117,7 +118,9 @@ export type EndType<T, IsArrayElement = false> = {
     lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? {
     cut: () => void;
-} : {});
+} : {}) & {
+    [k: string]: never;
+};
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
 } & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
