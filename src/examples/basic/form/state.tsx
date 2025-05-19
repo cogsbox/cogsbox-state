@@ -69,11 +69,10 @@ export const { useCogsState, setCogsOptions } = createCogsState(initialState);
 
 // Set up additional options for specific state keys
 
-//this is not in a component
 setCogsOptions("user", {
   validation: {
     key: "userValidation",
-    zodSchema: userSchema,
+    zodSchema: userSchema as any,
     onBlur: true,
   },
   formElements: {

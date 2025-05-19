@@ -1,6 +1,5 @@
 import { GenericObject } from './utility.js';
-import { UseMutationResult } from '@tanstack/react-query';
-import { ZodArray, ZodObject, ZodRawShape } from 'zod';
+import { z } from 'zod';
 import { ComponentsType } from './store.js';
 
 type Prettify<T> = {
@@ -178,7 +177,7 @@ export type CogsCookiesType<T extends string[] = string[]> = CookieType<ArrayToO
 export type ReactivityType = "none" | "component" | "deps" | "all";
 type ValidationOptionsType = {
     key?: string;
-    zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+    zodSchema?: z.ZodTypeAny;
     onBlur?: boolean;
 };
 export type OptionsType<T extends unknown = unknown> = {
@@ -226,7 +225,6 @@ export type ServerSyncType<T> = {
         state: T;
     }) => void;
     debounce?: number;
-    mutation: UseMutationResult<any, unknown, any, unknown>;
     snapshot?: {
         name: (({ state }: {
             state: T;

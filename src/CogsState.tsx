@@ -26,9 +26,16 @@ import {
   ValidationWrapper,
 } from "./Functions.js";
 import { isDeepEqual, transformStateFunc } from "./utility.js";
-import type { UseMutationResult } from "@tanstack/react-query";
+
 import { v4 as uuidv4 } from "uuid";
-import { ZodArray, ZodObject, type ZodRawShape } from "zod";
+import {
+  z,
+  ZodArray,
+  ZodObject,
+  ZodSchema,
+  type ZodRawShape,
+  type ZodTypeAny,
+} from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
@@ -290,7 +297,7 @@ export type ReactivityType = "none" | "component" | "deps" | "all";
 
 type ValidationOptionsType = {
   key?: string;
-  zodSchema?: ZodObject<ZodRawShape> | ZodArray<ZodObject<ZodRawShape>>;
+  zodSchema?: z.ZodTypeAny;
   onBlur?: boolean;
 };
 
@@ -340,7 +347,7 @@ export type ServerSyncType<T> = {
   syncKey: (({ state }: { state: T }) => string) | string;
   syncFunction: ({ state }: { state: T }) => void;
   debounce?: number;
-  mutation: UseMutationResult<any, unknown, any, unknown>;
+
   snapshot?: {
     name: (({ state }: { state: T }) => string) | string;
     stateKeys: StateKeys[];
