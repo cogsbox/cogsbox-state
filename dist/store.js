@@ -1,23 +1,23 @@
-import { create as u } from "./node_modules/zustand/esm/react.js";
-const v = u((a, i) => ({
+import { create as p } from "./node_modules/zustand/esm/react.js";
+const v = p((o, i) => ({
   formRefs: /* @__PURE__ */ new Map(),
-  registerFormRef: (e, r) => a((t) => {
+  registerFormRef: (e, r) => o((t) => {
     const n = new Map(t.formRefs);
     return n.set(e, r), { formRefs: n };
   }),
   getFormRef: (e) => i().formRefs.get(e),
-  removeFormRef: (e) => a((r) => {
+  removeFormRef: (e) => o((r) => {
     const t = new Map(r.formRefs);
     return t.delete(e), { formRefs: t };
   }),
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
     const r = i().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
-    return r.forEach((o, s) => {
-      (s.startsWith(t) || s === e) && n.set(s, o);
+    return r.forEach((a, s) => {
+      (s.startsWith(t) || s === e) && n.set(s, a);
     }), n;
   }
-})), m = u((a, i) => ({
+})), m = p((o, i) => ({
   selectedIndicesMap: /* @__PURE__ */ new Map(),
   // Add the new methods
   getSelectedIndex: (e, r) => {
@@ -26,17 +26,31 @@ const v = u((a, i) => ({
       return t.get(r);
   },
   setSelectedIndex: (e, r, t) => {
-    a((n) => {
-      const o = new Map(n.selectedIndicesMap);
-      let s = o.get(e);
-      return s || (s = /* @__PURE__ */ new Map(), o.set(e, s)), t === void 0 ? s.delete(r) : s.set(r, t), {
+    o((n) => {
+      const a = new Map(n.selectedIndicesMap);
+      let s = a.get(e);
+      return s || (s = /* @__PURE__ */ new Map(), a.set(e, s)), t === void 0 ? s.delete(r) : s.set(r, t), {
         ...n,
-        selectedIndicesMap: o
+        selectedIndicesMap: a
+      };
+    });
+  },
+  clearSelectedIndex: ({
+    stateKey: e,
+    path: r
+  }) => {
+    o((t) => {
+      const n = new Map(t.selectedIndicesMap), a = n.get(e);
+      if (!a) return t;
+      const s = r.join(".");
+      return a.delete(s), {
+        ...t,
+        selectedIndicesMap: n
       };
     });
   },
   clearSelectedIndexesForState: (e) => {
-    a((r) => {
+    o((r) => {
       const t = new Map(r.selectedIndicesMap);
       return t.delete(e) ? (console.log(
         `Cleared selected indices map entry for stateKey: ${e}`
@@ -46,14 +60,14 @@ const v = u((a, i) => ({
   stateComponents: /* @__PURE__ */ new Map(),
   subscribe: (e) => i().subscribe(e),
   reactiveDeps: {},
-  setReactiveDeps: (e, r) => a((t) => ({
+  setReactiveDeps: (e, r) => o((t) => ({
     ...t,
     reactiveDeps: {
       ...t.reactiveDeps,
       [e]: r
     }
   })),
-  deleteReactiveDeps: (e) => a((r) => {
+  deleteReactiveDeps: (e) => o((r) => {
     const { [e]: t, ...n } = r.reactiveDeps;
     return {
       ...r,
@@ -64,13 +78,13 @@ const v = u((a, i) => ({
   signalDomElements: /* @__PURE__ */ new Map(),
   addSignalElement: (e, r) => {
     const t = i().signalDomElements;
-    t.has(e) || t.set(e, /* @__PURE__ */ new Set()), t.get(e).add(r), a({ signalDomElements: new Map(t) });
+    t.has(e) || t.set(e, /* @__PURE__ */ new Set()), t.get(e).add(r), o({ signalDomElements: new Map(t) });
   },
   removeSignalElement: (e, r) => {
     const t = i().signalDomElements, n = t.get(e);
-    n && n.forEach((o) => {
-      o.instanceId === r && n.delete(o);
-    }), a({ signalDomElements: new Map(t) });
+    n && n.forEach((a) => {
+      a.instanceId === r && n.delete(a);
+    }), o({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
   updaterState: {},
@@ -81,7 +95,7 @@ const v = u((a, i) => ({
   initialStateGlobal: {},
   iniitialCreatedState: {},
   updateInitialCreatedState: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       iniitialCreatedState: {
         ...t.iniitialCreatedState,
         [e]: r
@@ -94,7 +108,7 @@ const v = u((a, i) => ({
   serverSyncLog: {},
   serverSideOrNot: {},
   setServerSyncLog: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       serverSyncLog: {
         ...t.serverSyncLog,
         [e]: [...t.serverSyncLog[e] ?? [], r]
@@ -102,7 +116,7 @@ const v = u((a, i) => ({
     }));
   },
   setServerSideOrNot: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       serverSideOrNot: {
         ...t.serverSideOrNot,
         [e]: r
@@ -112,7 +126,7 @@ const v = u((a, i) => ({
   getServerSideOrNot: (e) => i().serverSideOrNot[e],
   getThisLocalUpdate: (e) => i().stateLog[e],
   setServerState: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       serverState: {
         ...t.serverState,
         [e]: r
@@ -120,18 +134,18 @@ const v = u((a, i) => ({
     }));
   },
   setStateLog: (e, r) => {
-    a((t) => {
-      const n = t.stateLog[e] ?? [], o = r(n);
+    o((t) => {
+      const n = t.stateLog[e] ?? [], a = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: o
+          [e]: a
         }
       };
     });
   },
   setIsLoadingGlobal: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       isLoadingGlobal: {
         ...t.isLoadingGlobal,
         [e]: r
@@ -139,7 +153,7 @@ const v = u((a, i) => ({
     }));
   },
   setServerSyncActions: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       serverSyncActions: {
         ...t.serverSyncActions,
         [e]: r
@@ -147,22 +161,22 @@ const v = u((a, i) => ({
     }));
   },
   addValidationError: (e, r) => {
-    console.log("addValidationError---"), a((t) => {
-      const n = new Map(t.validationErrors), o = n.get(e) || [];
-      return console.log("addValidationError", e, r, o), n.set(e, [...o, r]), { validationErrors: n };
+    console.log("addValidationError---"), o((t) => {
+      const n = new Map(t.validationErrors), a = n.get(e) || [];
+      return console.log("addValidationError", e, r, a), n.set(e, [...a, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
-    a((r) => {
+    o((r) => {
       const t = new Map(r.validationErrors);
       let n = !1;
-      const o = e.split(".");
+      const a = e.split(".");
       return Array.from(t.keys()).forEach((s) => {
-        const c = s.split(".");
-        if (c.length >= o.length) {
+        const l = s.split(".");
+        if (l.length >= a.length) {
           let d = !0;
-          for (let l = 0; l < o.length; l++)
-            if (c[l] !== o[l]) {
+          for (let c = 0; c < a.length; c++)
+            if (l[c] !== a[c]) {
               d = !1;
               break;
             }
@@ -172,20 +186,20 @@ const v = u((a, i) => ({
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = i().validationErrors, n = e.split("."), o = (s, c) => s === "[*]" ? !0 : Array.isArray(s) ? s.includes(parseInt(c)) : s === c;
+    const r = [], t = i().validationErrors, n = e.split("."), a = (s, l) => s === "[*]" ? !0 : Array.isArray(s) ? s.includes(parseInt(l)) : s === l;
     return Array.from(t.keys()).forEach((s) => {
-      const c = s.split(".");
-      if (c.length >= n.length) {
+      const l = s.split(".");
+      if (l.length >= n.length) {
         let d = !0;
-        for (let l = 0; l < n.length; l++) {
-          const S = n[l], f = c[l];
+        for (let c = 0; c < n.length; c++) {
+          const S = n[c], f = l[c];
           if (S === "[*]" || Array.isArray(S)) {
-            const p = parseInt(f);
-            if (isNaN(p)) {
+            const u = parseInt(f);
+            if (isNaN(u)) {
               d = !1;
               break;
             }
-            if (!o(S, f)) {
+            if (!a(S, f)) {
               d = !1;
               break;
             }
@@ -195,36 +209,36 @@ const v = u((a, i) => ({
           }
         }
         if (d) {
-          const l = t.get(s);
-          l && r.push(...l);
+          const c = t.get(s);
+          c && r.push(...c);
         }
       }
     }), r;
   },
   getInitialOptions: (e) => i().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = i().cogsStateStore[e], n = (o, s) => {
-      if (s.length === 0) return o;
-      const c = s[0], d = s.slice(1);
-      if (c === "[*]") {
-        if (!Array.isArray(o)) {
+    const t = i().cogsStateStore[e], n = (a, s) => {
+      if (s.length === 0) return a;
+      const l = s[0], d = s.slice(1);
+      if (l === "[*]") {
+        if (!Array.isArray(a)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (d.length === 0) return o;
-        const S = o.map(
+        if (d.length === 0) return a;
+        const S = a.map(
           (f) => n(f, d)
         );
         return Array.isArray(S[0]) ? S.flat() : S;
       }
-      const l = o[c];
-      if (l !== void 0)
-        return n(l, d);
+      const c = a[l];
+      if (c !== void 0)
+        return n(c, d);
     };
     return n(t, r);
   },
   setInitialStateOptions: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       initialStateOptions: {
         ...t.initialStateOptions,
         [e]: r
@@ -232,7 +246,7 @@ const v = u((a, i) => ({
     }));
   },
   updateInitialStateGlobal: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       initialStateGlobal: {
         ...t.initialStateGlobal,
         [e]: r
@@ -242,11 +256,11 @@ const v = u((a, i) => ({
   getUpdaterState: (e) => i().updaterState[e],
   setUpdaterState: (e, r) => {
     const t = i().updaterState;
-    !e || !r || a({ updaterState: { ...t ?? {}, [e]: r } });
+    !e || !r || o({ updaterState: { ...t ?? {}, [e]: r } });
   },
   getKeyState: (e) => i().cogsStateStore[e],
   setState: (e, r) => {
-    a((t) => ({
+    o((t) => ({
       cogsStateStore: {
         ...t.cogsStateStore,
         [e]: typeof r == "function" ? r(t.cogsStateStore[e]) : r
@@ -254,7 +268,7 @@ const v = u((a, i) => ({
     }));
   },
   setInitialStates: (e) => {
-    a((r) => ({
+    o((r) => ({
       cogsStateStore: {
         ...r.cogsStateStore,
         ...e
@@ -262,7 +276,7 @@ const v = u((a, i) => ({
     }));
   },
   setCreatedState: (e) => {
-    a((r) => ({
+    o((r) => ({
       iniitialCreatedState: {
         ...r.cogsStateStore,
         ...e
@@ -270,7 +284,7 @@ const v = u((a, i) => ({
     }));
   },
   syncInfoStore: /* @__PURE__ */ new Map(),
-  setSyncInfo: (e, r) => a((t) => {
+  setSyncInfo: (e, r) => o((t) => {
     const n = new Map(t.syncInfoStore);
     return n.set(e, r), { ...t, syncInfoStore: n };
   }),

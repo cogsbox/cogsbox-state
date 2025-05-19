@@ -32,6 +32,10 @@ export type CogsGlobalState = {
     selectedIndicesMap: Map<string, Map<string, number>>;
     getSelectedIndex: (stateKey: string, parentPath: string) => number | undefined;
     setSelectedIndex: (stateKey: string, parentPath: string, index: number | undefined) => void;
+    clearSelectedIndex: ({ stateKey, path, }: {
+        stateKey: string;
+        path: string[];
+    }) => void;
     clearSelectedIndexesForState: (stateKey: string) => void;
     updaterState: {
         [key: string]: any;

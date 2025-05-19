@@ -94,6 +94,13 @@ export type CogsGlobalState = {
     parentPath: string,
     index: number | undefined
   ) => void;
+  clearSelectedIndex: ({
+    stateKey,
+    path,
+  }: {
+    stateKey: string;
+    path: string[];
+  }) => void;
   clearSelectedIndexesForState: (stateKey: string) => void;
   updaterState: { [key: string]: any };
   initialStateOptions: { [key: string]: OptionsType };
@@ -225,6 +232,25 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         stateMap.set(parentPath, index);
       }
 
+      return {
+        ...state,
+        selectedIndicesMap: newMap,
+      };
+    });
+  },
+  clearSelectedIndex: ({
+    stateKey,
+    path,
+  }: {
+    stateKey: string;
+    path: string[];
+  }) => {
+    set((state) => {
+      const newMap = new Map(state.selectedIndicesMap);
+      const stateMap = newMap.get(stateKey);
+      if (!stateMap) return state;
+      const parentPath = path.join(".");
+      stateMap.delete(parentPath);
       return {
         ...state,
         selectedIndicesMap: newMap,

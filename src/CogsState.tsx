@@ -145,6 +145,7 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (value: InferArrayElement<TShape>, index: number) => void
   ) => ArrayEndType<TShape>;
   getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
+  clearSelected: () => void;
   getSelectedIndex: () => number;
   last: () => StateObject<InferArrayElement<TShape>> | undefined;
 } & EndType<TShape> & {
@@ -1518,6 +1519,11 @@ function createProxyHandler<T>(
                 [...path, selectedIndex.toString()],
                 meta
               );
+            };
+          }
+          if (prop === "clearSelected") {
+            return () => {
+              getGlobalStore.getState().clearSelectedIndex({ stateKey, path });
             };
           }
           if (prop === "getSelectedIndex") {
