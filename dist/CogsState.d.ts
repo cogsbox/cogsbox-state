@@ -108,6 +108,7 @@ export type EndType<T, IsArrayElement = false> = {
     ignoreFields: (fields: string[]) => StateObject<T>;
     _selected: boolean;
     setSelected: (value: boolean) => void;
+    toggleSelected: () => void;
     getFormRef: () => React.RefObject<any> | undefined;
     removeStorage: () => void;
     sync: () => void;

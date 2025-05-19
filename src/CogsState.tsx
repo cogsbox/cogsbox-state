@@ -207,6 +207,7 @@ export type EndType<T, IsArrayElement = false> = {
   ignoreFields: (fields: string[]) => StateObject<T>;
   _selected: boolean;
   setSelected: (value: boolean) => void;
+  toggleSelected: () => void;
   getFormRef: () => React.RefObject<any> | undefined;
   removeStorage: () => void;
   sync: () => void;
@@ -1917,6 +1918,31 @@ function createProxyHandler<T>(
                 .setSelectedIndex(stateKey, parentKey, undefined);
             }
 
+            const nested = getGlobalStore
+              .getState()
+              .getNestedState(stateKey, [...parentPath]);
+            updateFn(effectiveSetState, nested, parentPath);
+
+            // Invalidate cache for this path
+            invalidateCachePath(parentPath);
+          };
+        }
+        if (prop === "toggleSelected") {
+          return () => {
+            const parentPath = path.slice(0, -1);
+            const thisIndex = Number(path[path.length - 1]);
+            const parentKey = parentPath.join(".");
+            const selectedIndex = getGlobalStore
+              .getState()
+              .getSelectedIndex(stateKey, parentKey);
+
+            getGlobalStore
+              .getState()
+              .setSelectedIndex(
+                stateKey,
+                parentKey,
+                selectedIndex === thisIndex ? undefined : thisIndex
+              );
             const nested = getGlobalStore
               .getState()
               .getNestedState(stateKey, [...parentPath]);
