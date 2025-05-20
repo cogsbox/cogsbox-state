@@ -36,19 +36,19 @@ export type FormElementParams<T> = {
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
 export type PushArgs<U, T> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => StateObject<T>;
-type CutFunctionType = (index?: number, options?: {
+type CutFunctionType<T> = (index?: number, options?: {
     waitForSync?: boolean;
-}) => void;
+}) => StateObject<T>;
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
 export type ArrayEndType<TShape extends unknown> = {
     findWith: findWithFuncType<InferArrayElement<TShape>>;
     index: (index: number) => StateObject<InferArrayElement<TShape>> & {
         insert: PushArgs<InferArrayElement<TShape>, TShape>;
-        cut: CutFunctionType;
+        cut: CutFunctionType<InferArrayElement<TShape>>;
         _index: number;
     } & EndType<InferArrayElement<TShape>>;
     insert: PushArgs<InferArrayElement<TShape>, TShape>;
-    cut: CutFunctionType;
+    cut: CutFunctionType<InferArrayElement<TShape>>;
     cutByValue: (value: string | number | boolean) => void;
     toggleByValue: (value: string | number | boolean) => void;
     stateSort: (compareFn: (a: InferArrayElement<TShape>, b: InferArrayElement<TShape>) => number) => ArrayEndType<TShape>;

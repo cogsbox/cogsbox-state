@@ -28,14 +28,7 @@ import {
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 
 import { v4 as uuidv4 } from "uuid";
-import {
-  z,
-  ZodArray,
-  ZodObject,
-  ZodSchema,
-  type ZodRawShape,
-  type ZodTypeAny,
-} from "zod";
+import { z } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
@@ -88,10 +81,10 @@ export type PushArgs<U, T> = (
   opts?: UpdateOpts<U>
 ) => StateObject<T>;
 
-type CutFunctionType = (
+type CutFunctionType<T> = (
   index?: number,
   options?: { waitForSync?: boolean }
-) => void;
+) => StateObject<T>;
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
 
@@ -99,11 +92,11 @@ export type ArrayEndType<TShape extends unknown> = {
   findWith: findWithFuncType<InferArrayElement<TShape>>;
   index: (index: number) => StateObject<InferArrayElement<TShape>> & {
     insert: PushArgs<InferArrayElement<TShape>, TShape>;
-    cut: CutFunctionType;
+    cut: CutFunctionType<InferArrayElement<TShape>>;
     _index: number;
   } & EndType<InferArrayElement<TShape>>;
   insert: PushArgs<InferArrayElement<TShape>, TShape>;
-  cut: CutFunctionType;
+  cut: CutFunctionType<InferArrayElement<TShape>>;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
   stateSort: (
@@ -1774,6 +1767,10 @@ function createProxyHandler<T>(
               // ADDED: Invalidate cache on cut
               invalidateCachePath(path);
               cutFunc(effectiveSetState, path, stateKey, index);
+              return rebuildStateShape(
+                getGlobalStore.getState().getNestedState(stateKey, path),
+                path
+              );
             };
           }
           if (prop === "cutByValue") {
