@@ -92,11 +92,11 @@ export type ArrayEndType<TShape extends unknown> = {
   findWith: findWithFuncType<InferArrayElement<TShape>>;
   index: (index: number) => StateObject<InferArrayElement<TShape>> & {
     insert: PushArgs<InferArrayElement<TShape>, TShape>;
-    cut: CutFunctionType<InferArrayElement<TShape>>;
+    cut: CutFunctionType<TShape>;
     _index: number;
   } & EndType<InferArrayElement<TShape>>;
   insert: PushArgs<InferArrayElement<TShape>, TShape>;
-  cut: CutFunctionType<InferArrayElement<TShape>>;
+  cut: CutFunctionType<TShape>;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
   stateSort: (
