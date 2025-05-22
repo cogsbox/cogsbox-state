@@ -194,6 +194,7 @@ export type EndType<T, IsArrayElement = false> = {
   $derive: <R>(fn: EffectFunction<T, R>) => R;
   _status: "fresh" | "stale" | "synced";
   getStatus: () => "fresh" | "stale";
+
   showValidationErrors: () => string[];
   setValidation: (ctx: string) => void;
   removeValidation: (ctx: string) => void;
@@ -235,6 +236,7 @@ export type StateObject<T> = (T extends any[]
     _isLoading: boolean;
     _serverState: T;
     revertToInitialState: (obj?: { validationKey?: string }) => T;
+    getDifferences: () => string[];
     middleware: (
       middles: ({
         updateLog,
@@ -894,8 +896,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(prevValue as TStateObject)
         : newStateOrFunction;
-      const changedPaths = getDifferences(prevValue, payload); // Returns array of path strings like "a.b.c"
-      const changedPathsSet = new Set(changedPaths); // For efficient lookup
 
       const signalId = `${thisKey}-${path.join(".")}`;
       if (signalId) {
@@ -1366,6 +1366,15 @@ function createProxyHandler<T>(
             } else {
             }
           }
+        }
+        if (prop === "getDifferences") {
+          return () => {
+            const differences = getDifferences(
+              getGlobalStore.getState().cogsStateStore[stateKey],
+              getGlobalStore.getState().initialStateGlobal[stateKey]
+            );
+            return differences;
+          };
         }
         if (prop === "sync" && path.length === 0) {
           return async function () {
