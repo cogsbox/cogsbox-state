@@ -12,7 +12,7 @@ export default function FormsMain() {
     reactiveDeps: (state) => [state.addresses],
   });
   const addresses = useCogsState("addresses");
-  addresses.index(0);
+
   const addNewAddress = () => {
     user.addresses.insert({
       street: "",

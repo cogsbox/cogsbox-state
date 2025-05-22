@@ -87,6 +87,37 @@ type CutFunctionType<T> = (
 ) => StateObject<T>;
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
+type ArraySpecificPrototypeKeys =
+  | "concat"
+  | "copyWithin"
+  | "fill"
+  | "find"
+  | "findIndex"
+  | "flat"
+  | "flatMap"
+  | "includes"
+  | "indexOf"
+  | "join"
+  | "keys"
+  | "lastIndexOf"
+  | "map"
+  | "pop"
+  | "push"
+  | "reduce"
+  | "reduceRight"
+  | "reverse"
+  | "shift"
+  | "slice"
+  | "some"
+  | "sort"
+  | "splice"
+  | "unshift"
+  | "values"
+  | "entries"
+  | "every"
+  | "filter"
+  | "forEach"
+  | "with";
 
 export type ArrayEndType<TShape extends unknown> = {
   findWith: findWithFuncType<InferArrayElement<TShape>>;
@@ -148,9 +179,7 @@ export type ArrayEndType<TShape extends unknown> = {
   clearSelected: () => void;
   getSelectedIndex: () => number;
   last: () => StateObject<InferArrayElement<TShape>> | undefined;
-} & EndType<TShape> & {
-    [K in keyof (any[] extends infer T ? T : never)]: never;
-  };
+} & EndType<TShape>;
 
 export type UpdateType<T> = (
   payload: UpdateArg<Prettify<T>>,
@@ -213,10 +242,7 @@ export type EndType<T, IsArrayElement = false> = {
     hideMessage?: boolean;
   }) => JSX.Element;
   lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cut: () => void } : {}) & {
-    [k: string]: never;
-  };
-
+} & (IsArrayElement extends true ? { cut: () => void } : {});
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
   : T extends Record<string, unknown> | object

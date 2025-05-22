@@ -62,9 +62,7 @@ export type ArrayEndType<TShape extends unknown> = {
     clearSelected: () => void;
     getSelectedIndex: () => number;
     last: () => StateObject<InferArrayElement<TShape>> | undefined;
-} & EndType<TShape> & {
-    [K in keyof (any[] extends infer T ? T : never)]: never;
-};
+} & EndType<TShape>;
 export type UpdateType<T> = (payload: UpdateArg<Prettify<T>>, opts?: UpdateOpts<T>) => void;
 export type FormOptsType = {
     key?: string;
@@ -119,9 +117,7 @@ export type EndType<T, IsArrayElement = false> = {
     lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? {
     cut: () => void;
-} : {}) & {
-    [k: string]: never;
-};
+} : {});
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
 } & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
