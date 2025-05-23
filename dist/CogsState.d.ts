@@ -2,7 +2,7 @@ import { GenericObject } from './utility.js';
 import { z } from 'zod';
 import { ComponentsType } from './store.js';
 
-type Prettify<T> = {
+type Prettify<T> = T extends undefined | null | string | number | boolean | any[] ? T : {
     [K in keyof T]: T[K];
 } & {};
 export type ServerSyncStatus = {
