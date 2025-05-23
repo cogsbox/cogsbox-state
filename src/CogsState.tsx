@@ -33,15 +33,8 @@ import { z } from "zod";
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 
-type Prettify<T> = T extends
-  | undefined
-  | null
-  | string
-  | number
-  | boolean
-  | any[]
-  ? T // Keep primitives and arrays as they are
-  : { [K in keyof T]: T[K] } & {}; // Apply to objects only
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
+
 export type ServerSyncStatus = {
   isFresh: boolean;
   isFreshTime: number;
