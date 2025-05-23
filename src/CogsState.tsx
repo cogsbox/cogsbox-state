@@ -181,10 +181,6 @@ export type ArrayEndType<TShape extends unknown> = {
   last: () => StateObject<InferArrayElement<TShape>> | undefined;
 } & EndType<TShape>;
 
-export type UpdateType<T> = (
-  payload: UpdateArg<Prettify<T>>,
-  opts?: UpdateOpts<T>
-) => void;
 export type FormOptsType = {
   key?: string;
   validation?: {
@@ -202,6 +198,12 @@ export type FormOptsType = {
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 
 export type UpdateArg<S> = S | ((prevState: S) => S);
+
+export type UpdateType<T> = (
+  payload: UpdateArg<T>,
+  opts?: UpdateOpts<T>
+) => void;
+
 export type UpdateOpts<T> = {
   afterUpdate?: (state: T) => void;
   debounce?: number;
@@ -243,6 +245,7 @@ export type EndType<T, IsArrayElement = false> = {
   }) => JSX.Element;
   lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? { cut: () => void } : {});
+
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
   : T extends Record<string, unknown> | object
@@ -279,9 +282,7 @@ export type StateObject<T> = (T extends any[]
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 
 export type EffectiveSetState<TStateObject> = (
-  newStateOrFunction:
-    | TStateObject
-    | ((prevState: TStateObject) => TStateObject),
+  newStateOrFunction: UpdateArg<TStateObject>,
   path: string[],
   updateObj: { updateType: "update" | "insert" | "cut" },
   validationKey?: string,
@@ -907,9 +908,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, []);
 
   const effectiveSetState = (
-    newStateOrFunction:
-      | TStateObject
-      | ((prevState: TStateObject) => TStateObject),
+    newStateOrFunction: UpdateArg<TStateObject>,
     path: string[],
     updateObj: { updateType: "insert" | "cut" | "update" },
     validationKey?: string

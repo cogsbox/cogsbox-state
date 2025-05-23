@@ -13,6 +13,15 @@ export default function FormsMain() {
   });
   const addresses = useCogsState("addresses");
 
+  addresses.index(0).update((p) => ({
+    street: "",
+    city: "",
+    state: "", //no error
+    zipCode: "",
+    country: "USA",
+    isDefault: false,
+  }));
+
   const addNewAddress = () => {
     user.addresses.insert({
       street: "",
