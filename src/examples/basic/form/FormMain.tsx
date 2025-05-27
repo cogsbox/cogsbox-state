@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useCogsState } from "./state";
+import { useCogsState, type Address } from "./state";
 import { Code, TriangleIcon } from "lucide-react";
 import CodeLine from "../CodeLine";
 import CodeExampleDropdown from "./CodeExamples";
@@ -7,6 +7,24 @@ import CodeExampleDropdown from "./CodeExamples";
 // Main Form Example Component
 export default function FormsMain() {
   const [activeTab, setActiveTab] = useState("description");
+  const [addressTest, setAddressTest] = useState<Address>({
+    street: "",
+    city: "",
+    state: "", //no error
+    zipCode: "",
+    country: "USA",
+    isDefault: false,
+  });
+
+  setAddressTest((p) => ({
+    ...p,
+    street: "",
+    city: "",
+    sssssstsate: "", //no error
+    zipCode: "",
+    country: "USA",
+    isDefault: false,
+  }));
   const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
   const user = useCogsState("user", {
     reactiveDeps: (state) => [state.addresses],
@@ -14,6 +32,7 @@ export default function FormsMain() {
   const addresses = useCogsState("addresses");
 
   addresses.index(0).update((p) => ({
+    ...p,
     street: "",
     city: "",
     state: "", //no error

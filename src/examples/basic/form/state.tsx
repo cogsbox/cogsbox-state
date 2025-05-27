@@ -2,7 +2,7 @@
 import { z, ZodSchema } from "zod";
 import { createCogsState } from "../../../CogsState";
 
-type Address = {
+export type Address = {
   street: string;
   city: string;
   state: string;
