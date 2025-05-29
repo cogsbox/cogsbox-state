@@ -26,7 +26,7 @@ import {
   ValidationWrapper,
 } from "./Functions.js";
 import { isDeepEqual, transformStateFunc } from "./utility.js";
-
+import superjson from "superjson";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
@@ -632,15 +632,15 @@ const loadFromLocalStorage = (localStorageKey: string) => {
     const storedData = window.localStorage.getItem(localStorageKey);
     if (!storedData) return null;
 
-    const parsedData = JSON.parse(storedData);
+    // Use SuperJSON instead of JSON.parse
+    const parsedData = superjson.parse(storedData);
 
-    return parsedData;
+    return parsedData as any;
   } catch (error) {
     console.error("Error loading from localStorage:", error);
     return null;
   }
 };
-
 const saveToLocalStorage = <T,>(
   state: T,
   thisKey: string,
@@ -655,9 +655,11 @@ const saveToLocalStorage = <T,>(
       sessionId
     );
   }
+
   const key = isFunction(currentInitialOptions?.localStorage?.key)
     ? currentInitialOptions.localStorage?.key(state)
     : currentInitialOptions?.localStorage?.key;
+
   if (key && sessionId) {
     const data: LocalStorageData<T> = {
       state,
@@ -669,7 +671,8 @@ const saveToLocalStorage = <T,>(
 
     const storageKey = `${sessionId}-${thisKey}-${key}`;
 
-    window.localStorage.setItem(storageKey, JSON.stringify(data));
+    // Use SuperJSON instead of JSON.stringify
+    window.localStorage.setItem(storageKey, superjson.stringify(data));
   }
 };
 
