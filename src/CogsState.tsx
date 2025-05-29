@@ -362,7 +362,7 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveType?: ReactivityType[] | ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
 
-  initialState?: T | ((state: T) => T);
+  initialState?: T;
   dependencies?: any[]; // Just like useEffect dependencies
 };
 export type ServerSyncType<T> = {
@@ -551,24 +551,6 @@ export const createCogsState = <State extends Record<string, unknown>>(
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
 
-    if (
-      options &&
-      typeof options.initialState !== "undefined" &&
-      isFunction(options.initialState)
-    ) {
-      const currentStateFromStore =
-        getGlobalStore.getState().cogsStateStore[stateKey as string] ||
-        statePart[stateKey as string];
-
-      const resolvedInitialValue = (options.initialState as Function)(
-        currentStateFromStore
-      );
-
-      options = {
-        ...options,
-        initialState: resolvedInitialValue,
-      };
-    }
     setOptions({
       stateKey,
       options,
@@ -606,6 +588,11 @@ export const createCogsState = <State extends Record<string, unknown>>(
     options: OptionsType<(typeof statePart)[StateKey]>
   ) {
     setOptions({ stateKey, options, initialOptionsPart });
+
+    if (options.localStorage) {
+      loadAndApplyLocalStorage(stateKey as string, options);
+    }
+
     notifyComponents(stateKey as string);
   }
 
@@ -678,6 +665,34 @@ const loadFromLocalStorage = (localStorageKey: string) => {
     console.error("Error loading from localStorage:", error);
     return null;
   }
+};
+const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
+  const currentState = getGlobalStore.getState().cogsStateStore[stateKey];
+  const { sessionId } = useCogsConfig();
+  const localkey = isFunction(options?.localStorage?.key)
+    ? options.localStorage.key(currentState)
+    : options?.localStorage?.key;
+
+  if (localkey && sessionId) {
+    const localData = loadFromLocalStorage(
+      `${sessionId}-${stateKey}-${localkey}`
+    );
+
+    if (
+      localData &&
+      localData.lastUpdated > (localData.lastSyncedWithServer || 0)
+    ) {
+      setState(stateKey, localData.state);
+
+      if (options?.localStorage?.onChange) {
+        options.localStorage.onChange(localData.state);
+      }
+
+      notifyComponents(stateKey);
+      return true;
+    }
+  }
+  return false;
 };
 
 type LocalStorageData<T> = {
@@ -828,12 +843,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       const currentGloballyStoredInitialState =
         getGlobalStore.getState().initialStateGlobal[thisKey];
-      console.log(
-        "currentGloballyStoredInitialState",
-        currentGloballyStoredInitialState,
-        initialState,
-        isDeepEqual(currentGloballyStoredInitialState, initialState)
-      );
+
       // Only update if the deep contents have actually changed
       if (
         (currentGloballyStoredInitialState &&

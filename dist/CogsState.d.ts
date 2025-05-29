@@ -211,7 +211,7 @@ export type OptionsType<T extends unknown = unknown> = {
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType[] | ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
-    initialState?: T | ((state: T) => T);
+    initialState?: T;
     dependencies?: any[];
 };
 export type ServerSyncType<T> = {
