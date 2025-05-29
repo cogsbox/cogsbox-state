@@ -625,22 +625,6 @@ const {
   setServerSyncActions,
 } = getGlobalStore.getState();
 
-const loadFromLocalStorage = (localStorageKey: string) => {
-  if (!localStorageKey) return null;
-
-  try {
-    const storedData = window.localStorage.getItem(localStorageKey);
-    if (!storedData) return null;
-
-    // Use SuperJSON instead of JSON.parse
-    const parsedData = superjson.parse(storedData);
-
-    return parsedData as any;
-  } catch (error) {
-    console.error("Error loading from localStorage:", error);
-    return null;
-  }
-};
 const saveToLocalStorage = <T,>(
   state: T,
   thisKey: string,
@@ -662,8 +646,8 @@ const saveToLocalStorage = <T,>(
 
   if (key && sessionId) {
     const data: LocalStorageData<T> = {
-      state,
-      lastUpdated: Date.now(),
+      state, // ← This is your state part
+      lastUpdated: Date.now(), // ← This is your lastUpdated
       lastSyncedWithServer:
         getGlobalStore.getState().serverSyncLog[thisKey]?.[0]?.timeStamp,
       baseServerState: getGlobalStore.getState().serverState[thisKey],
@@ -673,6 +657,23 @@ const saveToLocalStorage = <T,>(
 
     // Use SuperJSON instead of JSON.stringify
     window.localStorage.setItem(storageKey, superjson.stringify(data));
+  }
+};
+
+const loadFromLocalStorage = (localStorageKey: string) => {
+  if (!localStorageKey) return null;
+
+  try {
+    const storedData = window.localStorage.getItem(localStorageKey);
+    if (!storedData) return null;
+
+    // Use SuperJSON instead of JSON.parse
+    const parsedData = superjson.parse(storedData);
+
+    return parsedData as LocalStorageData<any>; // This will have your state, lastUpdated, etc.
+  } catch (error) {
+    console.error("Error loading from localStorage:", error);
+    return null;
   }
 };
 

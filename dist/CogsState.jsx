@@ -91,15 +91,7 @@ const He = (e, i) => {
   addValidationError: Ce,
   removeValidationError: D,
   setServerSyncActions: Pe
-} = r.getState(), Ie = (e) => {
-  if (!e) return null;
-  try {
-    const i = window.localStorage.getItem(e);
-    return i ? ye.parse(i) : null;
-  } catch (i) {
-    return console.error("Error loading from localStorage:", i), null;
-  }
-}, je = (e, i, v, S) => {
+} = r.getState(), je = (e, i, v, S) => {
   v?.log && console.log(
     "saving to localstorage",
     i,
@@ -110,11 +102,21 @@ const He = (e, i) => {
   if (u && S) {
     const N = {
       state: e,
+      // ← This is your state part
       lastUpdated: Date.now(),
+      // ← This is your lastUpdated
       lastSyncedWithServer: r.getState().serverSyncLog[i]?.[0]?.timeStamp,
       baseServerState: r.getState().serverState[i]
     }, E = `${S}-${i}-${u}`;
     window.localStorage.setItem(E, ye.stringify(N));
+  }
+}, Ie = (e) => {
+  if (!e) return null;
+  try {
+    const i = window.localStorage.getItem(e);
+    return i ? ye.parse(i) : null;
+  } catch (i) {
+    return console.error("Error loading from localStorage:", i), null;
   }
 }, Oe = (e, i, v, S, u, N) => {
   const E = {
