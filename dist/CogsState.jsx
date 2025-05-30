@@ -50,7 +50,7 @@ const Ye = (e, i) => {
       options: l,
       initialOptionsPart: u
     });
-    const t = r.getState().cogsStateStore[S] || g[S], v = l?.modifyState ? l.modifyState(t) : t, [P, T] = pe(
+    const t = r.getState().cogsStateStore[S] || g[S], v = l?.modifyState ? l.modifyState(t) : t, [P, T] = Fe(
       v,
       {
         stateKey: S,
@@ -77,9 +77,9 @@ const Ye = (e, i) => {
   getInitialOptions: B,
   getKeyState: Ie,
   getValidationErrors: xe,
-  setStateLog: Ce,
+  setStateLog: be,
   updateInitialStateGlobal: se,
-  addValidationError: be,
+  addValidationError: Ce,
   removeValidationError: D,
   setServerSyncActions: Pe
 } = r.getState(), je = (e, i, y, g) => {
@@ -117,10 +117,10 @@ const Ye = (e, i) => {
       `${g}-${e}-${u}`
     );
     if (I && I.lastUpdated > (I.lastSyncedWithServer || 0))
-      return q(e, I.state), i?.localStorage?.onChange && i.localStorage.onChange(I.state), ee(e), !0;
+      return q(e, I.state), ee(e), !0;
   }
   return !1;
-}, Fe = (e, i, y, g, u, I) => {
+}, pe = (e, i, y, g, u, I) => {
   const E = {
     initialState: i,
     updaterState: Q(
@@ -150,7 +150,7 @@ const Ye = (e, i) => {
     u && u.forceUpdate();
   }
 };
-function pe(e, {
+function Fe(e, {
   stateKey: i,
   serverSync: y,
   localStorage: g,
@@ -192,7 +192,7 @@ function pe(e, {
       const _ = r.getState().initialStateGlobal[f];
       if (_ && !U(_, m) || !_) {
         let h = m;
-        a && a.lastUpdated > (a.lastSyncedWithServer || 0) && (h = a.state, d?.localStorage?.onChange && d?.localStorage?.onChange(h)), Fe(
+        a && a.lastUpdated > (a.lastSyncedWithServer || 0) && (h = a.state, d?.localStorage?.onChange && d?.localStorage?.onChange(h)), pe(
           f,
           m,
           h,
@@ -230,19 +230,19 @@ function pe(e, {
       z.current.add(h);
     }
     q(f, (h) => {
-      const $ = W(d) ? d(h) : d, F = `${f}-${a.join(".")}`;
-      if (F) {
-        let p = !1, w = r.getState().signalDomElements.get(F);
+      const $ = W(d) ? d(h) : d, p = `${f}-${a.join(".")}`;
+      if (p) {
+        let F = !1, w = r.getState().signalDomElements.get(p);
         if ((!w || w.size === 0) && (c.updateType === "insert" || c.updateType === "cut")) {
-          const b = a.slice(0, -1), O = L($, b);
+          const C = a.slice(0, -1), O = L($, C);
           if (Array.isArray(O)) {
-            p = !0;
-            const N = `${f}-${b.join(".")}`;
+            F = !0;
+            const N = `${f}-${C.join(".")}`;
             w = r.getState().signalDomElements.get(N);
           }
         }
         if (w) {
-          const b = p ? L($, a.slice(0, -1)) : L($, a);
+          const C = F ? L($, a.slice(0, -1)) : L($, a);
           w.forEach(({ parentId: O, position: N, effect: V }) => {
             const A = document.querySelector(
               `[data-parent-id="${O}"]`
@@ -250,8 +250,8 @@ function pe(e, {
             if (A) {
               const R = Array.from(A.childNodes);
               if (R[N]) {
-                const C = V ? new Function("state", `return (${V})(state)`)(b) : b;
-                R[N].textContent = String(C);
+                const b = V ? new Function("state", `return (${V})(state)`)(C) : C;
+                R[N].textContent = String(b);
               }
             }
           });
@@ -265,18 +265,18 @@ function pe(e, {
         k.current?.validationKey + "." + x.join(".")
       ), c.updateType === "insert" && k.current?.validationKey && xe(
         k.current?.validationKey + "." + x.join(".")
-      ).filter(([w, b]) => {
+      ).filter(([w, C]) => {
         let O = w?.split(".").length;
         if (w == x.join(".") && O == x.length - 1) {
           let N = w + "." + x;
-          D(w), be(N, b);
+          D(w), Ce(N, C);
         }
       });
       const Z = L(h, a), Ee = L($, a);
       c.updateType === "update" ? a.join(".") : [...a].slice(0, -1).join(".");
       const le = r.getState().stateComponents.get(f);
       if (le) {
-        const p = ye(h, $), w = new Set(p), b = c.updateType === "update" ? a.join(".") : a.slice(0, -1).join(".") || "";
+        const F = ye(h, $), w = new Set(F), C = c.updateType === "update" ? a.join(".") : a.slice(0, -1).join(".") || "";
         for (const [
           O,
           N
@@ -288,38 +288,38 @@ function pe(e, {
               N.forceUpdate();
               continue;
             }
-            if (A.includes("component") && ((N.paths.has(b) || N.paths.has("")) && (V = !0), !V))
+            if (A.includes("component") && ((N.paths.has(C) || N.paths.has("")) && (V = !0), !V))
               for (const R of w) {
-                let C = R;
+                let b = R;
                 for (; ; ) {
-                  if (N.paths.has(C)) {
+                  if (N.paths.has(b)) {
                     V = !0;
                     break;
                   }
-                  const te = C.lastIndexOf(".");
+                  const te = b.lastIndexOf(".");
                   if (te !== -1) {
-                    const ue = C.substring(
+                    const ue = b.substring(
                       0,
                       te
                     );
                     if (!isNaN(
-                      Number(C.substring(te + 1))
+                      Number(b.substring(te + 1))
                     ) && N.paths.has(ue)) {
                       V = !0;
                       break;
                     }
-                    C = ue;
+                    b = ue;
                   } else
-                    C = "";
-                  if (C === "")
+                    b = "";
+                  if (b === "")
                     break;
                 }
                 if (V) break;
               }
             if (!V && A.includes("deps") && N.depsFunction) {
               const R = N.depsFunction($);
-              let C = !1;
-              typeof R == "boolean" ? R && (C = !0) : U(N.deps, R) || (N.deps = R, C = !0), C && (V = !0);
+              let b = !1;
+              typeof R == "boolean" ? R && (b = !0) : U(N.deps, R) || (N.deps = R, b = !0), b && (V = !0);
             }
             V && N.forceUpdate();
           }
@@ -334,12 +334,12 @@ function pe(e, {
         oldValue: Z,
         newValue: Ee
       };
-      if (Ce(f, (p) => {
-        const b = [...p ?? [], de].reduce((O, N) => {
+      if (be(f, (F) => {
+        const C = [...F ?? [], de].reduce((O, N) => {
           const V = `${N.stateKey}:${JSON.stringify(N.path)}`, A = O.get(V);
           return A ? (A.timeStamp = Math.max(A.timeStamp, N.timeStamp), A.newValue = N.newValue, A.oldValue = A.oldValue ?? N.oldValue, A.updateType = N.updateType) : O.set(V, { ...N }), O;
         }, /* @__PURE__ */ new Map());
-        return Array.from(b.values());
+        return Array.from(C.values());
       }), je(
         $,
         f,
@@ -349,10 +349,10 @@ function pe(e, {
         updateLog: s,
         update: de
       }), k.current?.serverSync) {
-        const p = r.getState().serverState[f], w = k.current?.serverSync;
+        const F = r.getState().serverState[f], w = k.current?.serverSync;
         Pe(f, {
           syncKey: typeof w.syncKey == "string" ? w.syncKey : w.syncKey({ state: $ }),
-          rollBackState: p,
+          rollBackState: F,
           actionTimeStamp: Date.now() + (w.debounce ?? 3e3),
           status: "waiting"
         });
@@ -612,15 +612,15 @@ function Q(e, i, y, g) {
                   );
                   return x && (_ = $), x;
                 }
-                const F = U($, c);
-                return F && (_ = $), F;
+                const p = U($, c);
+                return p && (_ = $), p;
               }))
                 E(t), ne(i, c, t, e);
               else if (d && _) {
-                const $ = d(_), F = a.map(
+                const $ = d(_), p = a.map(
                   (x) => U(x, _) ? $ : x
                 );
-                E(t), J(i, F, t);
+                E(t), J(i, p, t);
               }
             };
           if (s === "cut")
@@ -731,8 +731,8 @@ function Q(e, i, y, g) {
                 });
                 const c = n.zodSchema.safeParse(d);
                 return c.success ? !0 : (c.error.errors.forEach((h) => {
-                  const $ = h.path, F = h.message, x = [n.key, ...$].join(".");
-                  o(x, F);
+                  const $ = h.path, p = h.message, x = [n.key, ...$].join(".");
+                  o(x, p);
                 }), ee(e), !1);
               } catch (a) {
                 return console.error("Zod schema validation failed", a), !1;
@@ -888,6 +888,6 @@ export {
   He as addStateOptions,
   Ye as createCogsState,
   Xe as notifyComponent,
-  pe as useCogsStateFn
+  Fe as useCogsStateFn
 };
 //# sourceMappingURL=CogsState.jsx.map

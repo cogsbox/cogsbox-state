@@ -684,10 +684,6 @@ const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
     ) {
       setState(stateKey, localData.state);
 
-      if (options?.localStorage?.onChange) {
-        options.localStorage.onChange(localData.state);
-      }
-
       notifyComponents(stateKey);
       return true;
     }
