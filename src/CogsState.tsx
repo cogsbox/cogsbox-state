@@ -907,12 +907,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         forceUpdate({});
       }
     }
-  }, [
-    initialState,
-    serverState?.status,
-    serverState?.data,
-    ...(dependencies || []),
-  ]);
+  }, [initialState, serverState?.status, ...(dependencies || [])]);
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {

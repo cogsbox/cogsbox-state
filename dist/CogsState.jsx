@@ -50,7 +50,7 @@ const Xe = (e, c) => {
       options: l,
       initialOptionsPart: d
     });
-    const t = a.getState().cogsStateStore[f] || u[f], v = l?.modifyState ? l.modifyState(t) : t, [T, V] = Re(
+    const t = a.getState().cogsStateStore[f] || u[f], v = l?.modifyState ? l.modifyState(t) : t, [x, V] = Re(
       v,
       {
         stateKey: f,
@@ -168,7 +168,7 @@ function Re(e, {
   initialState: S,
   syncUpdate: t,
   dependencies: v,
-  serverState: T
+  serverState: x
 } = {}) {
   const [V, P] = ie({}), { sessionId: h } = _e();
   let j = !c;
@@ -209,12 +209,7 @@ function Re(e, {
         h
       ), $ && y && h && Ie(N, r, s, h, Date.now()), te(r), (Array.isArray(f) ? f : [f || "component"]).includes("none") || P({});
     }
-  }, [
-    S,
-    T?.status,
-    T?.data,
-    ...v || []
-  ]), Ne(() => {
+  }, [S, x?.status, ...v || []]), Ne(() => {
     j && ye(r, {
       serverSync: m,
       formElements: d,
@@ -255,14 +250,14 @@ function Re(e, {
         }
         if (w) {
           const O = R ? W(k, i.slice(0, -1)) : W(k, i);
-          w.forEach(({ parentId: F, position: _, effect: x }) => {
+          w.forEach(({ parentId: F, position: _, effect: T }) => {
             const A = document.querySelector(
               `[data-parent-id="${F}"]`
             );
             if (A) {
               const D = Array.from(A.childNodes);
               if (D[_]) {
-                const b = x ? new Function("state", `return (${x})(state)`)(O) : O;
+                const b = T ? new Function("state", `return (${T})(state)`)(O) : O;
                 D[_].textContent = String(b);
               }
             }
@@ -293,19 +288,19 @@ function Re(e, {
           F,
           _
         ] of ne.components.entries()) {
-          let x = !1;
+          let T = !1;
           const A = Array.isArray(_.reactiveType) ? _.reactiveType : [_.reactiveType || "component"];
           if (!A.includes("none")) {
             if (A.includes("all")) {
               _.forceUpdate();
               continue;
             }
-            if (A.includes("component") && ((_.paths.has(O) || _.paths.has("")) && (x = !0), !x))
+            if (A.includes("component") && ((_.paths.has(O) || _.paths.has("")) && (T = !0), !T))
               for (const D of w) {
                 let b = D;
                 for (; ; ) {
                   if (_.paths.has(b)) {
-                    x = !0;
+                    T = !0;
                     break;
                   }
                   const re = b.lastIndexOf(".");
@@ -317,7 +312,7 @@ function Re(e, {
                     if (!isNaN(
                       Number(b.substring(re + 1))
                     ) && _.paths.has(fe)) {
-                      x = !0;
+                      T = !0;
                       break;
                     }
                     b = fe;
@@ -326,14 +321,14 @@ function Re(e, {
                   if (b === "")
                     break;
                 }
-                if (x) break;
+                if (T) break;
               }
-            if (!x && A.includes("deps") && _.depsFunction) {
+            if (!T && A.includes("deps") && _.depsFunction) {
               const D = _.depsFunction(k);
               let b = !1;
-              typeof D == "boolean" ? D && (b = !0) : U(_.deps, D) || (_.deps = D, b = !0), b && (x = !0);
+              typeof D == "boolean" ? D && (b = !0) : U(_.deps, D) || (_.deps = D, b = !0), b && (T = !0);
             }
-            x && _.forceUpdate();
+            T && _.forceUpdate();
           }
         }
       }
@@ -348,8 +343,8 @@ function Re(e, {
       };
       if (Pe(r, (R) => {
         const O = [...R ?? [], ge].reduce((F, _) => {
-          const x = `${_.stateKey}:${JSON.stringify(_.path)}`, A = F.get(x);
-          return A ? (A.timeStamp = Math.max(A.timeStamp, _.timeStamp), A.newValue = _.newValue, A.oldValue = A.oldValue ?? _.oldValue, A.updateType = _.updateType) : F.set(x, { ..._ }), F;
+          const T = `${_.stateKey}:${JSON.stringify(_.path)}`, A = F.get(T);
+          return A ? (A.timeStamp = Math.max(A.timeStamp, _.timeStamp), A.newValue = _.newValue, A.oldValue = A.oldValue ?? _.oldValue, A.updateType = _.updateType) : F.set(T, { ..._ }), F;
         }, /* @__PURE__ */ new Map());
         return Array.from(O.values());
       }), Ie(
@@ -406,8 +401,8 @@ function Q(e, c, m, u) {
       t?.key && M(t?.key), S?.validationKey && M(S.validationKey);
       const v = a.getState().initialStateGlobal[e];
       a.getState().clearSelectedIndexesForState(e), d.clear(), I++;
-      const T = l(v, []), V = z(e), P = G(V?.localStorage?.key) ? V?.localStorage?.key(v) : V?.localStorage?.key, h = `${u}-${e}-${P}`;
-      h && localStorage.removeItem(h), X(e, T), q(e, v);
+      const x = l(v, []), V = z(e), P = G(V?.localStorage?.key) ? V?.localStorage?.key(v) : V?.localStorage?.key, h = `${u}-${e}-${P}`;
+      h && localStorage.removeItem(h), X(e, x), q(e, v);
       const j = a.getState().stateComponents.get(e);
       return j && j.components.forEach((r) => {
         r.forceUpdate();
@@ -420,7 +415,7 @@ function Q(e, c, m, u) {
         c,
         m,
         u
-      ), v = a.getState().initialStateGlobal[e], T = z(e), V = G(T?.localStorage?.key) ? T?.localStorage?.key(v) : T?.localStorage?.key, P = `${u}-${e}-${V}`;
+      ), v = a.getState().initialStateGlobal[e], x = z(e), V = G(x?.localStorage?.key) ? x?.localStorage?.key(v) : x?.localStorage?.key, P = `${u}-${e}-${V}`;
       return console.log("removing storage", P), localStorage.getItem(P) && localStorage.removeItem(P), we(() => {
         le(e, S), X(e, t), q(e, S);
         const h = a.getState().stateComponents.get(e);
@@ -440,8 +435,8 @@ function Q(e, c, m, u) {
     }
   };
   function l(S, t = [], v) {
-    const T = t.map(String).join(".");
-    d.get(T);
+    const x = t.map(String).join(".");
+    d.get(x);
     const V = function() {
       return a().getNestedState(e, t);
     };
@@ -816,7 +811,7 @@ function Q(e, c, m, u) {
         return l(L, Z, v);
       }
     }, h = new Proxy(V, P);
-    return d.set(T, {
+    return d.set(x, {
       proxy: h,
       stateVersion: I
     }), h;
@@ -871,8 +866,8 @@ function Ue({
     else
       v = t;
     v !== null && typeof v == "object" && (v = JSON.stringify(v));
-    const T = document.createTextNode(String(v));
-    u.replaceWith(T);
+    const x = document.createTextNode(String(v));
+    u.replaceWith(x);
   }, [e._stateKey, e._path.join("."), e._effect]), K("span", {
     ref: c,
     style: { display: "none" },
