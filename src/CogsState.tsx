@@ -835,42 +835,57 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
-
   useEffect(() => {
+    // Only proceed if initialState is provided
     if (initialState) {
       setAndMergeOptions(thisKey as string, {
         initialState,
       });
 
       const options = latestInitialOptionsRef.current;
-      let localData = null;
-
-      // Handle localStorage properly
-      const localkey = isFunction(options?.localStorage?.key)
-        ? options?.localStorage?.key(initialState)
-        : options?.localStorage?.key;
-
-      if (localkey && sessionId) {
-        localData = loadFromLocalStorage(
-          sessionId + "-" + thisKey + "-" + localkey
-        );
-      }
-
-      let newState = initialState;
-      let isFromServer = false;
-
-      // Get timestamps to compare
-      const serverTimestamp = Date.now(); // When we got this server data
-      const localTimestamp = localData?.lastUpdated || 0;
-      const lastSyncTimestamp = localData?.lastSyncedWithServer || 0;
-
       const hasServerId = options?.serverState?.id !== undefined;
       const hasServerData =
         hasServerId &&
         options?.serverState?.status === "success" &&
         options?.serverState?.data;
 
-      // Compare timestamps to decide which data to use
+      // Get the current stored initial state
+      const currentGloballyStoredInitialState =
+        getGlobalStore.getState().initialStateGlobal[thisKey];
+
+      // Check if we need to update the global state based on either:
+      // 1. Initial state has changed (deep comparison)
+      // 2. Server state is successful and has data
+      const initialStateChanged =
+        (currentGloballyStoredInitialState &&
+          !isDeepEqual(currentGloballyStoredInitialState, initialState)) ||
+        !currentGloballyStoredInitialState;
+
+      // Exit early if neither condition is met
+      if (!initialStateChanged && !hasServerData) {
+        return;
+      }
+
+      // Handle localStorage first
+      let localData = null;
+      const localkey = isFunction(options?.localStorage?.key)
+        ? options?.localStorage?.key(initialState)
+        : options?.localStorage?.key;
+
+      if (localkey && sessionId) {
+        localData = loadFromLocalStorage(`${sessionId}-${thisKey}-${localkey}`);
+      }
+
+      // Start with initialState as the base
+      let newState = initialState;
+      let isFromServer = false;
+
+      // Get timestamps to compare
+      const serverTimestamp = hasServerData ? Date.now() : 0; // When we got server data
+      const localTimestamp = localData?.lastUpdated || 0;
+      const lastSyncTimestamp = localData?.lastSyncedWithServer || 0;
+
+      // Determine which state to use based on timestamps
       if (hasServerData && serverTimestamp > localTimestamp) {
         // Server data is newer
         newState = options.serverState!.data!;
@@ -883,6 +898,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
 
+      // Update the global state
       updateGlobalState(
         thisKey,
         initialState,
@@ -897,6 +913,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         saveToLocalStorage(newState, thisKey, options, sessionId, Date.now());
       }
 
+      // Notify components of the change
       notifyComponents(thisKey);
 
       const reactiveTypes = Array.isArray(reactiveType)
@@ -907,7 +924,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
         forceUpdate({});
       }
     }
-  }, [initialState, serverState?.status, ...(dependencies || [])]);
+  }, [
+    initialState,
+    serverState?.status,
+    serverState?.data,
+    ...(dependencies || []),
+  ]);
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
