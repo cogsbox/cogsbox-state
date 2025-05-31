@@ -184,6 +184,11 @@ export type OptionsType<T extends unknown = unknown> = {
     serverSync?: ServerSyncType<T>;
     validation?: ValidationOptionsType;
     enableServerState?: boolean;
+    serverState?: {
+        id?: string | number;
+        data?: T;
+        status?: "pending" | "error" | "success";
+    };
     sync?: {
         action: (state: T) => Promise<{
             success: boolean;
@@ -293,7 +298,7 @@ type LocalStorageData<T> = {
     baseServerState?: T;
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initialState, syncUpdate, dependencies, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, middleware, reactiveDeps, reactiveType, componentId, initialState, syncUpdate, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
     initialState?: TStateObject;

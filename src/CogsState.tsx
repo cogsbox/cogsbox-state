@@ -330,6 +330,11 @@ export type OptionsType<T extends unknown = unknown> = {
   serverSync?: ServerSyncType<T>;
   validation?: ValidationOptionsType;
   enableServerState?: boolean;
+  serverState?: {
+    id?: string | number;
+    data?: T;
+    status?: "pending" | "error" | "success";
+  };
   sync?: {
     action: (state: T) => Promise<{
       success: boolean;
@@ -577,6 +582,7 @@ export const createCogsState = <State extends Record<string, unknown>>(
         reactiveDeps: options?.reactiveDeps,
         initialState: options?.initialState as any,
         dependencies: options?.dependencies,
+        serverState: options?.serverState,
       }
     );
 
@@ -615,7 +621,8 @@ const saveToLocalStorage = <T,>(
   state: T,
   thisKey: string,
   currentInitialOptions: any,
-  sessionId?: string
+  sessionId?: string,
+  lastSyncedWithServer?: number
 ) => {
   if (currentInitialOptions?.log) {
     console.log(
@@ -631,15 +638,22 @@ const saveToLocalStorage = <T,>(
     : currentInitialOptions?.localStorage?.key;
 
   if (key && sessionId) {
+    const storageKey = `${sessionId}-${thisKey}-${key}`;
+
+    // Get existing data to preserve lastSyncedWithServer if not explicitly updating it
+    let existingLastSynced: number | undefined;
+    try {
+      const existing = loadFromLocalStorage(storageKey);
+      existingLastSynced = existing?.lastSyncedWithServer;
+    } catch {
+      // Ignore errors, will use undefined
+    }
+
     const data: LocalStorageData<T> = {
       state,
       lastUpdated: Date.now(),
-      lastSyncedWithServer:
-        getGlobalStore.getState().serverSyncLog[thisKey]?.[0]?.timeStamp,
-      baseServerState: getGlobalStore.getState().serverState[thisKey],
+      lastSyncedWithServer: lastSyncedWithServer ?? existingLastSynced,
     };
-
-    const storageKey = `${sessionId}-${thisKey}-${key}`;
 
     // Use SuperJSON serialize to get the json part only
     const superJsonResult = superjson.serialize(data);
@@ -784,6 +798,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     initialState,
     syncUpdate,
     dependencies,
+    serverState,
   }: {
     stateKey?: string;
     componentId?: string;
@@ -798,8 +813,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
   const stateLog = getGlobalStore.getState().stateLog[thisKey];
   const componentUpdatesRef = useRef(new Set<string>());
   const componentIdRef = useRef(componentId ?? uuidv4());
-  const latestInitialOptionsRef = useRef<any>(null);
-  latestInitialOptionsRef.current = getInitialOptions(thisKey as string);
+  const latestInitialOptionsRef = useRef<OptionsType<TStateObject> | null>(
+    null
+  );
+  latestInitialOptionsRef.current = (getInitialOptions(thisKey as string) ??
+    null) as OptionsType<TStateObject> | null;
 
   useEffect(() => {
     if (syncUpdate && syncUpdate.stateKey === thisKey && syncUpdate.path?.[0]) {
@@ -817,6 +835,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
+
   useEffect(() => {
     if (initialState) {
       setAndMergeOptions(thisKey as string, {
@@ -837,48 +856,63 @@ export function useCogsStateFn<TStateObject extends unknown>(
         );
       }
 
-      const currentGloballyStoredInitialState =
-        getGlobalStore.getState().initialStateGlobal[thisKey];
+      let newState = initialState;
+      let isFromServer = false;
 
-      // Only update if the deep contents have actually changed
-      if (
-        (currentGloballyStoredInitialState &&
-          !isDeepEqual(currentGloballyStoredInitialState, initialState)) ||
-        !currentGloballyStoredInitialState
-      ) {
-        let newState = initialState;
+      // Get timestamps to compare
+      const serverTimestamp = Date.now(); // When we got this server data
+      const localTimestamp = localData?.lastUpdated || 0;
+      const lastSyncTimestamp = localData?.lastSyncedWithServer || 0;
 
-        if (localData) {
-          if (localData.lastUpdated > (localData.lastSyncedWithServer || 0)) {
-            newState = localData.state;
-            if (options?.localStorage?.onChange) {
-              options?.localStorage?.onChange(newState);
-            }
-          }
-        }
+      const hasServerId = options?.serverState?.id !== undefined;
+      const hasServerData =
+        hasServerId &&
+        options?.serverState?.status === "success" &&
+        options?.serverState?.data;
 
-        updateGlobalState(
-          thisKey,
-          initialState,
-          newState,
-          effectiveSetState,
-          componentIdRef.current,
-          sessionId
-        );
-
-        notifyComponents(thisKey);
-
-        const reactiveTypes = Array.isArray(reactiveType)
-          ? reactiveType
-          : [reactiveType || "component"];
-
-        if (!reactiveTypes.includes("none")) {
-          forceUpdate({});
+      // Compare timestamps to decide which data to use
+      if (hasServerData && serverTimestamp > localTimestamp) {
+        // Server data is newer
+        newState = options.serverState!.data!;
+        isFromServer = true;
+      } else if (localData && localTimestamp > lastSyncTimestamp) {
+        // Local changes are newer than last server sync
+        newState = localData.state;
+        if (options?.localStorage?.onChange) {
+          options?.localStorage?.onChange(newState);
         }
       }
-    }
-  }, [initialState, ...(dependencies || [])]);
 
+      updateGlobalState(
+        thisKey,
+        initialState,
+        newState,
+        effectiveSetState,
+        componentIdRef.current,
+        sessionId
+      );
+
+      // Save to localStorage if we used server data
+      if (isFromServer && localkey && sessionId) {
+        saveToLocalStorage(newState, thisKey, options, sessionId, Date.now());
+      }
+
+      notifyComponents(thisKey);
+
+      const reactiveTypes = Array.isArray(reactiveType)
+        ? reactiveType
+        : [reactiveType || "component"];
+
+      if (!reactiveTypes.includes("none")) {
+        forceUpdate({});
+      }
+    }
+  }, [
+    initialState,
+    serverState?.status,
+    serverState?.data,
+    ...(dependencies || []),
+  ]);
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
@@ -890,14 +924,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
 
-    const depsKey = `${thisKey}////${componentIdRef.current}`;
+    const componentKey = `${thisKey}////${componentIdRef.current}`;
     const stateEntry = getGlobalStore
       .getState()
       .stateComponents.get(thisKey) || {
       components: new Map(),
     };
 
-    stateEntry.components.set(depsKey, {
+    stateEntry.components.set(componentKey, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(),
       deps: [],
@@ -909,10 +943,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
     //need to force update to create the stateUpdates references
     forceUpdate({});
     return () => {
-      const depsKey = `${thisKey}////${componentIdRef.current}`;
+      const componentKey = `${thisKey}////${componentIdRef.current}`;
 
       if (stateEntry) {
-        stateEntry.components.delete(depsKey);
+        stateEntry.components.delete(componentKey);
         if (stateEntry.components.size === 0) {
           getGlobalStore.getState().stateComponents.delete(thisKey);
         }
@@ -981,11 +1015,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       if (
         updateObj.updateType === "update" &&
-        (validationKey || latestInitialOptionsRef.current?.validationKey) &&
+        (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
         path
       ) {
         removeValidationError(
-          (validationKey || latestInitialOptionsRef.current?.validationKey) +
+          (validationKey || latestInitialOptionsRef.current?.validation?.key) +
             "." +
             path.join(".")
         );
@@ -993,20 +1027,20 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const arrayWithoutIndex = path.slice(0, path.length - 1);
       if (
         updateObj.updateType === "cut" &&
-        latestInitialOptionsRef.current?.validationKey
+        latestInitialOptionsRef.current?.validation?.key
       ) {
         removeValidationError(
-          latestInitialOptionsRef.current?.validationKey +
+          latestInitialOptionsRef.current?.validation?.key +
             "." +
             arrayWithoutIndex.join(".")
         );
       }
       if (
         updateObj.updateType === "insert" &&
-        latestInitialOptionsRef.current?.validationKey
+        latestInitialOptionsRef.current?.validation?.key
       ) {
         let getValidation = getValidationErrors(
-          latestInitialOptionsRef.current?.validationKey +
+          latestInitialOptionsRef.current?.validation?.key +
             "." +
             arrayWithoutIndex.join(".")
         );
@@ -1315,6 +1349,18 @@ function createProxyHandler<T>(
         componentId,
         sessionId
       );
+      const initialState =
+        getGlobalStore.getState().initialStateGlobal[stateKey];
+      const initalOptionsGet = getInitialOptions(stateKey as string);
+      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+        ? initalOptionsGet?.localStorage?.key(initialState)
+        : initalOptionsGet?.localStorage?.key;
+
+      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+      console.log("removing storage", storageKey);
+      if (localStorage.getItem(storageKey)) {
+        localStorage.removeItem(storageKey);
+      }
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
         setUpdaterState(stateKey, newUpdaterState);
@@ -1322,6 +1368,7 @@ function createProxyHandler<T>(
         const stateEntry = getGlobalStore
           .getState()
           .stateComponents.get(stateKey);
+
         if (stateEntry) {
           stateEntry.components.forEach((component) => {
             component.forceUpdate();
