@@ -1,6 +1,10 @@
 # Cogsbox State: A Practical Guide
 
-> **⚠️ WARNING**: This README is AI-generated based on the current implementation of Cogsbox State. The library is under active development and APIs are subject to change.
+> **🚨 DANGER: DO NOT USE - UNSTABLE & EXPERIMENTAL 🚨**
+>
+> This library is in extremely early development and constantly changing.
+> Everything will break. Nothing works properly.
+> **DO NOT USE IN ANY PROJECT.**
 
 ## Getting Started
 
