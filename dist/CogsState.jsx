@@ -69,7 +69,7 @@ const Qe = (e, s) => {
     return b;
   };
   function E(f, l) {
-    Ie({ stateKey: f, options: l, initialOptionsPart: u }), l.localStorage && pe(f, l), re(f);
+    Ie({ stateKey: f, options: l, initialOptionsPart: u }), l.localStorage && Re(f, l), re(f);
   }
   return { useCogsState: I, setCogsOptions: E };
 }, {
@@ -116,7 +116,7 @@ const Qe = (e, s) => {
   } catch (s) {
     return console.error("Error loading from localStorage:", s), null;
   }
-}, pe = (e, s) => {
+}, Re = (e, s) => {
   const m = a.getState().cogsStateStore[e], { sessionId: d } = $e(), u = L(s?.localStorage?.key) ? s.localStorage.key(m) : s?.localStorage?.key;
   if (u && d) {
     const I = ne(
@@ -126,7 +126,7 @@ const Qe = (e, s) => {
       return q(e, I.state), re(e), !0;
   }
   return !1;
-}, Re = (e, s, m, d, u, I) => {
+}, pe = (e, s, m, d, u, I) => {
   const E = {
     initialState: s,
     updaterState: ee(
@@ -222,7 +222,7 @@ function De(e, {
       T && w && ($ = ne(`${w}-${r}-${T}`));
       let x = S, B = !1;
       const ae = y ? Date.now() : 0, Y = $?.lastUpdated || 0, oe = $?.lastSyncedWithServer || 0;
-      y && ae > Y ? (x = c.serverState.data, B = !0) : $ && Y > oe && (x = $.state, c?.localStorage?.onChange && c?.localStorage?.onChange(x)), Re(
+      y && ae > Y ? (x = c.serverState.data, B = !0) : $ && Y > oe && (x = $.state, c?.localStorage?.onChange && c?.localStorage?.onChange(x)), pe(
         r,
         S,
         x,
@@ -268,23 +268,23 @@ function De(e, {
       if (T) {
         let O = !1, h = a.getState().signalDomElements.get(T);
         if ((!h || h.size === 0) && (y.updateType === "insert" || y.updateType === "cut")) {
-          const p = i.slice(0, -1), R = M($, p);
-          if (Array.isArray(R)) {
+          const R = i.slice(0, -1), p = M($, R);
+          if (Array.isArray(p)) {
             O = !0;
-            const _ = `${r}-${p.join(".")}`;
+            const _ = `${r}-${R.join(".")}`;
             h = a.getState().signalDomElements.get(_);
           }
         }
         if (h) {
-          const p = O ? M($, i.slice(0, -1)) : M($, i);
-          h.forEach(({ parentId: R, position: _, effect: C }) => {
+          const R = O ? M($, i.slice(0, -1)) : M($, i);
+          h.forEach(({ parentId: p, position: _, effect: C }) => {
             const V = document.querySelector(
-              `[data-parent-id="${R}"]`
+              `[data-parent-id="${p}"]`
             );
             if (V) {
               const U = Array.from(V.childNodes);
               if (U[_]) {
-                const P = C ? new Function("state", `return (${C})(state)`)(p) : p;
+                const P = C ? new Function("state", `return (${C})(state)`)(R) : R;
                 U[_].textContent = String(P);
               }
             }
@@ -299,18 +299,18 @@ function De(e, {
         n.current?.validation?.key + "." + x.join(".")
       ), y.updateType === "insert" && n.current?.validation?.key && Pe(
         n.current?.validation?.key + "." + x.join(".")
-      ).filter(([h, p]) => {
-        let R = h?.split(".").length;
-        if (h == x.join(".") && R == x.length - 1) {
+      ).filter(([h, R]) => {
+        let p = h?.split(".").length;
+        if (h == x.join(".") && p == x.length - 1) {
           let _ = h + "." + x;
-          G(h), je(_, p);
+          G(h), je(_, R);
         }
       });
       const B = a.getState().stateComponents.get(r);
       if (B) {
-        const O = _e(N, $), h = new Set(O), p = y.updateType === "update" ? i.join(".") : i.slice(0, -1).join(".") || "";
+        const O = _e(N, $), h = new Set(O), R = y.updateType === "update" ? i.join(".") : i.slice(0, -1).join(".") || "";
         for (const [
-          R,
+          p,
           _
         ] of B.components.entries()) {
           let C = !1;
@@ -320,7 +320,7 @@ function De(e, {
               _.forceUpdate();
               continue;
             }
-            if (V.includes("component") && ((_.paths.has(p) || _.paths.has("")) && (C = !0), !C))
+            if (V.includes("component") && ((_.paths.has(R) || _.paths.has("")) && (C = !0), !C))
               for (const U of h) {
                 let P = U;
                 for (; ; ) {
@@ -359,7 +359,7 @@ function De(e, {
       }
       const ae = Date.now();
       i = i.map(
-        (O, h) => h === i.length - 1 && O === "-1" ? "0" : O
+        (O, h) => h === i.length - 1 && O === "-1" ? (i.length - 1).toString() : O
       ), console.log(
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
         y.updateType,
@@ -382,11 +382,11 @@ function De(e, {
         newValue: oe
       };
       if (Oe(r, (O) => {
-        const p = [...O ?? [], ie].reduce((R, _) => {
-          const C = `${_.stateKey}:${JSON.stringify(_.path)}`, V = R.get(C);
-          return V ? (V.timeStamp = Math.max(V.timeStamp, _.timeStamp), V.newValue = _.newValue, V.oldValue = V.oldValue ?? _.oldValue, V.updateType = _.updateType) : R.set(C, { ..._ }), R;
+        const R = [...O ?? [], ie].reduce((p, _) => {
+          const C = `${_.stateKey}:${JSON.stringify(_.path)}`, V = p.get(C);
+          return V ? (V.timeStamp = Math.max(V.timeStamp, _.timeStamp), V.newValue = _.newValue, V.oldValue = V.oldValue ?? _.oldValue, V.updateType = _.updateType) : p.set(C, { ..._ }), p;
         }, /* @__PURE__ */ new Map());
-        return Array.from(p.values());
+        return Array.from(R.values());
       }), Ee(
         $,
         r,

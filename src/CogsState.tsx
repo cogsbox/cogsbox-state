@@ -1197,7 +1197,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       const timeStamp = Date.now();
       path = path.map((p, i) =>
-        i === path.length - 1 && p === "-1" ? "0" : p
+        i === path.length - 1 && p === "-1" ? (path.length - 1).toString() : p
       );
       console.log(
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
