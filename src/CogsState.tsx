@@ -1197,13 +1197,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       const timeStamp = Date.now();
 
-      console.log(
-        "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
-        updateObj.updateType,
-        prevValue,
-        payload,
-        path
-      );
       const { oldValue, newValue } = getUpdateValues(
         updateObj.updateType,
         prevValue,
