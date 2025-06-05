@@ -1201,7 +1201,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         const arrayPath = path.slice(0, -1);
         const arrayValue = getNestedValue(payload, arrayPath);
         return i === path.length - 1 &&
-          ["isnert", "cut"].includes(updateObj.updateType) &&
+          ["insert", "cut"].includes(updateObj.updateType) &&
           p === "-1"
           ? arrayValue.length.toString()
           : p;
