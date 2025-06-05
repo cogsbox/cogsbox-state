@@ -1196,9 +1196,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
       const timeStamp = Date.now();
-      path = path.map((p, i) =>
-        i === path.length - 1 && p === "-1" ? (path.length - 1).toString() : p
-      );
+
+      path = path.map((p, i) => {
+        const arrayPath = path.slice(0, -1);
+        const arrayValue = getNestedValue(payload, arrayPath);
+        return i === path.length - 1 &&
+          ["isnert", "cut"].includes(updateObj.updateType) &&
+          p === "-1"
+          ? (arrayValue.length - 1).toString()
+          : p;
+      });
       console.log(
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
         updateObj.updateType,
