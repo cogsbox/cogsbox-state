@@ -1196,7 +1196,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
       const timeStamp = Date.now();
-
+      path = path.map((p, i) =>
+        i === path.length - 1 && p === "-1" ? "0" : p
+      );
       console.log(
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
         updateObj.updateType,
