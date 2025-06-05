@@ -1203,7 +1203,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         return i === path.length - 1 &&
           ["isnert", "cut"].includes(updateObj.updateType) &&
           p === "-1"
-          ? (arrayValue.length - 1).toString()
+          ? arrayValue.length.toString()
           : p;
       });
       console.log(

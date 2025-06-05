@@ -360,7 +360,7 @@ function De(e, {
       const ae = Date.now();
       i = i.map((j, h) => {
         const P = i.slice(0, -1), F = U($, P);
-        return h === i.length - 1 && ["isnert", "cut"].includes(y.updateType) && j === "-1" ? (F.length - 1).toString() : j;
+        return h === i.length - 1 && ["isnert", "cut"].includes(y.updateType) && j === "-1" ? F.length.toString() : j;
       }), console.log(
         "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm",
         y.updateType,
