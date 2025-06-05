@@ -14,6 +14,7 @@ export default defineConfig({
     },
     rollupOptions: {
       output: {
+        sourcemap: true,
         preserveModules: true,
         preserveModulesRoot: "src",
         entryFileNames: ({ name, facadeModuleId }) => {
