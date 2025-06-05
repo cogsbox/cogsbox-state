@@ -783,7 +783,32 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
     }
   }
 };
-
+const getUpdateValues = (
+  updateType: string,
+  prevValue: any,
+  payload: any,
+  path: string[]
+) => {
+  switch (updateType) {
+    case "update":
+      return {
+        oldValue: getNestedValue(prevValue, path),
+        newValue: getNestedValue(payload, path),
+      };
+    case "insert":
+      return {
+        oldValue: null, // or undefined
+        newValue: getNestedValue(payload, path),
+      };
+    case "cut":
+      return {
+        oldValue: getNestedValue(prevValue, path),
+        newValue: null, // or undefined
+      };
+    default:
+      return { oldValue: null, newValue: null };
+  }
+};
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -1079,12 +1104,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
-      const oldValue = getNestedValue(prevValue, path);
-      const newValue = getNestedValue(payload, path);
-      const pathToCheck =
-        updateObj.updateType === "update"
-          ? path.join(".")
-          : [...path].slice(0, -1).join(".");
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
 
       if (stateEntry) {
@@ -1178,6 +1197,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       const timeStamp = Date.now();
 
+      const { oldValue, newValue } = getUpdateValues(
+        updateObj.updateType,
+        prevValue,
+        payload,
+        path
+      );
       const newUpdate = {
         timeStamp,
         stateKey: thisKey,
