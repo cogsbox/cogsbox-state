@@ -1957,13 +1957,17 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const foundIndex = currentState.findIndex(callbackfn);
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+
+              const foundIndex = currentArray.findIndex(callbackfn);
 
               if (foundIndex === -1) {
                 return undefined;
               }
 
-              const foundValue = currentState[foundIndex];
+              const foundValue = currentArray[foundIndex];
               const newPath = [...path, foundIndex.toString()];
               return rebuildStateShape(foundValue, newPath);
             };
@@ -1976,29 +1980,23 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const newVal = currentState.map((v: any, i: number) => ({
-                ...v,
-                __origIndex: i.toString(),
-              }));
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
 
-              const validIndices: number[] = [];
-              const filteredArray: Array<InferArrayElement<T>> = [];
+              const filteredArray = currentArray.filter((v: any, i: number) => {
+                const itemWithIndex = { ...v, __origIndex: i.toString() };
+                return callbackfn(itemWithIndex, i);
+              });
 
-              for (let i = 0; i < newVal.length; i++) {
-                if (callbackfn(newVal[i], i)) {
-                  validIndices.push(i);
-                  filteredArray.push(newVal[i]);
-                }
-              }
-
-              // ADDED: Clear cache for filter operation
               shapeCache.clear();
               stateVersion++;
 
-              // Always include validIndices, even if it's an empty array
               return rebuildStateShape(filteredArray as any, path, {
                 filtered: [...(meta?.filtered || []), path],
-                validIndices: validIndices, // Always pass validIndices, even if empty
+                validIndices: filteredArray.map((item: any) =>
+                  parseInt(item.__origIndex)
+                ),
               });
             };
           }
