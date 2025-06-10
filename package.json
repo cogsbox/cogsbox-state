@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.178",
+  "version": "0.5.179",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
@@ -22,7 +22,7 @@
     "url": "git+https://github.com/cogsbox/cogsbox-state.git"
   },
   "scripts": {
- "build": "rimraf dist && vite build",
+    "build": "rimraf dist && vite build",
     "lint": "eslint src --ext ts,tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "dev": "vite  src/examples"
