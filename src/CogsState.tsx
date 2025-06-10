@@ -172,6 +172,9 @@ export type ArrayEndType<TShape extends unknown> = {
     fields?: (keyof InferArrayElement<TShape>)[],
     onMatch?: (existingItem: any) => any
   ) => void;
+  stateFind: (
+    callbackfn: (value: InferArrayElement<TShape>, index: number) => boolean
+  ) => StateObject<InferArrayElement<TShape>> | undefined;
   stateFilter: (
     callbackfn: (value: InferArrayElement<TShape>, index: number) => void
   ) => ArrayEndType<TShape>;
@@ -1944,6 +1947,24 @@ function createProxyHandler<T>(
                 // Value doesn't exist, so insert it
                 pushFunc(effectiveSetState, value as any, path, stateKey);
               }
+            };
+          }
+          if (prop === "stateFind") {
+            return (
+              callbackfn: (
+                value: InferArrayElement<T>,
+                index: number
+              ) => boolean
+            ) => {
+              const foundIndex = currentState.findIndex(callbackfn);
+
+              if (foundIndex === -1) {
+                return undefined;
+              }
+
+              const foundValue = currentState[foundIndex];
+              const newPath = [...path, foundIndex.toString()];
+              return rebuildStateShape(foundValue, newPath);
             };
           }
 

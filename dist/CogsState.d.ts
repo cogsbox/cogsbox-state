@@ -57,6 +57,7 @@ export type ArrayEndType<TShape extends unknown> = {
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(field: K) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
     uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[], onMatch?: (existingItem: any) => any) => void;
+    stateFind: (callbackfn: (value: InferArrayElement<TShape>, index: number) => boolean) => StateObject<InferArrayElement<TShape>> | undefined;
     stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
     getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
     clearSelected: () => void;
