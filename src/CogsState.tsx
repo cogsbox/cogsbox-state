@@ -820,7 +820,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     serverSync,
     localStorage,
     formElements,
-    middleware,
     reactiveDeps,
     reactiveType,
     componentId,
@@ -966,7 +965,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         formElements,
         initialState,
         localStorage,
-        middleware,
+        middleware: latestInitialOptionsRef.current?.middleware,
       });
     }
 
@@ -1266,8 +1265,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         sessionId
       );
 
-      if (middleware) {
-        middleware({
+      if (latestInitialOptionsRef.current?.middleware) {
+        latestInitialOptionsRef.current!.middleware({
           updateLog: stateLog,
           update: newUpdate,
         });
