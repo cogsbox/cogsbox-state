@@ -1,6 +1,7 @@
 // state.ts
-import { z, ZodSchema } from "zod";
-import { createCogsState } from "../../../CogsState";
+
+import { z } from "zod";
+import { createCogsState } from "../../../src/CogsState";
 
 export type Address = {
   street: string;
