@@ -1,4 +1,4 @@
-import { observable as u } from "./node_modules/@trpc/server/dist/observable/observable.js";
+import { observable as u } from "@trpc/server/observable";
 import { getGlobalStore as f } from "./store.js";
 const d = (l) => {
   const c = f.getState().addValidationError;

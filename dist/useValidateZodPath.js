@@ -1,8 +1,9 @@
 import "react";
-import { ZodArray as y, ZodObject as w, ZodOptional as f, ZodNullable as u, ZodEffects as l } from "zod";
-import { getGlobalStore as m } from "./store.js";
-import { create as g } from "./node_modules/zustand/esm/react.js";
-g((t, o) => ({
+import { ZodArray as y, ZodObject as m, ZodOptional as f, ZodNullable as u, ZodEffects as l } from "zod";
+import { create as w } from "zustand";
+import "uuid";
+import { getGlobalStore as g } from "./store.js";
+w((t, o) => ({
   results: {},
   request: {},
   getResultsByKey: (r) => o().results[r],
@@ -22,9 +23,9 @@ g((t, o) => ({
   })),
   getRequestsByKey: (r) => o().request[r]
 }));
-async function q(t, o, r, n) {
+async function v(t, o, r, n) {
   let e = o;
-  const d = m.getState().addValidationError;
+  const d = g.getState().addValidationError;
   for (const s of r)
     if (e = c(e), e instanceof y) {
       const i = Number(s);
@@ -32,7 +33,7 @@ async function q(t, o, r, n) {
         e = e.element;
       else
         throw new Error(`Invalid path: array index expected but got '${s}'.`);
-    } else if (e instanceof w)
+    } else if (e instanceof m)
       if (s in e.shape)
         e = e.shape[s];
       else
@@ -53,6 +54,6 @@ function c(t, o = !1) {
   return t;
 }
 export {
-  q as validateZodPathFunc
+  v as validateZodPathFunc
 };
 //# sourceMappingURL=useValidateZodPath.js.map

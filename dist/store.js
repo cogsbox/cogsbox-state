@@ -1,4 +1,4 @@
-import { create as p } from "./node_modules/zustand/esm/react.js";
+import { create as p } from "zustand";
 const v = p((o, i) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, r) => o((t) => {
