@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.180",
+  "version": "0.5.181",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
