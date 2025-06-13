@@ -2083,7 +2083,7 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Apply patches to get new state
+              // Apply patches to get new state using fast-json-patch
               const currentState =
                 getGlobalStore.getState().cogsStateStore[stateKey];
               const patchResult = applyPatch(currentState, patches);
@@ -2101,22 +2101,43 @@ function createProxyHandler<T>(
                   : [component.reactiveType || "component"]
                 : ["component"];
 
-              // Update the global state using the exact same approach as initialState
+              // IMPORTANT: Use updateGlobalState BUT with a flag to prevent middleware
+              // We need to temporarily disable middleware to prevent circular updates
+              const currentOptions = getInitialOptions(stateKey);
+              const originalMiddleware = currentOptions?.middleware;
+              const setInitialStateOptions =
+                getGlobalStore.getState().setInitialStateOptions;
+              // Temporarily remove middleware
+              if (currentOptions && originalMiddleware) {
+                setInitialStateOptions(stateKey, {
+                  ...currentOptions,
+                  middleware: undefined,
+                });
+              }
+
+              // Update the global state
               updateGlobalState(
                 stateKey,
-                getGlobalStore.getState().initialStateGlobal[stateKey], // Keep existing initial state
+                getGlobalStore.getState().initialStateGlobal[stateKey],
                 newState,
                 effectiveSetState,
                 componentId,
                 sessionId
               );
 
+              // Restore middleware
+              if (currentOptions && originalMiddleware) {
+                setInitialStateOptions(stateKey, {
+                  ...currentOptions,
+                  middleware: originalMiddleware,
+                });
+              }
+
               // Notify components of the change
               notifyComponents(stateKey);
 
-              // Force update this component if needed (same as initialState logic)
+              // Force update this component if needed
               if (!reactiveTypes.includes("none")) {
-                // Find the forceUpdate function for this component
                 const thisComponent = stateEntry?.components.get(componentKey);
                 if (thisComponent) {
                   thisComponent.forceUpdate();
