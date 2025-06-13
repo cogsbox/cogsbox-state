@@ -1452,9 +1452,7 @@ function createProxyHandler<T>(
 
     // MODIFIED: Cache check with version
     const cachedEntry = shapeCache.get(cacheKey);
-    // if (cachedEntry?.stateVersion === stateVersion) {
-    //     return cachedEntry.proxy;
-    // }
+
     type CallableStateObject<T> = {
       (): T;
     } & {
