@@ -34,6 +34,7 @@ import { z } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
+import { applyPatch } from "fast-json-patch";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -2083,211 +2084,46 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Get current state
-              let currentState =
-                getGlobalStore.getState().cogsStateStore[stateKey];
+              // Just apply the patches and update the store directly
+              const result = applyPatch(
+                getGlobalStore.getState().cogsStateStore[stateKey],
+                patches
+              );
 
-              // Apply each patch directly to the state
+              // Set state directly to bypass middleware
+              setState(stateKey, result.newDocument);
+
+              // Get paths that changed from patches
+              const changedPaths = new Set<string>();
               patches.forEach((patch) => {
-                const { op, path: patchPath, value } = patch;
+                // Convert /path/to/prop to path.to.prop
+                const path = patch.path.slice(1).replace(/\//g, ".");
+                changedPaths.add(path);
 
-                // Convert JSON Patch path to array format
-                const pathArray = patchPath
-                  .slice(1)
-                  .split("/")
-                  .map((segment: string) => {
-                    // Handle escaped characters in JSON Pointer
-                    return segment.replace(/~1/g, "/").replace(/~0/g, "~");
-                  });
-
-                switch (op) {
-                  case "add":
-                    if (pathArray.length === 0) {
-                      currentState = value;
-                    } else {
-                      const parentPath = pathArray.slice(0, -1);
-                      const lastSegment = pathArray[pathArray.length - 1];
-                      const parent = getNestedValue(currentState, parentPath);
-
-                      if (Array.isArray(parent)) {
-                        const index =
-                          lastSegment === "-"
-                            ? parent.length
-                            : parseInt(lastSegment);
-                        const newArray = [...parent];
-                        newArray.splice(index, 0, value);
-                        currentState = updateNestedProperty(
-                          parentPath,
-                          currentState,
-                          newArray
-                        );
-                      } else {
-                        // Object property addition
-                        const newParent = { ...parent, [lastSegment]: value };
-                        currentState = updateNestedProperty(
-                          parentPath,
-                          currentState,
-                          newParent
-                        );
-                      }
-                    }
-                    break;
-
-                  case "replace":
-                    currentState = updateNestedProperty(
-                      pathArray,
-                      currentState,
-                      value
-                    );
-                    break;
-
-                  case "remove":
-                    if (pathArray.length === 0) {
-                      currentState = undefined;
-                    } else {
-                      const parentPath = pathArray.slice(0, -1);
-                      const lastSegment = pathArray[pathArray.length - 1];
-                      const parent = getNestedValue(currentState, parentPath);
-
-                      if (Array.isArray(parent)) {
-                        const index = parseInt(lastSegment);
-                        const newArray = [...parent];
-                        newArray.splice(index, 1);
-                        currentState = updateNestedProperty(
-                          parentPath,
-                          currentState,
-                          newArray
-                        );
-                      } else {
-                        // Object property removal
-                        const { [lastSegment]: removed, ...newParent } = parent;
-                        currentState = updateNestedProperty(
-                          parentPath,
-                          currentState,
-                          newParent
-                        );
-                      }
-                    }
-                    break;
-
-                  case "move":
-                    const { from } = patch;
-                    const fromArray = from
-                      .slice(1)
-                      .split("/")
-                      .map((s: string) =>
-                        s.replace(/~1/g, "/").replace(/~0/g, "~")
-                      );
-
-                    // Get the value at source
-                    const sourceValue = getNestedValue(currentState, fromArray);
-
-                    // Remove from source
-                    const fromParentPath = fromArray.slice(0, -1);
-                    const fromLastSegment = fromArray[fromArray.length - 1];
-                    const fromParent = getNestedValue(
-                      currentState,
-                      fromParentPath
-                    );
-
-                    if (Array.isArray(fromParent)) {
-                      const newFromArray = [...fromParent];
-                      newFromArray.splice(parseInt(fromLastSegment), 1);
-                      currentState = updateNestedProperty(
-                        fromParentPath,
-                        currentState,
-                        newFromArray
-                      );
-                    }
-
-                    // Add to destination
-                    const toParentPath = pathArray.slice(0, -1);
-                    const toLastSegment = pathArray[pathArray.length - 1];
-                    const toParent = getNestedValue(currentState, toParentPath);
-
-                    if (Array.isArray(toParent)) {
-                      const index =
-                        toLastSegment === "-"
-                          ? toParent.length
-                          : parseInt(toLastSegment);
-                      const newToArray = [...toParent];
-                      newToArray.splice(index, 0, sourceValue);
-                      currentState = updateNestedProperty(
-                        toParentPath,
-                        currentState,
-                        newToArray
-                      );
-                    }
-                    break;
-
-                  case "copy":
-                    const { from: copyFrom } = patch;
-                    const copyFromArray = copyFrom
-                      .slice(1)
-                      .split("/")
-                      .map((s: string) =>
-                        s.replace(/~1/g, "/").replace(/~0/g, "~")
-                      );
-                    const copyValue = getNestedValue(
-                      currentState,
-                      copyFromArray
-                    );
-                    currentState = updateNestedProperty(
-                      pathArray,
-                      currentState,
-                      copyValue
-                    );
-                    break;
-
-                  case "test":
-                    const testValue = getNestedValue(currentState, pathArray);
-                    if (!isDeepEqual(testValue, value)) {
-                      throw new Error(
-                        `Test operation failed at path ${patchPath}`
-                      );
-                    }
-                    break;
+                // Also add parent paths
+                const parts = path.split(".");
+                for (let i = 1; i < parts.length; i++) {
+                  changedPaths.add(parts.slice(0, i).join("."));
                 }
               });
 
-              // Set the new state directly without triggering middleware
-              setState(stateKey, currentState);
-
-              // Notify only the components that need updates based on changed paths
+              // Update relevant components
               const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(stateKey);
               if (stateEntry) {
-                // Calculate which paths changed
-                const changedPaths = new Set<string>();
-                patches.forEach((patch) => {
-                  const pathArray = patch.path
-                    .slice(1)
-                    .split("/")
-                    .map((s: string) =>
-                      s.replace(/~1/g, "/").replace(/~0/g, "~")
+                stateEntry.components.forEach((component) => {
+                  const shouldUpdate =
+                    component.paths.has("") || // root watchers
+                    Array.from(component.paths).some(
+                      (watchedPath) =>
+                        changedPaths.has(watchedPath) ||
+                        Array.from(changedPaths).some(
+                          (changedPath) =>
+                            watchedPath.startsWith(changedPath + ".") ||
+                            changedPath.startsWith(watchedPath + ".")
+                        )
                     );
-
-                  // Add all parent paths as well
-                  for (let i = 0; i <= pathArray.length; i++) {
-                    changedPaths.add(pathArray.slice(0, i).join("."));
-                  }
-                });
-
-                // Notify only components watching changed paths
-                stateEntry.components.forEach((component, componentKey) => {
-                  const shouldUpdate = Array.from(component.paths).some(
-                    (watchedPath) => {
-                      // Check if any watched path matches or is a parent/child of changed paths
-                      return Array.from(changedPaths).some((changedPath) => {
-                        return (
-                          watchedPath === changedPath ||
-                          watchedPath.startsWith(changedPath + ".") ||
-                          changedPath.startsWith(watchedPath + ".")
-                        );
-                      });
-                    }
-                  );
 
                   if (shouldUpdate) {
                     component.forceUpdate();
