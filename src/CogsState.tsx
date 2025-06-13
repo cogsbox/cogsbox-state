@@ -1698,24 +1698,22 @@ function createProxyHandler<T>(
                 b: InferArrayElement<T>
               ) => number
             ) => {
-              const currentArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
+              // *** FIX: Operate on `currentState`, NOT a refetch from global store. ***
+              const arrayToSort = currentState as any[];
 
-              // Create a shallow copy with original indices
-              const arrayCopy = currentArray.map((v: any, i: number) => ({
+              // Attach original index if not already present
+              const arrayWithIndices = arrayToSort.map((v: any, i: number) => ({
                 ...v,
-                __origIndex: i.toString(),
+                // If it's already filtered, preserve its original index. Otherwise, use its current position.
+                __origIndex: v.__origIndex ?? i.toString(),
               }));
 
-              // Sort the copy using the provided compare function
-              const sortedArray = [...arrayCopy].sort(compareFn);
+              const sortedArray = [...arrayWithIndices].sort(compareFn);
 
-              // ADDED: Clear cache for sort operation
-              shapeCache.clear();
-              stateVersion++;
+              // No need to clear cache here, let the caller handle it if needed.
+              // We are returning a new shape.
 
-              // Return the sorted array with state objects
+              // The new `meta` will contain the indices from the *original*, unfiltered source array.
               return rebuildStateShape(sortedArray as any, path, {
                 filtered: [...(meta?.filtered || []), path],
                 validIndices: sortedArray.map((item) =>
@@ -1724,6 +1722,39 @@ function createProxyHandler<T>(
               });
             };
           }
+
+          if (prop === "stateFilter") {
+            return (
+              callbackfn: (
+                value: InferArrayElement<T>,
+                index: number
+              ) => boolean
+            ) => {
+              // *** FIX: Operate on `currentState`, NOT a refetch from global store. ***
+              const arrayToFilter = currentState as any[];
+
+              // The callback function needs the item and its index within the *current* array.
+              const filteredArray = arrayToFilter.filter(
+                (v: any, i: number) => {
+                  // Attach original index if not already present, for later chaining.
+                  const itemWithIndex = {
+                    ...v,
+                    __origIndex: v.__origIndex ?? i.toString(),
+                  };
+                  return callbackfn(itemWithIndex, i);
+                }
+              );
+
+              // The new `meta` will contain the indices from the *original*, unfiltered source array.
+              return rebuildStateShape(filteredArray as any, path, {
+                filtered: [...(meta?.filtered || []), path],
+                validIndices: filteredArray.map((item: any) =>
+                  parseInt(item.__origIndex)
+                ),
+              });
+            };
+          }
+
           if (prop === "stateMap" || prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -1734,26 +1765,18 @@ function createProxyHandler<T>(
                 arraySetter: StateObject<T>
               ) => void
             ) => {
-              const isFiltered = meta?.filtered?.some(
-                (p) => p.join(".") === path.join(".")
-              );
-              const arrayToMap = isFiltered
-                ? currentState
-                : getGlobalStore.getState().getNestedState(stateKey, path);
-
-              if (prop !== "stateMapNoRender") {
-                shapeCache.clear();
-                stateVersion++;
-              }
+              // *** FIX: This logic was almost right, but let's make it more robust. ***
+              const arrayToMap = currentState as any[]; // Always use the current state.
 
               return arrayToMap.map((val: any, index: number) => {
-                const thisIndex =
-                  isFiltered && val.__origIndex ? val.__origIndex : index;
+                // The `setter` needs the *original* index to correctly update the global state.
+                const originalIndex = val.__origIndex ?? index;
                 const elementProxy = rebuildStateShape(
                   val,
-                  [...path, thisIndex.toString()],
-                  meta
+                  [...path, originalIndex.toString()],
+                  meta // Pass meta through
                 );
+                // The callback gets the item, its proxy, and its index *within the current (potentially filtered) array*.
                 return callbackfn(
                   val,
                   elementProxy,
@@ -1969,34 +1992,6 @@ function createProxyHandler<T>(
               const foundValue = currentArray[foundIndex];
               const newPath = [...path, foundIndex.toString()];
               return rebuildStateShape(foundValue, newPath);
-            };
-          }
-
-          if (prop === "stateFilter") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                index: number
-              ) => boolean
-            ) => {
-              const currentArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-
-              const filteredArray = currentArray.filter((v: any, i: number) => {
-                const itemWithIndex = { ...v, __origIndex: i.toString() };
-                return callbackfn(itemWithIndex, i);
-              });
-
-              shapeCache.clear();
-              stateVersion++;
-
-              return rebuildStateShape(filteredArray as any, path, {
-                filtered: [...(meta?.filtered || []), path],
-                validIndices: filteredArray.map((item: any) =>
-                  parseInt(item.__origIndex)
-                ),
-              });
             };
           }
         }
