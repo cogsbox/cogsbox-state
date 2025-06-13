@@ -1707,30 +1707,19 @@ function createProxyHandler<T>(
                 b: InferArrayElement<T>
               ) => number
             ) => {
-              const currentArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-
-              // Create a shallow copy with original indices
-              const arrayCopy = currentArray.map((v: any, i: number) => ({
-                ...v,
-                __origIndex: i.toString(),
-              }));
-
-              // Sort the copy using the provided compare function
-              const sortedArray = [...arrayCopy].sort(compareFn);
-
-              // ADDED: Clear cache for sort operation
-              shapeCache.clear();
-              stateVersion++;
-
-              // Return the sorted array with state objects
-              return rebuildStateShape(sortedArray as any, path, {
-                filtered: [...(meta?.filtered || []), path],
-                validIndices: sortedArray.map((item) =>
-                  parseInt(item.__origIndex as string)
+              const sourceWithIndices = getSourceArrayAndIndices();
+              const sortedResult = [...sourceWithIndices].sort((a, b) =>
+                compareFn(a.item, b.item)
+              );
+              const newCurrentState = sortedResult.map(({ item }) => item);
+              // We construct the meta object with the CORRECT property name: `validIndices`.
+              const newMeta = {
+                ...meta,
+                validIndices: sortedResult.map(
+                  ({ originalIndex }) => originalIndex
                 ),
-              });
+              };
+              return rebuildStateShape(newCurrentState as any, path, newMeta);
             };
           }
 
@@ -1741,32 +1730,22 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const newVal = currentState.map((v: any, i: number) => ({
-                ...v,
-                __origIndex: i.toString(),
-              }));
-
-              const validIndices: number[] = [];
-              const filteredArray: Array<InferArrayElement<T>> = [];
-
-              for (let i = 0; i < newVal.length; i++) {
-                if (callbackfn(newVal[i], i)) {
-                  validIndices.push(i);
-                  filteredArray.push(newVal[i]);
-                }
-              }
-
-              // ADDED: Clear cache for filter operation
-              shapeCache.clear();
-              stateVersion++;
-
-              // Always include validIndices, even if it's an empty array
-              return rebuildStateShape(filteredArray as any, path, {
-                filtered: [...(meta?.filtered || []), path],
-                validIndices: validIndices, // Always pass validIndices, even if empty
-              });
+              const sourceWithIndices = getSourceArrayAndIndices();
+              const filteredResult = sourceWithIndices.filter(
+                ({ item }, index) => callbackfn(item, index)
+              );
+              const newCurrentState = filteredResult.map(({ item }) => item);
+              // We construct the meta object with the CORRECT property name: `validIndices`.
+              const newMeta = {
+                ...meta,
+                validIndices: filteredResult.map(
+                  ({ originalIndex }) => originalIndex
+                ),
+              };
+              return rebuildStateShape(newCurrentState as any, path, newMeta);
             };
           }
+
           if (prop === "stateMap" || prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -1775,31 +1754,26 @@ function createProxyHandler<T>(
                 index: number,
                 array: T,
                 arraySetter: StateObject<T>
-              ) => void
+              ) => any
             ) => {
-              const isFiltered = meta?.filtered?.some(
-                (p) => p.join(".") === path.join(".")
-              );
-              const arrayToMap = isFiltered
-                ? currentState
-                : getGlobalStore.getState().getNestedState(stateKey, path);
-
-              if (prop !== "stateMapNoRender") {
-                shapeCache.clear();
-                stateVersion++;
-              }
-
-              return arrayToMap.map((val: any, index: number) => {
-                const thisIndex =
-                  isFiltered && val.__origIndex ? val.__origIndex : index;
-                const elementProxy = rebuildStateShape(
-                  val,
-                  [...path, thisIndex.toString()],
-                  meta
-                );
+              const arrayToMap = currentState as any[];
+              return arrayToMap.map((item, index) => {
+                let originalIndex: number;
+                // We READ from the meta object using the CORRECT property name: `validIndices`.
+                if (
+                  meta?.validIndices &&
+                  meta.validIndices[index] !== undefined
+                ) {
+                  originalIndex = meta.validIndices[index]!;
+                } else {
+                  originalIndex = index;
+                }
+                const finalPath = [...path, originalIndex.toString()];
+                console.log("stateMapstateMapstateMapstateMap", finalPath);
+                const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
                 return callbackfn(
-                  val,
-                  elementProxy,
+                  item,
+                  setter,
                   index,
                   currentState as any,
                   rebuildStateShape(currentState as any, path, meta)
@@ -1831,25 +1805,14 @@ function createProxyHandler<T>(
 
           if (prop === "stateFlattenOn") {
             return (fieldName: string) => {
-              const isFiltered = meta?.filtered?.some(
-                (p) => p.join(".") === path.join(".")
-              );
-              const arrayToMap = isFiltered
-                ? currentState
-                : getGlobalStore.getState().getNestedState(stateKey, path);
-
-              // ADDED: Clear shape cache for flattening operation
+              const arrayToMap = currentState as any[];
               shapeCache.clear();
               stateVersion++;
-
               const flattenedResults = arrayToMap.flatMap(
-                (val: any, index: number) => {
-                  return val[fieldName] ?? [];
-                }
+                (val: any) => val[fieldName] ?? []
               );
-
               return rebuildStateShape(
-                flattenedResults,
+                flattenedResults as any,
                 [...path, "[*]", fieldName],
                 meta
               );
@@ -1974,54 +1937,25 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              // Use the standard JavaScript .findIndex() on the current array state.
-              // `currentState` is the correct array to search, whether it's the full
-              // array or a filtered/sorted one from a previous chain operation.
-              const foundIndex = (currentState as any[]).findIndex(callbackfn);
-
-              // If findIndex returns -1, the item was not found. Return undefined, just like native .find().
-              if (foundIndex === -1) {
-                return undefined;
-              }
-
-              // We found the item at `foundIndex` in the `currentState` array.
-              // Now, we need to get the proxy for that item. We already have a method for that: .index()
-
-              // Determine the true original index.
-              let originalIndex: number;
-              if (meta?.validIndices) {
-                // If we're in a chain, map the found index back to its original index.
-                originalIndex = meta.validIndices[foundIndex]!;
-              } else {
-                // Otherwise, the found index is the original index.
-                originalIndex = foundIndex;
-              }
-
-              const foundValue = (currentState as any[])[foundIndex];
-              const finalPath = [...path, originalIndex.toString()];
-
-              // Return a new proxy for the found item, using its correct original path.
-              return rebuildStateShape(foundValue, finalPath, meta);
+              const sourceWithIndices = getSourceArrayAndIndices();
+              const found = sourceWithIndices.find(({ item }, index) =>
+                callbackfn(item, index)
+              );
+              if (!found) return undefined;
+              const finalPath = [...path, found.originalIndex.toString()];
+              return rebuildStateShape(found.item, finalPath, meta);
             };
           }
+
           if (prop === "findWith") {
-            return (
-              thisKey: keyof InferArrayElement<T>,
-              thisValue: InferArrayElement<T>[keyof InferArrayElement<T>]
-            ) => {
-              const foundIndex = currentState.findIndex((obj: any) => {
-                return obj[thisKey] === thisValue;
-              });
-
-              if (foundIndex === -1) return undefined;
-              const foundValue = currentState[foundIndex];
-              const newPath = [...path, foundIndex.toString()];
-
-              shapeCache.clear();
-              stateVersion++;
-
-              // Try returning without spread
-              return rebuildStateShape(foundValue, newPath);
+            return (thisKey: keyof InferArrayElement<T>, thisValue: any) => {
+              const sourceWithIndices = getSourceArrayAndIndices();
+              const found = sourceWithIndices.find(
+                ({ item }) => item[thisKey] === thisValue
+              );
+              if (!found) return undefined;
+              const finalPath = [...path, found.originalIndex.toString()];
+              return rebuildStateShape(found.item, finalPath, meta);
             };
           }
         }
