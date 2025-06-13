@@ -2082,27 +2082,13 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Apply patches to get new state using fast-json-patch
+              // ... (keep the existing code that applies the patch and updates global state) ...
               const currentState =
                 getGlobalStore.getState().cogsStateStore[stateKey];
               const patchResult = applyPatch(currentState, patches);
               const newState = patchResult.newDocument;
 
-              // IMPORTANT: Use updateGlobalState BUT with a flag to prevent middleware
-              const currentOptions = getInitialOptions(stateKey);
-              const originalMiddleware = currentOptions?.middleware;
-              const setInitialStateOptions =
-                getGlobalStore.getState().setInitialStateOptions;
-
-              // Temporarily remove middleware
-              if (currentOptions && originalMiddleware) {
-                setInitialStateOptions(stateKey, {
-                  ...currentOptions,
-                  middleware: undefined,
-                });
-              }
-
-              // Update the global state
+              // ... updateGlobalState logic is fine ...
               updateGlobalState(
                 stateKey,
                 getGlobalStore.getState().initialStateGlobal[stateKey],
@@ -2112,100 +2098,86 @@ function createProxyHandler<T>(
                 sessionId
               );
 
-              // Restore middleware
-              if (currentOptions && originalMiddleware) {
-                setInitialStateOptions(stateKey, {
-                  ...currentOptions,
-                  middleware: originalMiddleware,
-                });
-              }
-
-              // COMPONENT UPDATE LOGIC
+              // ================ START: REPLACEMENT FOR COMPONENT UPDATE LOGIC ================
               const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(stateKey);
-              console.log("component update logic stateEntry", stateEntry);
               if (!stateEntry) return;
 
-              // Build a set of all paths that should trigger updates
               const pathsToCheck = new Set<string>();
-              console.log("component update logic pathsToCheck", pathsToCheck);
-              // Add root path if array length changed
-              if (Array.isArray(currentState) && Array.isArray(newState)) {
-                if (currentState.length !== newState.length) {
-                  pathsToCheck.add(""); // Root path for array length changes
+
+              // Helper function to recursively find all paths in an object or array
+              const findAllPaths = (currentPath: string, value: any) => {
+                pathsToCheck.add(currentPath);
+
+                if (Array.isArray(value)) {
+                  value.forEach((item, index) => {
+                    findAllPaths(`${currentPath}.${index}`, item);
+                  });
+                } else if (typeof value === "object" && value !== null) {
+                  Object.keys(value).forEach((key) => {
+                    findAllPaths(`${currentPath}.${key}`, value[key]);
+                  });
                 }
-              }
-              console.log("component update logic pathsToCheck", pathsToCheck);
-              // Process each patch to determine affected paths
+              };
+
               patches.forEach((patch) => {
-                const patchPath = patch.path.slice(1); // Remove leading slash
-                const segments = patchPath.split("/");
+                // The path from fast-json-patch is like "/a/b/0"
+                const patchPathString = patch.path.slice(1).replace(/\//g, ".");
 
-                // For array operations, we need to notify about the array itself
-                if (patch.op === "add" || patch.op === "remove") {
-                  // Check if this is an array operation by seeing if the last segment is a number
-                  const lastSegment = segments[segments.length - 1];
-                  if (!isNaN(parseInt(lastSegment))) {
-                    // It's an array operation, add the parent path
-                    const parentPath = segments.slice(0, -1).join(".");
-                    pathsToCheck.add(parentPath);
-                    // Also add root if this is a top-level array
-                    if (parentPath === "") {
-                      pathsToCheck.add("");
-                    }
-                  }
+                // Add the direct path of the operation
+                pathsToCheck.add(patchPathString);
+
+                // Add all parent paths of the operation
+                let currentParentPath = patchPathString;
+                while (currentParentPath.includes(".")) {
+                  currentParentPath = currentParentPath.substring(
+                    0,
+                    currentParentPath.lastIndexOf(".")
+                  );
+                  pathsToCheck.add(currentParentPath);
                 }
+                pathsToCheck.add(""); // Always add the root path
 
-                // Add the specific path and all parent paths
-                let currentPath = "";
-                segments.forEach((segment: any, index: any) => {
-                  if (index > 0) currentPath += ".";
-                  currentPath += segment;
-                  pathsToCheck.add(currentPath);
-                });
-
-                // Always check root path
-                pathsToCheck.add("");
+                // If adding or replacing, we need to check all nested paths within the new value
+                if (
+                  (patch.op === "add" || patch.op === "replace") &&
+                  patch.value
+                ) {
+                  findAllPaths(patchPathString, patch.value);
+                }
               });
 
-              // Now check each component
+              // Now, check each component for updates (this part is mostly okay, but benefits from the better pathsToCheck set)
               for (const [
                 componentKey,
                 component,
               ] of stateEntry.components.entries()) {
-                console.log("component update logic component", component);
                 let shouldUpdate = false;
                 const reactiveTypes = Array.isArray(component.reactiveType)
                   ? component.reactiveType
                   : [component.reactiveType || "component"];
 
                 if (reactiveTypes.includes("none")) continue;
-
                 if (reactiveTypes.includes("all")) {
                   component.forceUpdate();
                   continue;
                 }
 
                 if (reactiveTypes.includes("component")) {
-                  // Check if component is watching any of the changed paths
+                  // Check if any path the component is watching was affected
                   for (const watchedPath of component.paths) {
                     if (pathsToCheck.has(watchedPath)) {
                       shouldUpdate = true;
                       break;
                     }
-
-                    // Also check if a changed path is a child of a watched path
+                    // Also check if a changed path is a parent of a watched path (e.g., array update)
                     for (const changedPath of pathsToCheck) {
-                      if (
-                        changedPath.startsWith(watchedPath + ".") ||
-                        (watchedPath === "" && changedPath !== "")
-                      ) {
+                      if (watchedPath.startsWith(changedPath + ".")) {
                         shouldUpdate = true;
                         break;
                       }
                     }
-
                     if (shouldUpdate) break;
                   }
                 }
@@ -2213,14 +2185,14 @@ function createProxyHandler<T>(
                 if (!shouldUpdate && reactiveTypes.includes("deps")) {
                   if (component.depsFunction) {
                     const depsResult = component.depsFunction(newState);
-                    let depsChanged = false;
-                    if (typeof depsResult === "boolean") {
-                      if (depsResult) depsChanged = true;
-                    } else if (!isDeepEqual(component.deps, depsResult)) {
-                      component.deps = depsResult;
-                      depsChanged = true;
-                    }
-                    if (depsChanged) {
+                    if (
+                      typeof depsResult === "boolean"
+                        ? depsResult
+                        : !isDeepEqual(component.deps, depsResult)
+                    ) {
+                      component.deps = Array.isArray(depsResult)
+                        ? depsResult
+                        : [];
                       shouldUpdate = true;
                     }
                   }
@@ -2230,9 +2202,9 @@ function createProxyHandler<T>(
                   component.forceUpdate();
                 }
               }
+              // ================ END: REPLACEMENT ================
             };
           }
-
           if (prop === "validateZodSchema") {
             return () => {
               const init = getGlobalStore
