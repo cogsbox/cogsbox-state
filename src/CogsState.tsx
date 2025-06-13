@@ -1449,7 +1449,7 @@ function createProxyHandler<T>(
     meta?: { filtered?: string[][]; validIndices?: number[] }
   ): any {
     const cacheKey = path.map(String).join(".");
-
+    console.log("rebuildStateShape", path);
     // MODIFIED: Cache check with version
     const cachedEntry = shapeCache.get(cacheKey);
     // if (cachedEntry?.stateVersion === stateVersion) {

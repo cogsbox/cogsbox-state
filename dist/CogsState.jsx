@@ -477,7 +477,7 @@ function ee(e, i, S, u) {
   };
   function s(m, t = [], I) {
     const j = t.map(String).join(".");
-    f.get(j);
+    console.log("rebuildStateShape", t), f.get(j);
     const A = function() {
       return n().getNestedState(e, t);
     };
