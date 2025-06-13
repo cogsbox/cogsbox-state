@@ -2076,7 +2076,6 @@ function createProxyHandler<T>(
               .getNestedState(stateKey, [...parentPath]);
             updateFn(effectiveSetState, nested, parentPath);
 
-            // Invalidate cache for this path
             invalidateCachePath(parentPath);
           };
         }
