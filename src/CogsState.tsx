@@ -17,6 +17,7 @@ import {
   getDifferences,
   getNestedValue,
   isFunction,
+  updateNestedProperty,
   type GenericObject,
 } from "./utility.js";
 import {
@@ -2082,159 +2083,164 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Process each patch operation
+              // Get current state
+              let currentState =
+                getGlobalStore.getState().cogsStateStore[stateKey];
+
+              // Apply each patch directly to the state
               patches.forEach((patch) => {
                 const { op, path: patchPath, value } = patch;
 
                 // Convert JSON Patch path to array format
-                // Remove leading slash and split by '/'
                 const pathArray = patchPath
                   .slice(1)
                   .split("/")
                   .map((segment: string) => {
-                    // Handle array indices
-                    if (/^\d+$/.test(segment)) {
-                      return segment;
-                    }
                     // Handle escaped characters in JSON Pointer
                     return segment.replace(/~1/g, "/").replace(/~0/g, "~");
                   });
 
                 switch (op) {
                   case "add":
-                    // Check if it's an array operation
-                    const parentPath = pathArray.slice(0, -1);
-                    const parentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, parentPath);
+                    if (pathArray.length === 0) {
+                      currentState = value;
+                    } else {
+                      const parentPath = pathArray.slice(0, -1);
+                      const lastSegment = pathArray[pathArray.length - 1];
+                      const parent = getNestedValue(currentState, parentPath);
 
-                    if (Array.isArray(parentValue)) {
-                      const index = pathArray[pathArray.length - 1];
-                      if (
-                        index === "-" ||
-                        parseInt(index) === parentValue.length
-                      ) {
-                        // It's an append operation
-                        pushFunc(
-                          effectiveSetState,
-                          value,
+                      if (Array.isArray(parent)) {
+                        const index =
+                          lastSegment === "-"
+                            ? parent.length
+                            : parseInt(lastSegment);
+                        const newArray = [...parent];
+                        newArray.splice(index, 0, value);
+                        currentState = updateNestedProperty(
                           parentPath,
-                          stateKey
+                          currentState,
+                          newArray
                         );
                       } else {
-                        // It's an insert at specific index
-                        const insertIndex = parseInt(index);
-                        const newArray = [...parentValue];
-                        newArray.splice(insertIndex, 0, value);
-                        updateFn(
-                          effectiveSetState,
-                          newArray as any,
-                          parentPath
+                        // Object property addition
+                        const newParent = { ...parent, [lastSegment]: value };
+                        currentState = updateNestedProperty(
+                          parentPath,
+                          currentState,
+                          newParent
                         );
                       }
-                    } else {
-                      // It's an object property addition
-                      updateFn(effectiveSetState, value, pathArray);
                     }
                     break;
 
                   case "replace":
-                    updateFn(effectiveSetState, value, pathArray);
+                    currentState = updateNestedProperty(
+                      pathArray,
+                      currentState,
+                      value
+                    );
                     break;
 
                   case "remove":
-                    const removeParentPath = pathArray.slice(0, -1);
-                    const removeParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, removeParentPath);
-
-                    if (Array.isArray(removeParentValue)) {
-                      const removeIndex = parseInt(
-                        pathArray[pathArray.length - 1]
-                      );
-                      cutFunc(
-                        effectiveSetState,
-                        removeParentPath,
-                        stateKey,
-                        removeIndex
-                      );
+                    if (pathArray.length === 0) {
+                      currentState = undefined;
                     } else {
-                      // For object property removal, set to undefined
-                      updateFn(effectiveSetState as any, undefined, pathArray);
+                      const parentPath = pathArray.slice(0, -1);
+                      const lastSegment = pathArray[pathArray.length - 1];
+                      const parent = getNestedValue(currentState, parentPath);
+
+                      if (Array.isArray(parent)) {
+                        const index = parseInt(lastSegment);
+                        const newArray = [...parent];
+                        newArray.splice(index, 1);
+                        currentState = updateNestedProperty(
+                          parentPath,
+                          currentState,
+                          newArray
+                        );
+                      } else {
+                        // Object property removal
+                        const { [lastSegment]: removed, ...newParent } = parent;
+                        currentState = updateNestedProperty(
+                          parentPath,
+                          currentState,
+                          newParent
+                        );
+                      }
                     }
                     break;
 
                   case "move":
-                    // Move is a combination of remove and add
                     const { from } = patch;
-                    const fromArray = from.slice(1).split("/");
+                    const fromArray = from
+                      .slice(1)
+                      .split("/")
+                      .map((s: string) =>
+                        s.replace(/~1/g, "/").replace(/~0/g, "~")
+                      );
 
-                    // Get the value at the source location
-                    const sourceValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, fromArray);
+                    // Get the value at source
+                    const sourceValue = getNestedValue(currentState, fromArray);
 
                     // Remove from source
-                    const moveParentPath = fromArray.slice(0, -1);
-                    const moveParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, moveParentPath);
+                    const fromParentPath = fromArray.slice(0, -1);
+                    const fromLastSegment = fromArray[fromArray.length - 1];
+                    const fromParent = getNestedValue(
+                      currentState,
+                      fromParentPath
+                    );
 
-                    if (Array.isArray(moveParentValue)) {
-                      const moveIndex = parseInt(
-                        fromArray[fromArray.length - 1]
-                      );
-                      cutFunc(
-                        effectiveSetState,
-                        moveParentPath,
-                        stateKey,
-                        moveIndex
+                    if (Array.isArray(fromParent)) {
+                      const newFromArray = [...fromParent];
+                      newFromArray.splice(parseInt(fromLastSegment), 1);
+                      currentState = updateNestedProperty(
+                        fromParentPath,
+                        currentState,
+                        newFromArray
                       );
                     }
 
                     // Add to destination
-                    const destParentPath = pathArray.slice(0, -1);
-                    const destParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, destParentPath);
+                    const toParentPath = pathArray.slice(0, -1);
+                    const toLastSegment = pathArray[pathArray.length - 1];
+                    const toParent = getNestedValue(currentState, toParentPath);
 
-                    if (Array.isArray(destParentValue)) {
-                      const destIndex = pathArray[pathArray.length - 1];
-                      if (destIndex === "-") {
-                        pushFunc(
-                          effectiveSetState,
-                          sourceValue,
-                          destParentPath,
-                          stateKey
-                        );
-                      } else {
-                        const insertIndex = parseInt(destIndex);
-                        const newArray = [...destParentValue];
-                        newArray.splice(insertIndex, 0, sourceValue);
-                        updateFn(
-                          effectiveSetState,
-                          newArray as any,
-                          destParentPath
-                        );
-                      }
+                    if (Array.isArray(toParent)) {
+                      const index =
+                        toLastSegment === "-"
+                          ? toParent.length
+                          : parseInt(toLastSegment);
+                      const newToArray = [...toParent];
+                      newToArray.splice(index, 0, sourceValue);
+                      currentState = updateNestedProperty(
+                        toParentPath,
+                        currentState,
+                        newToArray
+                      );
                     }
                     break;
 
                   case "copy":
                     const { from: copyFrom } = patch;
-                    const copyFromArray = copyFrom.slice(1).split("/");
-                    const copyValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, copyFromArray);
-                    updateFn(effectiveSetState, copyValue, pathArray);
+                    const copyFromArray = copyFrom
+                      .slice(1)
+                      .split("/")
+                      .map((s: string) =>
+                        s.replace(/~1/g, "/").replace(/~0/g, "~")
+                      );
+                    const copyValue = getNestedValue(
+                      currentState,
+                      copyFromArray
+                    );
+                    currentState = updateNestedProperty(
+                      pathArray,
+                      currentState,
+                      copyValue
+                    );
                     break;
 
                   case "test":
-                    // Test operations are typically used for validation
-                    // You might want to implement this based on your needs
-                    const testValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, pathArray);
+                    const testValue = getNestedValue(currentState, pathArray);
                     if (!isDeepEqual(testValue, value)) {
                       throw new Error(
                         `Test operation failed at path ${patchPath}`
@@ -2243,6 +2249,51 @@ function createProxyHandler<T>(
                     break;
                 }
               });
+
+              // Set the new state directly without triggering middleware
+              setState(stateKey, currentState);
+
+              // Notify only the components that need updates based on changed paths
+              const stateEntry = getGlobalStore
+                .getState()
+                .stateComponents.get(stateKey);
+              if (stateEntry) {
+                // Calculate which paths changed
+                const changedPaths = new Set<string>();
+                patches.forEach((patch) => {
+                  const pathArray = patch.path
+                    .slice(1)
+                    .split("/")
+                    .map((s: string) =>
+                      s.replace(/~1/g, "/").replace(/~0/g, "~")
+                    );
+
+                  // Add all parent paths as well
+                  for (let i = 0; i <= pathArray.length; i++) {
+                    changedPaths.add(pathArray.slice(0, i).join("."));
+                  }
+                });
+
+                // Notify only components watching changed paths
+                stateEntry.components.forEach((component, componentKey) => {
+                  const shouldUpdate = Array.from(component.paths).some(
+                    (watchedPath) => {
+                      // Check if any watched path matches or is a parent/child of changed paths
+                      return Array.from(changedPaths).some((changedPath) => {
+                        return (
+                          watchedPath === changedPath ||
+                          watchedPath.startsWith(changedPath + ".") ||
+                          changedPath.startsWith(watchedPath + ".")
+                        );
+                      });
+                    }
+                  );
+
+                  if (shouldUpdate) {
+                    component.forceUpdate();
+                  }
+                });
+              }
             };
           }
           if (prop === "validateZodSchema") {
