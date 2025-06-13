@@ -2107,6 +2107,7 @@ function createProxyHandler<T>(
               const originalMiddleware = currentOptions?.middleware;
               const setInitialStateOptions =
                 getGlobalStore.getState().setInitialStateOptions;
+
               // Temporarily remove middleware
               if (currentOptions && originalMiddleware) {
                 setInitialStateOptions(stateKey, {
@@ -2133,14 +2134,91 @@ function createProxyHandler<T>(
                 });
               }
 
-              // Notify components of the change
-              notifyComponents(stateKey);
+              // COMPONENT UPDATE LOGIC FROM effectiveSetState
+              // Calculate which paths changed from the patches
+              const changedPaths = getDifferences(currentState, newState);
+              const changedPathsSet = new Set(changedPaths);
 
-              // Force update this component if needed
-              if (!reactiveTypes.includes("none")) {
-                const thisComponent = stateEntry?.components.get(componentKey);
-                if (thisComponent) {
-                  thisComponent.forceUpdate();
+              if (stateEntry) {
+                for (const [
+                  componentKey,
+                  component,
+                ] of stateEntry.components.entries()) {
+                  let shouldUpdate = false;
+                  const reactiveTypes = Array.isArray(component.reactiveType)
+                    ? component.reactiveType
+                    : [component.reactiveType || "component"];
+
+                  if (reactiveTypes.includes("none")) continue;
+                  if (reactiveTypes.includes("all")) {
+                    component.forceUpdate();
+                    continue;
+                  }
+
+                  if (reactiveTypes.includes("component")) {
+                    // Check if any changed paths match component's watched paths
+                    for (const changedPath of changedPathsSet) {
+                      let currentPathToCheck = changedPath;
+                      while (true) {
+                        if (component.paths.has(currentPathToCheck)) {
+                          shouldUpdate = true;
+                          break;
+                        }
+                        const lastDotIndex =
+                          currentPathToCheck.lastIndexOf(".");
+                        if (lastDotIndex !== -1) {
+                          const parentPath = currentPathToCheck.substring(
+                            0,
+                            lastDotIndex
+                          );
+                          // Check if it's an array index
+                          if (
+                            !isNaN(
+                              Number(
+                                currentPathToCheck.substring(lastDotIndex + 1)
+                              )
+                            )
+                          ) {
+                            if (component.paths.has(parentPath)) {
+                              shouldUpdate = true;
+                              break;
+                            }
+                          }
+                          currentPathToCheck = parentPath;
+                        } else {
+                          currentPathToCheck = "";
+                        }
+                        if (currentPathToCheck === "") {
+                          // Check root path
+                          if (component.paths.has("")) {
+                            shouldUpdate = true;
+                          }
+                          break;
+                        }
+                      }
+                      if (shouldUpdate) break;
+                    }
+                  }
+
+                  if (!shouldUpdate && reactiveTypes.includes("deps")) {
+                    if (component.depsFunction) {
+                      const depsResult = component.depsFunction(newState);
+                      let depsChanged = false;
+                      if (typeof depsResult === "boolean") {
+                        if (depsResult) depsChanged = true;
+                      } else if (!isDeepEqual(component.deps, depsResult)) {
+                        component.deps = depsResult;
+                        depsChanged = true;
+                      }
+                      if (depsChanged) {
+                        shouldUpdate = true;
+                      }
+                    }
+                  }
+
+                  if (shouldUpdate) {
+                    component.forceUpdate();
+                  }
                 }
               }
             };
