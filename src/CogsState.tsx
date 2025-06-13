@@ -2084,52 +2084,15 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Just apply the patches and update the store directly
-              const result = applyPatch(
-                getGlobalStore.getState().cogsStateStore[stateKey],
-                patches
-              );
+              // Apply patches to current state
+              const currentState =
+                getGlobalStore.getState().cogsStateStore[stateKey];
+              const patchResult = applyPatch(currentState, patches);
 
-              // Set state directly to bypass middleware
-              setState(stateKey, result.newDocument);
-
-              // Get paths that changed from patches
-              const changedPaths = new Set<string>();
-              patches.forEach((patch) => {
-                // Convert /path/to/prop to path.to.prop
-                const path = patch.path.slice(1).replace(/\//g, ".");
-                changedPaths.add(path);
-
-                // Also add parent paths
-                const parts = path.split(".");
-                for (let i = 1; i < parts.length; i++) {
-                  changedPaths.add(parts.slice(0, i).join("."));
-                }
-              });
-
-              // Update relevant components
-              const stateEntry = getGlobalStore
+              // Set state directly in the store - bypasses middleware
+              getGlobalStore
                 .getState()
-                .stateComponents.get(stateKey);
-              if (stateEntry) {
-                stateEntry.components.forEach((component) => {
-                  const shouldUpdate =
-                    component.paths.has("") || // root watchers
-                    Array.from(component.paths).some(
-                      (watchedPath) =>
-                        changedPaths.has(watchedPath) ||
-                        Array.from(changedPaths).some(
-                          (changedPath) =>
-                            watchedPath.startsWith(changedPath + ".") ||
-                            changedPath.startsWith(watchedPath + ".")
-                        )
-                    );
-
-                  if (shouldUpdate) {
-                    component.forceUpdate();
-                  }
-                });
-              }
+                .setState(stateKey, patchResult.newDocument);
             };
           }
           if (prop === "validateZodSchema") {
