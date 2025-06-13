@@ -1487,7 +1487,10 @@ function createProxyHandler<T>(
         ) {
           const currentPath = path.join(".");
           const fullComponentId = `${stateKey}////${componentId}`;
-
+          console.log(
+            ".........................................................",
+            currentPath
+          );
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
