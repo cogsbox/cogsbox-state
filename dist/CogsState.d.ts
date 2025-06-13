@@ -92,6 +92,7 @@ export type ObjectEndType<T> = EndType<T> & {
 };
 type EffectFunction<T, R> = (state: T) => R;
 export type EndType<T, IsArrayElement = false> = {
+    applyJsonPatch: (patches: any[]) => void;
     update: UpdateType<T>;
     _path: string[];
     _stateKey: string;
