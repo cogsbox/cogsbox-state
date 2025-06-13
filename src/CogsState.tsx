@@ -1974,13 +1974,15 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const found = sourceWithIndices.find(({ item }, index) =>
-                callbackfn(item, index)
-              );
-              if (!found) return undefined;
-              const finalPath = [...path, found.originalIndex.toString()];
-              return rebuildStateShape(found.item, finalPath, meta);
+              const foundIndex = currentState.findIndex(callbackfn);
+
+              if (foundIndex === -1) {
+                return undefined;
+              }
+
+              const foundValue = currentState[foundIndex];
+              const newPath = [...path, foundIndex.toString()];
+              return rebuildStateShape(foundValue, newPath);
             };
           }
 
