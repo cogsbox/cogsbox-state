@@ -1769,6 +1769,10 @@ function createProxyHandler<T>(
                   originalIndex = index;
                 }
                 const finalPath = [...path, originalIndex.toString()];
+                console.log(
+                  "stateMapstateMapstateMapstateMapstateMap",
+                  finalPath
+                );
                 const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
                 return callbackfn(
                   item,
