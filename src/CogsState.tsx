@@ -2124,18 +2124,19 @@ function createProxyHandler<T>(
               const stateEntry = getGlobalStore
                 .getState()
                 .stateComponents.get(stateKey);
+              console.log("component update logic stateEntry", stateEntry);
               if (!stateEntry) return;
 
               // Build a set of all paths that should trigger updates
               const pathsToCheck = new Set<string>();
-
+              console.log("component update logic pathsToCheck", pathsToCheck);
               // Add root path if array length changed
               if (Array.isArray(currentState) && Array.isArray(newState)) {
                 if (currentState.length !== newState.length) {
                   pathsToCheck.add(""); // Root path for array length changes
                 }
               }
-
+              console.log("component update logic pathsToCheck", pathsToCheck);
               // Process each patch to determine affected paths
               patches.forEach((patch) => {
                 const patchPath = patch.path.slice(1); // Remove leading slash
@@ -2173,6 +2174,7 @@ function createProxyHandler<T>(
                 componentKey,
                 component,
               ] of stateEntry.components.entries()) {
+                console.log("component update logic component", component);
                 let shouldUpdate = false;
                 const reactiveTypes = Array.isArray(component.reactiveType)
                   ? component.reactiveType
