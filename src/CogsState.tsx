@@ -2082,13 +2082,13 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // ... (keep the existing code that applies the patch and updates global state) ...
+              // This part is correct.
               const currentState =
                 getGlobalStore.getState().cogsStateStore[stateKey];
               const patchResult = applyPatch(currentState, patches);
               const newState = patchResult.newDocument;
 
-              // ... updateGlobalState logic is fine ...
+              // This is also correct.
               updateGlobalState(
                 stateKey,
                 getGlobalStore.getState().initialStateGlobal[stateKey],
@@ -2098,111 +2098,91 @@ function createProxyHandler<T>(
                 sessionId
               );
 
-              // ================ START: REPLACEMENT FOR COMPONENT UPDATE LOGIC ================
+              // ===================================================================
+              // REPLACE THE OLD LOGIC WITH THIS DIRECT COPY
+              // ===================================================================
+
               const stateEntry = getGlobalStore
                 .getState()
-                .stateComponents.get(stateKey);
-              if (!stateEntry) return;
+                .stateComponents.get(stateKey); // Use stateKey here
 
-              const pathsToCheck = new Set<string>();
+              if (stateEntry) {
+                // Use `getDifferences` between the state before and after the patch.
+                const changedPaths = getDifferences(currentState, newState);
+                const changedPathsSet = new Set(changedPaths);
 
-              // Helper function to recursively find all paths in an object or array
-              const findAllPaths = (currentPath: string, value: any) => {
-                pathsToCheck.add(currentPath);
+                // There is no single `primaryPathToCheck` for a patch, so we just check against the full set.
 
-                if (Array.isArray(value)) {
-                  value.forEach((item, index) => {
-                    findAllPaths(`${currentPath}.${index}`, item);
-                  });
-                } else if (typeof value === "object" && value !== null) {
-                  Object.keys(value).forEach((key) => {
-                    findAllPaths(`${currentPath}.${key}`, value[key]);
-                  });
-                }
-              };
+                for (const [
+                  componentKey,
+                  component,
+                ] of stateEntry.components.entries()) {
+                  let shouldUpdate = false;
+                  const reactiveTypes = Array.isArray(component.reactiveType)
+                    ? component.reactiveType
+                    : [component.reactiveType || "component"];
 
-              patches.forEach((patch) => {
-                // The path from fast-json-patch is like "/a/b/0"
-                const patchPathString = patch.path.slice(1).replace(/\//g, ".");
+                  if (reactiveTypes.includes("none")) continue;
+                  if (reactiveTypes.includes("all")) {
+                    component.forceUpdate();
+                    continue;
+                  }
 
-                // Add the direct path of the operation
-                pathsToCheck.add(patchPathString);
-
-                // Add all parent paths of the operation
-                let currentParentPath = patchPathString;
-                while (currentParentPath.includes(".")) {
-                  currentParentPath = currentParentPath.substring(
-                    0,
-                    currentParentPath.lastIndexOf(".")
-                  );
-                  pathsToCheck.add(currentParentPath);
-                }
-                pathsToCheck.add(""); // Always add the root path
-
-                // If adding or replacing, we need to check all nested paths within the new value
-                if (
-                  (patch.op === "add" || patch.op === "replace") &&
-                  patch.value
-                ) {
-                  findAllPaths(patchPathString, patch.value);
-                }
-              });
-
-              // Now, check each component for updates (this part is mostly okay, but benefits from the better pathsToCheck set)
-              for (const [
-                componentKey,
-                component,
-              ] of stateEntry.components.entries()) {
-                let shouldUpdate = false;
-                const reactiveTypes = Array.isArray(component.reactiveType)
-                  ? component.reactiveType
-                  : [component.reactiveType || "component"];
-
-                if (reactiveTypes.includes("none")) continue;
-                if (reactiveTypes.includes("all")) {
-                  component.forceUpdate();
-                  continue;
-                }
-
-                if (reactiveTypes.includes("component")) {
-                  // Check if any path the component is watching was affected
-                  for (const watchedPath of component.paths) {
-                    if (pathsToCheck.has(watchedPath)) {
+                  if (reactiveTypes.includes("component")) {
+                    // This is the core logic that needs to be copied.
+                    // Check if any of the component's watched paths are in the set of changed paths.
+                    if (component.paths.has("")) {
+                      // Always update for root listeners
                       shouldUpdate = true;
-                      break;
                     }
-                    // Also check if a changed path is a parent of a watched path (e.g., array update)
-                    for (const changedPath of pathsToCheck) {
-                      if (watchedPath.startsWith(changedPath + ".")) {
-                        shouldUpdate = true;
-                        break;
+
+                    if (!shouldUpdate) {
+                      for (const changedPath of changedPathsSet) {
+                        // Iterate over all actual changes
+                        // Direct match
+                        if (component.paths.has(changedPath)) {
+                          shouldUpdate = true;
+                          break;
+                        }
+                        // Parent match (e.g., component watches 'a' and 'a.b' changed)
+                        let currentPathToCheck = changedPath;
+                        while (currentPathToCheck.includes(".")) {
+                          currentPathToCheck = currentPathToCheck.substring(
+                            0,
+                            currentPathToCheck.lastIndexOf(".")
+                          );
+                          if (component.paths.has(currentPathToCheck)) {
+                            shouldUpdate = true;
+                            break;
+                          }
+                        }
+                        if (shouldUpdate) break;
                       }
                     }
-                    if (shouldUpdate) break;
                   }
-                }
 
-                if (!shouldUpdate && reactiveTypes.includes("deps")) {
-                  if (component.depsFunction) {
-                    const depsResult = component.depsFunction(newState);
-                    if (
-                      typeof depsResult === "boolean"
-                        ? depsResult
-                        : !isDeepEqual(component.deps, depsResult)
-                    ) {
-                      component.deps = Array.isArray(depsResult)
-                        ? depsResult
-                        : [];
-                      shouldUpdate = true;
+                  if (!shouldUpdate && reactiveTypes.includes("deps")) {
+                    // Use `newState` (the result of the patch) for dependency checks.
+                    if (component.depsFunction) {
+                      const depsResult = component.depsFunction(newState);
+                      let depsChanged = false;
+                      if (typeof depsResult === "boolean") {
+                        if (depsResult) depsChanged = true;
+                      } else if (!isDeepEqual(component.deps, depsResult)) {
+                        component.deps = depsResult;
+                        depsChanged = true;
+                      }
+                      if (depsChanged) {
+                        shouldUpdate = true;
+                      }
                     }
                   }
-                }
 
-                if (shouldUpdate) {
-                  component.forceUpdate();
+                  if (shouldUpdate) {
+                    component.forceUpdate();
+                  }
                 }
               }
-              // ================ END: REPLACEMENT ================
             };
           }
           if (prop === "validateZodSchema") {
