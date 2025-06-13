@@ -1707,19 +1707,30 @@ function createProxyHandler<T>(
                 b: InferArrayElement<T>
               ) => number
             ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const sortedResult = [...sourceWithIndices].sort((a, b) =>
-                compareFn(a.item, b.item)
-              );
-              const newCurrentState = sortedResult.map(({ item }) => item);
-              // We construct the meta object with the CORRECT property name: `validIndices`.
-              const newMeta = {
-                ...meta,
-                validIndices: sortedResult.map(
-                  ({ originalIndex }) => originalIndex
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+
+              // Create a shallow copy with original indices
+              const arrayCopy = currentArray.map((v: any, i: number) => ({
+                ...v,
+                __origIndex: i.toString(),
+              }));
+
+              // Sort the copy using the provided compare function
+              const sortedArray = [...arrayCopy].sort(compareFn);
+
+              // ADDED: Clear cache for sort operation
+              shapeCache.clear();
+              stateVersion++;
+
+              // Return the sorted array with state objects
+              return rebuildStateShape(sortedArray as any, path, {
+                filtered: [...(meta?.filtered || []), path],
+                validIndices: sortedArray.map((item) =>
+                  parseInt(item.__origIndex as string)
                 ),
-              };
-              return rebuildStateShape(newCurrentState as any, path, newMeta);
+              });
             };
           }
 
@@ -1730,22 +1741,32 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const filteredResult = sourceWithIndices.filter(
-                ({ item }, index) => callbackfn(item, index)
-              );
-              const newCurrentState = filteredResult.map(({ item }) => item);
-              // We construct the meta object with the CORRECT property name: `validIndices`.
-              const newMeta = {
-                ...meta,
-                validIndices: filteredResult.map(
-                  ({ originalIndex }) => originalIndex
-                ),
-              };
-              return rebuildStateShape(newCurrentState as any, path, newMeta);
+              const newVal = currentState.map((v: any, i: number) => ({
+                ...v,
+                __origIndex: i.toString(),
+              }));
+
+              const validIndices: number[] = [];
+              const filteredArray: Array<InferArrayElement<T>> = [];
+
+              for (let i = 0; i < newVal.length; i++) {
+                if (callbackfn(newVal[i], i)) {
+                  validIndices.push(i);
+                  filteredArray.push(newVal[i]);
+                }
+              }
+
+              // ADDED: Clear cache for filter operation
+              shapeCache.clear();
+              stateVersion++;
+
+              // Always include validIndices, even if it's an empty array
+              return rebuildStateShape(filteredArray as any, path, {
+                filtered: [...(meta?.filtered || []), path],
+                validIndices: validIndices, // Always pass validIndices, even if empty
+              });
             };
           }
-
           if (prop === "stateMap" || prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -1754,29 +1775,31 @@ function createProxyHandler<T>(
                 index: number,
                 array: T,
                 arraySetter: StateObject<T>
-              ) => any
+              ) => void
             ) => {
-              const arrayToMap = currentState as any[];
-              return arrayToMap.map((item, index) => {
-                let originalIndex: number;
-                // We READ from the meta object using the CORRECT property name: `validIndices`.
-                if (
-                  meta?.validIndices &&
-                  meta.validIndices[index] !== undefined
-                ) {
-                  originalIndex = meta.validIndices[index]!;
-                } else {
-                  originalIndex = index;
-                }
-                const finalPath = [...path, originalIndex.toString()];
-                console.log(
-                  "stateMapstateMapstateMapstateMapstateMap",
-                  finalPath
+              const isFiltered = meta?.filtered?.some(
+                (p) => p.join(".") === path.join(".")
+              );
+              const arrayToMap = isFiltered
+                ? currentState
+                : getGlobalStore.getState().getNestedState(stateKey, path);
+
+              if (prop !== "stateMapNoRender") {
+                shapeCache.clear();
+                stateVersion++;
+              }
+
+              return arrayToMap.map((val: any, index: number) => {
+                const thisIndex =
+                  isFiltered && val.__origIndex ? val.__origIndex : index;
+                const elementProxy = rebuildStateShape(
+                  val,
+                  [...path, thisIndex.toString()],
+                  meta
                 );
-                const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
                 return callbackfn(
-                  item,
-                  setter,
+                  val,
+                  elementProxy,
                   index,
                   currentState as any,
                   rebuildStateShape(currentState as any, path, meta)
@@ -1808,14 +1831,25 @@ function createProxyHandler<T>(
 
           if (prop === "stateFlattenOn") {
             return (fieldName: string) => {
-              const arrayToMap = currentState as any[];
+              const isFiltered = meta?.filtered?.some(
+                (p) => p.join(".") === path.join(".")
+              );
+              const arrayToMap = isFiltered
+                ? currentState
+                : getGlobalStore.getState().getNestedState(stateKey, path);
+
+              // ADDED: Clear shape cache for flattening operation
               shapeCache.clear();
               stateVersion++;
+
               const flattenedResults = arrayToMap.flatMap(
-                (val: any) => val[fieldName] ?? []
+                (val: any, index: number) => {
+                  return val[fieldName] ?? [];
+                }
               );
+
               return rebuildStateShape(
-                flattenedResults as any,
+                flattenedResults,
                 [...path, "[*]", fieldName],
                 meta
               );
@@ -1951,14 +1985,23 @@ function createProxyHandler<T>(
           }
 
           if (prop === "findWith") {
-            return (thisKey: keyof InferArrayElement<T>, thisValue: any) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const found = sourceWithIndices.find(
-                ({ item }) => item[thisKey] === thisValue
-              );
-              if (!found) return undefined;
-              const finalPath = [...path, found.originalIndex.toString()];
-              return rebuildStateShape(found.item, finalPath, meta);
+            return (
+              thisKey: keyof InferArrayElement<T>,
+              thisValue: InferArrayElement<T>[keyof InferArrayElement<T>]
+            ) => {
+              const foundIndex = currentState.findIndex((obj: any) => {
+                return obj[thisKey] === thisValue;
+              });
+
+              if (foundIndex === -1) return undefined;
+              const foundValue = currentState[foundIndex];
+              const newPath = [...path, foundIndex.toString()];
+
+              shapeCache.clear();
+              stateVersion++;
+
+              // Try returning without spread
+              return rebuildStateShape(foundValue, newPath);
             };
           }
         }
