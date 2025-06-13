@@ -1190,28 +1190,22 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
       const timeStamp = Date.now();
+      let logPath = [...path]; // Create a mutable copy of the path.
+      let updateForLog = { ...updateObj }; // Copy update object.
 
-      path = path.map((p, i) => {
-        const arrayPath = path.slice(0, -1);
-        const arrayValue = getNestedValue(payload, arrayPath);
+      if (updateObj.updateType === "insert") {
+        const newArray = getNestedValue(payload, path);
+        if (Array.isArray(newArray) && newArray.length > 0) {
+          // For an insert, the element is at the end of the new array.
+          logPath.push((newArray.length - 1).toString());
+        }
+      }
 
-        return i === path.length - 1 &&
-          ["insert", "cut"].includes(updateObj.updateType)
-          ? (arrayValue.length - 1).toString()
-          : p;
-      });
-      console.log(
-        "mmmmmmmmmmmmmmmmm22222222222222",
-        updateObj.updateType,
-        prevValue,
-        payload,
-        path
-      );
       const { oldValue, newValue } = getUpdateValues(
-        updateObj.updateType,
+        updateForLog.updateType,
         prevValue,
         payload,
-        path
+        logPath // Use the correctly determined path for logging
       );
       const newUpdate = {
         timeStamp,
