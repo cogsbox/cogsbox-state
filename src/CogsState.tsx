@@ -33,6 +33,7 @@ import { z } from "zod";
 
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
+import { applyPatch } from "fast-json-patch";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -2082,147 +2083,48 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // Process each patch operation
-              patches.forEach((patch) => {
-                const { op, path: patchPath, value } = patch;
+              // Apply patches to get new state
+              const currentState =
+                getGlobalStore.getState().cogsStateStore[stateKey];
+              const patchResult = applyPatch(currentState, patches);
+              const newState = patchResult.newDocument;
 
-                // Convert JSON Patch path to array format
-                // Remove leading slash and split by '/'
-                const pathArray = patchPath
-                  .slice(1)
-                  .split("/")
-                  .map((segment: string) => {
-                    // Handle array indices
-                    if (/^\d+$/.test(segment)) {
-                      return segment;
-                    }
-                    // Handle escaped characters in JSON Pointer
-                    return segment.replace(/~1/g, "/").replace(/~0/g, "~");
-                  });
+              // Get the current component's reactive type
+              const componentKey = `${stateKey}////${componentId}`;
+              const stateEntry = getGlobalStore
+                .getState()
+                .stateComponents.get(stateKey);
+              const component = stateEntry?.components.get(componentKey);
+              const reactiveTypes = component
+                ? Array.isArray(component.reactiveType)
+                  ? component.reactiveType
+                  : [component.reactiveType || "component"]
+                : ["component"];
 
-                switch (op) {
-                  case "add":
-                    // Check if it's an array operation
-                    const parentPath = pathArray.slice(0, -1);
-                    const parentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, parentPath);
+              // Update the global state using the exact same approach as initialState
+              updateGlobalState(
+                stateKey,
+                getGlobalStore.getState().initialStateGlobal[stateKey], // Keep existing initial state
+                newState,
+                effectiveSetState,
+                componentId,
+                sessionId
+              );
 
-                    if (Array.isArray(parentValue)) {
-                      const index = pathArray[pathArray.length - 1];
-                      if (
-                        index === "-" ||
-                        parseInt(index) === parentValue.length
-                      ) {
-                        // It's an append operation
-                        pushFunc(
-                          effectiveSetState,
-                          value,
-                          parentPath,
-                          stateKey
-                        );
-                      } else {
-                        // It's an insert at specific index
-                        const insertIndex = parseInt(index);
-                        const newArray = [...parentValue];
-                        newArray.splice(insertIndex, 0, value);
-                        updateFn(
-                          effectiveSetState,
-                          newArray as any,
-                          parentPath
-                        );
-                      }
-                    } else {
-                      // It's an object property addition
-                      updateFn(effectiveSetState, value, pathArray);
-                    }
-                    break;
+              // Notify components of the change
+              notifyComponents(stateKey);
 
-                  case "replace":
-                    updateFn(effectiveSetState, value, pathArray);
-                    break;
-
-                  case "remove":
-                    const removeParentPath = pathArray.slice(0, -1);
-                    const removeParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, removeParentPath);
-
-                    if (Array.isArray(removeParentValue)) {
-                      const removeIndex = parseInt(
-                        pathArray[pathArray.length - 1]
-                      );
-                      cutFunc(
-                        effectiveSetState,
-                        removeParentPath,
-                        stateKey,
-                        removeIndex
-                      );
-                    } else {
-                      // For object property removal, set to undefined
-                      updateFn(effectiveSetState as any, undefined, pathArray);
-                    }
-                    break;
-
-                  case "move":
-                    // Move is a combination of remove and add
-                    const { from } = patch;
-                    const fromArray = from.slice(1).split("/");
-
-                    // Get the value at the source location
-                    const sourceValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, fromArray);
-
-                    // Remove from source
-                    const moveParentPath = fromArray.slice(0, -1);
-                    const moveParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, moveParentPath);
-
-                    if (Array.isArray(moveParentValue)) {
-                      const moveIndex = parseInt(
-                        fromArray[fromArray.length - 1]
-                      );
-                      cutFunc(
-                        effectiveSetState,
-                        moveParentPath,
-                        stateKey,
-                        moveIndex
-                      );
-                    }
-
-                    // Add to destination
-                    const destParentPath = pathArray.slice(0, -1);
-                    const destParentValue = getGlobalStore
-                      .getState()
-                      .getNestedState(stateKey, destParentPath);
-
-                    if (Array.isArray(destParentValue)) {
-                      const destIndex = pathArray[pathArray.length - 1];
-                      if (destIndex === "-") {
-                        pushFunc(
-                          effectiveSetState,
-                          sourceValue,
-                          destParentPath,
-                          stateKey
-                        );
-                      } else {
-                        const insertIndex = parseInt(destIndex);
-                        const newArray = [...destParentValue];
-                        newArray.splice(insertIndex, 0, sourceValue);
-                        updateFn(
-                          effectiveSetState,
-                          newArray as any,
-                          destParentPath
-                        );
-                      }
-                    }
-                    break;
+              // Force update this component if needed (same as initialState logic)
+              if (!reactiveTypes.includes("none")) {
+                // Find the forceUpdate function for this component
+                const thisComponent = stateEntry?.components.get(componentKey);
+                if (thisComponent) {
+                  thisComponent.forceUpdate();
                 }
-              });
+              }
             };
           }
+
           if (prop === "validateZodSchema") {
             return () => {
               const init = getGlobalStore
