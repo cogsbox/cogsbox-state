@@ -1974,18 +1974,36 @@ function createProxyHandler<T>(
                 index: number
               ) => boolean
             ) => {
-              const foundIndex = currentState.findIndex(callbackfn);
+              // Use the standard JavaScript .findIndex() on the current array state.
+              // `currentState` is the correct array to search, whether it's the full
+              // array or a filtered/sorted one from a previous chain operation.
+              const foundIndex = (currentState as any[]).findIndex(callbackfn);
 
+              // If findIndex returns -1, the item was not found. Return undefined, just like native .find().
               if (foundIndex === -1) {
                 return undefined;
               }
 
-              const foundValue = currentState[foundIndex];
-              const newPath = [...path, foundIndex.toString()];
-              return rebuildStateShape(foundValue, newPath);
+              // We found the item at `foundIndex` in the `currentState` array.
+              // Now, we need to get the proxy for that item. We already have a method for that: .index()
+
+              // Determine the true original index.
+              let originalIndex: number;
+              if (meta?.validIndices) {
+                // If we're in a chain, map the found index back to its original index.
+                originalIndex = meta.validIndices[foundIndex]!;
+              } else {
+                // Otherwise, the found index is the original index.
+                originalIndex = foundIndex;
+              }
+
+              const foundValue = (currentState as any[])[foundIndex];
+              const finalPath = [...path, originalIndex.toString()];
+
+              // Return a new proxy for the found item, using its correct original path.
+              return rebuildStateShape(foundValue, finalPath, meta);
             };
           }
-
           if (prop === "findWith") {
             return (
               thisKey: keyof InferArrayElement<T>,

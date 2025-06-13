@@ -701,8 +701,10 @@ function ee(e, i, m, u) {
               const a = f.findIndex(n);
               if (a === -1)
                 return;
-              const l = f[a], o = [...t, a.toString()];
-              return s(l, o);
+              let l;
+              v?.validIndices ? l = v.validIndices[a] : l = a;
+              const o = f[a], c = [...t, l.toString()];
+              return s(o, c, v);
             };
           if (d === "findWith")
             return (n, a) => {
