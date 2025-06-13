@@ -477,13 +477,13 @@ function ee(e, i, S, u) {
   };
   function s(m, t = [], I) {
     const j = t.map(String).join(".");
-    console.log("rebuildStateShape", t), f.get(j);
+    f.get(j);
     const A = function() {
       return n().getNestedState(e, t);
     };
     Object.keys(v).forEach((g) => {
       A[g] = v[g];
-    });
+    }), console.log("rebuildStateShapessss", t);
     const V = {
       apply(g, c, H) {
         return console.log(

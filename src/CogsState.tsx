@@ -1449,7 +1449,7 @@ function createProxyHandler<T>(
     meta?: { filtered?: string[][]; validIndices?: number[] }
   ): any {
     const cacheKey = path.map(String).join(".");
-    console.log("rebuildStateShape", path);
+
     // MODIFIED: Cache check with version
     const cachedEntry = shapeCache.get(cacheKey);
     // if (cachedEntry?.stateVersion === stateVersion) {
@@ -1469,7 +1469,7 @@ function createProxyHandler<T>(
     Object.keys(baseObj).forEach((key) => {
       (baseFunction as any)[key] = (baseObj as any)[key];
     });
-
+    console.log("rebuildStateShapessss", path);
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
         console.log(
