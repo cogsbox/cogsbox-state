@@ -40,62 +40,36 @@ import { applyPatch } from "fast-json-patch";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
-export type VirtualizerOptions = {
-  /**
-   * The fixed height of each item in pixels.
-   * @required
-   */
+export type VirtualViewOptions = {
   itemHeight: number;
-  /**
-   * The number of items to render above and below the visible viewport.
-   * @default 5
-   */
   overscan?: number;
-  /**
-   * If true, the list will automatically scroll to the bottom when new items are added
-   * and the user was already at the bottom. Ideal for chat.
-   * @default false
-   */
   stickToBottom?: boolean;
 };
 
-export type VirtualizerResult<T> = {
+// This is the new, simpler result type
+export type VirtualViewResult<T> = {
   /**
-   * The array of items that should be rendered in the viewport.
+   * A view object with a `stateMap` method to render the virtualized items.
    */
-  virtualItems: {
-    value: T;
-    setter: StateObject<T>;
-    originalIndex: number;
-  }[];
-  /**
-   * An object containing props that should be spread onto your DOM elements
-   * to enable virtualization.
-   */
-  virtualizerProps: {
-    outer: {
-      ref: RefObject<HTMLDivElement>;
-      style: CSSProperties;
-    };
-    inner: {
-      style: CSSProperties;
-    };
-    list: {
-      style: CSSProperties;
-    };
+  virtualView: {
+    stateMap: (
+      callbackfn: (
+        value: T,
+        setter: StateObject<T>,
+        index: number // This is the local index (0, 1, 2...)
+      ) => React.ReactNode
+    ) => React.ReactNode[];
   };
   /**
-   * A function to programmatically scroll to the bottom of the list.
+   * Props to be spread onto your DOM elements to enable virtualization.
    */
+  virtualizerProps: {
+    outer: { ref: RefObject<HTMLDivElement>; style: CSSProperties };
+    inner: { style: CSSProperties };
+    list: { style: CSSProperties };
+  };
   scrollToBottom: (behavior?: ScrollBehavior) => void;
-  /**
-   * A function to programmatically scroll to a specific item index.
-   */
   scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
-  /**
-   * A function to programmatically scroll to a specific pixel position.
-   */
-  scrollTo: (position: number, behavior?: ScrollBehavior) => void;
 };
 export type ServerSyncStatus = {
   isFresh: boolean;
@@ -198,9 +172,9 @@ export type ArrayEndType<TShape extends unknown> = {
       b: InferArrayElement<TShape>
     ) => number
   ) => ArrayEndType<TShape>;
-  useVirtualizer: (
-    options: VirtualizerOptions
-  ) => VirtualizerResult<InferArrayElement<TShape>>;
+  useVirtualView: (
+    options: VirtualViewOptions
+  ) => VirtualViewResult<InferArrayElement<TShape>>;
   stateMapNoRender: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1798,23 +1772,21 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === "useVirtualizer") {
-            // This method IS a React hook.
-            return (options: VirtualizerOptions) => {
+          if (prop === "useVirtualView") {
+            // This is the new, simpler, and correct React Hook implementation.
+            return (options: VirtualViewOptions): VirtualViewResult<any> => {
               const {
                 itemHeight,
                 overscan = 5,
                 stickToBottom = false,
               } = options;
 
-              // Runtime check for safety, even with TS.
               if (typeof itemHeight !== "number" || itemHeight <= 0) {
                 throw new Error(
-                  "[cogs-state] `useVirtualizer` requires a positive number for the `itemHeight` option."
+                  "[cogs-state] `useVirtualView` requires a positive number for `itemHeight` option."
                 );
               }
 
-              // 1. INTERNAL STATE AND REFS
               const containerRef = useRef<HTMLDivElement | null>(null);
               const wasAtBottomRef = useRef(true);
               const [viewport, setViewport] = useState({
@@ -1822,15 +1794,13 @@ function createProxyHandler<T>(
                 containerHeight: 0,
               });
 
-              // 2. DATA SOURCE & DERIVATION
               const sourceArray =
                 (getGlobalStore
                   .getState()
-                  .getNestedState(stateKey, path) as T[]) || [];
+                  .getNestedState(stateKey, path) as any[]) || [];
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              // 3. CALCULATE VIRTUAL RANGE
               const { startIndex, endIndex } = useMemo(() => {
                 const start = Math.max(
                   0,
@@ -1852,35 +1822,49 @@ function createProxyHandler<T>(
                 overscan,
               ]);
 
-              // 4. GET VIRTUAL ITEMS (Encapsulated Slicing Logic)
-              const virtualItems = useMemo(() => {
-                if (totalCount === 0) return [];
-                const count = endIndex - startIndex;
-                if (count <= 0) return [];
+              // This is the "view object". It's memoized to prevent re-creating the `stateMap` function on every render.
+              const virtualView = useMemo(
+                () => ({
+                  stateMap: (
+                    callbackfn: (
+                      value: any,
+                      setter: StateObject<any>,
+                      index: number
+                    ) => React.ReactNode
+                  ) => {
+                    if (totalCount === 0) return [];
+                    const count = endIndex - startIndex;
+                    if (count <= 0) return [];
 
-                const slicedRawItems = sourceArray.slice(startIndex, count);
+                    const slicedRawItems = sourceArray.slice(startIndex, count);
 
-                return slicedRawItems.map((item, localIndex) => {
-                  const originalIndex = startIndex + localIndex;
-                  const finalPath = [...path, originalIndex.toString()];
-                  const setter = rebuildStateShape(item, finalPath, meta);
+                    return slicedRawItems.map((item, localIndex) => {
+                      // Calculate the true index in the original source array.
+                      const originalIndex = startIndex + localIndex;
 
-                  return {
-                    value: item,
-                    setter: setter,
-                    originalIndex: originalIndex,
-                  };
-                });
-              }, [startIndex, endIndex, sourceArray, path.join("."), stateKey]);
+                      // Create the setter proxy for this item using its ORIGINAL path.
+                      // This correctly calls the original effectiveSetState. No new state needed.
+                      const setter = rebuildStateShape(
+                        item,
+                        [...path, originalIndex.toString()],
+                        meta
+                      );
 
-              // 5. CONTROL FUNCTIONS
+                      // Call the user's render callback.
+                      return callbackfn(item, setter, localIndex);
+                    });
+                  },
+                }),
+                [startIndex, endIndex, sourceArray, path.join("."), stateKey]
+              );
+
+              // Control functions remain the same
               const scrollTo = useCallback(
                 (position: number, behavior: ScrollBehavior = "auto") => {
                   containerRef.current?.scrollTo({ top: position, behavior });
                 },
                 []
               );
-
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
@@ -1889,7 +1873,6 @@ function createProxyHandler<T>(
                 },
                 [scrollTo]
               );
-
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   scrollTo(index * itemHeight, behavior);
@@ -1897,18 +1880,19 @@ function createProxyHandler<T>(
                 [scrollTo, itemHeight]
               );
 
-              // 6. BINDINGS & EFFECTS
+              // Effects for scroll/resize listeners remain the same
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-
+                // ... (scroll and resize observer logic from previous correct answer)
                 const handleScroll = () => {
                   const scrollTop = container.scrollTop;
-                  const scrollHeight = container.scrollHeight;
-                  const clientHeight = container.clientHeight;
                   wasAtBottomRef.current =
-                    scrollHeight > 0 &&
-                    scrollHeight - scrollTop - clientHeight < 1;
+                    container.scrollHeight > 0 &&
+                    container.scrollHeight -
+                      scrollTop -
+                      container.clientHeight <
+                      1;
                   setViewport((v) =>
                     v.scrollPosition === scrollTop
                       ? v
@@ -1919,7 +1903,6 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-
                 const observer = new ResizeObserver((entries) => {
                   const entry = entries[0];
                   if (entry) {
@@ -1931,35 +1914,30 @@ function createProxyHandler<T>(
                   }
                 });
                 observer.observe(container);
-
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                   observer.disconnect();
                 };
               }, []);
-
               useLayoutEffect(() => {
                 if (stickToBottom && wasAtBottomRef.current) {
                   scrollToBottom("auto");
                 }
-              }, [totalCount, stickToBottom, scrollToBottom]);
+              }, [sourceArray, stickToBottom, scrollToBottom]);
 
-              // 7. THE RETURNED API
+              // Props to spread on DOM elements remain the same
               const virtualizerProps = useMemo(
                 () => ({
                   outer: {
                     ref: containerRef,
-                    style: {
-                      overflowY: "auto",
-                      position: "relative",
-                    } as CSSProperties,
+                    style: { overflowY: "auto", position: "relative" },
                   },
                   inner: {
                     style: {
                       position: "relative",
                       height: `${totalHeight}px`,
                       width: "100%",
-                    } as CSSProperties,
+                    },
                   },
                   list: {
                     style: {
@@ -1968,18 +1946,17 @@ function createProxyHandler<T>(
                       left: 0,
                       width: "100%",
                       transform: `translateY(${startIndex * itemHeight}px)`,
-                    } as CSSProperties,
+                    },
                   },
                 }),
                 [totalHeight, startIndex, itemHeight]
               );
 
               return {
-                virtualItems,
-                virtualizerProps,
+                virtualView,
+                virtualizerProps: virtualizerProps as any,
                 scrollToBottom,
                 scrollToIndex,
-                scrollTo,
               };
             };
           }

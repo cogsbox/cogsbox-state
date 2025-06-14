@@ -6,36 +6,20 @@ import { ComponentsType } from './store.js';
 type Prettify<T> = {
     [K in keyof T]: T[K];
 } & {};
-export type VirtualizerOptions = {
-    /**
-     * The fixed height of each item in pixels.
-     * @required
-     */
+export type VirtualViewOptions = {
     itemHeight: number;
-    /**
-     * The number of items to render above and below the visible viewport.
-     * @default 5
-     */
     overscan?: number;
-    /**
-     * If true, the list will automatically scroll to the bottom when new items are added
-     * and the user was already at the bottom. Ideal for chat.
-     * @default false
-     */
     stickToBottom?: boolean;
 };
-export type VirtualizerResult<T> = {
+export type VirtualViewResult<T> = {
     /**
-     * The array of items that should be rendered in the viewport.
+     * A view object with a `stateMap` method to render the virtualized items.
      */
-    virtualItems: {
-        value: T;
-        setter: StateObject<T>;
-        originalIndex: number;
-    }[];
+    virtualView: {
+        stateMap: (callbackfn: (value: T, setter: StateObject<T>, index: number) => React.ReactNode) => React.ReactNode[];
+    };
     /**
-     * An object containing props that should be spread onto your DOM elements
-     * to enable virtualization.
+     * Props to be spread onto your DOM elements to enable virtualization.
      */
     virtualizerProps: {
         outer: {
@@ -49,18 +33,8 @@ export type VirtualizerResult<T> = {
             style: CSSProperties;
         };
     };
-    /**
-     * A function to programmatically scroll to the bottom of the list.
-     */
     scrollToBottom: (behavior?: ScrollBehavior) => void;
-    /**
-     * A function to programmatically scroll to a specific item index.
-     */
     scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
-    /**
-     * A function to programmatically scroll to a specific pixel position.
-     */
-    scrollTo: (position: number, behavior?: ScrollBehavior) => void;
 };
 export type ServerSyncStatus = {
     isFresh: boolean;
@@ -109,7 +83,7 @@ export type ArrayEndType<TShape extends unknown> = {
     cutByValue: (value: string | number | boolean) => void;
     toggleByValue: (value: string | number | boolean) => void;
     stateSort: (compareFn: (a: InferArrayElement<TShape>, b: InferArrayElement<TShape>) => number) => ArrayEndType<TShape>;
-    useVirtualizer: (options: VirtualizerOptions) => VirtualizerResult<InferArrayElement<TShape>>;
+    useVirtualView: (options: VirtualViewOptions) => VirtualViewResult<InferArrayElement<TShape>>;
     stateMapNoRender: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
