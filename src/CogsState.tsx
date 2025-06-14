@@ -1565,13 +1565,18 @@ function createProxyHandler<T>(
                 }
 
                 if (needsAdd) {
-                  // console.log(
-                  //   "adding path actualyl adding",
-                  //   fullComponentId,
-                  //   path,
-                  //   prop
-                  // );
                   component.paths.add(currentPath);
+                  // ADD TO TRIE HERE!
+                  const stateEntry = getGlobalStore
+                    .getState()
+                    .stateComponents.get(stateKey);
+                  if (stateEntry && stateEntry.pathTrie) {
+                    addToTrie(
+                      stateEntry.pathTrie,
+                      currentPath,
+                      fullComponentId
+                    );
+                  }
                 }
               }
             }
