@@ -1989,7 +1989,6 @@ function createProxyHandler<T>(
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                // The third argument is an info object with the register function
                 info: {
                   register: () => void;
                   index: number;
@@ -2010,28 +2009,21 @@ function createProxyHandler<T>(
                 return null;
               }
 
-              return arrayToMap.map((item, index) => {
-                let originalIndex: number;
-                if (
-                  meta?.validIndices &&
-                  meta.validIndices[index] !== undefined
-                ) {
-                  originalIndex = meta.validIndices[index]!;
-                } else {
-                  originalIndex = index;
-                }
+              // If we have validIndices, only map those items
+              const indicesToMap =
+                meta?.validIndices ||
+                Array.from({ length: arrayToMap.length }, (_, i) => i);
 
+              return indicesToMap.map((originalIndex, localIndex) => {
+                const item = arrayToMap[originalIndex];
                 const finalPath = [...path, originalIndex.toString()];
                 const setter = rebuildStateShape(item, finalPath, meta);
 
                 // Create the register function right here. It closes over the necessary variables.
-                // This function IS a React Hook and must be called inside a component.
                 const register = () => {
                   const [, forceUpdate] = useState({});
-                  // This is stable and unique for this specific item in the list.
                   const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                  // This effect performs the one-time registration and cleanup.
                   useLayoutEffect(() => {
                     const fullComponentId = `${stateKey}////${itemComponentId}`;
                     const stateEntry = getGlobalStore
@@ -2042,14 +2034,13 @@ function createProxyHandler<T>(
 
                     stateEntry.components.set(fullComponentId, {
                       forceUpdate: () => forceUpdate({}),
-                      paths: new Set([finalPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
+                      paths: new Set([finalPath.join(".")]),
                     });
 
                     getGlobalStore
                       .getState()
                       .stateComponents.set(stateKey, stateEntry);
 
-                    // Cleanup function to un-register the component
                     return () => {
                       const currentEntry = getGlobalStore
                         .getState()
@@ -2058,13 +2049,12 @@ function createProxyHandler<T>(
                         currentEntry.components.delete(fullComponentId);
                       }
                     };
-                  }, [stateKey, itemComponentId]); // Effect depends only on stable keys
+                  }, [stateKey, itemComponentId]);
                 };
 
-                // Call the user's function with the item, its setter, and the info object
                 return callbackfn(item, setter, {
                   register,
-                  index,
+                  index: localIndex,
                   originalIndex,
                 });
               });
