@@ -1503,6 +1503,9 @@ function createProxyHandler<T>(
           "setValidation",
           "removeStorage",
           "middleware",
+          "_componentId",
+          "_stateKey",
+          "getComponents",
         ]);
         if (
           prop !== "then" &&
