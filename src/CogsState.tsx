@@ -1508,10 +1508,8 @@ function createProxyHandler<T>(
           prop !== "then" &&
           !prop.startsWith("$") &&
           prop !== "stateMapNoRender" &&
-          !mutationMethods.has(prop) // ADD THIS CHECK
+          !mutationMethods.has(prop)
         ) {
-          console.log("adding path start", path, prop);
-          // Only compute these if needed
           const fullComponentId = `${stateKey}////${componentId}`;
           const stateEntry = getGlobalStore
             .getState()
@@ -1520,16 +1518,16 @@ function createProxyHandler<T>(
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
 
-            if (component) {
-              // If we already track root, no need to track anything else
-              if (component.paths.has("")) {
-              } else {
-                // Build the current path including the property being accessed
+            if (component && !component.pathsInitialized) {
+              // Mark as initialized immediately to prevent re-processing
+              component.pathsInitialized = true;
+
+              // Now do the path tracking logic ONCE
+              if (!component.paths.has("")) {
                 const currentPath = path.join(".");
-                // Check if we need to add this path
+
                 let needsAdd = true;
                 for (const existingPath of component.paths) {
-                  // If we already track this exact path or a parent of it
                   if (
                     currentPath.startsWith(existingPath) &&
                     (currentPath === existingPath ||
@@ -1541,7 +1539,6 @@ function createProxyHandler<T>(
                 }
 
                 if (needsAdd) {
-                  console.log("adding path addimg", currentPath, prop);
                   component.paths.add(currentPath);
                 }
               }

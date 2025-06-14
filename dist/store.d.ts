@@ -18,6 +18,7 @@ export type ComponentsType = {
         deps?: any[];
         depsFunction?: (state: any) => any[] | true;
         reactiveType: ReactivityType[] | ReactivityType;
+        pathsInitialized?: boolean;
     }>;
 };
 export type FormRefStoreState = {
