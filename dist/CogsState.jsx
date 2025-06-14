@@ -882,13 +882,10 @@ function le(e, i, h, g) {
         if (l === "get")
           return () => {
             if (S?.validIndices && Array.isArray(m)) {
-              const d = r().getNestedState(
-                e,
-                o
-              );
+              const d = r.getState().getNestedState(e, o);
               return S.validIndices.map((t) => d[t]);
             }
-            return r().getNestedState(e, o);
+            return r.getState().getNestedState(e, o);
           };
         if (l === "$derive")
           return (d) => be({

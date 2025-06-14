@@ -2340,13 +2340,12 @@ function createProxyHandler<T>(
           return () => {
             if (meta?.validIndices && Array.isArray(currentState)) {
               // For filtered arrays, return only the items at validIndices
-              const fullArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
+              const fullArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
               return meta.validIndices.map((index) => fullArray[index]);
             }
-            return getGlobalStore().getNestedState(stateKey, path);
+            return getGlobalStore.getState().getNestedState(stateKey, path);
           };
         }
         if (prop === "$derive") {
