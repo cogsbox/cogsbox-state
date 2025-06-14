@@ -1099,7 +1099,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-      console.log("stateEntry", stateEntry);
+      console.log("stateEntry >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", stateEntry);
       if (stateEntry) {
         const changedPaths = getDifferences(prevValue, payload);
         const changedPathsSet = new Set(changedPaths);
