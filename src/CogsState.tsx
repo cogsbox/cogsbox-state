@@ -1768,7 +1768,6 @@ function createProxyHandler<T>(
           }
 
           if (prop === "useVirtualView") {
-            // This hook leverages the existing `stateFilter` to create a dynamic view.
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
@@ -1786,38 +1785,52 @@ function createProxyHandler<T>(
 
               const containerRef = useRef<HTMLDivElement | null>(null);
               const wasAtBottomRef = useRef(true);
-              // This state now drives the filtering
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 0,
               });
 
-              const sourceArray =
-                (getGlobalStore
-                  .getState()
-                  .getNestedState(stateKey, path) as any[]) || [];
+              // Force a re-render when the source array changes
+              const [arrayVersion, setArrayVersion] = useState(0);
+
+              // Get the source array and watch for changes
+              const sourceArray = getGlobalStore().getNestedState(
+                stateKey,
+                path
+              ) as any[];
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              // The core insight: On every render where the range changes,
-              // we create a new filtered StateObject.
+              // Track array length changes to trigger virtualState recreation
+              const prevLengthRef = useRef(totalCount);
+              useEffect(() => {
+                if (prevLengthRef.current !== totalCount) {
+                  prevLengthRef.current = totalCount;
+                  setArrayVersion((v) => v + 1);
+                }
+              }, [totalCount]);
+
+              // Create virtual state with dependencies on both range AND array changes
               const virtualState = useMemo(() => {
-                // Get a proxy to the original array to call stateFilter on it.
+                // Get a fresh proxy to the original array
                 const originalProxy = rebuildStateShape(
-                  currentState,
+                  sourceArray as any, // Use the actual current array
                   path,
                   meta
                 );
 
-                // Use the existing stateFilter with a dynamic predicate.
-                // This is lazy and performs well.
-                return originalProxy.stateFilter((_: any, index: any) => {
+                // Use stateFilter with the current range
+                return originalProxy.stateFilter((_: any, index: number) => {
                   return index >= range.startIndex && index < range.endIndex;
                 });
-              }, [range.startIndex, range.endIndex, sourceArray]);
+              }, [
+                range.startIndex,
+                range.endIndex,
+                arrayVersion,
+                sourceArray.length,
+              ]);
 
-              // All effects and control functions now just manage the `range` state
-              // and scroll position.
+              // All the scroll handling remains the same
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1856,7 +1869,7 @@ function createProxyHandler<T>(
                   calculateRange();
                 };
 
-                calculateRange(); // Initial calculation
+                calculateRange();
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
@@ -1898,14 +1911,17 @@ function createProxyHandler<T>(
                 () => ({
                   outer: {
                     ref: containerRef,
-                    style: { overflowY: "auto", position: "relative" },
+                    style: {
+                      overflowY: "auto",
+                      position: "relative",
+                    } as CSSProperties,
                   },
                   inner: {
                     style: {
                       position: "relative",
                       height: `${totalHeight}px`,
                       width: "100%",
-                    },
+                    } as CSSProperties,
                   },
                   list: {
                     style: {
@@ -1914,7 +1930,7 @@ function createProxyHandler<T>(
                       left: 0,
                       width: "100%",
                       transform: `translateY(${range.startIndex * itemHeight}px)`,
-                    },
+                    } as CSSProperties,
                   },
                 }),
                 [totalHeight, range.startIndex, itemHeight]
@@ -1922,7 +1938,7 @@ function createProxyHandler<T>(
 
               return {
                 virtualState,
-                virtualizerProps: virtualizerProps as any,
+                virtualizerProps,
                 scrollToBottom,
                 scrollToIndex,
               };
