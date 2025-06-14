@@ -1108,6 +1108,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ? path.join(".")
             : path.slice(0, -1).join(".") || "";
 
+        const componentsToUpdate: Array<() => void> = [];
+
         for (const [
           componentKey,
           component,
@@ -1119,7 +1121,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
-            component.forceUpdate();
+            componentsToUpdate.push(component.forceUpdate); // COLLECT instead of calling
             continue;
           }
 
@@ -1185,8 +1187,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
 
           if (shouldUpdate) {
-            component.forceUpdate();
+            componentsToUpdate.push(component.forceUpdate); // COLLECT instead of calling
           }
+        }
+
+        // BATCH all updates at once
+        if (componentsToUpdate.length > 0) {
+          queueMicrotask(() => {
+            componentsToUpdate.forEach((update) => update());
+          });
         }
       }
       const timeStamp = Date.now();
@@ -1299,7 +1308,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       componentIdRef.current,
       sessionId
     );
-  }, [thisKey]);
+  }, [thisKey, sessionId]);
 
   return [getKeyState(thisKey), updaterFinal] as [
     TStateObject,
@@ -1476,13 +1485,14 @@ function createProxyHandler<T>(
           meta = { ...meta, validIndices: undefined };
         }
         if (
-          prop !== "then" &&
-          !prop.startsWith("$") &&
-          prop !== "stateMapNoRender"
+          prop === "then" ||
+          prop[0] === "$" || // Faster than startsWith
+          prop === "stateMapNoRender"
         ) {
-          const currentPath = path.join(".");
+          // Skip path tracking entirely
+        } else {
+          // Only compute these if needed
           const fullComponentId = `${stateKey}////${componentId}`;
-
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
@@ -1491,11 +1501,46 @@ function createProxyHandler<T>(
             const component = stateEntry.components.get(fullComponentId);
 
             if (component) {
-              // Only add paths for non-root or specifically for get() at root
-              if (path.length > 0 || prop === "get") {
-                component.paths.add(currentPath);
+              // OPTIMIZED: Most important optimization - check for root first
+              if (component.paths.has("")) {
+                // Do nothing - root already tracks everything
+              } else if (path.length === 0 && prop === "get") {
+                // Special case for root get()
+                component.paths.add("");
+              } else if (path.length > 0) {
+                // OPTIMIZED: Build path only when needed
+                const currentPath = path.join(".");
+
+                // OPTIMIZED: Use size check first (O(1))
+                if (component.paths.size === 0) {
+                  component.paths.add(currentPath);
+                } else {
+                  // OPTIMIZED: For small sets, iteration is faster than complex algorithms
+                  let needsAdd = true;
+
+                  // Check if any existing path is a parent
+                  for (const existingPath of component.paths) {
+                    if (existingPath === currentPath) {
+                      needsAdd = false;
+                      break;
+                    }
+                    // OPTIMIZED: Length check before string operation
+                    if (
+                      existingPath.length < currentPath.length &&
+                      currentPath[existingPath.length] === "." &&
+                      currentPath.substring(0, existingPath.length) ===
+                        existingPath
+                    ) {
+                      needsAdd = false;
+                      break;
+                    }
+                  }
+
+                  if (needsAdd) {
+                    component.paths.add(currentPath);
+                  }
+                }
               }
-            } else {
             }
           }
         }
@@ -2134,24 +2179,41 @@ function createProxyHandler<T>(
 
                     if (!shouldUpdate) {
                       for (const changedPath of changedPathsSet) {
-                        // Iterate over all actual changes
-                        // Direct match
+                        // Direct match first (fastest)
                         if (component.paths.has(changedPath)) {
                           shouldUpdate = true;
                           break;
                         }
-                        // Parent match (e.g., component watches 'a' and 'a.b' changed)
-                        let currentPathToCheck = changedPath;
-                        while (currentPathToCheck.includes(".")) {
-                          currentPathToCheck = currentPathToCheck.substring(
-                            0,
-                            currentPathToCheck.lastIndexOf(".")
-                          );
-                          if (component.paths.has(currentPathToCheck)) {
+
+                        // Check parent paths more efficiently
+                        let dotIndex = changedPath.lastIndexOf(".");
+                        while (dotIndex !== -1) {
+                          const parentPath = changedPath.substring(0, dotIndex);
+                          if (component.paths.has(parentPath)) {
                             shouldUpdate = true;
                             break;
                           }
+                          // Skip numeric segments more efficiently
+                          const lastSegment = changedPath.substring(
+                            dotIndex + 1
+                          );
+                          if (!isNaN(Number(lastSegment))) {
+                            // For array indices, check the parent collection path
+                            const parentDotIndex = parentPath.lastIndexOf(".");
+                            if (parentDotIndex !== -1) {
+                              const grandParentPath = parentPath.substring(
+                                0,
+                                parentDotIndex
+                              );
+                              if (component.paths.has(grandParentPath)) {
+                                shouldUpdate = true;
+                                break;
+                              }
+                            }
+                          }
+                          dotIndex = parentPath.lastIndexOf(".");
                         }
+
                         if (shouldUpdate) break;
                       }
                     }
