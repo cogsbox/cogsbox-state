@@ -1504,6 +1504,7 @@ function createProxyHandler<T>(
           "removeStorage",
           "middleware",
         ]);
+
         if (
           prop !== "then" &&
           !prop.startsWith("$") &&
