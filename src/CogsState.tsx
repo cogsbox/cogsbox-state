@@ -1527,8 +1527,7 @@ function createProxyHandler<T>(
               }
 
               // Build the current path including the property being accessed
-              const currentPath = [...path, prop].join(".");
-
+              const currentPath = path.join(".");
               // Check if we need to add this path
               let needsAdd = true;
               for (const existingPath of component.paths) {
