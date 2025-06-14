@@ -1797,55 +1797,8 @@ function createProxyHandler<T>(
               return rebuildStateShape(newCurrentState as any, path, newMeta);
             };
           }
-          // This code goes inside the `get` trap of `createProxyHandler`
-          if (prop === "stateMap") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
-                index: number
-              ) => React.ReactNode // Your callback returns the JSX to render
-            ) => {
-              const arrayToMap = currentState as any[];
 
-              return arrayToMap.map((item, index) => {
-                let originalIndex: number;
-                if (
-                  meta?.validIndices &&
-                  meta.validIndices[index] !== undefined
-                ) {
-                  originalIndex = meta.validIndices[index]!;
-                } else {
-                  originalIndex = index;
-                }
-
-                // The specific path for this individual item in the array.
-                const finalPath = [...path, originalIndex.toString()];
-
-                // The proxy for this item, which can be used for updates.
-                const setter = rebuildStateShape(item, finalPath, meta);
-
-                // A stable and unique ID for this item's wrapper component.
-                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
-
-                // Call the user's render function to get their actual component JSX.
-                const userComponentJsx = callbackfn(item, setter, index);
-
-                // Transparently wrap the user's component in our internal registration component.
-                return (
-                  <CogsItemWrapper
-                    key={originalIndex} // The wrapper itself needs a key for React's mapping.
-                    stateKey={stateKey}
-                    itemComponentId={itemComponentId}
-                    itemPath={finalPath} // Pass the specific path for atomic updates.
-                  >
-                    {userComponentJsx}
-                  </CogsItemWrapper>
-                );
-              });
-            };
-          }
-          if (prop === "stateMapNoRender") {
+          if (prop === "stateMap" || prop === "stateMapNoRender") {
             return (
               callbackfn: (
                 value: InferArrayElement<T>,
