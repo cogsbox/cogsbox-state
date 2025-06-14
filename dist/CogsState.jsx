@@ -526,7 +526,7 @@ function re(e, i, S, l) {
         ]);
         if (d !== "then" && !d.startsWith("$") && d !== "stateMapNoRender" && !Q.has(d)) {
           const u = `${e}////${S}`, t = n.getState().stateComponents.get(e);
-          if (t) {
+          if (console.log("stateEntry", t), t) {
             const o = t.components.get(u);
             if (o && !o.paths.has("")) {
               const a = r.join(".");

@@ -231,7 +231,11 @@ export function getDifferences(
     for (let i = 0; i < commonLength; i++) {
       if (obj1[i] !== obj2[i]) {
         differences = differences.concat(
-          getDifferences(obj1[i], obj2[i], `${currentPath}[${i}]`)
+          getDifferences(
+            obj1[i],
+            obj2[i],
+            currentPath ? `${currentPath}.${i}` : `${i}`
+          )
         );
       }
     }
@@ -240,7 +244,7 @@ export function getDifferences(
     if (obj1.length !== obj2.length) {
       const longerArrayPath = obj1.length > obj2.length ? obj1 : obj2;
       for (let i = commonLength; i < longerArrayPath.length; i++) {
-        differences.push(`${currentPath}[${i}]`);
+        differences.push(currentPath ? `${currentPath}.${i}` : `${i}`);
       }
     }
     return differences;

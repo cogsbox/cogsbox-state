@@ -1541,7 +1541,7 @@ function createProxyHandler<T>(
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
-
+          console.log("stateEntry", stateEntry);
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
 
