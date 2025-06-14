@@ -1559,6 +1559,7 @@ function createProxyHandler<T>(
                   }
 
                   if (needsAdd) {
+                    console.log("adding path to component", currentPath, prop);
                     component.paths.add(currentPath);
                   }
                 }
