@@ -1885,16 +1885,28 @@ function createProxyHandler<T>(
                 const calculateRange = () => {
                   const scrollTop = container.scrollTop;
                   const clientHeight = container.clientHeight;
+                  const scrollHeight = container.scrollHeight;
+
+                  // Check if we're near the bottom (within 50px)
+                  const isNearBottom =
+                    scrollHeight - (scrollTop + clientHeight) < 50;
 
                   const start = Math.max(
                     0,
                     Math.floor(scrollTop / itemHeight) - overscan
                   );
-                  const end = Math.min(
-                    totalCount,
-                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
-                      overscan
-                  );
+
+                  let end;
+                  if (isNearBottom) {
+                    // If near bottom, always include all items to the end
+                    end = totalCount;
+                  } else {
+                    end = Math.min(
+                      totalCount,
+                      Math.ceil((scrollTop + clientHeight) / itemHeight) +
+                        overscan
+                    );
+                  }
 
                   setRange((currentRange) => {
                     if (
