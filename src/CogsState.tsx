@@ -436,7 +436,7 @@ export type OptionsType<T extends unknown = unknown> = {
   syncUpdate?: Partial<UpdateTypeDetail>;
 
   initialState?: T;
-  dependencies?: any[]; // Just like useEffect dependencies
+  dependencies?: any[];
 };
 export type ServerSyncType<T> = {
   testKey?: string;
