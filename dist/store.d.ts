@@ -11,6 +11,10 @@ type SyncLogType = {
     timeStamp: number;
 };
 type StateValue = any;
+export type TrieNode = {
+    subscribers: Set<string>;
+    children: Map<string, TrieNode>;
+};
 export type ComponentsType = {
     components: Map<string, {
         forceUpdate: () => void;
@@ -20,6 +24,7 @@ export type ComponentsType = {
         reactiveType: ReactivityType[] | ReactivityType;
         pathsInitialized?: boolean;
     }>;
+    pathTrie?: TrieNode;
 };
 export type FormRefStoreState = {
     formRefs: Map<string, React.RefObject<any>>;

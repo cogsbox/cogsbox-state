@@ -31,7 +31,12 @@ import superjson from "superjson";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
-import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
+import {
+  formRefStore,
+  getGlobalStore,
+  type ComponentsType,
+  type TrieNode,
+} from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
 
@@ -815,6 +820,50 @@ const getUpdateValues = (
       return { oldValue: null, newValue: null };
   }
 };
+
+function addToTrie(node: TrieNode, path: string, componentId: string): void {
+  const segments = path.split(".");
+  let current = node;
+
+  for (const segment of segments) {
+    if (!current.children.has(segment)) {
+      current.children.set(segment, {
+        subscribers: new Set<string>(),
+        children: new Map<string, TrieNode>(),
+      });
+    }
+    current = current.children.get(segment)!;
+  }
+  current.subscribers.add(componentId);
+}
+function removeFromTrie(
+  node: TrieNode,
+  path: string,
+  componentId: string
+): void {
+  const segments = path.split(".");
+  let current = node;
+
+  for (const segment of segments) {
+    current = current.children.get(segment)!;
+    if (!current) return;
+  }
+
+  current.subscribers.delete(componentId);
+}
+function getTrieSubscribers(node: TrieNode, path: string): Set<string> {
+  const segments = path.split(".");
+  const subscribers = new Set<string>(node.subscribers);
+
+  let current: TrieNode | undefined = node;
+  for (const segment of segments) {
+    current = current.children?.get(segment);
+    if (!current) break;
+    current.subscribers.forEach((sub) => subscribers.add(sub));
+  }
+
+  return subscribers;
+}
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -961,10 +1010,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
 
     const componentKey = `${thisKey}////${componentIdRef.current}`;
+
     const stateEntry = getGlobalStore
       .getState()
       .stateComponents.get(thisKey) || {
       components: new Map(),
+      pathTrie: {
+        subscribers: new Set<string>(),
+        children: new Map<string, TrieNode>(),
+      },
     };
 
     stateEntry.components.set(componentKey, {
@@ -974,7 +1028,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       depsFunction: reactiveDeps || undefined,
       reactiveType: reactiveType ?? ["component", "deps"],
     });
-
     getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
     //need to force update to create the stateUpdates references
     forceUpdate({});
@@ -1099,77 +1152,50 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
-      console.log("stateEntry >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", stateEntry);
-      if (stateEntry) {
+
+      if (stateEntry && stateEntry.pathTrie) {
         const changedPaths = getDifferences(prevValue, payload);
-        const changedPathsSet = new Set(changedPaths);
+
+        // Get all affected components using trie
+        const componentsToUpdate = new Set<string>();
+
+        // For each changed path, get subscribers
+        changedPaths.forEach((changedPath) => {
+          const subscribers = getTrieSubscribers(
+            stateEntry.pathTrie!,
+            changedPath
+          );
+          subscribers.forEach((sub) => componentsToUpdate.add(sub));
+        });
+
+        // Also check the primary path
         const primaryPathToCheck =
           updateObj.updateType === "update"
             ? path.join(".")
             : path.slice(0, -1).join(".") || "";
 
-        for (const [
-          componentKey,
-          component,
-        ] of stateEntry.components.entries()) {
-          let shouldUpdate = false;
-          const reactiveTypes = Array.isArray(component.reactiveType)
-            ? component.reactiveType
-            : [component.reactiveType || "component"];
-          console.log("component", component);
-          if (reactiveTypes.includes("none")) continue;
-          if (reactiveTypes.includes("all")) {
-            component.forceUpdate();
-            continue;
-          }
+        const primarySubscribers = getTrieSubscribers(
+          stateEntry.pathTrie!,
+          primaryPathToCheck
+        );
+        primarySubscribers.forEach((sub) => componentsToUpdate.add(sub));
+        console.log("componentsToUpdate", componentsToUpdate);
+        // Update components
+        componentsToUpdate.forEach((componentId) => {
+          const component = stateEntry.components.get(componentId);
+          if (component) {
+            const reactiveTypes = Array.isArray(component.reactiveType)
+              ? component.reactiveType
+              : [component.reactiveType || "component"];
 
-          if (reactiveTypes.includes("component")) {
-            if (
-              component.paths.has(primaryPathToCheck) ||
-              component.paths.has("")
-            ) {
-              shouldUpdate = true;
+            if (reactiveTypes.includes("none")) return;
+            if (reactiveTypes.includes("all")) {
+              component.forceUpdate();
+              return;
             }
 
-            if (!shouldUpdate) {
-              for (const changedPath of changedPathsSet) {
-                let currentPathToCheck = changedPath;
-                while (true) {
-                  if (component.paths.has(currentPathToCheck)) {
-                    shouldUpdate = true;
-                    break;
-                  }
-                  const lastDotIndex = currentPathToCheck.lastIndexOf(".");
-                  if (lastDotIndex !== -1) {
-                    const parentPath = currentPathToCheck.substring(
-                      0,
-                      lastDotIndex
-                    );
-                    if (
-                      !isNaN(
-                        Number(currentPathToCheck.substring(lastDotIndex + 1))
-                      )
-                    ) {
-                      if (component.paths.has(parentPath)) {
-                        shouldUpdate = true;
-                        break;
-                      }
-                    }
-                    currentPathToCheck = parentPath;
-                  } else {
-                    currentPathToCheck = "";
-                  }
-                  if (currentPathToCheck === "") {
-                    break;
-                  }
-                }
-                if (shouldUpdate) break;
-              }
-            }
-          }
-
-          if (!shouldUpdate && reactiveTypes.includes("deps")) {
-            if (component.depsFunction) {
+            // Handle deps reactivity
+            if (reactiveTypes.includes("deps") && component.depsFunction) {
               const depsResult = component.depsFunction(payload);
               let depsChanged = false;
               if (typeof depsResult === "boolean") {
@@ -1179,14 +1205,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 depsChanged = true;
               }
               if (depsChanged) {
-                shouldUpdate = true;
+                component.forceUpdate();
+                return;
               }
             }
+
+            // Component reactivity already handled by trie
+            if (reactiveTypes.includes("component")) {
+              component.forceUpdate();
+            }
           }
-          if (shouldUpdate) {
-            component.forceUpdate();
-          }
-        }
+        });
       }
       const timeStamp = Date.now();
 
@@ -1832,37 +1861,59 @@ function createProxyHandler<T>(
                 // This function IS a React Hook and must be called inside a component.
                 const register = () => {
                   const [, forceUpdate] = useState({});
-                  // This is stable and unique for this specific item in the list.
                   const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                  // This effect performs the one-time registration and cleanup.
                   useLayoutEffect(() => {
                     const fullComponentId = `${stateKey}////${itemComponentId}`;
                     const stateEntry = getGlobalStore
                       .getState()
                       .stateComponents.get(stateKey) || {
                       components: new Map(),
+                      pathTrie: {
+                        subscribers: new Set<string>(),
+                        children: new Map<string, TrieNode>(),
+                      },
                     };
 
                     stateEntry.components.set(fullComponentId, {
                       forceUpdate: () => forceUpdate({}),
-                      paths: new Set([finalPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
+                      paths: new Set([finalPath.join(".")]),
+                      deps: [],
+                      depsFunction: undefined,
+                      reactiveType: ["component"],
+                      pathsInitialized: true,
                     });
+
+                    // ADD TO TRIE
+                    if (stateEntry.pathTrie) {
+                      addToTrie(
+                        stateEntry.pathTrie,
+                        finalPath.join("."),
+                        fullComponentId
+                      );
+                    }
 
                     getGlobalStore
                       .getState()
                       .stateComponents.set(stateKey, stateEntry);
 
-                    // Cleanup function to un-register the component
                     return () => {
                       const currentEntry = getGlobalStore
                         .getState()
                         .stateComponents.get(stateKey);
                       if (currentEntry) {
                         currentEntry.components.delete(fullComponentId);
+                        // REMOVE FROM TRIE
+                        if (currentEntry.pathTrie) {
+                          removeFromTrie(
+                            currentEntry.pathTrie,
+                            finalPath.join("."),
+                            fullComponentId
+                          );
+                        }
                       }
                     };
-                  }, [stateKey, itemComponentId]); // Effect depends only on stable keys
+                  }, [stateKey, itemComponentId]);
                 };
 
                 // Call the user's function with the item, its setter, and the info object
@@ -2630,60 +2681,44 @@ export function $cogsSignalStore(proxy: {
         .getState()
         .stateComponents.get(proxy._stateKey) || {
         components: new Map(),
+        pathTrie: {
+          subscribers: new Set<string>(),
+          children: new Map<string, TrieNode>(),
+        },
       };
-      stateEntry.components.set(proxy._stateKey, {
+
+      const componentKey = `signal-${proxy._stateKey}-${Date.now()}`;
+
+      stateEntry.components.set(componentKey, {
         forceUpdate: notify,
         paths: new Set([proxy._path.join(".")]),
+        deps: [],
+        depsFunction: undefined,
+        reactiveType: ["component"],
+        pathsInitialized: true,
       });
-      return () => stateEntry.components.delete(proxy._stateKey);
+
+      // Add to trie
+      if (stateEntry.pathTrie) {
+        addToTrie(stateEntry.pathTrie, proxy._path.join("."), componentKey);
+      }
+
+      getGlobalStore
+        .getState()
+        .stateComponents.set(proxy._stateKey, stateEntry);
+
+      return () => {
+        stateEntry.components.delete(componentKey);
+        if (stateEntry.pathTrie) {
+          removeFromTrie(
+            stateEntry.pathTrie,
+            proxy._path.join("."),
+            componentKey
+          );
+        }
+      };
     },
     () => getGlobalStore.getState().getNestedState(proxy._stateKey, proxy._path)
   );
   return createElement("text", {}, String(value));
-}
-// This is an internal component. It should NOT be exported.
-function CogsItemWrapper({
-  stateKey,
-  itemComponentId,
-  itemPath,
-  children,
-}: {
-  stateKey: string;
-  itemComponentId: string;
-  itemPath: string[];
-  children: React.ReactNode;
-}) {
-  // This is a real component, so we can safely call hooks.
-  const [, forceUpdate] = useState({});
-
-  // We use useLayoutEffect to register the component and clean up when it unmounts.
-  useLayoutEffect(() => {
-    const fullComponentId = `${stateKey}////${itemComponentId}`;
-    const stateEntry = getGlobalStore
-      .getState()
-      .stateComponents.get(stateKey) || {
-      components: new Map(),
-    };
-
-    // Register the component with its unique ID and its specific, atomic path.
-    stateEntry.components.set(fullComponentId, {
-      forceUpdate: () => forceUpdate({}),
-      paths: new Set([itemPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
-    });
-
-    getGlobalStore.getState().stateComponents.set(stateKey, stateEntry);
-
-    // Return a cleanup function to unregister on unmount.
-    return () => {
-      const currentEntry = getGlobalStore
-        .getState()
-        .stateComponents.get(stateKey);
-      if (currentEntry) {
-        currentEntry.components.delete(fullComponentId);
-      }
-    };
-  }, [stateKey, itemComponentId, itemPath.join(".")]); // Effect dependency array is stable.
-
-  // Render the actual component the user provided.
-  return <>{children}</>;
 }

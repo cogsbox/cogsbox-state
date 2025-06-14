@@ -24,6 +24,10 @@ type SyncLogType = {
 };
 type StateValue = any;
 
+export type TrieNode = {
+  subscribers: Set<string>;
+  children: Map<string, TrieNode>;
+};
 export type ComponentsType = {
   components: Map<
     string,
@@ -36,6 +40,7 @@ export type ComponentsType = {
       pathsInitialized?: boolean;
     }
   >;
+  pathTrie?: TrieNode;
 };
 export type FormRefStoreState = {
   formRefs: Map<string, React.RefObject<any>>;
