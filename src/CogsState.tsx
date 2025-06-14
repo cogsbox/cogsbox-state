@@ -1484,10 +1484,32 @@ function createProxyHandler<T>(
         if (meta?.validIndices && !Array.isArray(currentState)) {
           meta = { ...meta, validIndices: undefined };
         }
+        const mutationMethods = new Set([
+          "insert",
+          "cut",
+          "cutByValue",
+          "toggleByValue",
+          "uniqueInsert",
+          "update",
+          "applyJsonPatch",
+          "setSelected",
+          "toggleSelected",
+          "clearSelected",
+          "sync",
+          "validateZodSchema",
+          "revertToInitialState",
+          "updateInitialState",
+          "removeValidation",
+          "setValidation",
+          "removeStorage",
+          "middleware",
+        ]);
+
         if (
           prop === "then" ||
-          prop[0] === "$" || // Faster than startsWith
-          prop === "stateMapNoRender"
+          prop[0] === "$" ||
+          prop === "stateMapNoRender" ||
+          mutationMethods.has(prop)
         ) {
           // Skip path tracking entirely
         } else {
