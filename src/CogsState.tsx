@@ -1787,13 +1787,10 @@ function createProxyHandler<T>(
               const wasAtBottomRef = useRef(true);
               const [range, setRange] = useState({
                 startIndex: 0,
-                endIndex: 0,
+                endIndex: 10, // Start with some visible items
               });
 
-              // Force a re-render when the source array changes
-              const [arrayVersion, setArrayVersion] = useState(0);
-
-              // Get the source array and watch for changes
+              // Get the source array directly
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
                 path
@@ -1801,51 +1798,45 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              // Track array length changes to trigger virtualState recreation
-              const prevLengthRef = useRef(totalCount);
-              useEffect(() => {
-                if (prevLengthRef.current !== totalCount) {
-                  prevLengthRef.current = totalCount;
-                  setArrayVersion((v) => v + 1);
-                }
-              }, [totalCount]);
-
-              // Create virtual state with dependencies on both range AND array changes
+              // Create a virtual state that actually returns the sliced data
               const virtualState = useMemo(() => {
-                // Get a fresh proxy to the original array
-                const originalProxy = rebuildStateShape(
-                  sourceArray as any, // Use the actual current array
-                  path,
-                  meta
+                // Create a proxy that returns a sliced version of the array
+                const virtualArray = sourceArray.slice(
+                  range.startIndex,
+                  range.endIndex
                 );
 
-                // Use stateFilter with the current range
-                return originalProxy.stateFilter((_: any, index: number) => {
-                  return index >= range.startIndex && index < range.endIndex;
-                });
-              }, [
-                range.startIndex,
-                range.endIndex,
-                arrayVersion,
-                sourceArray.length,
-              ]);
+                // Build a new proxy for this sliced array with adjusted indices
+                const virtualMeta = {
+                  validIndices: Array.from(
+                    { length: range.endIndex - range.startIndex },
+                    (_, i) => range.startIndex + i
+                  ),
+                };
 
-              // All the scroll handling remains the same
+                return rebuildStateShape(
+                  virtualArray as any,
+                  path,
+                  virtualMeta
+                );
+              }, [range.startIndex, range.endIndex, totalCount]); // Include totalCount to trigger updates
+
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 const calculateRange = () => {
+                  const scrollTop = container.scrollTop;
+                  const clientHeight = container.clientHeight;
+
                   const start = Math.max(
                     0,
-                    Math.floor(container.scrollTop / itemHeight) - overscan
+                    Math.floor(scrollTop / itemHeight) - overscan
                   );
                   const end = Math.min(
                     totalCount,
-                    Math.ceil(
-                      (container.scrollTop + container.clientHeight) /
-                        itemHeight
-                    ) + overscan
+                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
+                      overscan
                   );
 
                   setRange((currentRange) => {
@@ -1860,21 +1851,30 @@ function createProxyHandler<T>(
                 };
 
                 const handleScroll = () => {
+                  const container = containerRef.current;
+                  if (!container) return;
+
                   wasAtBottomRef.current =
                     container.scrollHeight > 0 &&
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                      1;
+                    Math.abs(
+                      container.scrollHeight -
+                        container.scrollTop -
+                        container.clientHeight
+                    ) < 1;
+
                   calculateRange();
                 };
 
+                // Initial calculation
                 calculateRange();
+
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
 
-                const observer = new ResizeObserver(handleScroll);
+                const observer = new ResizeObserver(() => {
+                  calculateRange();
+                });
                 observer.observe(container);
 
                 return () => {
@@ -1884,20 +1884,29 @@ function createProxyHandler<T>(
               }, [totalCount, itemHeight, overscan]);
 
               const scrollTo = useCallback(
-                (p: number, b: ScrollBehavior = "auto") =>
-                  containerRef.current?.scrollTo({ top: p, behavior: b }),
+                (p: number, b: ScrollBehavior = "auto") => {
+                  containerRef.current?.scrollTo({ top: p, behavior: b });
+                },
                 []
               );
+
               const scrollToBottom = useCallback(
                 (b: ScrollBehavior = "smooth") => {
-                  if (containerRef.current)
-                    scrollTo(containerRef.current.scrollHeight, b);
+                  const container = containerRef.current;
+                  if (container) {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: b,
+                    });
+                  }
                 },
-                [scrollTo]
+                []
               );
+
               const scrollToIndex = useCallback(
-                (i: number, b: ScrollBehavior = "smooth") =>
-                  scrollTo(i * itemHeight, b),
+                (i: number, b: ScrollBehavior = "smooth") => {
+                  scrollTo(i * itemHeight, b);
+                },
                 [scrollTo, itemHeight]
               );
 
@@ -1905,36 +1914,34 @@ function createProxyHandler<T>(
                 if (stickToBottom && wasAtBottomRef.current) {
                   scrollToBottom("auto");
                 }
-              }, [sourceArray, stickToBottom, scrollToBottom]);
+              }, [totalCount, stickToBottom, scrollToBottom]);
 
-              const virtualizerProps = useMemo(
-                () => ({
-                  outer: {
-                    ref: containerRef,
-                    style: {
-                      overflowY: "auto",
-                      position: "relative",
-                    } as CSSProperties,
+              const virtualizerProps = {
+                outer: {
+                  ref: containerRef,
+                  style: {
+                    overflowY: "auto" as const,
+                    position: "relative" as const,
+                    height: "100%",
                   },
-                  inner: {
-                    style: {
-                      position: "relative",
-                      height: `${totalHeight}px`,
-                      width: "100%",
-                    } as CSSProperties,
+                },
+                inner: {
+                  style: {
+                    position: "relative" as const,
+                    height: `${totalHeight}px`,
+                    width: "100%",
                   },
-                  list: {
-                    style: {
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${range.startIndex * itemHeight}px)`,
-                    } as CSSProperties,
+                },
+                list: {
+                  style: {
+                    position: "absolute" as const,
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    transform: `translateY(${range.startIndex * itemHeight}px)`,
                   },
-                }),
-                [totalHeight, range.startIndex, itemHeight]
-              );
+                },
+              };
 
               return {
                 virtualState,
