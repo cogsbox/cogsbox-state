@@ -1846,26 +1846,14 @@ function createProxyHandler<T>(
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                // The third argument is an info object with the register function
-                info: {
-                  register: () => void;
-                  index: number;
-                  originalIndex: number;
-                }
-              ) => any
+                index: number,
+                array: T,
+                arraySetter: StateObject<T>
+              ) => void
             ) => {
               const arrayToMap = getGlobalStore
                 .getState()
                 .getNestedState(stateKey, path) as any[];
-
-              // Defensive check to make sure we are mapping over an array
-              if (!Array.isArray(arrayToMap)) {
-                console.warn(
-                  `stateMap called on a non-array value at path: ${path.join(".")}. The current value is:`,
-                  arrayToMap
-                );
-                return null;
-              }
 
               return arrayToMap.map((item, index) => {
                 let originalIndex: number;
@@ -1877,74 +1865,41 @@ function createProxyHandler<T>(
                 } else {
                   originalIndex = index;
                 }
-
                 const finalPath = [...path, originalIndex.toString()];
                 const setter = rebuildStateShape(item, finalPath, meta);
 
-                // Create the register function right here. It closes over the necessary variables.
-                // This function IS a React Hook and must be called inside a component.
-                const register = () => {
-                  const [, forceUpdate] = useState({});
-                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                // Auto-register the component
+                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                const fullComponentId = `${stateKey}////${itemComponentId}`;
 
-                  useLayoutEffect(() => {
-                    const fullComponentId = `${stateKey}////${itemComponentId}`;
-                    const stateEntry = getGlobalStore
-                      .getState()
-                      .stateComponents.get(stateKey) || {
-                      components: new Map(),
-                      pathTrie: {
-                        subscribers: new Set<string>(),
-                        children: new Map<string, TrieNode>(),
-                      },
-                    };
+                // Register immediately (not in a hook)
+                const stateEntry = getGlobalStore
+                  .getState()
+                  .stateComponents.get(stateKey);
+                if (stateEntry && stateEntry.pathTrie) {
+                  // Add a basic registration for this item
+                  stateEntry.components.set(fullComponentId, {
+                    forceUpdate: () => {}, // This will be updated when component mounts
+                    paths: new Set([finalPath.join(".")]),
+                    deps: [],
+                    depsFunction: undefined,
+                    reactiveType: ["component"],
+                  });
+                  addToTrie(
+                    stateEntry.pathTrie,
+                    finalPath.join("."),
+                    fullComponentId
+                  );
+                }
 
-                    stateEntry.components.set(fullComponentId, {
-                      forceUpdate: () => forceUpdate({}),
-                      paths: new Set([finalPath.join(".")]),
-                      deps: [],
-                      depsFunction: undefined,
-                      reactiveType: ["component"],
-                    });
-
-                    // ADD TO TRIE
-                    if (stateEntry.pathTrie) {
-                      addToTrie(
-                        stateEntry.pathTrie,
-                        finalPath.join("."),
-                        fullComponentId
-                      );
-                    }
-
-                    getGlobalStore
-                      .getState()
-                      .stateComponents.set(stateKey, stateEntry);
-
-                    return () => {
-                      const currentEntry = getGlobalStore
-                        .getState()
-                        .stateComponents.get(stateKey);
-                      if (currentEntry) {
-                        currentEntry.components.delete(fullComponentId);
-                        // REMOVE FROM TRIE
-                        if (currentEntry.pathTrie) {
-                          removeFromTrie(
-                            currentEntry.pathTrie,
-                            finalPath.join("."),
-                            fullComponentId
-                          );
-                        }
-                      }
-                    };
-                  }, [stateKey, itemComponentId]);
-                };
-
-                // Call the user's function with the item, its setter, and the info object
-                return callbackfn(item, setter, {
-                  register,
+                // Call with original signature
+                return callbackfn(
+                  item,
+                  setter,
                   index,
-                  originalIndex,
-                });
+                  arrayToMap as any,
+                  rebuildStateShape(arrayToMap as any, path, meta)
+                );
               });
             };
           }
