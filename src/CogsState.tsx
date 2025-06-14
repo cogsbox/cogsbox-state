@@ -1523,28 +1523,27 @@ function createProxyHandler<T>(
             if (component) {
               // If we already track root, no need to track anything else
               if (component.paths.has("")) {
-                return;
-              }
-
-              // Build the current path including the property being accessed
-              const currentPath = path.join(".");
-              // Check if we need to add this path
-              let needsAdd = true;
-              for (const existingPath of component.paths) {
-                // If we already track this exact path or a parent of it
-                if (
-                  currentPath.startsWith(existingPath) &&
-                  (currentPath === existingPath ||
-                    currentPath[existingPath.length] === ".")
-                ) {
-                  needsAdd = false;
-                  break;
+              } else {
+                // Build the current path including the property being accessed
+                const currentPath = path.join(".");
+                // Check if we need to add this path
+                let needsAdd = true;
+                for (const existingPath of component.paths) {
+                  // If we already track this exact path or a parent of it
+                  if (
+                    currentPath.startsWith(existingPath) &&
+                    (currentPath === existingPath ||
+                      currentPath[existingPath.length] === ".")
+                  ) {
+                    needsAdd = false;
+                    break;
+                  }
                 }
-              }
 
-              if (needsAdd) {
-                console.log("adding path addimg", currentPath, prop);
-                component.paths.add(currentPath);
+                if (needsAdd) {
+                  console.log("adding path addimg", currentPath, prop);
+                  component.paths.add(currentPath);
+                }
               }
             }
           }

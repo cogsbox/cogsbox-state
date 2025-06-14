@@ -514,9 +514,7 @@ function re(e, i, v, u) {
           const l = `${e}////${v}`, t = r.getState().stateComponents.get(e);
           if (t) {
             const a = t.components.get(l);
-            if (a) {
-              if (a.paths.has(""))
-                return;
+            if (a && !a.paths.has("")) {
               const o = n.join(".");
               let d = !0;
               for (const I of a.paths)
