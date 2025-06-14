@@ -223,7 +223,7 @@ export function getDifferences(
   if (Array.isArray(obj1) && Array.isArray(obj2)) {
     // Handle changes in length directly
     if (obj1.length !== obj2.length) {
-      differences.push(`${currentPath}.length`);
+      differences.push(`${currentPath}`);
     }
 
     // Use the shorter length for comparison to detect shifts or changes

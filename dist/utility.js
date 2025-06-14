@@ -1,4 +1,4 @@
-const a = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, A = (e) => typeof e == "function", y = (e) => Array.isArray(e), g = (e, r, n = {}, t = []) => {
+const a = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, A = (e) => typeof e == "function", y = (e) => Array.isArray(e), d = (e, r, n = {}, t = []) => {
   if (a(e) && a(r)) {
     const i = Object.keys(e), l = Object.keys(r);
     if (i.length !== l.length)
@@ -8,7 +8,7 @@ const a = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, A
       if (!(f in e) || !(f in r))
         return !1;
       const c = [...t, f];
-      if (!g(o, s, n, c))
+      if (!d(o, s, n, c))
         return !1;
     }
     return !0;
@@ -16,7 +16,7 @@ const a = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, A
     if (e.length !== r.length)
       return !1;
     for (let i = 0; i < e.length; i++)
-      if (!g(e[i], r[i], n, [
+      if (!d(e[i], r[i], n, [
         ...t,
         i.toString()
       ]))
@@ -25,7 +25,7 @@ const a = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, A
   } else
     return e === r || Number.isNaN(e) && Number.isNaN(r);
 };
-function d(e, r, n) {
+function g(e, r, n) {
   if (!e || e.length === 0) return n;
   const t = e[0], i = e.slice(1);
   if (Array.isArray(r)) {
@@ -33,7 +33,7 @@ function d(e, r, n) {
     if (!isNaN(l) && l >= 0 && l < r.length)
       return [
         ...r.slice(0, l),
-        d(i, r[l], n),
+        g(i, r[l], n),
         ...r.slice(l + 1)
       ];
     throw console.log("errorstate", r, e), new Error(
@@ -43,7 +43,7 @@ function d(e, r, n) {
     if (t && t in r)
       return {
         ...r,
-        [t]: d(i, r[t], n)
+        [t]: g(i, r[t], n)
       };
     throw console.log("Invalid property", t, i, e), new Error(
       `Invalid property "${t}" in path "${e.join(".")}".`
@@ -111,7 +111,7 @@ function u(e, r, n = "") {
   if (typeof e != "object" || typeof r != "object")
     return e !== r ? [n] : t;
   if (Array.isArray(e) && Array.isArray(r)) {
-    e.length !== r.length && t.push(`${n}.length`);
+    e.length !== r.length && t.push(`${n}`);
     const o = Math.min(e.length, r.length);
     for (let s = 0; s < o; s++)
       e[s] !== r[s] && (t = t.concat(
@@ -190,10 +190,10 @@ export {
   $ as getDifferencesArray,
   w as getNestedValue,
   y as isArray,
-  g as isDeepEqual,
+  d as isDeepEqual,
   A as isFunction,
   a as isObject,
   v as transformStateFunc,
-  d as updateNestedProperty
+  g as updateNestedProperty
 };
 //# sourceMappingURL=utility.js.map
