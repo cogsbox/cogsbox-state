@@ -1545,9 +1545,8 @@ function createProxyHandler<T>(
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
 
-            if (component && !component.pathsInitialized) {
+            if (component) {
               // Mark as initialized immediately to prevent re-processing
-              component.pathsInitialized = true;
 
               // Now do the path tracking logic ONCE
               if (!component.paths.has("")) {
@@ -1565,17 +1564,32 @@ function createProxyHandler<T>(
                 }
 
                 if (needsAdd) {
+                  console.log(
+                    "ADDING PATH:",
+                    currentPath,
+                    "for component:",
+                    fullComponentId
+                  );
                   component.paths.add(currentPath);
-                  // ADD TO TRIE HERE!
+
                   const stateEntry = getGlobalStore
                     .getState()
                     .stateComponents.get(stateKey);
+
                   if (stateEntry && stateEntry.pathTrie) {
+                    console.log(
+                      "ADDING TO TRIE:",
+                      currentPath,
+                      fullComponentId
+                    );
                     addToTrie(
                       stateEntry.pathTrie,
                       currentPath,
                       fullComponentId
                     );
+                    console.log("TRIE AFTER ADD:", stateEntry.pathTrie);
+                  } else {
+                    console.log("NO TRIE FOUND for state:", stateKey);
                   }
                 }
               }
@@ -1890,7 +1904,6 @@ function createProxyHandler<T>(
                       deps: [],
                       depsFunction: undefined,
                       reactiveType: ["component"],
-                      pathsInitialized: true,
                     });
 
                     // ADD TO TRIE
@@ -2704,7 +2717,6 @@ export function $cogsSignalStore(proxy: {
         deps: [],
         depsFunction: undefined,
         reactiveType: ["component"],
-        pathsInitialized: true,
       });
 
       // Add to trie
