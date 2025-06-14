@@ -1883,32 +1883,23 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 const calculateRange = () => {
+                  if (!container) return;
+
                   const scrollTop = container.scrollTop;
                   const clientHeight = container.clientHeight;
-                  const scrollHeight = container.scrollHeight;
 
-                  // Check if we're near the bottom (within 50px)
-                  const isNearBottom =
-                    scrollHeight - (scrollTop + clientHeight) < 50;
-
-                  const start = Math.max(
-                    0,
-                    Math.floor(scrollTop / itemHeight) - overscan
+                  // Calculate the theoretical visible range
+                  const visibleStart = Math.floor(scrollTop / itemHeight);
+                  const visibleEnd = Math.ceil(
+                    (scrollTop + clientHeight) / itemHeight
                   );
 
-                  let end;
-                  if (isNearBottom) {
-                    // If near bottom, always include all items to the end
-                    end = totalCount;
-                  } else {
-                    end = Math.min(
-                      totalCount,
-                      Math.ceil((scrollTop + clientHeight) / itemHeight) +
-                        overscan
-                    );
-                  }
+                  // Apply overscan
+                  const start = Math.max(0, visibleStart - overscan);
+                  const end = Math.min(totalCount, visibleEnd + overscan);
 
                   setRange((currentRange) => {
+                    // Only update if there's a meaningful change
                     if (
                       currentRange.startIndex === start &&
                       currentRange.endIndex === end
@@ -1919,20 +1910,20 @@ function createProxyHandler<T>(
                   });
                 };
 
-                const handleScroll = () => {
+                const handleScroll = debounce(() => {
                   const container = containerRef.current;
                   if (!container) return;
 
-                  wasAtBottomRef.current =
-                    container.scrollHeight > 0 &&
-                    Math.abs(
-                      container.scrollHeight -
-                        container.scrollTop -
-                        container.clientHeight
-                    ) < 1;
+                  // Update the "at bottom" status
+                  const atBottom =
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
+                  wasAtBottomRef.current = atBottom;
 
                   calculateRange();
-                };
+                }, 10); // Small debounce to prevent too many calculations
 
                 // Initial calculation
                 calculateRange();
@@ -1941,14 +1932,18 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                const observer = new ResizeObserver(calculateRange);
+                const observer = new ResizeObserver(() => {
+                  calculateRange();
+                });
                 observer.observe(container);
 
                 // Auto-scroll to bottom if needed
-                if (stickToBottom && wasAtBottomRef.current) {
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "auto",
+                if (stickToBottom && wasAtBottomRef.current && totalCount > 0) {
+                  requestAnimationFrame(() => {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
+                    });
                   });
                 }
 
