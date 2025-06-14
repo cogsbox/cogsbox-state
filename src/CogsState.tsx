@@ -1798,7 +1798,77 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === "stateMap" || prop === "stateMapNoRender") {
+          // 1. The new logic, ONLY for `stateMap`
+          if (prop === "stateMap") {
+            return (
+              callbackfn: (
+                value: InferArrayElement<T>,
+                setter: StateObject<InferArrayElement<T>>,
+                info: {
+                  register: () => void;
+                  index: number;
+                  originalIndex: number;
+                }
+              ) => any
+            ) => {
+              const arrayToMap = currentState as any[];
+              return arrayToMap.map((item, index) => {
+                let originalIndex: number;
+                if (
+                  meta?.validIndices &&
+                  meta.validIndices[index] !== undefined
+                ) {
+                  originalIndex = meta.validIndices[index]!;
+                } else {
+                  originalIndex = index;
+                }
+
+                const finalPath = [...path, originalIndex.toString()];
+                const setter = rebuildStateShape(item, finalPath, meta);
+
+                const register = () => {
+                  const [, forceUpdate] = useState({});
+                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+
+                  useLayoutEffect(() => {
+                    const fullComponentId = `${stateKey}////${itemComponentId}`;
+                    const stateEntry = getGlobalStore
+                      .getState()
+                      .stateComponents.get(stateKey) || {
+                      components: new Map(),
+                    };
+
+                    stateEntry.components.set(fullComponentId, {
+                      forceUpdate: () => forceUpdate({}),
+                      paths: new Set([""]),
+                    });
+
+                    getGlobalStore
+                      .getState()
+                      .stateComponents.set(stateKey, stateEntry);
+
+                    return () => {
+                      const currentEntry = getGlobalStore
+                        .getState()
+                        .stateComponents.get(stateKey);
+                      if (currentEntry) {
+                        currentEntry.components.delete(fullComponentId);
+                      }
+                    };
+                  }, [stateKey, itemComponentId]);
+                };
+
+                return callbackfn(item, setter, {
+                  register,
+                  index,
+                  originalIndex,
+                });
+              });
+            };
+          }
+
+          // 2. The previous, simple logic, ONLY for `stateMapNoRender`
+          if (prop === "stateMapNoRender") {
             return (
               callbackfn: (
                 value: InferArrayElement<T>,
@@ -1811,7 +1881,6 @@ function createProxyHandler<T>(
               const arrayToMap = currentState as any[];
               return arrayToMap.map((item, index) => {
                 let originalIndex: number;
-                // We READ from the meta object using the CORRECT property name: `validIndices`.
                 if (
                   meta?.validIndices &&
                   meta.validIndices[index] !== undefined
@@ -1822,7 +1891,8 @@ function createProxyHandler<T>(
                 }
                 const finalPath = [...path, originalIndex.toString()];
 
-                const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
+                const setter = rebuildStateShape(item, finalPath, meta);
+
                 return callbackfn(
                   item,
                   setter,
@@ -2031,14 +2101,6 @@ function createProxyHandler<T>(
 
         if (prop === "get") {
           return () => getGlobalStore.getState().getNestedState(stateKey, path);
-        }
-        if (prop === "$derive") {
-          return (fn: any) =>
-            $cogsSignal({
-              _stateKey: stateKey,
-              _path: path,
-              _effect: fn.toString(),
-            });
         }
 
         if (prop === "$derive") {
