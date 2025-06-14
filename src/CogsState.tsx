@@ -1504,15 +1504,13 @@ function createProxyHandler<T>(
           "removeStorage",
           "middleware",
         ]);
-
         if (
-          prop === "then" ||
-          prop[0] === "$" ||
-          prop === "stateMapNoRender" ||
-          !mutationMethods.has(prop)
+          prop !== "then" &&
+          !prop.startsWith("$") &&
+          prop !== "stateMapNoRender" &&
+          !mutationMethods.has(prop) // ADD THIS CHECK
         ) {
-          // Skip path tracking entirely
-        } else {
+          console.log("adding path start", path, prop);
           // Only compute these if needed
           const fullComponentId = `${stateKey}////${componentId}`;
           const stateEntry = getGlobalStore
@@ -1546,7 +1544,7 @@ function createProxyHandler<T>(
               }
 
               if (needsAdd) {
-                console.log("adding path", currentPath, prop);
+                console.log("adding path addimg", currentPath, prop);
                 component.paths.add(currentPath);
               }
             }
