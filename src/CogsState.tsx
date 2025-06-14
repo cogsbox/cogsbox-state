@@ -3,13 +3,16 @@
 import {
   createElement,
   startTransition,
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
   type ReactNode,
+  type RefObject,
 } from "react";
 
 import {
@@ -37,6 +40,63 @@ import { applyPatch } from "fast-json-patch";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
+export type VirtualizerOptions = {
+  /**
+   * The fixed height of each item in pixels.
+   * @required
+   */
+  itemHeight: number;
+  /**
+   * The number of items to render above and below the visible viewport.
+   * @default 5
+   */
+  overscan?: number;
+  /**
+   * If true, the list will automatically scroll to the bottom when new items are added
+   * and the user was already at the bottom. Ideal for chat.
+   * @default false
+   */
+  stickToBottom?: boolean;
+};
+
+export type VirtualizerResult<T> = {
+  /**
+   * The array of items that should be rendered in the viewport.
+   */
+  virtualItems: {
+    value: T;
+    setter: StateObject<T>;
+    originalIndex: number;
+  }[];
+  /**
+   * An object containing props that should be spread onto your DOM elements
+   * to enable virtualization.
+   */
+  virtualizerProps: {
+    outer: {
+      ref: RefObject<HTMLDivElement>;
+      style: CSSProperties;
+    };
+    inner: {
+      style: CSSProperties;
+    };
+    list: {
+      style: CSSProperties;
+    };
+  };
+  /**
+   * A function to programmatically scroll to the bottom of the list.
+   */
+  scrollToBottom: (behavior?: ScrollBehavior) => void;
+  /**
+   * A function to programmatically scroll to a specific item index.
+   */
+  scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
+  /**
+   * A function to programmatically scroll to a specific pixel position.
+   */
+  scrollTo: (position: number, behavior?: ScrollBehavior) => void;
+};
 export type ServerSyncStatus = {
   isFresh: boolean;
   isFreshTime: number;
@@ -138,7 +198,9 @@ export type ArrayEndType<TShape extends unknown> = {
       b: InferArrayElement<TShape>
     ) => number
   ) => ArrayEndType<TShape>;
-
+  useVirtualizer: (
+    options: VirtualizerOptions
+  ) => VirtualizerResult<InferArrayElement<TShape>>;
   stateMapNoRender: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1735,6 +1797,193 @@ function createProxyHandler<T>(
               return selectedIndex ?? -1;
             };
           }
+
+          if (prop === "useVirtualizer") {
+            // This method IS a React hook.
+            return (options: VirtualizerOptions) => {
+              const {
+                itemHeight,
+                overscan = 5,
+                stickToBottom = false,
+              } = options;
+
+              // Runtime check for safety, even with TS.
+              if (typeof itemHeight !== "number" || itemHeight <= 0) {
+                throw new Error(
+                  "[cogs-state] `useVirtualizer` requires a positive number for the `itemHeight` option."
+                );
+              }
+
+              // 1. INTERNAL STATE AND REFS
+              const containerRef = useRef<HTMLDivElement | null>(null);
+              const wasAtBottomRef = useRef(true);
+              const [viewport, setViewport] = useState({
+                scrollPosition: 0,
+                containerHeight: 0,
+              });
+
+              // 2. DATA SOURCE & DERIVATION
+              const sourceArray =
+                (getGlobalStore
+                  .getState()
+                  .getNestedState(stateKey, path) as T[]) || [];
+              const totalCount = sourceArray.length;
+              const totalHeight = totalCount * itemHeight;
+
+              // 3. CALCULATE VIRTUAL RANGE
+              const { startIndex, endIndex } = useMemo(() => {
+                const start = Math.max(
+                  0,
+                  Math.floor(viewport.scrollPosition / itemHeight) - overscan
+                );
+                const end = Math.min(
+                  totalCount,
+                  Math.ceil(
+                    (viewport.scrollPosition + viewport.containerHeight) /
+                      itemHeight
+                  ) + overscan
+                );
+                return { startIndex: start, endIndex: end };
+              }, [
+                viewport.scrollPosition,
+                viewport.containerHeight,
+                totalCount,
+                itemHeight,
+                overscan,
+              ]);
+
+              // 4. GET VIRTUAL ITEMS (Encapsulated Slicing Logic)
+              const virtualItems = useMemo(() => {
+                if (totalCount === 0) return [];
+                const count = endIndex - startIndex;
+                if (count <= 0) return [];
+
+                const slicedRawItems = sourceArray.slice(startIndex, count);
+
+                return slicedRawItems.map((item, localIndex) => {
+                  const originalIndex = startIndex + localIndex;
+                  const finalPath = [...path, originalIndex.toString()];
+                  const setter = rebuildStateShape(item, finalPath, meta);
+
+                  return {
+                    value: item,
+                    setter: setter,
+                    originalIndex: originalIndex,
+                  };
+                });
+              }, [startIndex, endIndex, sourceArray, path.join("."), stateKey]);
+
+              // 5. CONTROL FUNCTIONS
+              const scrollTo = useCallback(
+                (position: number, behavior: ScrollBehavior = "auto") => {
+                  containerRef.current?.scrollTo({ top: position, behavior });
+                },
+                []
+              );
+
+              const scrollToBottom = useCallback(
+                (behavior: ScrollBehavior = "smooth") => {
+                  if (containerRef.current) {
+                    scrollTo(containerRef.current.scrollHeight, behavior);
+                  }
+                },
+                [scrollTo]
+              );
+
+              const scrollToIndex = useCallback(
+                (index: number, behavior: ScrollBehavior = "smooth") => {
+                  scrollTo(index * itemHeight, behavior);
+                },
+                [scrollTo, itemHeight]
+              );
+
+              // 6. BINDINGS & EFFECTS
+              useLayoutEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                const handleScroll = () => {
+                  const scrollTop = container.scrollTop;
+                  const scrollHeight = container.scrollHeight;
+                  const clientHeight = container.clientHeight;
+                  wasAtBottomRef.current =
+                    scrollHeight > 0 &&
+                    scrollHeight - scrollTop - clientHeight < 1;
+                  setViewport((v) =>
+                    v.scrollPosition === scrollTop
+                      ? v
+                      : { ...v, scrollPosition: scrollTop }
+                  );
+                };
+                handleScroll();
+                container.addEventListener("scroll", handleScroll, {
+                  passive: true,
+                });
+
+                const observer = new ResizeObserver((entries) => {
+                  const entry = entries[0];
+                  if (entry) {
+                    setViewport((v) =>
+                      v.containerHeight === entry.contentRect.height
+                        ? v
+                        : { ...v, containerHeight: entry.contentRect.height }
+                    );
+                  }
+                });
+                observer.observe(container);
+
+                return () => {
+                  container.removeEventListener("scroll", handleScroll);
+                  observer.disconnect();
+                };
+              }, []);
+
+              useLayoutEffect(() => {
+                if (stickToBottom && wasAtBottomRef.current) {
+                  scrollToBottom("auto");
+                }
+              }, [totalCount, stickToBottom, scrollToBottom]);
+
+              // 7. THE RETURNED API
+              const virtualizerProps = useMemo(
+                () => ({
+                  outer: {
+                    ref: containerRef,
+                    style: {
+                      overflowY: "auto",
+                      position: "relative",
+                    } as CSSProperties,
+                  },
+                  inner: {
+                    style: {
+                      position: "relative",
+                      height: `${totalHeight}px`,
+                      width: "100%",
+                    } as CSSProperties,
+                  },
+                  list: {
+                    style: {
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      transform: `translateY(${startIndex * itemHeight}px)`,
+                    } as CSSProperties,
+                  },
+                }),
+                [totalHeight, startIndex, itemHeight]
+              );
+
+              return {
+                virtualItems,
+                virtualizerProps,
+                scrollToBottom,
+                scrollToIndex,
+                scrollTo,
+              };
+            };
+          }
+          // ... other array methods like stateMap, stateFilter, etc.
           if (prop === "stateSort") {
             return (
               compareFn: (
