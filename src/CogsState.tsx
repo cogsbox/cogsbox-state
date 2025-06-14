@@ -1478,6 +1478,9 @@ function createProxyHandler<T>(
       },
 
       get(target: any, prop: string) {
+        if (meta?.validIndices && !Array.isArray(currentState)) {
+          meta = { ...meta, validIndices: undefined };
+        }
         if (
           prop !== "then" &&
           !prop.startsWith("$") &&
@@ -1661,7 +1664,7 @@ function createProxyHandler<T>(
             if (meta?.validIndices) {
               return (currentState as any[]).map((item, index) => ({
                 item,
-                originalIndex: meta.validIndices![index]!,
+                originalIndex: meta!.validIndices![index]!,
               }));
             }
             // Otherwise, this is the first operation. Use the full array from the global store.
