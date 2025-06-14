@@ -1797,21 +1797,17 @@ function createProxyHandler<T>(
               return rebuildStateShape(newCurrentState as any, path, newMeta);
             };
           }
-
-          // 1. The new logic, ONLY for `stateMap`
+          // This code goes inside the `get` trap of `createProxyHandler`
           if (prop === "stateMap") {
             return (
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                info: {
-                  register: () => void;
-                  index: number;
-                  originalIndex: number;
-                }
-              ) => any
+                index: number
+              ) => React.ReactNode // Your callback returns the JSX to render
             ) => {
               const arrayToMap = currentState as any[];
+
               return arrayToMap.map((item, index) => {
                 let originalIndex: number;
                 if (
@@ -1823,51 +1819,32 @@ function createProxyHandler<T>(
                   originalIndex = index;
                 }
 
+                // The specific path for this individual item in the array.
                 const finalPath = [...path, originalIndex.toString()];
+
+                // The proxy for this item, which can be used for updates.
                 const setter = rebuildStateShape(item, finalPath, meta);
 
-                const register = () => {
-                  const [, forceUpdate] = useState({});
-                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                // A stable and unique ID for this item's wrapper component.
+                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                  useLayoutEffect(() => {
-                    const fullComponentId = `${stateKey}////${itemComponentId}`;
-                    const stateEntry = getGlobalStore
-                      .getState()
-                      .stateComponents.get(stateKey) || {
-                      components: new Map(),
-                    };
+                // Call the user's render function to get their actual component JSX.
+                const userComponentJsx = callbackfn(item, setter, index);
 
-                    stateEntry.components.set(fullComponentId, {
-                      forceUpdate: () => forceUpdate({}),
-                      paths: new Set([""]),
-                    });
-
-                    getGlobalStore
-                      .getState()
-                      .stateComponents.set(stateKey, stateEntry);
-
-                    return () => {
-                      const currentEntry = getGlobalStore
-                        .getState()
-                        .stateComponents.get(stateKey);
-                      if (currentEntry) {
-                        currentEntry.components.delete(fullComponentId);
-                      }
-                    };
-                  }, [stateKey, itemComponentId]);
-                };
-
-                return callbackfn(item, setter, {
-                  register,
-                  index,
-                  originalIndex,
-                });
+                // Transparently wrap the user's component in our internal registration component.
+                return (
+                  <CogsItemWrapper
+                    key={originalIndex} // The wrapper itself needs a key for React's mapping.
+                    stateKey={stateKey}
+                    itemComponentId={itemComponentId}
+                    itemPath={finalPath} // Pass the specific path for atomic updates.
+                  >
+                    {userComponentJsx}
+                  </CogsItemWrapper>
+                );
               });
             };
           }
-
-          // 2. The previous, simple logic, ONLY for `stateMapNoRender`
           if (prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -1881,6 +1858,7 @@ function createProxyHandler<T>(
               const arrayToMap = currentState as any[];
               return arrayToMap.map((item, index) => {
                 let originalIndex: number;
+                // We READ from the meta object using the CORRECT property name: `validIndices`.
                 if (
                   meta?.validIndices &&
                   meta.validIndices[index] !== undefined
@@ -1891,8 +1869,7 @@ function createProxyHandler<T>(
                 }
                 const finalPath = [...path, originalIndex.toString()];
 
-                const setter = rebuildStateShape(item, finalPath, meta);
-
+                const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
                 return callbackfn(
                   item,
                   setter,
@@ -2634,4 +2611,50 @@ export function $cogsSignalStore(proxy: {
     () => getGlobalStore.getState().getNestedState(proxy._stateKey, proxy._path)
   );
   return createElement("text", {}, String(value));
+}
+// This is an internal component. It should NOT be exported.
+function CogsItemWrapper({
+  stateKey,
+  itemComponentId,
+  itemPath,
+  children,
+}: {
+  stateKey: string;
+  itemComponentId: string;
+  itemPath: string[];
+  children: React.ReactNode;
+}) {
+  // This is a real component, so we can safely call hooks.
+  const [, forceUpdate] = useState({});
+
+  // We use useLayoutEffect to register the component and clean up when it unmounts.
+  useLayoutEffect(() => {
+    const fullComponentId = `${stateKey}////${itemComponentId}`;
+    const stateEntry = getGlobalStore
+      .getState()
+      .stateComponents.get(stateKey) || {
+      components: new Map(),
+    };
+
+    // Register the component with its unique ID and its specific, atomic path.
+    stateEntry.components.set(fullComponentId, {
+      forceUpdate: () => forceUpdate({}),
+      paths: new Set([itemPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
+    });
+
+    getGlobalStore.getState().stateComponents.set(stateKey, stateEntry);
+
+    // Return a cleanup function to unregister on unmount.
+    return () => {
+      const currentEntry = getGlobalStore
+        .getState()
+        .stateComponents.get(stateKey);
+      if (currentEntry) {
+        currentEntry.components.delete(fullComponentId);
+      }
+    };
+  }, [stateKey, itemComponentId, itemPath.join(".")]); // Effect dependency array is stable.
+
+  // Render the actual component the user provided.
+  return <>{children}</>;
 }
