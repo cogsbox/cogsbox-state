@@ -1887,19 +1887,24 @@ function createProxyHandler<T>(
 
                   const scrollTop = container.scrollTop;
                   const clientHeight = container.clientHeight;
+                  const scrollHeight = container.scrollHeight;
 
-                  // Calculate the theoretical visible range
+                  // Calculate what items should be visible
                   const visibleStart = Math.floor(scrollTop / itemHeight);
                   const visibleEnd = Math.ceil(
                     (scrollTop + clientHeight) / itemHeight
                   );
 
                   // Apply overscan
-                  const start = Math.max(0, visibleStart - overscan);
-                  const end = Math.min(totalCount, visibleEnd + overscan);
+                  let start = Math.max(0, visibleStart - overscan);
+                  let end = Math.min(totalCount, visibleEnd + overscan);
+
+                  // Make sure we have at least some items
+                  if (end - start < 1 && totalCount > 0) {
+                    end = Math.min(start + 10, totalCount);
+                  }
 
                   setRange((currentRange) => {
-                    // Only update if there's a meaningful change
                     if (
                       currentRange.startIndex === start &&
                       currentRange.endIndex === end
@@ -1910,20 +1915,21 @@ function createProxyHandler<T>(
                   });
                 };
 
-                const handleScroll = debounce(() => {
+                const handleScroll = () => {
                   const container = containerRef.current;
                   if (!container) return;
 
-                  // Update the "at bottom" status
-                  const atBottom =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    1;
-                  wasAtBottomRef.current = atBottom;
+                  // Check if actually at bottom
+                  const scrollTop = container.scrollTop;
+                  const scrollHeight = container.scrollHeight;
+                  const clientHeight = container.clientHeight;
+
+                  // Use a small threshold (1px) to account for rounding
+                  wasAtBottomRef.current =
+                    scrollHeight - scrollTop - clientHeight < 1;
 
                   calculateRange();
-                }, 10); // Small debounce to prevent too many calculations
+                };
 
                 // Initial calculation
                 calculateRange();
@@ -1932,6 +1938,7 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+
                 const observer = new ResizeObserver(() => {
                   calculateRange();
                 });
@@ -1939,12 +1946,12 @@ function createProxyHandler<T>(
 
                 // Auto-scroll to bottom if needed
                 if (stickToBottom && wasAtBottomRef.current && totalCount > 0) {
-                  requestAnimationFrame(() => {
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
-                    });
-                  });
+                  // Use setTimeout to ensure DOM has updated
+                  setTimeout(() => {
+                    if (container) {
+                      container.scrollTop = container.scrollHeight;
+                    }
+                  }, 0);
                 }
 
                 return () => {
@@ -1991,6 +1998,7 @@ function createProxyHandler<T>(
                     overflowY: "auto" as const,
                     position: "relative" as const,
                     height: "100%",
+                    width: "100%",
                   },
                 },
                 inner: {
@@ -1998,6 +2006,7 @@ function createProxyHandler<T>(
                     position: "relative" as const,
                     height: `${totalHeight}px`,
                     width: "100%",
+                    pointerEvents: "none" as const, // Prevent inner from interfering
                   },
                 },
                 list: {
@@ -2007,6 +2016,7 @@ function createProxyHandler<T>(
                     left: 0,
                     right: 0,
                     transform: `translateY(${range.startIndex * itemHeight}px)`,
+                    pointerEvents: "auto" as const, // Re-enable for list items
                   },
                 },
               };
