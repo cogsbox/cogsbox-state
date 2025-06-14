@@ -852,16 +852,20 @@ function removeFromTrie(
   current.subscribers.delete(componentId);
 }
 function getTrieSubscribers(node: TrieNode, path: string): Set<string> {
+  console.log("Getting subscribers for path:", path);
   const segments = path.split(".");
   const subscribers = new Set<string>(node.subscribers);
+  console.log("Root subscribers:", node.subscribers);
 
   let current: TrieNode | undefined = node;
   for (const segment of segments) {
     current = current.children?.get(segment);
+    console.log(`Segment ${segment} subscribers:`, current?.subscribers);
     if (!current) break;
     current.subscribers.forEach((sub) => subscribers.add(sub));
   }
 
+  console.log("Total subscribers found:", subscribers);
   return subscribers;
 }
 export function useCogsStateFn<TStateObject extends unknown>(
