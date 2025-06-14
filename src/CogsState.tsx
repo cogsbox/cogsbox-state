@@ -1531,12 +1531,6 @@ function createProxyHandler<T>(
                 }
 
                 if (needsAdd) {
-                  // console.log(
-                  //   "adding path actualyl adding",
-                  //   fullComponentId,
-                  //   path,
-                  //   prop
-                  // );
                   component.paths.add(currentPath);
                 }
               }
