@@ -1182,7 +1182,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
               }
             }
           }
-
           if (shouldUpdate) {
             component.forceUpdate();
           }
