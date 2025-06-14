@@ -1526,7 +1526,6 @@ function createProxyHandler<T>(
               // Now do the path tracking logic ONCE
               if (!component.paths.has("")) {
                 const currentPath = path.join(".");
-
                 let needsAdd = true;
                 for (const existingPath of component.paths) {
                   if (
