@@ -2336,6 +2336,7 @@ function createProxyHandler<T>(
               );
           }
         }
+
         if (prop === "get") {
           return () => {
             if (meta?.validIndices && Array.isArray(currentState)) {
