@@ -1787,16 +1787,32 @@ function createProxyHandler<T>(
               return rebuildStateShape(newCurrentState as any, path, newMeta);
             };
           }
-          // This code goes inside the `get` trap of `createProxyHandler`
+
           if (prop === "stateMap") {
             return (
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                index: number
-              ) => React.ReactNode // Your callback returns the JSX to render
+                // The third argument is an info object with the register function
+                info: {
+                  register: () => void;
+                  index: number;
+                  originalIndex: number;
+                }
+              ) => any
             ) => {
-              const arrayToMap = currentState as any[];
+              const arrayToMap = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+
+              // Defensive check to make sure we are mapping over an array
+              if (!Array.isArray(arrayToMap)) {
+                console.warn(
+                  `stateMap called on a non-array value at path: ${path.join(".")}. The current value is:`,
+                  arrayToMap
+                );
+                return null;
+              }
 
               return arrayToMap.map((item, index) => {
                 let originalIndex: number;
@@ -1809,29 +1825,52 @@ function createProxyHandler<T>(
                   originalIndex = index;
                 }
 
-                // The specific path for this individual item in the array.
                 const finalPath = [...path, originalIndex.toString()];
-
-                // The proxy for this item, which can be used for updates.
                 const setter = rebuildStateShape(item, finalPath, meta);
 
-                // A stable and unique ID for this item's wrapper component.
-                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                // Create the register function right here. It closes over the necessary variables.
+                // This function IS a React Hook and must be called inside a component.
+                const register = () => {
+                  const [, forceUpdate] = useState({});
+                  // This is stable and unique for this specific item in the list.
+                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                // Call the user's render function to get their actual component JSX.
-                const userComponentJsx = callbackfn(item, setter, index);
+                  // This effect performs the one-time registration and cleanup.
+                  useLayoutEffect(() => {
+                    const fullComponentId = `${stateKey}////${itemComponentId}`;
+                    const stateEntry = getGlobalStore
+                      .getState()
+                      .stateComponents.get(stateKey) || {
+                      components: new Map(),
+                    };
 
-                // Transparently wrap the user's component in our internal registration component.
-                return (
-                  <CogsItemWrapper
-                    key={originalIndex} // The wrapper itself needs a key for React's mapping.
-                    stateKey={stateKey}
-                    itemComponentId={itemComponentId}
-                    itemPath={finalPath} // Pass the specific path for atomic updates.
-                  >
-                    {userComponentJsx}
-                  </CogsItemWrapper>
-                );
+                    stateEntry.components.set(fullComponentId, {
+                      forceUpdate: () => forceUpdate({}),
+                      paths: new Set([finalPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
+                    });
+
+                    getGlobalStore
+                      .getState()
+                      .stateComponents.set(stateKey, stateEntry);
+
+                    // Cleanup function to un-register the component
+                    return () => {
+                      const currentEntry = getGlobalStore
+                        .getState()
+                        .stateComponents.get(stateKey);
+                      if (currentEntry) {
+                        currentEntry.components.delete(fullComponentId);
+                      }
+                    };
+                  }, [stateKey, itemComponentId]); // Effect depends only on stable keys
+                };
+
+                // Call the user's function with the item, its setter, and the info object
+                return callbackfn(item, setter, {
+                  register,
+                  index,
+                  originalIndex,
+                });
               });
             };
           }
