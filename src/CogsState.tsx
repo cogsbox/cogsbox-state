@@ -1787,16 +1787,10 @@ function createProxyHandler<T>(
               const wasAtBottomRef = useRef(true);
               const [range, setRange] = useState({
                 startIndex: 0,
-                endIndex: 10,
+                endIndex: Math.min(20, (currentState as any[]).length),
               });
 
-              // Create a unique virtual state key
-              const virtualStateKey = useRef(
-                `${stateKey}-virtual-${path.join(".")}-${Math.random()}`
-              ).current;
-              const [, forceUpdate] = useState({});
-
-              // Get source array - REACTIVE version so component updates when array changes
+              // Get source array
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
                 path
@@ -1804,114 +1798,58 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              // Single effect to handle initialization and subscriptions
-              useLayoutEffect(() => {
-                // Initialize virtual state - use non-reactive for initial setup
-                const slicedData = sourceArray.slice(
-                  range.startIndex,
-                  range.endIndex
-                );
-                getGlobalStore.getState().setState(virtualStateKey, slicedData);
+              // Create a filtered state using the existing stateFilter mechanism
+              const virtualState = useMemo(() => {
+                // Get the base proxy
+                const baseProxy = rebuildStateShape(currentState, path, meta);
 
-                // Create updater proxy if it doesn't exist - non-reactive check
-                if (!getGlobalStore.getState().updaterState[virtualStateKey]) {
-                  getGlobalStore
-                    .getState()
-                    .setUpdaterState(
-                      virtualStateKey,
-                      createProxyHandler(
-                        virtualStateKey,
-                        effectiveSetState,
-                        componentId,
-                        sessionId
-                      )
-                    );
-                }
-
-                // Subscribe to source array changes - non-reactive for setup
-                const componentKey = `${stateKey}////${componentId}-virtual`;
-                const stateEntry = getGlobalStore
-                  .getState()
-                  .stateComponents.get(stateKey) || {
-                  components: new Map(),
-                };
-
-                stateEntry.components.set(componentKey, {
-                  forceUpdate: () => forceUpdate({}),
-                  paths: new Set([path.join(".")]),
-                  reactiveType: ["component"],
+                // Use stateFilter to create a view of just the visible items
+                return baseProxy.stateFilter((_: any, index: number) => {
+                  return index >= range.startIndex && index < range.endIndex;
                 });
+              }, [range.startIndex, range.endIndex, totalCount]);
 
-                getGlobalStore
-                  .getState()
-                  .stateComponents.set(stateKey, stateEntry);
-
-                // Cleanup
-                return () => {
-                  const currentEntry = getGlobalStore
-                    .getState()
-                    .stateComponents.get(stateKey);
-                  if (currentEntry) {
-                    currentEntry.components.delete(componentKey);
-                  }
-
-                  // Clean up virtual state - non-reactive for cleanup
-                  const store = getGlobalStore.getState();
-                  delete store.cogsStateStore[virtualStateKey];
-                  delete store.updaterState[virtualStateKey];
-                  store.stateComponents.delete(virtualStateKey);
-                };
-              }, []); // Only on mount/unmount
-
-              // Update virtual state when range or source changes
-              useEffect(() => {
-                const slicedData = sourceArray.slice(
-                  range.startIndex,
-                  range.endIndex
-                );
-                getGlobalStore.getState().setState(virtualStateKey, slicedData);
-              }, [
-                range.startIndex,
-                range.endIndex,
-                virtualStateKey,
-                sourceArray.length,
-              ]);
-
-              // Single effect for scroll handling
+              // Scroll handling
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
+
+                let scrollTimeout: any;
 
                 const calculateRange = () => {
                   if (!container) return;
 
                   const scrollTop = container.scrollTop;
                   const clientHeight = container.clientHeight;
-                  const scrollHeight = container.scrollHeight;
 
-                  // Calculate what items should be visible
-                  const visibleStart = Math.floor(scrollTop / itemHeight);
-                  const visibleEnd = Math.ceil(
+                  const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
+                  const lastVisibleIndex = Math.ceil(
                     (scrollTop + clientHeight) / itemHeight
                   );
 
-                  // Apply overscan
-                  let start = Math.max(0, visibleStart - overscan);
-                  let end = Math.min(totalCount, visibleEnd + overscan);
-
-                  // Make sure we have at least some items
-                  if (end - start < 1 && totalCount > 0) {
-                    end = Math.min(start + 10, totalCount);
-                  }
+                  const start = Math.max(0, firstVisibleIndex - overscan);
+                  const end = Math.min(totalCount, lastVisibleIndex + overscan);
 
                   setRange((currentRange) => {
-                    if (
-                      currentRange.startIndex === start &&
-                      currentRange.endIndex === end
-                    ) {
-                      return currentRange;
+                    // Only update if changed significantly (not just 1-2 items)
+                    const startDiff = Math.abs(currentRange.startIndex - start);
+                    const endDiff = Math.abs(currentRange.endIndex - end);
+
+                    // Update only if we've scrolled enough to warrant a re-render
+                    if (startDiff > overscan / 2 || endDiff > overscan / 2) {
+                      return { startIndex: start, endIndex: end };
                     }
-                    return { startIndex: start, endIndex: end };
+
+                    // If we're at the edges, always update to ensure we show all items
+                    if (
+                      (start === 0 && currentRange.startIndex !== 0) ||
+                      (end === totalCount &&
+                        currentRange.endIndex !== totalCount)
+                    ) {
+                      return { startIndex: start, endIndex: end };
+                    }
+
+                    return currentRange;
                   });
                 };
 
@@ -1919,20 +1857,27 @@ function createProxyHandler<T>(
                   const container = containerRef.current;
                   if (!container) return;
 
-                  // Check if actually at bottom
-                  const scrollTop = container.scrollTop;
-                  const scrollHeight = container.scrollHeight;
-                  const clientHeight = container.clientHeight;
+                  // Clear any pending scroll update
+                  clearTimeout(scrollTimeout);
 
-                  // Use a small threshold (1px) to account for rounding
+                  // Check if at bottom
                   wasAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 1;
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
 
-                  calculateRange();
+                  // Debounce the range calculation slightly
+                  scrollTimeout = setTimeout(calculateRange, 10);
                 };
 
                 // Initial calculation
                 calculateRange();
+
+                // Scroll to bottom on mount if needed
+                if (stickToBottom) {
+                  container.scrollTop = container.scrollHeight;
+                }
 
                 // Add listeners
                 container.addEventListener("scroll", handleScroll, {
@@ -1941,28 +1886,30 @@ function createProxyHandler<T>(
 
                 const observer = new ResizeObserver(() => {
                   calculateRange();
+                  if (stickToBottom && wasAtBottomRef.current) {
+                    container.scrollTop = container.scrollHeight;
+                  }
                 });
                 observer.observe(container);
 
-                // Auto-scroll to bottom if needed
-                if (stickToBottom && wasAtBottomRef.current && totalCount > 0) {
-                  // Use setTimeout to ensure DOM has updated
-                  setTimeout(() => {
-                    if (container) {
-                      container.scrollTop = container.scrollHeight;
-                    }
-                  }, 0);
-                }
-
                 return () => {
+                  clearTimeout(scrollTimeout);
                   container.removeEventListener("scroll", handleScroll);
                   observer.disconnect();
                 };
               }, [totalCount, itemHeight, overscan, stickToBottom]);
 
-              // Get the virtual state proxy - non-reactive, we just need the reference
-              const virtualState =
-                getGlobalStore.getState().updaterState[virtualStateKey];
+              // Auto-scroll when new items are added
+              useEffect(() => {
+                if (
+                  stickToBottom &&
+                  wasAtBottomRef.current &&
+                  containerRef.current
+                ) {
+                  containerRef.current.scrollTop =
+                    containerRef.current.scrollHeight;
+                }
+              }, [totalCount]);
 
               const scrollTo = useCallback(
                 (p: number, b: ScrollBehavior = "auto") => {
@@ -1998,7 +1945,6 @@ function createProxyHandler<T>(
                     overflowY: "auto" as const,
                     position: "relative" as const,
                     height: "100%",
-                    width: "100%",
                   },
                 },
                 inner: {
@@ -2006,7 +1952,6 @@ function createProxyHandler<T>(
                     position: "relative" as const,
                     height: `${totalHeight}px`,
                     width: "100%",
-                    pointerEvents: "none" as const, // Prevent inner from interfering
                   },
                 },
                 list: {
@@ -2016,7 +1961,6 @@ function createProxyHandler<T>(
                     left: 0,
                     right: 0,
                     transform: `translateY(${range.startIndex * itemHeight}px)`,
-                    pointerEvents: "auto" as const, // Re-enable for list items
                   },
                 },
               };
