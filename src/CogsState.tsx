@@ -1800,8 +1800,15 @@ function createProxyHandler<T>(
 
               // Create a filtered state using the existing stateFilter mechanism
               const virtualState = useMemo(() => {
-                // Get the base proxy
-                const baseProxy = rebuildStateShape(currentState, path, meta);
+                const validIndices = Array.from(
+                  { length: range.endIndex - range.startIndex },
+                  (_, i) => range.startIndex + i
+                ).filter((idx) => idx < totalCount);
+
+                const baseProxy = rebuildStateShape(currentState, path, {
+                  ...meta,
+                  validIndices,
+                });
 
                 // Use stateFilter to create a view of just the visible items
                 return baseProxy.stateFilter((_: any, index: number) => {
@@ -1810,11 +1817,10 @@ function createProxyHandler<T>(
               }, [range.startIndex, range.endIndex, totalCount]);
 
               // Scroll handling
+              // Simplified scroll handling
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-
-                let scrollTimeout: any;
 
                 const calculateRange = () => {
                   if (!container) return;
@@ -1822,59 +1828,39 @@ function createProxyHandler<T>(
                   const scrollTop = container.scrollTop;
                   const clientHeight = container.clientHeight;
 
-                  const firstVisibleIndex = Math.floor(scrollTop / itemHeight);
-                  const lastVisibleIndex = Math.ceil(
-                    (scrollTop + clientHeight) / itemHeight
+                  // Simple calculation without restrictions
+                  const start = Math.max(
+                    0,
+                    Math.floor(scrollTop / itemHeight) - overscan
+                  );
+                  const end = Math.min(
+                    totalCount,
+                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
+                      overscan
                   );
 
-                  const start = Math.max(0, firstVisibleIndex - overscan);
-                  const end = Math.min(totalCount, lastVisibleIndex + overscan);
-
-                  setRange((currentRange) => {
-                    // Only update if changed significantly (not just 1-2 items)
-                    const startDiff = Math.abs(currentRange.startIndex - start);
-                    const endDiff = Math.abs(currentRange.endIndex - end);
-
-                    // Update only if we've scrolled enough to warrant a re-render
-                    if (startDiff > overscan / 2 || endDiff > overscan / 2) {
-                      return { startIndex: start, endIndex: end };
-                    }
-
-                    // If we're at the edges, always update to ensure we show all items
-                    if (
-                      (start === 0 && currentRange.startIndex !== 0) ||
-                      (end === totalCount &&
-                        currentRange.endIndex !== totalCount)
-                    ) {
-                      return { startIndex: start, endIndex: end };
-                    }
-
-                    return currentRange;
-                  });
+                  setRange({ startIndex: start, endIndex: end });
                 };
 
                 const handleScroll = () => {
                   const container = containerRef.current;
                   if (!container) return;
 
-                  // Clear any pending scroll update
-                  clearTimeout(scrollTimeout);
-
-                  // Check if at bottom
+                  // Just track if at bottom
                   wasAtBottomRef.current =
                     container.scrollHeight -
                       container.scrollTop -
                       container.clientHeight <
-                    1;
+                    2;
 
-                  // Debounce the range calculation slightly
-                  scrollTimeout = setTimeout(calculateRange, 10);
+                  // Always calculate range on scroll
+                  calculateRange();
                 };
 
                 // Initial calculation
                 calculateRange();
 
-                // Scroll to bottom on mount if needed
+                // Initial scroll to bottom if needed
                 if (stickToBottom) {
                   container.scrollTop = container.scrollHeight;
                 }
@@ -1886,14 +1872,10 @@ function createProxyHandler<T>(
 
                 const observer = new ResizeObserver(() => {
                   calculateRange();
-                  if (stickToBottom && wasAtBottomRef.current) {
-                    container.scrollTop = container.scrollHeight;
-                  }
                 });
                 observer.observe(container);
 
                 return () => {
-                  clearTimeout(scrollTimeout);
                   container.removeEventListener("scroll", handleScroll);
                   observer.disconnect();
                 };
