@@ -23,7 +23,6 @@ export type ComponentsType = {
         depsFunction?: (state: any) => any[] | true;
         reactiveType: ReactivityType[] | ReactivityType;
     }>;
-    pathTrie?: TrieNode;
 };
 export type FormRefStoreState = {
     formRefs: Map<string, React.RefObject<any>>;

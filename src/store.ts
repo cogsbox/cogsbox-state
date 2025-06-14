@@ -39,7 +39,6 @@ export type ComponentsType = {
       reactiveType: ReactivityType[] | ReactivityType;
     }
   >;
-  pathTrie?: TrieNode;
 };
 export type FormRefStoreState = {
   formRefs: Map<string, React.RefObject<any>>;
