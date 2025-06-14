@@ -1200,13 +1200,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           ? (arrayValue.length - 1).toString()
           : p;
       });
-      console.log(
-        "mmmmmmmmmmmmmmmmm22222222222222",
-        updateObj.updateType,
-        prevValue,
-        payload,
-        path
-      );
+
       const { oldValue, newValue } = getUpdateValues(
         updateObj.updateType,
         prevValue,
@@ -1409,7 +1403,7 @@ function createProxyHandler<T>(
         : initalOptionsGet?.localStorage?.key;
 
       const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-      console.log("removing storage", storageKey);
+
       if (localStorage.getItem(storageKey)) {
         localStorage.removeItem(storageKey);
       }
@@ -1467,7 +1461,7 @@ function createProxyHandler<T>(
     Object.keys(baseObj).forEach((key) => {
       (baseFunction as any)[key] = (baseObj as any)[key];
     });
-    console.log("rebuildStateShapessss", path);
+
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
         console.log(
@@ -1633,7 +1627,7 @@ function createProxyHandler<T>(
               : initalOptionsGet?.localStorage?.key;
 
             const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-            console.log("removing storage", storageKey);
+
             if (storageKey) {
               localStorage.removeItem(storageKey);
             }
@@ -1772,7 +1766,7 @@ function createProxyHandler<T>(
                   originalIndex = index;
                 }
                 const finalPath = [...path, originalIndex.toString()];
-                console.log("stateMapstateMapstateMapstateMap", finalPath);
+
                 const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
                 return callbackfn(
                   item,
