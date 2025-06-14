@@ -1509,7 +1509,7 @@ function createProxyHandler<T>(
           prop === "then" ||
           prop[0] === "$" ||
           prop === "stateMapNoRender" ||
-          mutationMethods.has(prop)
+          !mutationMethods.has(prop)
         ) {
           // Skip path tracking entirely
         } else {
@@ -1523,46 +1523,31 @@ function createProxyHandler<T>(
             const component = stateEntry.components.get(fullComponentId);
 
             if (component) {
-              // OPTIMIZED: Most important optimization - check for root first
+              // If we already track root, no need to track anything else
               if (component.paths.has("")) {
-                // Do nothing - root already tracks everything
-              } else if (path.length === 0 && prop === "get") {
-                // Special case for root get()
-                component.paths.add("");
-              } else if (path.length > 0) {
-                // OPTIMIZED: Build path only when needed
-                const currentPath = path.join(".");
+                return;
+              }
 
-                // OPTIMIZED: Use size check first (O(1))
-                if (component.paths.size === 0) {
-                  component.paths.add(currentPath);
-                } else {
-                  // OPTIMIZED: For small sets, iteration is faster than complex algorithms
-                  let needsAdd = true;
+              // Build the current path including the property being accessed
+              const currentPath = [...path, prop].join(".");
 
-                  // Check if any existing path is a parent
-                  for (const existingPath of component.paths) {
-                    if (existingPath === currentPath) {
-                      needsAdd = false;
-                      break;
-                    }
-                    // OPTIMIZED: Length check before string operation
-                    if (
-                      existingPath.length < currentPath.length &&
-                      currentPath[existingPath.length] === "." &&
-                      currentPath.substring(0, existingPath.length) ===
-                        existingPath
-                    ) {
-                      needsAdd = false;
-                      break;
-                    }
-                  }
-
-                  if (needsAdd) {
-                    console.log("adding path to component", currentPath, prop);
-                    component.paths.add(currentPath);
-                  }
+              // Check if we need to add this path
+              let needsAdd = true;
+              for (const existingPath of component.paths) {
+                // If we already track this exact path or a parent of it
+                if (
+                  currentPath.startsWith(existingPath) &&
+                  (currentPath === existingPath ||
+                    currentPath[existingPath.length] === ".")
+                ) {
+                  needsAdd = false;
+                  break;
                 }
+              }
+
+              if (needsAdd) {
+                console.log("adding path", currentPath, prop);
+                component.paths.add(currentPath);
               }
             }
           }
