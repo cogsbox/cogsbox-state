@@ -11,13 +11,12 @@ export type VirtualViewOptions = {
     overscan?: number;
     stickToBottom?: boolean;
 };
-export type VirtualViewResult<T> = {
+export type VirtualStateObjectResult<T extends any[]> = {
     /**
-     * A view object with a `stateMap` method to render the virtualized items.
+     * A new, fully-functional StateObject that represents the virtualized slice.
+     * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
      */
-    virtualView: {
-        stateMap: (callbackfn: (value: T, setter: StateObject<T>, index: number) => React.ReactNode) => React.ReactNode[];
-    };
+    virtualState: StateObject<T>;
     /**
      * Props to be spread onto your DOM elements to enable virtualization.
      */
@@ -83,7 +82,7 @@ export type ArrayEndType<TShape extends unknown> = {
     cutByValue: (value: string | number | boolean) => void;
     toggleByValue: (value: string | number | boolean) => void;
     stateSort: (compareFn: (a: InferArrayElement<TShape>, b: InferArrayElement<TShape>) => number) => ArrayEndType<TShape>;
-    useVirtualView: (options: VirtualViewOptions) => VirtualViewResult<InferArrayElement<TShape>>;
+    useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
     stateMapNoRender: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;

@@ -46,20 +46,13 @@ export type VirtualViewOptions = {
   stickToBottom?: boolean;
 };
 
-// This is the new, simpler result type
-export type VirtualViewResult<T> = {
+// The result now returns a real StateObject
+export type VirtualStateObjectResult<T extends any[]> = {
   /**
-   * A view object with a `stateMap` method to render the virtualized items.
+   * A new, fully-functional StateObject that represents the virtualized slice.
+   * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
    */
-  virtualView: {
-    stateMap: (
-      callbackfn: (
-        value: T,
-        setter: StateObject<T>,
-        index: number // This is the local index (0, 1, 2...)
-      ) => React.ReactNode
-    ) => React.ReactNode[];
-  };
+  virtualState: StateObject<T>;
   /**
    * Props to be spread onto your DOM elements to enable virtualization.
    */
@@ -71,6 +64,7 @@ export type VirtualViewResult<T> = {
   scrollToBottom: (behavior?: ScrollBehavior) => void;
   scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
 };
+
 export type ServerSyncStatus = {
   isFresh: boolean;
   isFreshTime: number;
@@ -174,7 +168,8 @@ export type ArrayEndType<TShape extends unknown> = {
   ) => ArrayEndType<TShape>;
   useVirtualView: (
     options: VirtualViewOptions
-  ) => VirtualViewResult<InferArrayElement<TShape>>;
+  ) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
+
   stateMapNoRender: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1773,8 +1768,10 @@ function createProxyHandler<T>(
           }
 
           if (prop === "useVirtualView") {
-            // This is the new, simpler, and correct React Hook implementation.
-            return (options: VirtualViewOptions): VirtualViewResult<any> => {
+            // This hook leverages the existing `stateFilter` to create a dynamic view.
+            return (
+              options: VirtualViewOptions
+            ): VirtualStateObjectResult<any[]> => {
               const {
                 itemHeight,
                 overscan = 5,
@@ -1789,9 +1786,10 @@ function createProxyHandler<T>(
 
               const containerRef = useRef<HTMLDivElement | null>(null);
               const wasAtBottomRef = useRef(true);
-              const [viewport, setViewport] = useState({
-                scrollPosition: 0,
-                containerHeight: 0,
+              // This state now drives the filtering
+              const [range, setRange] = useState({
+                startIndex: 0,
+                endIndex: 0,
               });
 
               const sourceArray =
@@ -1801,131 +1799,101 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              const { startIndex, endIndex } = useMemo(() => {
-                const start = Math.max(
-                  0,
-                  Math.floor(viewport.scrollPosition / itemHeight) - overscan
+              // The core insight: On every render where the range changes,
+              // we create a new filtered StateObject.
+              const virtualState = useMemo(() => {
+                // Get a proxy to the original array to call stateFilter on it.
+                const originalProxy = rebuildStateShape(
+                  currentState,
+                  path,
+                  meta
                 );
-                const end = Math.min(
-                  totalCount,
-                  Math.ceil(
-                    (viewport.scrollPosition + viewport.containerHeight) /
-                      itemHeight
-                  ) + overscan
-                );
-                return { startIndex: start, endIndex: end };
-              }, [
-                viewport.scrollPosition,
-                viewport.containerHeight,
-                totalCount,
-                itemHeight,
-                overscan,
-              ]);
 
-              // This is the "view object". It's memoized to prevent re-creating the `stateMap` function on every render.
-              const virtualView = useMemo(
-                () => ({
-                  stateMap: (
-                    callbackfn: (
-                      value: any,
-                      setter: StateObject<any>,
-                      index: number
-                    ) => React.ReactNode
-                  ) => {
-                    if (totalCount === 0) return [];
-                    const count = endIndex - startIndex;
-                    if (count <= 0) return [];
+                // Use the existing stateFilter with a dynamic predicate.
+                // This is lazy and performs well.
+                return originalProxy.stateFilter((_: any, index: any) => {
+                  return index >= range.startIndex && index < range.endIndex;
+                });
+              }, [range.startIndex, range.endIndex, sourceArray]);
 
-                    const slicedRawItems = sourceArray.slice(startIndex, count);
-
-                    return slicedRawItems.map((item, localIndex) => {
-                      // Calculate the true index in the original source array.
-                      const originalIndex = startIndex + localIndex;
-
-                      // Create the setter proxy for this item using its ORIGINAL path.
-                      // This correctly calls the original effectiveSetState. No new state needed.
-                      const setter = rebuildStateShape(
-                        item,
-                        [...path, originalIndex.toString()],
-                        meta
-                      );
-
-                      // Call the user's render callback.
-                      return callbackfn(item, setter, localIndex);
-                    });
-                  },
-                }),
-                [startIndex, endIndex, sourceArray, path.join("."), stateKey]
-              );
-
-              // Control functions remain the same
-              const scrollTo = useCallback(
-                (position: number, behavior: ScrollBehavior = "auto") => {
-                  containerRef.current?.scrollTo({ top: position, behavior });
-                },
-                []
-              );
-              const scrollToBottom = useCallback(
-                (behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current) {
-                    scrollTo(containerRef.current.scrollHeight, behavior);
-                  }
-                },
-                [scrollTo]
-              );
-              const scrollToIndex = useCallback(
-                (index: number, behavior: ScrollBehavior = "smooth") => {
-                  scrollTo(index * itemHeight, behavior);
-                },
-                [scrollTo, itemHeight]
-              );
-
-              // Effects for scroll/resize listeners remain the same
+              // All effects and control functions now just manage the `range` state
+              // and scroll position.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-                // ... (scroll and resize observer logic from previous correct answer)
+
+                const calculateRange = () => {
+                  const start = Math.max(
+                    0,
+                    Math.floor(container.scrollTop / itemHeight) - overscan
+                  );
+                  const end = Math.min(
+                    totalCount,
+                    Math.ceil(
+                      (container.scrollTop + container.clientHeight) /
+                        itemHeight
+                    ) + overscan
+                  );
+
+                  setRange((currentRange) => {
+                    if (
+                      currentRange.startIndex === start &&
+                      currentRange.endIndex === end
+                    ) {
+                      return currentRange;
+                    }
+                    return { startIndex: start, endIndex: end };
+                  });
+                };
+
                 const handleScroll = () => {
-                  const scrollTop = container.scrollTop;
                   wasAtBottomRef.current =
                     container.scrollHeight > 0 &&
                     container.scrollHeight -
-                      scrollTop -
+                      container.scrollTop -
                       container.clientHeight <
                       1;
-                  setViewport((v) =>
-                    v.scrollPosition === scrollTop
-                      ? v
-                      : { ...v, scrollPosition: scrollTop }
-                  );
+                  calculateRange();
                 };
-                handleScroll();
+
+                calculateRange(); // Initial calculation
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                const observer = new ResizeObserver((entries) => {
-                  const entry = entries[0];
-                  if (entry) {
-                    setViewport((v) =>
-                      v.containerHeight === entry.contentRect.height
-                        ? v
-                        : { ...v, containerHeight: entry.contentRect.height }
-                    );
-                  }
-                });
+
+                const observer = new ResizeObserver(handleScroll);
                 observer.observe(container);
+
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                   observer.disconnect();
                 };
-              }, []);
+              }, [totalCount, itemHeight, overscan]);
+
+              const scrollTo = useCallback(
+                (p: number, b: ScrollBehavior = "auto") =>
+                  containerRef.current?.scrollTo({ top: p, behavior: b }),
+                []
+              );
+              const scrollToBottom = useCallback(
+                (b: ScrollBehavior = "smooth") => {
+                  if (containerRef.current)
+                    scrollTo(containerRef.current.scrollHeight, b);
+                },
+                [scrollTo]
+              );
+              const scrollToIndex = useCallback(
+                (i: number, b: ScrollBehavior = "smooth") =>
+                  scrollTo(i * itemHeight, b),
+                [scrollTo, itemHeight]
+              );
+
               useLayoutEffect(() => {
                 if (stickToBottom && wasAtBottomRef.current) {
                   scrollToBottom("auto");
                 }
               }, [sourceArray, stickToBottom, scrollToBottom]);
 
-              // Props to spread on DOM elements remain the same
               const virtualizerProps = useMemo(
                 () => ({
                   outer: {
@@ -1945,15 +1913,15 @@ function createProxyHandler<T>(
                       top: 0,
                       left: 0,
                       width: "100%",
-                      transform: `translateY(${startIndex * itemHeight}px)`,
+                      transform: `translateY(${range.startIndex * itemHeight}px)`,
                     },
                   },
                 }),
-                [totalHeight, startIndex, itemHeight]
+                [totalHeight, range.startIndex, itemHeight]
               );
 
               return {
-                virtualView,
+                virtualState,
                 virtualizerProps: virtualizerProps as any,
                 scrollToBottom,
                 scrollToIndex,
