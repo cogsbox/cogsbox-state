@@ -1511,6 +1511,7 @@ function createProxyHandler<T>(
           !mutationMethods.has(prop)
         ) {
           const fullComponentId = `${stateKey}////${componentId}`;
+          console.log("adding path", fullComponentId, path, prop);
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
@@ -1539,6 +1540,12 @@ function createProxyHandler<T>(
                 }
 
                 if (needsAdd) {
+                  console.log(
+                    "adding path actualyl adding",
+                    fullComponentId,
+                    path,
+                    prop
+                  );
                   component.paths.add(currentPath);
                 }
               }
