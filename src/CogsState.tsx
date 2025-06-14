@@ -1844,12 +1844,12 @@ function createProxyHandler<T>(
           if (prop === "stateMap") {
             return (
               callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
+                item: any,
+                setter: StateObject<any>,
                 index: number,
-                array: T,
-                arraySetter: StateObject<T>
-              ) => void
+                array: any[],
+                arraySetter: StateObject<any>
+              ) => JSX.Element
             ) => {
               const arrayToMap = getGlobalStore
                 .getState()
@@ -1868,38 +1868,71 @@ function createProxyHandler<T>(
                 const finalPath = [...path, originalIndex.toString()];
                 const setter = rebuildStateShape(item, finalPath, meta);
 
-                // Auto-register the component
-                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
-                const fullComponentId = `${stateKey}////${itemComponentId}`;
+                // Wrap the user's component in a wrapper that handles registration
+                const WrappedComponent = () => {
+                  const [, forceUpdate] = useState({});
+                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                // Register immediately (not in a hook)
-                const stateEntry = getGlobalStore
-                  .getState()
-                  .stateComponents.get(stateKey);
-                if (stateEntry && stateEntry.pathTrie) {
-                  // Add a basic registration for this item
-                  stateEntry.components.set(fullComponentId, {
-                    forceUpdate: () => {}, // This will be updated when component mounts
-                    paths: new Set([finalPath.join(".")]),
-                    deps: [],
-                    depsFunction: undefined,
-                    reactiveType: ["component"],
-                  });
-                  addToTrie(
-                    stateEntry.pathTrie,
-                    finalPath.join("."),
-                    fullComponentId
+                  useLayoutEffect(() => {
+                    const fullComponentId = `${stateKey}////${itemComponentId}`;
+                    const stateEntry = getGlobalStore
+                      .getState()
+                      .stateComponents.get(stateKey) || {
+                      components: new Map(),
+                      pathTrie: {
+                        subscribers: new Set<string>(),
+                        children: new Map<string, TrieNode>(),
+                      },
+                    };
+
+                    stateEntry.components.set(fullComponentId, {
+                      forceUpdate: () => forceUpdate({}),
+                      paths: new Set([finalPath.join(".")]),
+                      deps: [],
+                      depsFunction: undefined,
+                      reactiveType: ["component"],
+                    });
+
+                    if (stateEntry.pathTrie) {
+                      addToTrie(
+                        stateEntry.pathTrie,
+                        finalPath.join("."),
+                        fullComponentId
+                      );
+                    }
+
+                    getGlobalStore
+                      .getState()
+                      .stateComponents.set(stateKey, stateEntry);
+
+                    return () => {
+                      const currentEntry = getGlobalStore
+                        .getState()
+                        .stateComponents.get(stateKey);
+                      if (currentEntry) {
+                        currentEntry.components.delete(fullComponentId);
+                        if (currentEntry.pathTrie) {
+                          removeFromTrie(
+                            currentEntry.pathTrie,
+                            finalPath.join("."),
+                            fullComponentId
+                          );
+                        }
+                      }
+                    };
+                  }, []);
+
+                  // Call the user's render function
+                  return callbackfn(
+                    item,
+                    setter,
+                    index,
+                    arrayToMap,
+                    rebuildStateShape(arrayToMap as any, path, meta)
                   );
-                }
+                };
 
-                // Call with original signature
-                return callbackfn(
-                  item,
-                  setter,
-                  index,
-                  arrayToMap as any,
-                  rebuildStateShape(arrayToMap as any, path, meta)
-                );
+                return <WrappedComponent key={index} />;
               });
             };
           }
