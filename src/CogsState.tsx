@@ -851,6 +851,7 @@ function removeFromTrie(
 
   current.subscribers.delete(componentId);
 }
+
 function getTrieSubscribers(node: TrieNode, path: string): Set<string> {
   console.log("Getting subscribers for path:", path);
   const segments = path.split(".");
