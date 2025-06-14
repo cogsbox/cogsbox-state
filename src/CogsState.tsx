@@ -1791,9 +1791,12 @@ function createProxyHandler<T>(
               });
 
               // Create a unique virtual state key
-              const virtualStateKey = `${stateKey}-virtual-${path.join(".")}`;
+              const virtualStateKey = useRef(
+                `${stateKey}-virtual-${path.join(".")}-${Math.random()}`
+              ).current;
+              const [, forceUpdate] = useState({});
 
-              // Get the source array
+              // Get source array - REACTIVE version so component updates when array changes
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
                 path
@@ -1801,60 +1804,80 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
               const totalHeight = totalCount * itemHeight;
 
-              // Update the virtual state in the store whenever range changes
+              // Single effect to handle initialization and subscriptions
               useLayoutEffect(() => {
+                // Initialize virtual state - use non-reactive for initial setup
                 const slicedData = sourceArray.slice(
                   range.startIndex,
                   range.endIndex
                 );
+                getGlobalStore.getState().setState(virtualStateKey, slicedData);
 
-                // Set this as a completely new state in the global store
-                setState(virtualStateKey, slicedData);
-
-                // Create the updater/proxy for this virtual state
+                // Create updater proxy if it doesn't exist - non-reactive check
                 if (!getGlobalStore.getState().updaterState[virtualStateKey]) {
-                  setUpdaterState(
-                    virtualStateKey,
-                    createProxyHandler(
+                  getGlobalStore
+                    .getState()
+                    .setUpdaterState(
                       virtualStateKey,
-                      effectiveSetState,
-                      componentId,
-                      sessionId
-                    )
-                  );
+                      createProxyHandler(
+                        virtualStateKey,
+                        effectiveSetState,
+                        componentId,
+                        sessionId
+                      )
+                    );
                 }
+
+                // Subscribe to source array changes - non-reactive for setup
+                const componentKey = `${stateKey}////${componentId}-virtual`;
+                const stateEntry = getGlobalStore
+                  .getState()
+                  .stateComponents.get(stateKey) || {
+                  components: new Map(),
+                };
+
+                stateEntry.components.set(componentKey, {
+                  forceUpdate: () => forceUpdate({}),
+                  paths: new Set([path.join(".")]),
+                  reactiveType: ["component"],
+                });
+
+                getGlobalStore
+                  .getState()
+                  .stateComponents.set(stateKey, stateEntry);
+
+                // Cleanup
+                return () => {
+                  const currentEntry = getGlobalStore
+                    .getState()
+                    .stateComponents.get(stateKey);
+                  if (currentEntry) {
+                    currentEntry.components.delete(componentKey);
+                  }
+
+                  // Clean up virtual state - non-reactive for cleanup
+                  const store = getGlobalStore.getState();
+                  delete store.cogsStateStore[virtualStateKey];
+                  delete store.updaterState[virtualStateKey];
+                  store.stateComponents.delete(virtualStateKey);
+                };
+              }, []); // Only on mount/unmount
+
+              // Update virtual state when range or source changes
+              useEffect(() => {
+                const slicedData = sourceArray.slice(
+                  range.startIndex,
+                  range.endIndex
+                );
+                getGlobalStore.getState().setState(virtualStateKey, slicedData);
               }, [
                 range.startIndex,
                 range.endIndex,
-                sourceArray.length,
                 virtualStateKey,
+                sourceArray.length,
               ]);
 
-              // Get the virtual state proxy
-              const virtualState = useMemo(() => {
-                return (
-                  getGlobalStore.getState().updaterState[virtualStateKey] ||
-                  createProxyHandler(
-                    virtualStateKey,
-                    effectiveSetState,
-                    componentId,
-                    sessionId
-                  )
-                );
-              }, [virtualStateKey]);
-
-              // Cleanup on unmount
-              useEffect(() => {
-                return () => {
-                  // Clean up the virtual state when component unmounts
-                  const { cogsStateStore, updaterState, stateComponents } =
-                    getGlobalStore.getState();
-                  delete cogsStateStore[virtualStateKey];
-                  delete updaterState[virtualStateKey];
-                  stateComponents.delete(virtualStateKey);
-                };
-              }, [virtualStateKey]);
-
+              // Single effect for scroll handling
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1899,22 +1922,33 @@ function createProxyHandler<T>(
                   calculateRange();
                 };
 
+                // Initial calculation
                 calculateRange();
 
+                // Add listeners
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-
-                const observer = new ResizeObserver(() => {
-                  calculateRange();
-                });
+                const observer = new ResizeObserver(calculateRange);
                 observer.observe(container);
+
+                // Auto-scroll to bottom if needed
+                if (stickToBottom && wasAtBottomRef.current) {
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: "auto",
+                  });
+                }
 
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                   observer.disconnect();
                 };
-              }, [totalCount, itemHeight, overscan]);
+              }, [totalCount, itemHeight, overscan, stickToBottom]);
+
+              // Get the virtual state proxy - non-reactive, we just need the reference
+              const virtualState =
+                getGlobalStore.getState().updaterState[virtualStateKey];
 
               const scrollTo = useCallback(
                 (p: number, b: ScrollBehavior = "auto") => {
@@ -1942,12 +1976,6 @@ function createProxyHandler<T>(
                 },
                 [scrollTo, itemHeight]
               );
-
-              useLayoutEffect(() => {
-                if (stickToBottom && wasAtBottomRef.current) {
-                  scrollToBottom("auto");
-                }
-              }, [totalCount, stickToBottom, scrollToBottom]);
 
               const virtualizerProps = {
                 outer: {
