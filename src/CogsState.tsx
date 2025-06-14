@@ -1099,6 +1099,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
+      console.log("stateEntry", stateEntry);
       if (stateEntry) {
         const changedPaths = getDifferences(prevValue, payload);
         const changedPathsSet = new Set(changedPaths);
@@ -1115,7 +1116,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
-
+          console.log("component", component);
           if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
