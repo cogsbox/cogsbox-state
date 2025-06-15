@@ -947,7 +947,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           options?.localStorage?.onChange(newState);
         }
       }
-
+      getGlobalStore.getState().initializeShadowState(thisKey, initialState);
       // Update the global state
       updateGlobalState(
         thisKey,
@@ -1010,8 +1010,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     //need to force update to create the stateUpdates references
     forceUpdate({});
     return () => {
-      const componentKey = `${thisKey}////${componentIdRef.current}`;
-
       if (stateEntry) {
         stateEntry.components.delete(componentKey);
         if (stateEntry.components.size === 0) {
@@ -1080,6 +1078,33 @@ export function useCogsStateFn<TStateObject extends unknown>(
           });
         }
       }
+
+      const shadowUpdate = () => {
+        const store = getGlobalStore.getState();
+
+        switch (updateObj.updateType) {
+          case "update":
+            // For updates, just mirror the structure at the path
+            store.updateShadowAtPath(thisKey, path, payload);
+            break;
+
+          case "insert":
+            // For array insert, add empty element to shadow array
+            const parentPath = path.slice(0, -1);
+            store.insertShadowArrayElement(thisKey, parentPath);
+            break;
+
+          case "cut":
+            // For array cut, remove element from shadow array
+            const arrayPath = path.slice(0, -1);
+            const index = parseInt(path[path.length - 1]!);
+            store.removeShadowArrayElement(thisKey, arrayPath, index);
+            break;
+        }
+      };
+
+      shadowUpdate();
+      console.log("shadowState", getGlobalStore.getState().shadowStateStore);
       if (
         updateObj.updateType === "update" &&
         (validationKey || latestInitialOptionsRef.current?.validation?.key) &&

@@ -33,6 +33,15 @@ export type FormRefStoreState = {
 };
 export declare const formRefStore: import('zustand').UseBoundStore<import('zustand').StoreApi<FormRefStoreState>>;
 export type CogsGlobalState = {
+    shadowStateStore: {
+        [key: string]: any;
+    };
+    initializeShadowState: (key: string, initialState: any) => void;
+    updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+    insertShadowArrayElement: (key: string, arrayPath: string[]) => void;
+    removeShadowArrayElement: (key: string, arrayPath: string[], index: number) => void;
+    getShadowMetadata: (key: string, path: string[]) => any;
+    setShadowMetadata: (key: string, path: string[], metadata: any) => void;
     selectedIndicesMap: Map<string, Map<string, number>>;
     getSelectedIndex: (stateKey: string, parentPath: string) => number | undefined;
     setSelectedIndex: (stateKey: string, parentPath: string, index: number | undefined) => void;

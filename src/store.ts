@@ -85,7 +85,32 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
     return filteredRefs;
   },
 }));
+
+type ShadowMetadata = {
+  virtualisedState?: { listItemHeight: number };
+  syncInfo?: { status: string };
+  // Add other metadata fields you need
+};
+
+type ShadowState<T> =
+  T extends Array<infer U>
+    ? Array<ShadowState<U>> & ShadowMetadata
+    : T extends object
+      ? { [K in keyof T]: ShadowState<T[K]> } & ShadowMetadata
+      : ShadowMetadata;
 export type CogsGlobalState = {
+  shadowStateStore: { [key: string]: any };
+  initializeShadowState: (key: string, initialState: any) => void;
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+  insertShadowArrayElement: (key: string, arrayPath: string[]) => void;
+  removeShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    index: number
+  ) => void;
+  getShadowMetadata: (key: string, path: string[]) => any;
+  setShadowMetadata: (key: string, path: string[], metadata: any) => void;
+
   selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
 
   // Add these new methods
@@ -207,6 +232,130 @@ export type CogsGlobalState = {
 };
 
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  shadowStateStore: {},
+  getShadowMetadata: (key: string, path: string[]) => {
+    const shadow = get().shadowStateStore[key];
+    if (!shadow) return null;
+
+    let current = shadow;
+    for (const segment of path) {
+      current = current?.[segment];
+      if (!current) return null;
+    }
+
+    return current;
+  },
+
+  setShadowMetadata: (key: string, path: string[], metadata: any) => {
+    set((state) => {
+      const newShadow = { ...state.shadowStateStore };
+      if (!newShadow[key]) return state;
+
+      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
+
+      let current = newShadow[key];
+      for (const segment of path) {
+        if (!current[segment]) current[segment] = {};
+        current = current[segment];
+      }
+
+      Object.assign(current, metadata);
+
+      return { shadowStateStore: newShadow };
+    });
+  },
+  initializeShadowState: (key: string, initialState: any) => {
+    const createShadowStructure = (obj: any): any => {
+      if (Array.isArray(obj)) {
+        return new Array(obj.length)
+          .fill(null)
+          .map((_, i) => createShadowStructure(obj[i]));
+      }
+      if (typeof obj === "object" && obj !== null) {
+        const shadow: any = {};
+        for (const k in obj) {
+          shadow[k] = createShadowStructure(obj[k]);
+        }
+        return shadow;
+      }
+      return {}; // Leaf node - empty object for metadata
+    };
+
+    set((state) => ({
+      shadowStateStore: {
+        ...state.shadowStateStore,
+        [key]: createShadowStructure(initialState),
+      },
+    }));
+  },
+
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => {
+    set((state) => {
+      const newShadow = { ...state.shadowStateStore };
+      if (!newShadow[key]) return state;
+
+      let current = newShadow[key];
+      const pathCopy = [...path];
+      const lastSegment = pathCopy.pop();
+
+      // Navigate to parent
+      for (const segment of pathCopy) {
+        if (!current[segment]) current[segment] = {};
+        current = current[segment];
+      }
+
+      // Update shadow structure to match new value structure
+      if (lastSegment !== undefined) {
+        if (Array.isArray(newValue)) {
+          current[lastSegment] = new Array(newValue.length);
+        } else if (typeof newValue === "object" && newValue !== null) {
+          current[lastSegment] = {};
+        } else {
+          current[lastSegment] = current[lastSegment] || {};
+        }
+      }
+
+      return { shadowStateStore: newShadow };
+    });
+  },
+
+  insertShadowArrayElement: (key: string, arrayPath: string[]) => {
+    set((state) => {
+      const newShadow = { ...state.shadowStateStore };
+      let current = newShadow[key];
+
+      for (const segment of arrayPath) {
+        current = current?.[segment];
+      }
+
+      if (Array.isArray(current)) {
+        current.push({});
+      }
+
+      return { shadowStateStore: newShadow };
+    });
+  },
+
+  removeShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    index: number
+  ) => {
+    set((state) => {
+      const newShadow = { ...state.shadowStateStore };
+      let current = newShadow[key];
+
+      for (const segment of arrayPath) {
+        current = current?.[segment];
+      }
+
+      if (Array.isArray(current)) {
+        current.splice(index, 1);
+      }
+
+      return { shadowStateStore: newShadow };
+    });
+  },
   selectedIndicesMap: new Map<string, Map<string, number>>(),
 
   // Add the new methods
