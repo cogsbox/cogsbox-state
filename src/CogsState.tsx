@@ -1820,27 +1820,20 @@ function createProxyHandler<T>(
                 []
               );
 
-              // --- This useEffect now cleanly subscribes to height changes ---
               useEffect(() => {
-                // Subscribe to shadow state changes for this specific key.
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToShadowState(stateKey, forceRecalculate);
-
-                // On initial mount, we still need to trigger one recalculation
-                // to capture heights from the very first render.
                 const timer = setTimeout(forceRecalculate, 50);
-
-                // Cleanup function to unsubscribe when the component unmounts.
                 return () => {
                   unsubscribe();
                   clearTimeout(timer);
                 };
-              }, [stateKey, forceRecalculate]); // Runs only once on mount.
+              }, [stateKey, forceRecalculate]);
 
               const isAtBottomRef = useRef(stickToBottom);
-              const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
+              const previousTotalCountRef = useRef(0);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1876,34 +1869,28 @@ function createProxyHandler<T>(
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray]);
+
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 const listGrew = totalCount > previousTotalCountRef.current;
-
-                // --- THE FIX for BOTH initial load and new entries ---
-                // We capture the scroll position *before* we do anything else.
-                // We also check if we are VERY close to the bottom. This will be true
-                // on initial load (0 scrollHeight, 0 scrollTop) and when user is at the end.
-                const wasAtBottom =
-                  container.scrollHeight -
-                    container.scrollTop -
-                    container.clientHeight <
-                  5;
-
-                // Now we update the ref for the *next* render cycle.
                 previousTotalCountRef.current = totalCount;
 
+                const wasAtBottom = isAtBottomRef.current;
+
                 const handleScroll = () => {
-                  // ... (binary search logic to setRange is the same) ...
                   const { scrollTop, clientHeight, scrollHeight } = container;
+                  isAtBottomRef.current =
+                    scrollHeight - scrollTop - clientHeight < 5;
+
                   let search = (list: number[], value: number) => {
-                    let low = 0;
-                    let high = list.length - 1;
+                    let low = 0,
+                      high = list.length - 1;
                     while (low <= high) {
                       const mid = Math.floor((low + high) / 2);
-                      if (list[mid]! < value) {
+                      const midValue = list[mid]!;
+                      if (midValue < value) {
                         low = mid + 1;
                       } else {
                         high = mid - 1;
@@ -1937,20 +1924,21 @@ function createProxyHandler<T>(
                 });
                 handleScroll();
 
-                // This single block now handles all cases.
-                if (
-                  stickToBottom &&
-                  (listGrew || isInitialMountRef.current) &&
-                  wasAtBottom
-                ) {
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "auto",
-                  });
+                if (stickToBottom) {
+                  if (isInitialMountRef.current) {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
+                    });
+                  } else if (listGrew && wasAtBottom) {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
+                    });
+                  }
                 }
 
-                // We only set this to false after the first correct layout has been established.
-                if (positions.length > 0) {
+                if (totalCount > 0) {
                   isInitialMountRef.current = false;
                 }
 
