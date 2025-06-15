@@ -1817,7 +1817,7 @@ function createProxyHandler<T>(
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
-              // Subscribe to shadow state changes
+              const previousTotalHeightRef = useRef(0);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
@@ -1883,12 +1883,14 @@ function createProxyHandler<T>(
 
                 const wasAtBottom = isAtBottomRef.current;
                 const listGrew = totalCount > previousTotalCountRef.current;
+                const heightGrew = totalHeight > previousTotalHeightRef.current;
                 previousTotalCountRef.current = totalCount;
+                previousTotalHeightRef.current = totalHeight;
 
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 10;
+                    scrollHeight - scrollTop - clientHeight < 30;
 
                   // Binary search for start index
                   let low = 0,
@@ -1941,7 +1943,7 @@ function createProxyHandler<T>(
                       behavior: "auto",
                     });
                     isInitialMountRef.current = false;
-                  } else if (wasAtBottom && listGrew) {
+                  } else if (wasAtBottom && (listGrew || heightGrew)) {
                     console.log(
                       "stickToBottom wasAtBottom && listGrew",
                       container.scrollHeight
