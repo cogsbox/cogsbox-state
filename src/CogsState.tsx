@@ -1999,7 +1999,6 @@ function createProxyHandler<T>(
                   },
                 },
               };
-
               return {
                 virtualState,
                 virtualizerProps,
