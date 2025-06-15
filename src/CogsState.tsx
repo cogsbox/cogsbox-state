@@ -1945,7 +1945,7 @@ function createProxyHandler<T>(
               };
             };
           }
-          // ... other array methods like stateMap, stateFilter, etc.
+
           if (prop === "stateSort") {
             return (
               compareFn: (
