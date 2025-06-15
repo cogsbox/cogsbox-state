@@ -1814,28 +1814,9 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              const [heightsVersion, setHeightsVersion] = useState(0);
-              const forceRecalculate = useCallback(
-                () => setHeightsVersion((v) => v + 1),
-                []
-              );
-
-              // Track scroll position
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
-              const hasScrolledToBottomRef = useRef(false); // Track if we've done initial scroll
-
-              useEffect(() => {
-                const unsubscribe = getGlobalStore
-                  .getState()
-                  .subscribeToShadowState(stateKey, forceRecalculate);
-                const timer = setTimeout(forceRecalculate, 50);
-                return () => {
-                  unsubscribe();
-                  clearTimeout(timer);
-                };
-              }, [stateKey, forceRecalculate]);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1843,32 +1824,23 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              const { totalHeight, positions, allItemsMeasured } =
-                useMemo(() => {
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
-                  let height = 0;
-                  const pos: number[] = [];
-                  let measured = true;
+              // Calculate heights from shadow state
+              const { totalHeight, positions } = useMemo(() => {
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                let height = 0;
+                const pos: number[] = [];
 
-                  for (let i = 0; i < totalCount; i++) {
-                    pos[i] = height;
-                    const measuredHeight =
-                      shadowArray[i]?.virtualizer?.itemHeight;
-                    if (!measuredHeight && totalCount > 0) {
-                      measured = false;
-                    }
-                    height += measuredHeight || itemHeight;
-                  }
+                for (let i = 0; i < totalCount; i++) {
+                  pos[i] = height;
+                  const measuredHeight =
+                    shadowArray[i]?.virtualizer?.itemHeight;
+                  height += measuredHeight || itemHeight;
+                }
 
-                  return {
-                    totalHeight: height,
-                    positions: pos,
-                    allItemsMeasured: measured,
-                  };
-                }, [totalCount, stateKey, path, itemHeight, heightsVersion]);
+                return { totalHeight: height, positions: pos };
+              }, [totalCount, stateKey, path.join("."), itemHeight]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1894,7 +1866,6 @@ function createProxyHandler<T>(
 
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
-                  // Consider "at bottom" if within 10px
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
 
@@ -1939,37 +1910,18 @@ function createProxyHandler<T>(
 
                 // Handle stick to bottom
                 if (stickToBottom) {
-                  if (
-                    isInitialMountRef.current &&
-                    !hasScrolledToBottomRef.current
-                  ) {
-                    // For initial mount, wait for items to be measured
-                    if (allItemsMeasured && totalCount > 0) {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "auto",
-                      });
-                      hasScrolledToBottomRef.current = true;
-                      isInitialMountRef.current = false;
-                    } else if (totalCount > 0) {
-                      // If not all measured yet, try again soon
-                      const retryTimer = setTimeout(() => {
-                        if (containerRef.current && isInitialMountRef.current) {
-                          containerRef.current.scrollTo({
-                            top: containerRef.current.scrollHeight,
-                            behavior: "auto",
-                          });
-                          hasScrolledToBottomRef.current = true;
-                          isInitialMountRef.current = false;
-                        }
-                      }, 100);
-                      return () => clearTimeout(retryTimer);
-                    }
-                  } else if (
-                    !isInitialMountRef.current &&
-                    wasAtBottom &&
-                    listGrew
-                  ) {
+                  if (isInitialMountRef.current && totalCount > 0) {
+                    // Delay initial scroll to ensure items are rendered
+                    setTimeout(() => {
+                      if (containerRef.current) {
+                        containerRef.current.scrollTo({
+                          top: containerRef.current.scrollHeight,
+                          behavior: "auto",
+                        });
+                      }
+                    }, 0);
+                    isInitialMountRef.current = false;
+                  } else if (wasAtBottom && listGrew) {
                     // New items added and we were at bottom - stay at bottom
                     requestAnimationFrame(() => {
                       container.scrollTo({
@@ -1987,13 +1939,7 @@ function createProxyHandler<T>(
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [
-                totalCount,
-                positions,
-                overscan,
-                stickToBottom,
-                allItemsMeasured,
-              ]);
+              }, [totalCount, positions, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
