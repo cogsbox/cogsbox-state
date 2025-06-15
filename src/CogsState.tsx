@@ -1039,6 +1039,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const pathKey = `${thisKey}-${path.join(".")}`;
       componentUpdatesRef.current.add(pathKey);
     }
+    const store = getGlobalStore.getState();
+
     setState(thisKey, (prevValue: TStateObject) => {
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(prevValue as TStateObject)
@@ -1047,9 +1049,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const signalId = `${thisKey}-${path.join(".")}`;
       if (signalId) {
         let isArrayOperation = false;
-        let elements = getGlobalStore
-          .getState()
-          .signalDomElements.get(signalId);
+        let elements = store.signalDomElements.get(signalId);
 
         if (
           (!elements || elements.size === 0) &&
@@ -1062,9 +1062,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (Array.isArray(arrayValue)) {
             isArrayOperation = true;
             const arraySignalId = `${thisKey}-${arrayPath.join(".")}`;
-            elements = getGlobalStore
-              .getState()
-              .signalDomElements.get(arraySignalId);
+            elements = store.signalDomElements.get(arraySignalId);
           }
         }
 
@@ -1089,32 +1087,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
 
-      const shadowUpdate = () => {
-        const store = getGlobalStore.getState();
-
-        switch (updateObj.updateType) {
-          case "update":
-            // For updates, just mirror the structure at the path
-            store.updateShadowAtPath(thisKey, path, payload);
-            break;
-
-          case "insert":
-            // For array insert, add empty element to shadow array
-            const parentPath = path.slice(0, -1);
-            store.insertShadowArrayElement(thisKey, parentPath);
-            break;
-
-          case "cut":
-            // For array cut, remove element from shadow array
-            const arrayPath = path.slice(0, -1);
-            const index = parseInt(path[path.length - 1]!);
-            store.removeShadowArrayElement(thisKey, arrayPath, index);
-            break;
-        }
-      };
-
-      shadowUpdate();
-      console.log("shadowState", getGlobalStore.getState().shadowStateStore);
+      console.log("shadowState", store.shadowStateStore);
       if (
         updateObj.updateType === "update" &&
         (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
@@ -1164,7 +1137,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
-      const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
+      const stateEntry = store.stateComponents.get(thisKey);
       console.log("stateEntry >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", stateEntry);
       if (stateEntry) {
         const changedPaths = getDifferences(prevValue, payload);
@@ -1282,6 +1255,26 @@ export function useCogsStateFn<TStateObject extends unknown>(
         newValue,
       } satisfies UpdateTypeDetail;
 
+      switch (updateObj.updateType) {
+        case "update":
+          // For updates, just mirror the structure at the path
+          store.updateShadowAtPath(thisKey, path, payload);
+          break;
+
+        case "insert":
+          // For array insert, add empty element to shadow array
+          const parentPath = path.slice(0, -1);
+          store.insertShadowArrayElement(thisKey, parentPath);
+          break;
+
+        case "cut":
+          // For array cut, remove element from shadow array
+          const arrayPath = path.slice(0, -1);
+          const index = parseInt(path[path.length - 1]!);
+          store.removeShadowArrayElement(thisKey, arrayPath, index);
+          break;
+      }
+
       setStateLog(thisKey, (prevLogs) => {
         const logs = [...(prevLogs ?? []), newUpdate];
 
@@ -1322,7 +1315,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
       if (latestInitialOptionsRef.current?.serverSync) {
-        const serverStateStore = getGlobalStore.getState().serverState[thisKey];
+        const serverStateStore = store.serverState[thisKey];
         const serverSync = latestInitialOptionsRef.current?.serverSync;
         setServerSyncActions(thisKey, {
           syncKey:
