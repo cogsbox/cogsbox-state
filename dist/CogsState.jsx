@@ -665,7 +665,7 @@ function mt(t, c, m, f) {
                 _.current = V;
                 const W = () => {
                   const { scrollTop: Y, clientHeight: dt, scrollHeight: jt } = A;
-                  C.current = jt - Y - dt < 10;
+                  C.current = jt - Y - dt < 5;
                   let at = ((nt, Ot) => {
                     let ut = 0, yt = nt.length - 1;
                     for (; ut <= yt; ) {
@@ -680,13 +680,13 @@ function mt(t, c, m, f) {
                 };
                 return A.addEventListener("scroll", W, {
                   passive: !0
-                }), i && (F.current ? A.scrollTo({
+                }), W(), i && (F.current ? (A.scrollTo({
                   top: A.scrollHeight,
                   behavior: "auto"
-                }) : N && z && A.scrollTo({
+                }), F.current = !1) : z && N && A.scrollTo({
                   top: A.scrollHeight,
                   behavior: "auto"
-                })), F.current = !1, W(), () => A.removeEventListener("scroll", W);
+                })), () => A.removeEventListener("scroll", W);
               }, [V, s, i, P]);
               const E = pt(
                 (A = "smooth") => {

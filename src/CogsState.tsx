@@ -1876,7 +1876,6 @@ function createProxyHandler<T>(
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray]);
-
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1888,8 +1887,9 @@ function createProxyHandler<T>(
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 10;
+                    scrollHeight - scrollTop - clientHeight < 5; // Use a small tolerance
 
+                  // ... (binary search logic to setRange) ...
                   let search = (list: number[], value: number) => {
                     let low = 0;
                     let high = list.length - 1;
@@ -1903,7 +1903,6 @@ function createProxyHandler<T>(
                     }
                     return low;
                   };
-
                   let startIndex = search(positions, scrollTop);
                   let endIndex = startIndex;
                   while (
@@ -1912,10 +1911,8 @@ function createProxyHandler<T>(
                   ) {
                     endIndex++;
                   }
-
                   startIndex = Math.max(0, startIndex - overscan);
                   endIndex = Math.min(totalCount, endIndex + overscan);
-
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== startIndex ||
@@ -1930,23 +1927,27 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+                handleScroll(); // Run once to set initial view
 
+                // --- THE SIMPLE FIX ---
+                // We check the flags *after* handleScroll has updated them.
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
+                    // On first load, always go to the bottom.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
-                  } else if (wasAtBottom && listGrew) {
-                    // Use 'auto' for an instant jump to the bottom to prevent visual glitches.
+                    isInitialMountRef.current = false;
+                  } else if (listGrew && wasAtBottom) {
+                    // If a new item was added AND we were already at the bottom,
+                    // scroll to the new bottom.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
                   }
                 }
-                isInitialMountRef.current = false;
-                handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
