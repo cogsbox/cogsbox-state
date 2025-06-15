@@ -1836,7 +1836,6 @@ function createProxyHandler<T>(
                 };
 
                 const handleScroll = () => {
-                  // Update "at bottom" status
                   const { scrollTop, scrollHeight, clientHeight } = container;
 
                   isAtBottomRef.current =
