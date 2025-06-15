@@ -38,7 +38,7 @@ export type CogsGlobalState = {
     };
     initializeShadowState: (key: string, initialState: any) => void;
     updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
-    insertShadowArrayElement: (key: string, arrayPath: string[]) => void;
+    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any) => void;
     removeShadowArrayElement: (key: string, arrayPath: string[], index: number) => void;
     getShadowMetadata: (key: string, path: string[]) => any;
     setShadowMetadata: (key: string, path: string[], metadata: any) => void;

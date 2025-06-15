@@ -1,26 +1,26 @@
 import { create as u } from "zustand";
-const w = u((s, l) => ({
+const w = u((s, S) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, r) => s((t) => {
     const n = new Map(t.formRefs);
     return n.set(e, r), { formRefs: n };
   }),
-  getFormRef: (e) => l().formRefs.get(e),
+  getFormRef: (e) => S().formRefs.get(e),
   removeFormRef: (e) => s((r) => {
     const t = new Map(r.formRefs);
     return t.delete(e), { formRefs: t };
   }),
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
-    const r = l().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
+    const r = S().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
     return r.forEach((o, a) => {
       (a.startsWith(t) || a === e) && n.set(a, o);
     }), n;
   }
-})), h = u((s, l) => ({
+})), h = u((s, S) => ({
   shadowStateStore: {},
   getShadowMetadata: (e, r) => {
-    const t = l().shadowStateStore[e];
+    const t = S().shadowStateStore[e];
     if (!t) return null;
     let n = t;
     for (const o of r)
@@ -64,19 +64,35 @@ const w = u((s, l) => ({
       const o = { ...n.shadowStateStore };
       if (!o[e]) return n;
       let a = o[e];
-      const i = [...r], S = i.pop();
-      for (const c of i)
-        a[c] || (a[c] = {}), a = a[c];
-      return S !== void 0 && (Array.isArray(t) ? a[S] = new Array(t.length) : typeof t == "object" && t !== null ? a[S] = {} : a[S] = a[S] || {}), { shadowStateStore: o };
+      const i = [...r], c = i.pop();
+      for (const l of i)
+        a[l] || (a[l] = {}), a = a[l];
+      return c !== void 0 && (Array.isArray(t) ? a[c] = new Array(t.length) : typeof t == "object" && t !== null ? a[c] = {} : a[c] = a[c] || {}), { shadowStateStore: o };
     });
   },
-  insertShadowArrayElement: (e, r) => {
-    s((t) => {
-      const n = { ...t.shadowStateStore };
-      let o = n[e];
-      for (const a of r)
-        o = o?.[a];
-      return Array.isArray(o) && o.push({}), { shadowStateStore: n };
+  insertShadowArrayElement: (e, r, t) => {
+    s((n) => {
+      const o = { ...n.shadowStateStore };
+      if (!o[e]) return n;
+      o[e] = JSON.parse(JSON.stringify(o[e]));
+      let a = o[e];
+      for (const i of r)
+        if (a = a[i], !a) return n;
+      if (Array.isArray(a)) {
+        const i = (c) => {
+          if (Array.isArray(c))
+            return c.map((l) => i(l));
+          if (typeof c == "object" && c !== null) {
+            const l = {};
+            for (const d in c)
+              l[d] = i(c[d]);
+            return l;
+          }
+          return {};
+        };
+        a.push(i(t));
+      }
+      return { shadowStateStore: o };
     });
   },
   removeShadowArrayElement: (e, r, t) => {
@@ -91,7 +107,7 @@ const w = u((s, l) => ({
   selectedIndicesMap: /* @__PURE__ */ new Map(),
   // Add the new methods
   getSelectedIndex: (e, r) => {
-    const t = l().selectedIndicesMap.get(e);
+    const t = S().selectedIndicesMap.get(e);
     if (t)
       return t.get(r);
   },
@@ -128,7 +144,7 @@ const w = u((s, l) => ({
     });
   },
   stateComponents: /* @__PURE__ */ new Map(),
-  subscribe: (e) => l().subscribe(e),
+  subscribe: (e) => S().subscribe(e),
   reactiveDeps: {},
   setReactiveDeps: (e, r) => s((t) => ({
     ...t,
@@ -147,11 +163,11 @@ const w = u((s, l) => ({
   reRenderTriggerPrevValue: {},
   signalDomElements: /* @__PURE__ */ new Map(),
   addSignalElement: (e, r) => {
-    const t = l().signalDomElements;
+    const t = S().signalDomElements;
     t.has(e) || t.set(e, /* @__PURE__ */ new Set()), t.get(e).add(r), s({ signalDomElements: new Map(t) });
   },
   removeSignalElement: (e, r) => {
-    const t = l().signalDomElements, n = t.get(e);
+    const t = S().signalDomElements, n = t.get(e);
     n && n.forEach((o) => {
       o.instanceId === r && n.delete(o);
     }), s({ signalDomElements: new Map(t) });
@@ -193,8 +209,8 @@ const w = u((s, l) => ({
       }
     }));
   },
-  getServerSideOrNot: (e) => l().serverSideOrNot[e],
-  getThisLocalUpdate: (e) => l().stateLog[e],
+  getServerSideOrNot: (e) => S().serverSideOrNot[e],
+  getThisLocalUpdate: (e) => S().stateLog[e],
   setServerState: (e, r) => {
     s((t) => ({
       serverState: {
@@ -244,66 +260,66 @@ const w = u((s, l) => ({
       return Array.from(t.keys()).forEach((a) => {
         const i = a.split(".");
         if (i.length >= o.length) {
-          let S = !0;
-          for (let c = 0; c < o.length; c++)
-            if (i[c] !== o[c]) {
-              S = !1;
+          let c = !0;
+          for (let l = 0; l < o.length; l++)
+            if (i[l] !== o[l]) {
+              c = !1;
               break;
             }
-          S && (n = !0, t.delete(a));
+          c && (n = !0, t.delete(a));
         }
       }), n ? { validationErrors: t } : r;
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = l().validationErrors, n = e.split("."), o = (a, i) => a === "[*]" ? !0 : Array.isArray(a) ? a.includes(parseInt(i)) : a === i;
+    const r = [], t = S().validationErrors, n = e.split("."), o = (a, i) => a === "[*]" ? !0 : Array.isArray(a) ? a.includes(parseInt(i)) : a === i;
     return Array.from(t.keys()).forEach((a) => {
       const i = a.split(".");
       if (i.length >= n.length) {
-        let S = !0;
-        for (let c = 0; c < n.length; c++) {
-          const d = n[c], f = i[c];
+        let c = !0;
+        for (let l = 0; l < n.length; l++) {
+          const d = n[l], f = i[l];
           if (d === "[*]" || Array.isArray(d)) {
             const p = parseInt(f);
             if (isNaN(p)) {
-              S = !1;
+              c = !1;
               break;
             }
             if (!o(d, f)) {
-              S = !1;
+              c = !1;
               break;
             }
           } else if (d !== f) {
-            S = !1;
+            c = !1;
             break;
           }
         }
-        if (S) {
-          const c = t.get(a);
-          c && r.push(...c);
+        if (c) {
+          const l = t.get(a);
+          l && r.push(...l);
         }
       }
     }), r;
   },
-  getInitialOptions: (e) => l().initialStateOptions[e],
+  getInitialOptions: (e) => S().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = l().cogsStateStore[e], n = (o, a) => {
+    const t = S().cogsStateStore[e], n = (o, a) => {
       if (a.length === 0) return o;
-      const i = a[0], S = a.slice(1);
+      const i = a[0], c = a.slice(1);
       if (i === "[*]") {
         if (!Array.isArray(o)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (S.length === 0) return o;
+        if (c.length === 0) return o;
         const d = o.map(
-          (f) => n(f, S)
+          (f) => n(f, c)
         );
         return Array.isArray(d[0]) ? d.flat() : d;
       }
-      const c = o[i];
-      if (c !== void 0)
-        return n(c, S);
+      const l = o[i];
+      if (l !== void 0)
+        return n(l, c);
     };
     return n(t, r);
   },
@@ -323,12 +339,12 @@ const w = u((s, l) => ({
       }
     }));
   },
-  getUpdaterState: (e) => l().updaterState[e],
+  getUpdaterState: (e) => S().updaterState[e],
   setUpdaterState: (e, r) => {
-    const t = l().updaterState;
+    const t = S().updaterState;
     !e || !r || s({ updaterState: { ...t ?? {}, [e]: r } });
   },
-  getKeyState: (e) => l().cogsStateStore[e],
+  getKeyState: (e) => S().cogsStateStore[e],
   setState: (e, r) => {
     s((t) => ({
       cogsStateStore: {
@@ -358,7 +374,7 @@ const w = u((s, l) => ({
     const n = new Map(t.syncInfoStore);
     return n.set(e, r), { ...t, syncInfoStore: n };
   }),
-  getSyncInfo: (e) => l().syncInfoStore.get(e) || null
+  getSyncInfo: (e) => S().syncInfoStore.get(e) || null
 }));
 export {
   w as formRefStore,
