@@ -1869,7 +1869,6 @@ function createProxyHandler<T>(
                 const wasAtBottom = isAtBottomRef.current;
                 const listGrew = totalCount > previousTotalCountRef.current;
                 previousTotalCountRef.current = totalCount;
-
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
