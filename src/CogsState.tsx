@@ -1816,20 +1816,18 @@ function createProxyHandler<T>(
 
               // --- State and Lock Management Refs ---
               const isLockedToBottomRef = useRef(stickToBottom);
-              const isInitialMountRef = useRef(true);
+              // This ref tracks the item count to determine when to scroll smoothly vs instantly.
+              const previousTotalCountRef = useRef(0);
 
               // Subscribe to shadow state changes for height updates
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
-                // Subscribe to shadow state updates for this stateKey
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToShadowState(stateKey, () => {
-                    // Force recalculation when shadow state updates
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
-
                 return unsubscribe;
               }, [stateKey]);
 
@@ -1839,21 +1837,19 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights from shadow state
+              // Calculate heights and positions from shadow state
               const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
                 let height = 0;
                 const pos: number[] = [];
-
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
                   height += measuredHeight || itemHeight;
                 }
-
                 return { totalHeight: height, positions: pos };
               }, [
                 totalCount,
@@ -1881,30 +1877,23 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
+                const listGrew = totalCount > previousTotalCountRef.current;
+
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
-
-                  // Determine if the user is at the bottom
                   const isNowAtBottom =
                     scrollHeight - scrollTop - clientHeight < 1;
-
-                  // If the user scrolls up, unlock. If they scroll back down, re-lock.
                   isLockedToBottomRef.current = isNowAtBottom;
 
-                  // Binary search for start index
+                  // ... (virtualization range calculation logic is unchanged)
                   let low = 0,
                     high = totalCount - 1;
                   while (low <= high) {
                     const mid = Math.floor((low + high) / 2);
-                    if (positions[mid]! < scrollTop) {
-                      low = mid + 1;
-                    } else {
-                      high = mid - 1;
-                    }
+                    if (positions[mid]! < scrollTop) low = mid + 1;
+                    else high = mid - 1;
                   }
                   const startIndex = Math.max(0, high - overscan);
-
-                  // Find end index
                   let endIndex = startIndex;
                   const visibleEnd = scrollTop + clientHeight;
                   while (
@@ -1914,7 +1903,6 @@ function createProxyHandler<T>(
                     endIndex++;
                   }
                   endIndex = Math.min(totalCount, endIndex + overscan);
-
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== startIndex ||
@@ -1930,12 +1918,15 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- REFINED STICK-TO-BOTTOM LOGIC ---
+                // --- ROBUST STICK-TO-BOTTOM LOGIC ---
                 if (stickToBottom && isLockedToBottomRef.current) {
-                  // Use 'auto' for instant snap on first load, 'smooth' for subsequent updates.
-                  const behavior = isInitialMountRef.current
-                    ? "auto"
-                    : "smooth";
+                  // If the list grew (a new message was added), we want a smooth scroll.
+                  // For all other cases (initial load, height recalculation), we MUST
+                  // use 'auto' to instantly snap to the bottom and prevent the "jump up".
+                  const behavior =
+                    listGrew && previousTotalCountRef.current > 0
+                      ? "smooth"
+                      : "auto";
 
                   container.scrollTo({
                     top: container.scrollHeight,
@@ -1943,15 +1934,9 @@ function createProxyHandler<T>(
                   });
                 }
 
-                // After the first layout effect, it's no longer the initial mount.
-                // queueMicrotask ensures this is set *after* the current render cycle.
-                queueMicrotask(() => {
-                  if (isInitialMountRef.current) {
-                    isInitialMountRef.current = false;
-                  }
-                });
+                // Update the count for the next run AFTER the scroll logic.
+                previousTotalCountRef.current = totalCount;
 
-                // Run handleScroll once on setup to set initial range and lock status
                 handleScroll();
 
                 return () =>
@@ -1999,6 +1984,7 @@ function createProxyHandler<T>(
                   },
                 },
               };
+
               return {
                 virtualState,
                 virtualizerProps,
