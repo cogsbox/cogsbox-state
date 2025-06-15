@@ -629,10 +629,7 @@ function mt(t, c, h, f) {
                 ($) => o.getState().getShadowMetadata(t, [...n, $.toString()])?.virtualizer?.itemHeight || r,
                 [r]
               ), A = dt(() => {
-                const $ = o().getNestedState(
-                  t,
-                  n
-                );
+                const $ = o.getState().getNestedState(t, n);
                 let b = 0;
                 const G = [];
                 for (let z = 0; z < $.length; z++)

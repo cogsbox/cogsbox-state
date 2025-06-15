@@ -1826,10 +1826,9 @@ function createProxyHandler<T>(
 
               // Calculate total height and item positions
               const calculateHeights = useCallback(() => {
-                const sourceArray = getGlobalStore().getNestedState(
-                  stateKey,
-                  path
-                ) as any[];
+                const sourceArray = getGlobalStore
+                  .getState()
+                  .getNestedState(stateKey, path) as any[];
 
                 let totalHeight = 0;
                 const positions: number[] = [];
