@@ -337,7 +337,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       if (Array.isArray(current)) {
         current.push({});
       }
-
       return { shadowStateStore: newShadow };
     });
   },
