@@ -1784,7 +1784,7 @@ function createProxyHandler<T>(
               }
 
               const containerRef = useRef<HTMLDivElement | null>(null);
-              const wasAtBottomRef = useRef(true);
+
               const rangeRef = useRef({ startIndex: 0, endIndex: 50 });
 
               const [range, setRange] = useState({
@@ -1825,7 +1825,6 @@ function createProxyHandler<T>(
                   // Check if at bottom
                   const isAtBottom =
                     scrollHeight - scrollTop - clientHeight < 2;
-                  wasAtBottomRef.current = isAtBottom;
 
                   // Calculate what's actually visible
                   const firstVisible = Math.floor(scrollTop / itemHeight);
@@ -1886,18 +1885,21 @@ function createProxyHandler<T>(
                 };
               }, [totalCount, itemHeight, overscan, stickToBottom]);
 
-              // Auto-stick to bottom when new items added
               useEffect(() => {
-                if (
-                  stickToBottom &&
-                  wasAtBottomRef.current &&
-                  containerRef.current
-                ) {
-                  containerRef.current.scrollTop =
-                    containerRef.current.scrollHeight;
+                if (stickToBottom && containerRef.current && totalCount > 0) {
+                  const container = containerRef.current;
+
+                  // Only auto-scroll if currently near bottom
+                  if (
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    50
+                  ) {
+                    container.scrollTop = container.scrollHeight;
+                  }
                 }
               }, [totalCount, stickToBottom]);
-
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
