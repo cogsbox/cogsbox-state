@@ -1824,6 +1824,7 @@ function createProxyHandler<T>(
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
+              const hasScrolledToBottomRef = useRef(false); // Track if we've done initial scroll
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1842,20 +1843,32 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              const { totalHeight, positions } = useMemo(() => {
-                const shadowArray =
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                  [];
-                let height = 0;
-                const pos: number[] = [];
-                for (let i = 0; i < totalCount; i++) {
-                  pos[i] = height;
-                  const measuredHeight =
-                    shadowArray[i]?.virtualizer?.itemHeight;
-                  height += measuredHeight || itemHeight;
-                }
-                return { totalHeight: height, positions: pos };
-              }, [totalCount, stateKey, path, itemHeight, heightsVersion]);
+              const { totalHeight, positions, allItemsMeasured } =
+                useMemo(() => {
+                  const shadowArray =
+                    getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, path) || [];
+                  let height = 0;
+                  const pos: number[] = [];
+                  let measured = true;
+
+                  for (let i = 0; i < totalCount; i++) {
+                    pos[i] = height;
+                    const measuredHeight =
+                      shadowArray[i]?.virtualizer?.itemHeight;
+                    if (!measuredHeight && totalCount > 0) {
+                      measured = false;
+                    }
+                    height += measuredHeight || itemHeight;
+                  }
+
+                  return {
+                    totalHeight: height,
+                    positions: pos,
+                    allItemsMeasured: measured,
+                  };
+                }, [totalCount, stateKey, path, itemHeight, heightsVersion]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1926,13 +1939,37 @@ function createProxyHandler<T>(
 
                 // Handle stick to bottom
                 if (stickToBottom) {
-                  if (isInitialMountRef.current) {
-                    // First render - go to bottom instantly
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
-                    });
-                  } else if (wasAtBottom && listGrew) {
+                  if (
+                    isInitialMountRef.current &&
+                    !hasScrolledToBottomRef.current
+                  ) {
+                    // For initial mount, wait for items to be measured
+                    if (allItemsMeasured && totalCount > 0) {
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "auto",
+                      });
+                      hasScrolledToBottomRef.current = true;
+                      isInitialMountRef.current = false;
+                    } else if (totalCount > 0) {
+                      // If not all measured yet, try again soon
+                      const retryTimer = setTimeout(() => {
+                        if (containerRef.current && isInitialMountRef.current) {
+                          containerRef.current.scrollTo({
+                            top: containerRef.current.scrollHeight,
+                            behavior: "auto",
+                          });
+                          hasScrolledToBottomRef.current = true;
+                          isInitialMountRef.current = false;
+                        }
+                      }, 100);
+                      return () => clearTimeout(retryTimer);
+                    }
+                  } else if (
+                    !isInitialMountRef.current &&
+                    wasAtBottom &&
+                    listGrew
+                  ) {
                     // New items added and we were at bottom - stay at bottom
                     requestAnimationFrame(() => {
                       container.scrollTo({
@@ -1941,17 +1978,22 @@ function createProxyHandler<T>(
                       });
                     });
                   }
+                } else {
+                  isInitialMountRef.current = false;
                 }
-
-                // Mark as no longer initial mount after first render
-                isInitialMountRef.current = false;
 
                 // Run handleScroll once to set initial range
                 handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, positions, overscan, stickToBottom]);
+              }, [
+                totalCount,
+                positions,
+                overscan,
+                stickToBottom,
+                allItemsMeasured,
+              ]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
