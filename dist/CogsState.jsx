@@ -523,7 +523,7 @@ function lt(t, c, h, g) {
           "_stateKey",
           "getComponents"
         ]);
-        if (l !== "then" && !l.startsWith("$") && l !== "stateMapNoRender" && !ot.has(l)) {
+        if (console.log("prop", m, r, l), l && l !== "then" && !l.startsWith("$") && l !== "stateMapNoRender" && !ot.has(l)) {
           const d = `${t}////${h}`, e = o.getState().stateComponents.get(t);
           if (e) {
             const n = e.components.get(d);

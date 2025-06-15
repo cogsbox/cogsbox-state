@@ -1558,7 +1558,10 @@ function createProxyHandler<T>(
           "_stateKey",
           "getComponents",
         ]);
+
+        console.log("prop", target, path, prop);
         if (
+          prop &&
           prop !== "then" &&
           !prop.startsWith("$") &&
           prop !== "stateMapNoRender" &&
