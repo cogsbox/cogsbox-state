@@ -1782,8 +1782,6 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 50,
               });
-              const isAtBottomRef = useRef(true);
-              const prevSourceArrayRef = useRef<any[]>();
 
               // Get source array
               const sourceArray = getGlobalStore().getNestedState(
@@ -1791,13 +1789,6 @@ function createProxyHandler<T>(
                 path
               ) as any[];
               const totalCount = sourceArray.length;
-
-              // Check if source array changed (new conversation)
-              const sourceArrayChanged =
-                prevSourceArrayRef.current !== sourceArray;
-              if (sourceArrayChanged) {
-                prevSourceArrayRef.current = sourceArray;
-              }
 
               // Create virtual state
               const virtualState = useMemo(() => {
@@ -1820,11 +1811,7 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 const handleScroll = () => {
-                  const { scrollTop, clientHeight, scrollHeight } = container;
-
-                  // Track if at bottom
-                  isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 10;
+                  const { scrollTop, clientHeight } = container;
 
                   const start = Math.max(
                     0,
@@ -1843,8 +1830,8 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Initial setup or source array changed
-                if (sourceArrayChanged && stickToBottom && totalCount > 0) {
+                // Scroll to bottom on mount if stickToBottom
+                if (stickToBottom && totalCount > 0) {
                   const visibleCount = Math.ceil(
                     container.clientHeight / itemHeight
                   );
@@ -1853,39 +1840,16 @@ function createProxyHandler<T>(
                     totalCount - visibleCount - overscan
                   );
                   setRange({ startIndex: start, endIndex: totalCount });
-                  container.scrollTop = container.scrollHeight;
-                  isAtBottomRef.current = true;
+                  setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                  }, 0);
                 } else {
                   handleScroll();
                 }
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [
-                sourceArray,
-                totalCount,
-                itemHeight,
-                overscan,
-                stickToBottom,
-              ]);
-
-              // Auto-scroll if at bottom when new items added (same conversation)
-              useEffect(() => {
-                if (stickToBottom && containerRef.current) {
-                  const container = containerRef.current;
-                  const wasAtBottom =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    10;
-
-                  if (wasAtBottom && !sourceArrayChanged) {
-                    requestAnimationFrame(() => {
-                      container.scrollTop = container.scrollHeight;
-                    });
-                  }
-                }
-              }, [totalCount, sourceArrayChanged]);
+              }, [totalCount, itemHeight, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1939,7 +1903,6 @@ function createProxyHandler<T>(
               };
             };
           }
-
           if (prop === "stateSort") {
             return (
               compareFn: (
