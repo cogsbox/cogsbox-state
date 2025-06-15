@@ -36,6 +36,8 @@ export type CogsGlobalState = {
     shadowStateStore: {
         [key: string]: any;
     };
+    shadowStateSubscribers: Map<string, Set<() => void>>;
+    subscribeToShadowState: (key: string, callback: () => void) => () => void;
     initializeShadowState: (key: string, initialState: any) => void;
     updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
     insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any) => void;
@@ -68,30 +70,9 @@ export type CogsGlobalState = {
     iniitialCreatedState: {
         [key: string]: StateValue;
     };
-    validationErrors: Map<string, string[]>;
     serverState: {
         [key: string]: StateValue;
     };
-    serverSyncActions: {
-        [key: string]: SyncActionsType<any>;
-    };
-    serverSyncLog: {
-        [key: string]: SyncLogType[];
-    };
-    serverSideOrNot: {
-        [key: string]: boolean;
-    };
-    setServerSyncLog: (key: string, newValue: SyncLogType) => void;
-    setServerSideOrNot: (key: string, value: boolean) => void;
-    getServerSideOrNot: (key: string) => boolean | undefined;
-    setServerState: <StateKey extends StateKeys>(key: StateKey, value: StateValue) => void;
-    getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
-    setServerSyncActions: (key: string, value: SyncActionsType<any>) => void;
-    addValidationError: (path: string, message: string) => void;
-    getValidationErrors: (path: string) => string[];
-    updateInitialStateGlobal: (key: string, newState: StateValue) => void;
-    updateInitialCreatedState: (key: string, newState: StateValue) => void;
-    getInitialOptions: (key: string) => OptionsType | undefined;
     getUpdaterState: (key: string) => StateUpdater<StateValue>;
     setUpdaterState: (key: string, newUpdater: any) => void;
     getKeyState: <StateKey extends StateKeys>(key: StateKey) => StateValue;
@@ -99,13 +80,37 @@ export type CogsGlobalState = {
     setState: <StateKey extends StateKeys>(key: StateKey, value: StateUpdater<StateValue>) => void;
     setInitialStates: (initialState: StateValue) => void;
     setCreatedState: (initialState: StateValue) => void;
+    updateInitialStateGlobal: (key: string, newState: StateValue) => void;
+    updateInitialCreatedState: (key: string, newState: StateValue) => void;
+    setIsLoadingGlobal: (key: string, value: boolean) => void;
+    setServerState: <StateKey extends StateKeys>(key: StateKey, value: StateValue) => void;
+    getInitialOptions: (key: string) => OptionsType | undefined;
+    setInitialStateOptions: (key: string, value: OptionsType) => void;
+    validationErrors: Map<string, string[]>;
+    addValidationError: (path: string, message: string) => void;
+    getValidationErrors: (path: string) => string[];
+    removeValidationError: (path: string) => void;
+    serverSyncActions: {
+        [key: string]: SyncActionsType<any>;
+    };
+    serverSyncLog: {
+        [key: string]: SyncLogType[];
+    };
     stateLog: {
         [key: string]: UpdateTypeDetail[];
     };
+    syncInfoStore: Map<string, SyncInfo>;
+    serverSideOrNot: {
+        [key: string]: boolean;
+    };
+    setServerSyncLog: (key: string, newValue: SyncLogType) => void;
+    setServerSideOrNot: (key: string, value: boolean) => void;
+    getServerSideOrNot: (key: string) => boolean | undefined;
+    getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
+    setServerSyncActions: (key: string, value: SyncActionsType<any>) => void;
     setStateLog: (key: string, updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]) => void;
-    setIsLoadingGlobal: (key: string, value: boolean) => void;
-    setInitialStateOptions: (key: string, value: OptionsType) => void;
-    removeValidationError: (path: string) => void;
+    setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
+    getSyncInfo: (key: string) => SyncInfo | null;
     signalDomElements: Map<string, Set<{
         instanceId: string;
         parentId: string;
@@ -121,6 +126,7 @@ export type CogsGlobalState = {
         map?: string;
     }) => void;
     removeSignalElement: (signalId: string, instanceId: string) => void;
+    stateComponents: Map<string, ComponentsType>;
     reRenderTriggerPrevValue: Record<string, any>;
     reactiveDeps: Record<string, {
         deps: any[];
@@ -134,10 +140,6 @@ export type CogsGlobalState = {
     }) => void;
     deleteReactiveDeps: (key: string) => void;
     subscribe: (listener: () => void) => () => void;
-    stateComponents: Map<string, ComponentsType>;
-    syncInfoStore: Map<string, SyncInfo>;
-    setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
-    getSyncInfo: (key: string) => SyncInfo | null;
 };
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};

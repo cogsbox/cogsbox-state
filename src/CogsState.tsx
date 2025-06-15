@@ -1814,25 +1814,29 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              // --- STATE AND CALLBACKS FOR HEIGHTS ---
-              // This state value is the key. We increment it to force a re-calculation.
               const [heightsVersion, setHeightsVersion] = useState(0);
-              // This callback is stable and won't cause re-renders itself.
               const forceRecalculate = useCallback(
                 () => setHeightsVersion((v) => v + 1),
                 []
               );
 
-              // --- ON MOUNT: SCHEDULE A RECALCULATION ---
-              // This solves the "initial load" problem. It ensures that after the first
-              // items render and measure themselves, we run the calculations again
-              // with the new, correct height data.
+              // --- This useEffect now cleanly subscribes to height changes ---
               useEffect(() => {
-                const timer = setTimeout(() => {
-                  forceRecalculate();
-                }, 50); // A small delay helps batch initial measurements.
-                return () => clearTimeout(timer);
-              }, [forceRecalculate]);
+                // Subscribe to shadow state changes for this specific key.
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToShadowState(stateKey, forceRecalculate);
+
+                // On initial mount, we still need to trigger one recalculation
+                // to capture heights from the very first render.
+                const timer = setTimeout(forceRecalculate, 50);
+
+                // Cleanup function to unsubscribe when the component unmounts.
+                return () => {
+                  unsubscribe();
+                  clearTimeout(timer);
+                };
+              }, [stateKey, forceRecalculate]); // Runs only once on mount.
 
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
@@ -1844,27 +1848,21 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // --- EFFICIENT HEIGHT & POSITION CALCULATION ---
               const { totalHeight, positions } = useMemo(() => {
-                // Get the shadow object for the whole array ONCE. This is fast.
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
-
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  // Access the height from the local shadowArray. No repeated deep lookups.
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
                   height += measuredHeight || itemHeight;
                 }
                 return { totalHeight: height, positions: pos };
-                // This now depends on `heightsVersion`, so it re-runs when we force it.
               }, [totalCount, stateKey, path, itemHeight, heightsVersion]);
 
-              // This logic is from your original working code.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1877,9 +1875,8 @@ function createProxyHandler<T>(
                   ...meta,
                   validIndices,
                 });
-              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+              }, [range.startIndex, range.endIndex, sourceArray]);
 
-              // This is your original useLayoutEffect with the robust index calculation.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1893,7 +1890,6 @@ function createProxyHandler<T>(
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
 
-                  // ROBUST: Binary search to find the start index. Prevents errors.
                   let search = (list: number[], value: number) => {
                     let low = 0;
                     let high = list.length - 1;
@@ -1909,7 +1905,6 @@ function createProxyHandler<T>(
                   };
 
                   let startIndex = search(positions, scrollTop);
-
                   let endIndex = startIndex;
                   while (
                     endIndex < totalCount &&
@@ -1936,7 +1931,6 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // This stickToBottom logic is from your original working code.
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
                     container.scrollTo({
@@ -1944,15 +1938,13 @@ function createProxyHandler<T>(
                       behavior: "auto",
                     });
                   } else if (wasAtBottom && listGrew) {
-                    requestAnimationFrame(() => {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "smooth",
-                      });
+                    // Use 'auto' for an instant jump to the bottom to prevent visual glitches.
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
                     });
                   }
                 }
-
                 isInitialMountRef.current = false;
                 handleScroll();
 
@@ -2950,7 +2942,6 @@ export function $cogsSignalStore(proxy: {
   );
   return createElement("text", {}, String(value));
 }
-
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
@@ -2962,19 +2953,31 @@ function CogsItemWrapper({
   itemPath: string[];
   children: React.ReactNode;
 }) {
+  // This hook handles the re-rendering when the item's own data changes.
   const [, forceUpdate] = useState({});
+  // This hook measures the element.
   const [ref, bounds] = useMeasure();
+  // This ref prevents sending the same height update repeatedly.
+  const lastReportedHeight = useRef<number | null>(null);
 
+  // This is the primary effect for this component.
   useEffect(() => {
-    if (bounds.height > 0) {
+    // We only report a height if it's a valid number AND it's different
+    // from the last height we reported. This prevents infinite loops.
+    if (bounds.height > 0 && bounds.height !== lastReportedHeight.current) {
+      // Store the new height so we don't report it again.
+      lastReportedHeight.current = bounds.height;
+
+      // Call the store function to save the height and notify listeners.
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
         virtualizer: {
           itemHeight: bounds.height,
         },
       });
     }
-  }, [bounds.height]);
+  }, [bounds.height, stateKey, itemPath]); // Reruns whenever the measured height changes.
 
+  // This effect handles subscribing the item to its own data path for updates.
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore
@@ -3000,5 +3003,6 @@ function CogsItemWrapper({
     };
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 
+  // The rendered output is a simple div that gets measured.
   return <div ref={ref}>{children}</div>;
 }

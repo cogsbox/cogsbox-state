@@ -98,8 +98,12 @@ type ShadowState<T> =
     : T extends object
       ? { [K in keyof T]: ShadowState<T[K]> } & ShadowMetadata
       : ShadowMetadata;
+
 export type CogsGlobalState = {
+  // --- Shadow State and Subscription System ---
   shadowStateStore: { [key: string]: any };
+  shadowStateSubscribers: Map<string, Set<() => void>>; // Stores subscribers for shadow state updates
+  subscribeToShadowState: (key: string, callback: () => void) => () => void; // Subscribes a listener, returns an unsubscribe function
   initializeShadowState: (key: string, initialState: any) => void;
   updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
   insertShadowArrayElement: (
@@ -115,9 +119,8 @@ export type CogsGlobalState = {
   getShadowMetadata: (key: string, path: string[]) => any;
   setShadowMetadata: (key: string, path: string[], metadata: any) => void;
 
+  // --- Selected Item State ---
   selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
-
-  // Add these new methods
   getSelectedIndex: (
     stateKey: string,
     parentPath: string
@@ -135,36 +138,16 @@ export type CogsGlobalState = {
     path: string[];
   }) => void;
   clearSelectedIndexesForState: (stateKey: string) => void;
+
+  // --- Core State and Updaters ---
   updaterState: { [key: string]: any };
   initialStateOptions: { [key: string]: OptionsType };
   cogsStateStore: { [key: string]: StateValue };
   isLoadingGlobal: { [key: string]: boolean };
-
   initialStateGlobal: { [key: string]: StateValue };
   iniitialCreatedState: { [key: string]: StateValue };
-  validationErrors: Map<string, string[]>;
-
   serverState: { [key: string]: StateValue };
-  serverSyncActions: { [key: string]: SyncActionsType<any> };
 
-  serverSyncLog: { [key: string]: SyncLogType[] };
-  serverSideOrNot: { [key: string]: boolean };
-  setServerSyncLog: (key: string, newValue: SyncLogType) => void;
-
-  setServerSideOrNot: (key: string, value: boolean) => void;
-  getServerSideOrNot: (key: string) => boolean | undefined;
-  setServerState: <StateKey extends StateKeys>(
-    key: StateKey,
-    value: StateValue
-  ) => void;
-
-  getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
-  setServerSyncActions: (key: string, value: SyncActionsType<any>) => void;
-  addValidationError: (path: string, message: string) => void;
-  getValidationErrors: (path: string) => string[];
-  updateInitialStateGlobal: (key: string, newState: StateValue) => void;
-  updateInitialCreatedState: (key: string, newState: StateValue) => void;
-  getInitialOptions: (key: string) => OptionsType | undefined;
   getUpdaterState: (key: string) => StateUpdater<StateValue>;
   setUpdaterState: (key: string, newUpdater: any) => void;
   getKeyState: <StateKey extends StateKeys>(key: StateKey) => StateValue;
@@ -178,15 +161,41 @@ export type CogsGlobalState = {
   ) => void;
   setInitialStates: (initialState: StateValue) => void;
   setCreatedState: (initialState: StateValue) => void;
+  updateInitialStateGlobal: (key: string, newState: StateValue) => void;
+  updateInitialCreatedState: (key: string, newState: StateValue) => void;
+  setIsLoadingGlobal: (key: string, value: boolean) => void;
+  setServerState: <StateKey extends StateKeys>(
+    key: StateKey,
+    value: StateValue
+  ) => void;
+  getInitialOptions: (key: string) => OptionsType | undefined;
+  setInitialStateOptions: (key: string, value: OptionsType) => void;
+
+  // --- Validation ---
+  validationErrors: Map<string, string[]>;
+  addValidationError: (path: string, message: string) => void;
+  getValidationErrors: (path: string) => string[];
+  removeValidationError: (path: string) => void;
+
+  // --- Server Sync and Logging ---
+  serverSyncActions: { [key: string]: SyncActionsType<any> };
+  serverSyncLog: { [key: string]: SyncLogType[] };
   stateLog: { [key: string]: UpdateTypeDetail[] };
+  syncInfoStore: Map<string, SyncInfo>;
+  serverSideOrNot: { [key: string]: boolean };
+  setServerSyncLog: (key: string, newValue: SyncLogType) => void;
+  setServerSideOrNot: (key: string, value: boolean) => void;
+  getServerSideOrNot: (key: string) => boolean | undefined;
+  getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
+  setServerSyncActions: (key: string, value: SyncActionsType<any>) => void;
   setStateLog: (
     key: string,
     updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]
   ) => void;
-  setIsLoadingGlobal: (key: string, value: boolean) => void;
+  setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
+  getSyncInfo: (key: string) => SyncInfo | null;
 
-  setInitialStateOptions: (key: string, value: OptionsType) => void;
-  removeValidationError: (path: string) => void;
+  // --- Component and DOM Integration ---
   signalDomElements: Map<
     string,
     Set<{
@@ -208,8 +217,10 @@ export type CogsGlobalState = {
     }
   ) => void;
   removeSignalElement: (signalId: string, instanceId: string) => void;
-  reRenderTriggerPrevValue: Record<string, any>;
+  stateComponents: Map<string, ComponentsType>;
 
+  // --- Deprecated/Legacy (Review for removal) ---
+  reRenderTriggerPrevValue: Record<string, any>;
   reactiveDeps: Record<
     string,
     {
@@ -228,11 +239,6 @@ export type CogsGlobalState = {
   ) => void;
   deleteReactiveDeps: (key: string) => void;
   subscribe: (listener: () => void) => () => void;
-
-  stateComponents: Map<string, ComponentsType>;
-  syncInfoStore: Map<string, SyncInfo>;
-  setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
-  getSyncInfo: (key: string) => SyncInfo | null;
 };
 
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
@@ -250,30 +256,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     return current;
   },
 
-  setShadowMetadata: (key: string, path: string[], metadata: any) => {
-    set((state) => {
-      const newShadow = { ...state.shadowStateStore };
-      if (!newShadow[key]) return state;
-
-      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
-
-      let current: any = newShadow[key];
-      for (const segment of path) {
-        if (!current[segment]) current[segment] = {};
-        current = current[segment];
-      }
-
-      // Merge the metadata into the existing structure
-      Object.keys(metadata).forEach((category) => {
-        if (!current[category]) {
-          current[category] = {};
-        }
-        Object.assign(current[category], metadata[category]);
-      });
-
-      return { shadowStateStore: newShadow };
-    });
-  },
   initializeShadowState: (key: string, initialState: any) => {
     const createShadowStructure = (obj: any): any => {
       if (Array.isArray(obj)) {
@@ -388,6 +370,63 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
       return { shadowStateStore: newShadow };
     });
+  },
+  shadowStateSubscribers: new Map<string, Set<() => void>>(), // key -> Set of callbacks
+
+  subscribeToShadowState: (key: string, callback: () => void) => {
+    set((state) => {
+      const newSubs = new Map(state.shadowStateSubscribers);
+      const subsForKey = newSubs.get(key) || new Set();
+      subsForKey.add(callback);
+      newSubs.set(key, subsForKey);
+      return { shadowStateSubscribers: newSubs };
+    });
+    // Return an unsubscribe function
+    return () => {
+      set((state) => {
+        const newSubs = new Map(state.shadowStateSubscribers);
+        const subsForKey = newSubs.get(key);
+        if (subsForKey) {
+          subsForKey.delete(callback);
+        }
+        return { shadowStateSubscribers: newSubs };
+      });
+    };
+  },
+
+  setShadowMetadata: (key: string, path: string[], metadata: any) => {
+    let hasChanged = false;
+    set((state) => {
+      const newShadow = { ...state.shadowStateStore };
+      if (!newShadow[key]) return state;
+
+      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
+
+      let current: any = newShadow[key];
+      for (const segment of path) {
+        if (!current[segment]) current[segment] = {};
+        current = current[segment];
+      }
+
+      const oldHeight = current.virtualizer?.itemHeight;
+      const newHeight = metadata.virtualizer?.itemHeight;
+
+      if (newHeight && oldHeight !== newHeight) {
+        hasChanged = true;
+        if (!current.virtualizer) current.virtualizer = {};
+        current.virtualizer.itemHeight = newHeight;
+      }
+
+      return { shadowStateStore: newShadow };
+    });
+
+    // If a height value was actually changed, notify the specific subscribers.
+    if (hasChanged) {
+      const subscribers = get().shadowStateSubscribers.get(key);
+      if (subscribers) {
+        subscribers.forEach((callback) => callback());
+      }
+    }
   },
   selectedIndicesMap: new Map<string, Map<string, number>>(),
 

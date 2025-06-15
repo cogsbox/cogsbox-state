@@ -13,8 +13,8 @@ const w = u((s, S) => ({
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (e) => {
     const r = S().formRefs, t = e + ".", n = /* @__PURE__ */ new Map();
-    return r.forEach((o, a) => {
-      (a.startsWith(t) || a === e) && n.set(a, o);
+    return r.forEach((a, o) => {
+      (o.startsWith(t) || o === e) && n.set(o, a);
     }), n;
   }
 })), h = u((s, S) => ({
@@ -23,32 +23,19 @@ const w = u((s, S) => ({
     const t = S().shadowStateStore[e];
     if (!t) return null;
     let n = t;
-    for (const o of r)
-      if (n = n?.[o], !n) return null;
+    for (const a of r)
+      if (n = n?.[a], !n) return null;
     return n;
-  },
-  setShadowMetadata: (e, r, t) => {
-    s((n) => {
-      const o = { ...n.shadowStateStore };
-      if (!o[e]) return n;
-      o[e] = JSON.parse(JSON.stringify(o[e]));
-      let a = o[e];
-      for (const i of r)
-        a[i] || (a[i] = {}), a = a[i];
-      return Object.keys(t).forEach((i) => {
-        a[i] || (a[i] = {}), Object.assign(a[i], t[i]);
-      }), { shadowStateStore: o };
-    });
   },
   initializeShadowState: (e, r) => {
     const t = (n) => {
       if (Array.isArray(n))
-        return new Array(n.length).fill(null).map((o, a) => t(n[a]));
+        return new Array(n.length).fill(null).map((a, o) => t(n[o]));
       if (typeof n == "object" && n !== null) {
-        const o = {};
-        for (const a in n)
-          o[a] = t(n[a]);
-        return o;
+        const a = {};
+        for (const o in n)
+          a[o] = t(n[o]);
+        return a;
       }
       return {};
     };
@@ -61,48 +48,75 @@ const w = u((s, S) => ({
   },
   updateShadowAtPath: (e, r, t) => {
     s((n) => {
-      const o = { ...n.shadowStateStore };
-      if (!o[e]) return n;
-      let a = o[e];
-      const i = [...r], c = i.pop();
-      for (const l of i)
-        a[l] || (a[l] = {}), a = a[l];
-      return c !== void 0 && (Array.isArray(t) ? a[c] = new Array(t.length) : typeof t == "object" && t !== null ? a[c] = {} : a[c] = a[c] || {}), { shadowStateStore: o };
+      const a = { ...n.shadowStateStore };
+      if (!a[e]) return n;
+      let o = a[e];
+      const i = [...r], l = i.pop();
+      for (const c of i)
+        o[c] || (o[c] = {}), o = o[c];
+      return l !== void 0 && (Array.isArray(t) ? o[l] = new Array(t.length) : typeof t == "object" && t !== null ? o[l] = {} : o[l] = o[l] || {}), { shadowStateStore: a };
     });
   },
   insertShadowArrayElement: (e, r, t) => {
     s((n) => {
-      const o = { ...n.shadowStateStore };
-      if (!o[e]) return n;
-      o[e] = JSON.parse(JSON.stringify(o[e]));
-      let a = o[e];
+      const a = { ...n.shadowStateStore };
+      if (!a[e]) return n;
+      a[e] = JSON.parse(JSON.stringify(a[e]));
+      let o = a[e];
       for (const i of r)
-        if (a = a[i], !a) return n;
-      if (Array.isArray(a)) {
-        const i = (c) => {
-          if (Array.isArray(c))
-            return c.map((l) => i(l));
-          if (typeof c == "object" && c !== null) {
-            const l = {};
-            for (const d in c)
-              l[d] = i(c[d]);
-            return l;
+        if (o = o[i], !o) return n;
+      if (Array.isArray(o)) {
+        const i = (l) => {
+          if (Array.isArray(l))
+            return l.map((c) => i(c));
+          if (typeof l == "object" && l !== null) {
+            const c = {};
+            for (const d in l)
+              c[d] = i(l[d]);
+            return c;
           }
           return {};
         };
-        a.push(i(t));
+        o.push(i(t));
       }
-      return { shadowStateStore: o };
+      return { shadowStateStore: a };
     });
   },
   removeShadowArrayElement: (e, r, t) => {
     s((n) => {
-      const o = { ...n.shadowStateStore };
-      let a = o[e];
+      const a = { ...n.shadowStateStore };
+      let o = a[e];
       for (const i of r)
-        a = a?.[i];
-      return Array.isArray(a) && a.splice(t, 1), { shadowStateStore: o };
+        o = o?.[i];
+      return Array.isArray(o) && o.splice(t, 1), { shadowStateStore: a };
     });
+  },
+  shadowStateSubscribers: /* @__PURE__ */ new Map(),
+  // key -> Set of callbacks
+  subscribeToShadowState: (e, r) => (s((t) => {
+    const n = new Map(t.shadowStateSubscribers), a = n.get(e) || /* @__PURE__ */ new Set();
+    return a.add(r), n.set(e, a), { shadowStateSubscribers: n };
+  }), () => {
+    s((t) => {
+      const n = new Map(t.shadowStateSubscribers), a = n.get(e);
+      return a && a.delete(r), { shadowStateSubscribers: n };
+    });
+  }),
+  setShadowMetadata: (e, r, t) => {
+    let n = !1;
+    if (s((a) => {
+      const o = { ...a.shadowStateStore };
+      if (!o[e]) return a;
+      o[e] = JSON.parse(JSON.stringify(o[e]));
+      let i = o[e];
+      for (const d of r)
+        i[d] || (i[d] = {}), i = i[d];
+      const l = i.virtualizer?.itemHeight, c = t.virtualizer?.itemHeight;
+      return c && l !== c && (n = !0, i.virtualizer || (i.virtualizer = {}), i.virtualizer.itemHeight = c), { shadowStateStore: o };
+    }), n) {
+      const a = S().shadowStateSubscribers.get(e);
+      a && a.forEach((o) => o());
+    }
   },
   selectedIndicesMap: /* @__PURE__ */ new Map(),
   // Add the new methods
@@ -113,11 +127,11 @@ const w = u((s, S) => ({
   },
   setSelectedIndex: (e, r, t) => {
     s((n) => {
-      const o = new Map(n.selectedIndicesMap);
-      let a = o.get(e);
-      return a || (a = /* @__PURE__ */ new Map(), o.set(e, a)), t === void 0 ? a.delete(r) : a.set(r, t), {
+      const a = new Map(n.selectedIndicesMap);
+      let o = a.get(e);
+      return o || (o = /* @__PURE__ */ new Map(), a.set(e, o)), t === void 0 ? o.delete(r) : o.set(r, t), {
         ...n,
-        selectedIndicesMap: o
+        selectedIndicesMap: a
       };
     });
   },
@@ -126,10 +140,10 @@ const w = u((s, S) => ({
     path: r
   }) => {
     s((t) => {
-      const n = new Map(t.selectedIndicesMap), o = n.get(e);
-      if (!o) return t;
-      const a = r.join(".");
-      return o.delete(a), {
+      const n = new Map(t.selectedIndicesMap), a = n.get(e);
+      if (!a) return t;
+      const o = r.join(".");
+      return a.delete(o), {
         ...t,
         selectedIndicesMap: n
       };
@@ -168,8 +182,8 @@ const w = u((s, S) => ({
   },
   removeSignalElement: (e, r) => {
     const t = S().signalDomElements, n = t.get(e);
-    n && n.forEach((o) => {
-      o.instanceId === r && n.delete(o);
+    n && n.forEach((a) => {
+      a.instanceId === r && n.delete(a);
     }), s({ signalDomElements: new Map(t) });
   },
   initialStateOptions: {},
@@ -221,11 +235,11 @@ const w = u((s, S) => ({
   },
   setStateLog: (e, r) => {
     s((t) => {
-      const n = t.stateLog[e] ?? [], o = r(n);
+      const n = t.stateLog[e] ?? [], a = r(n);
       return {
         stateLog: {
           ...t.stateLog,
-          [e]: o
+          [e]: a
         }
       };
     });
@@ -248,78 +262,78 @@ const w = u((s, S) => ({
   },
   addValidationError: (e, r) => {
     console.log("addValidationError---"), s((t) => {
-      const n = new Map(t.validationErrors), o = n.get(e) || [];
-      return console.log("addValidationError", e, r, o), n.set(e, [...o, r]), { validationErrors: n };
+      const n = new Map(t.validationErrors), a = n.get(e) || [];
+      return console.log("addValidationError", e, r, a), n.set(e, [...a, r]), { validationErrors: n };
     });
   },
   removeValidationError: (e) => {
     s((r) => {
       const t = new Map(r.validationErrors);
       let n = !1;
-      const o = e.split(".");
-      return Array.from(t.keys()).forEach((a) => {
-        const i = a.split(".");
-        if (i.length >= o.length) {
-          let c = !0;
-          for (let l = 0; l < o.length; l++)
-            if (i[l] !== o[l]) {
-              c = !1;
+      const a = e.split(".");
+      return Array.from(t.keys()).forEach((o) => {
+        const i = o.split(".");
+        if (i.length >= a.length) {
+          let l = !0;
+          for (let c = 0; c < a.length; c++)
+            if (i[c] !== a[c]) {
+              l = !1;
               break;
             }
-          c && (n = !0, t.delete(a));
+          l && (n = !0, t.delete(o));
         }
       }), n ? { validationErrors: t } : r;
     });
   },
   getValidationErrors: (e) => {
-    const r = [], t = S().validationErrors, n = e.split("."), o = (a, i) => a === "[*]" ? !0 : Array.isArray(a) ? a.includes(parseInt(i)) : a === i;
-    return Array.from(t.keys()).forEach((a) => {
-      const i = a.split(".");
+    const r = [], t = S().validationErrors, n = e.split("."), a = (o, i) => o === "[*]" ? !0 : Array.isArray(o) ? o.includes(parseInt(i)) : o === i;
+    return Array.from(t.keys()).forEach((o) => {
+      const i = o.split(".");
       if (i.length >= n.length) {
-        let c = !0;
-        for (let l = 0; l < n.length; l++) {
-          const d = n[l], f = i[l];
+        let l = !0;
+        for (let c = 0; c < n.length; c++) {
+          const d = n[c], f = i[c];
           if (d === "[*]" || Array.isArray(d)) {
             const p = parseInt(f);
             if (isNaN(p)) {
-              c = !1;
+              l = !1;
               break;
             }
-            if (!o(d, f)) {
-              c = !1;
+            if (!a(d, f)) {
+              l = !1;
               break;
             }
           } else if (d !== f) {
-            c = !1;
+            l = !1;
             break;
           }
         }
-        if (c) {
-          const l = t.get(a);
-          l && r.push(...l);
+        if (l) {
+          const c = t.get(o);
+          c && r.push(...c);
         }
       }
     }), r;
   },
   getInitialOptions: (e) => S().initialStateOptions[e],
   getNestedState: (e, r) => {
-    const t = S().cogsStateStore[e], n = (o, a) => {
-      if (a.length === 0) return o;
-      const i = a[0], c = a.slice(1);
+    const t = S().cogsStateStore[e], n = (a, o) => {
+      if (o.length === 0) return a;
+      const i = o[0], l = o.slice(1);
       if (i === "[*]") {
-        if (!Array.isArray(o)) {
+        if (!Array.isArray(a)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (c.length === 0) return o;
-        const d = o.map(
-          (f) => n(f, c)
+        if (l.length === 0) return a;
+        const d = a.map(
+          (f) => n(f, l)
         );
         return Array.isArray(d[0]) ? d.flat() : d;
       }
-      const l = o[i];
-      if (l !== void 0)
-        return n(l, c);
+      const c = a[i];
+      if (c !== void 0)
+        return n(c, l);
     };
     return n(t, r);
   },
