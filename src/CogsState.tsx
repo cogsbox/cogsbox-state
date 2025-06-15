@@ -1784,11 +1784,13 @@ function createProxyHandler<T>(
               }
 
               const containerRef = useRef<HTMLDivElement | null>(null);
+              const wasAtBottomRef = useRef(true);
+              const rangeRef = useRef({ startIndex: 0, endIndex: 50 });
+
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 50,
               });
-              const isAtBottomRef = useRef(true);
 
               // Get source array
               const sourceArray = getGlobalStore().getNestedState(
@@ -1797,7 +1799,7 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Create virtual state with proper validIndices
+              // Create virtual state
               const virtualState = useMemo(() => {
                 const validIndices = Array.from(
                   { length: range.endIndex - range.startIndex },
@@ -1812,45 +1814,48 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray]);
 
-              // Handle scrolling
+              // Scroll handling
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                let scrollTimeout: any;
-
-                const updateVisibleRange = () => {
-                  const { scrollTop, clientHeight } = container;
-
-                  const startIndex = Math.max(
-                    0,
-                    Math.floor(scrollTop / itemHeight) - overscan
-                  );
-                  const endIndex = Math.min(
-                    totalCount,
-                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
-                      overscan
-                  );
-
-                  setRange({ startIndex, endIndex });
-                };
-
                 const handleScroll = () => {
-                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  const { scrollTop, clientHeight, scrollHeight } = container;
 
-                  isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 5;
+                  // Check if at bottom
+                  const isAtBottom =
+                    scrollHeight - scrollTop - clientHeight < 2;
+                  wasAtBottomRef.current = isAtBottom;
 
-                  console.log(
-                    "isAtBottomRef",
-                    isAtBottomRef.current,
-                    scrollTop,
-                    scrollHeight,
-                    clientHeight
+                  // Calculate what's actually visible
+                  const firstVisible = Math.floor(scrollTop / itemHeight);
+                  const lastVisible = Math.ceil(
+                    (scrollTop + clientHeight) / itemHeight
                   );
-                  // Debounce range updates slightly for smoothness
-                  clearTimeout(scrollTimeout);
-                  scrollTimeout = setTimeout(updateVisibleRange, 10);
+
+                  // Check if we need to update the range
+                  const currentRange = rangeRef.current;
+                  const needsUpdate =
+                    firstVisible < currentRange.startIndex + overscan ||
+                    lastVisible > currentRange.endIndex - overscan ||
+                    (isAtBottom && currentRange.endIndex < totalCount);
+
+                  if (!needsUpdate) return;
+
+                  // Calculate new range with bigger buffer
+                  let start = Math.max(0, firstVisible - overscan * 3);
+                  let end = Math.min(totalCount, lastVisible + overscan * 3);
+
+                  // If at bottom, extend to end
+                  if (isAtBottom) {
+                    end = totalCount;
+                    // Keep reasonable start
+                    const maxVisible = Math.ceil(clientHeight / itemHeight);
+                    start = Math.max(0, totalCount - maxVisible - overscan * 2);
+                  }
+
+                  rangeRef.current = { startIndex: start, endIndex: end };
+                  setRange({ startIndex: start, endIndex: end });
                 };
 
                 container.addEventListener("scroll", handleScroll, {
@@ -1859,41 +1864,37 @@ function createProxyHandler<T>(
 
                 // Initial setup
                 if (stickToBottom && totalCount > 0) {
-                  const startIdx = Math.max(
-                    0,
-                    totalCount -
-                      Math.ceil(container.clientHeight / itemHeight) -
-                      overscan
+                  const visibleCount = Math.ceil(
+                    container.clientHeight / itemHeight
                   );
-                  setRange({ startIndex: startIdx, endIndex: totalCount });
-                  // Use requestAnimationFrame for smoother initial scroll
-                  requestAnimationFrame(() => {
-                    container.scrollTop = container.scrollHeight;
-                    isAtBottomRef.current = true;
-                  });
+                  const start = Math.max(
+                    0,
+                    totalCount - visibleCount - overscan * 2
+                  );
+                  rangeRef.current = {
+                    startIndex: start,
+                    endIndex: totalCount,
+                  };
+                  setRange({ startIndex: start, endIndex: totalCount });
+                  container.scrollTop = container.scrollHeight;
                 } else {
-                  updateVisibleRange();
+                  handleScroll();
                 }
 
                 return () => {
-                  clearTimeout(scrollTimeout);
                   container.removeEventListener("scroll", handleScroll);
                 };
               }, [totalCount, itemHeight, overscan, stickToBottom]);
 
-              // Auto-scroll ONLY if already at bottom
+              // Auto-stick to bottom when new items added
               useEffect(() => {
                 if (
                   stickToBottom &&
-                  containerRef.current &&
-                  isAtBottomRef.current
+                  wasAtBottomRef.current &&
+                  containerRef.current
                 ) {
-                  const container = containerRef.current;
-                  // Smooth scroll to bottom
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "smooth",
-                  });
+                  containerRef.current.scrollTop =
+                    containerRef.current.scrollHeight;
                 }
               }, [totalCount, stickToBottom]);
 
@@ -1902,7 +1903,7 @@ function createProxyHandler<T>(
                   if (containerRef.current) {
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
-                      behavior: behavior,
+                      behavior,
                     });
                   }
                 },
@@ -1921,7 +1922,6 @@ function createProxyHandler<T>(
                 [itemHeight]
               );
 
-              // Simple virtualizer props - no transform tricks
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
