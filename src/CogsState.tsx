@@ -1777,20 +1777,12 @@ function createProxyHandler<T>(
                 stickToBottom = false,
               } = options;
 
-              if (typeof itemHeight !== "number" || itemHeight <= 0) {
-                throw new Error(
-                  "[cogs-state] `useVirtualView` requires a positive number for `itemHeight` option."
-                );
-              }
-
               const containerRef = useRef<HTMLDivElement | null>(null);
-
-              const rangeRef = useRef({ startIndex: 0, endIndex: 50 });
-
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 50,
               });
+              const isAtBottomRef = useRef(true);
 
               // Get source array
               const sourceArray = getGlobalStore().getNestedState(
@@ -1814,7 +1806,7 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray]);
 
-              // Scroll handling
+              // Scroll handler
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1822,84 +1814,44 @@ function createProxyHandler<T>(
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
 
-                  // Check if at bottom
-                  const isAtBottom =
-                    scrollHeight - scrollTop - clientHeight < 2;
+                  // Track if at bottom
+                  isAtBottomRef.current =
+                    scrollHeight - scrollTop - clientHeight < 30;
 
-                  // Calculate what's actually visible
-                  const firstVisible = Math.floor(scrollTop / itemHeight);
-                  const lastVisible = Math.ceil(
-                    (scrollTop + clientHeight) / itemHeight
+                  const start = Math.max(
+                    0,
+                    Math.floor(scrollTop / itemHeight) - overscan
+                  );
+                  const end = Math.min(
+                    totalCount,
+                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
+                      overscan
                   );
 
-                  // Check if we need to update the range
-                  const currentRange = rangeRef.current;
-                  const needsUpdate =
-                    firstVisible < currentRange.startIndex + overscan ||
-                    lastVisible > currentRange.endIndex - overscan ||
-                    (isAtBottom && currentRange.endIndex < totalCount);
-
-                  if (!needsUpdate) return;
-
-                  // Calculate new range with bigger buffer
-                  let start = Math.max(0, firstVisible - overscan * 3);
-                  let end = Math.min(totalCount, lastVisible + overscan * 3);
-
-                  // If at bottom, extend to end
-                  if (isAtBottom) {
-                    end = totalCount;
-                    // Keep reasonable start
-                    const maxVisible = Math.ceil(clientHeight / itemHeight);
-                    start = Math.max(0, totalCount - maxVisible - overscan * 2);
-                  }
-
-                  rangeRef.current = { startIndex: start, endIndex: end };
                   setRange({ startIndex: start, endIndex: end });
                 };
 
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+                handleScroll(); // Set initial range
 
-                // Initial setup
-                if (stickToBottom && totalCount > 0) {
-                  const visibleCount = Math.ceil(
-                    container.clientHeight / itemHeight
-                  );
-                  const start = Math.max(
-                    0,
-                    totalCount - visibleCount - overscan * 2
-                  );
-                  rangeRef.current = {
-                    startIndex: start,
-                    endIndex: totalCount,
-                  };
-                  setRange({ startIndex: start, endIndex: totalCount });
-                  container.scrollTop = container.scrollHeight;
-                } else {
-                  handleScroll();
-                }
-
-                return () => {
+                return () =>
                   container.removeEventListener("scroll", handleScroll);
-                };
-              }, [totalCount, itemHeight, overscan, stickToBottom]);
+              }, [totalCount, itemHeight, overscan]);
 
+              // Auto-scroll if at bottom when new items added
               useEffect(() => {
-                if (stickToBottom && containerRef.current && totalCount > 0) {
-                  const container = containerRef.current;
-
-                  // Only auto-scroll if currently near bottom
-                  if (
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    50
-                  ) {
-                    container.scrollTop = container.scrollHeight;
-                  }
+                if (
+                  stickToBottom &&
+                  isAtBottomRef.current &&
+                  containerRef.current
+                ) {
+                  containerRef.current.scrollTop =
+                    containerRef.current.scrollHeight;
                 }
-              }, [totalCount, stickToBottom]);
+              }, [totalCount]);
+
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
@@ -1930,13 +1882,11 @@ function createProxyHandler<T>(
                   style: {
                     overflowY: "auto" as const,
                     height: "100%",
-                    position: "relative" as const,
                   },
                 },
                 inner: {
                   style: {
                     height: `${totalCount * itemHeight}px`,
-                    position: "relative" as const,
                   },
                 },
                 list: {
