@@ -1802,7 +1802,7 @@ function createProxyHandler<T>(
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
               const {
-                itemHeight,
+                itemHeight = 50, // Now optional with default
                 overscan = 5,
                 stickToBottom = false,
               } = options;
@@ -1812,16 +1812,38 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-              const getItemHeight = useCallback((index: number) => {
-                const metadata = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, [...path, index.toString()]);
-                return metadata?.virtualizer?.itemHeight || options.itemHeight;
-              }, []);
-              // --- State Tracking Refs ---
+
+              // Get item height from shadow state or fall back to default
+              const getItemHeight = useCallback(
+                (index: number) => {
+                  const metadata = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, [...path, index.toString()]);
+                  return metadata?.virtualizer?.itemHeight || itemHeight;
+                },
+                [itemHeight]
+              );
+
+              // Calculate total height and item positions
+              const calculateHeights = useCallback(() => {
+                const sourceArray = getGlobalStore().getNestedState(
+                  stateKey,
+                  path
+                ) as any[];
+
+                let totalHeight = 0;
+                const positions: number[] = [];
+
+                for (let i = 0; i < sourceArray.length; i++) {
+                  positions[i] = totalHeight;
+                  totalHeight += getItemHeight(i);
+                }
+
+                return { totalHeight, positions };
+              }, [getItemHeight]);
+
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
-              // NEW: Ref to explicitly track if this is the component's first render cycle.
               const isInitialMountRef = useRef(true);
 
               const sourceArray = getGlobalStore().getNestedState(
@@ -1852,25 +1874,43 @@ function createProxyHandler<T>(
                 const listGrew = totalCount > previousTotalCountRef.current;
                 previousTotalCountRef.current = totalCount;
 
+                const { totalHeight, positions } = calculateHeights();
+
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
-                  const start = Math.max(
-                    0,
-                    Math.floor(scrollTop / itemHeight) - overscan
-                  );
-                  const end = Math.min(
-                    totalCount,
-                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
-                      overscan
-                  );
+
+                  // Find start index using binary search
+                  let start = 0;
+                  let end = positions.length - 1;
+                  while (start < end) {
+                    const mid = Math.floor((start + end) / 2);
+                    if (positions[mid]! < scrollTop) {
+                      start = mid + 1;
+                    } else {
+                      end = mid;
+                    }
+                  }
+                  start = Math.max(0, start - overscan);
+
+                  // Find end index
+                  const visibleEnd = scrollTop + clientHeight;
+                  let endIndex = start;
+                  while (
+                    endIndex < positions.length &&
+                    positions[endIndex]! < visibleEnd
+                  ) {
+                    endIndex++;
+                  }
+                  endIndex = Math.min(totalCount, endIndex + overscan);
+
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== start ||
-                      prevRange.endIndex !== end
+                      prevRange.endIndex !== endIndex
                     ) {
-                      return { startIndex: start, endIndex: end };
+                      return { startIndex: start, endIndex: endIndex };
                     }
                     return prevRange;
                   });
@@ -1880,19 +1920,13 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- THE CORRECTED DECISION LOGIC ---
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
-                    // SCENARIO 1: First render of the component.
-                    // Go to the bottom unconditionally. Use `auto` scroll for an instant jump.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
                   } else if (wasAtBottom && listGrew) {
-                    // SCENARIO 2: Subsequent renders (new messages arrive).
-                    // Only scroll if the user was already at the bottom.
-                    // Use `smooth` for a nice animated scroll for new messages.
                     requestAnimationFrame(() => {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1902,15 +1936,12 @@ function createProxyHandler<T>(
                   }
                 }
 
-                // After the logic runs, it's no longer the initial mount.
                 isInitialMountRef.current = false;
-
-                // Always run handleScroll once to set the initial visible window.
                 handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, itemHeight, overscan, stickToBottom]);
+              }, [totalCount, calculateHeights, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1927,37 +1958,44 @@ function createProxyHandler<T>(
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
+                    const { positions } = calculateHeights();
                     containerRef.current.scrollTo({
-                      top: index * itemHeight,
+                      top: positions[index] || 0,
                       behavior,
                     });
                   }
                 },
-                [itemHeight]
+                [calculateHeights]
               );
 
-              // Same virtualizer props as before
+              // Calculate actual heights for rendering
+              const {
+                totalHeight: totalHeightForRender,
+                positions: positionsForRender,
+              } = calculateHeights();
+              const offsetY = positionsForRender[range.startIndex] || 0;
+
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto", height: "100%" },
+                  style: { overflowY: "auto", height: "100%" } as CSSProperties,
                 },
                 inner: {
                   style: {
-                    height: `${totalCount * itemHeight}px`,
+                    height: `${totalHeightForRender}px`,
                     position: "relative",
-                  },
+                  } as CSSProperties,
                 },
                 list: {
                   style: {
-                    transform: `translateY(${range.startIndex * itemHeight}px)`,
-                  },
+                    transform: `translateY(${offsetY}px)`,
+                  } as CSSProperties,
                 },
               };
 
               return {
                 virtualState,
-                virtualizerProps: virtualizerProps as any,
+                virtualizerProps,
                 scrollToBottom,
                 scrollToIndex,
               };
