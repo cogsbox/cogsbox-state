@@ -37,6 +37,7 @@ import { z } from "zod";
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
+import useMeasure from "react-use-measure";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -2132,7 +2133,53 @@ function createProxyHandler<T>(
               });
             };
           }
+          if (prop === "stateList") {
+            return (
+              callbackfn: (
+                value: InferArrayElement<T>,
+                setter: StateObject<InferArrayElement<T>>,
+                index: number,
+                array: T,
+                arraySetter: StateObject<T>
+              ) => any
+            ) => {
+              const arrayToMap = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
 
+              if (!Array.isArray(arrayToMap)) {
+                console.warn(
+                  `stateList called on a non-array value at path: ${path.join(".")}.`
+                );
+                return null;
+              }
+
+              const indicesToMap =
+                meta?.validIndices ||
+                Array.from({ length: arrayToMap.length }, (_, i) => i);
+
+              return indicesToMap.map((originalIndex, localIndex) => {
+                const item = arrayToMap[originalIndex];
+                const finalPath = [...path, originalIndex.toString()];
+                const setter = rebuildStateShape(item, finalPath, meta);
+                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+
+                return createElement(CogsItemWrapper, {
+                  key: originalIndex,
+                  stateKey,
+                  itemComponentId,
+                  itemPath: finalPath,
+                  children: callbackfn(
+                    item,
+                    setter,
+                    localIndex,
+                    arrayToMap as any,
+                    rebuildStateShape(arrayToMap as any, path, meta)
+                  ),
+                });
+              });
+            };
+          }
           if (prop === "stateFlattenOn") {
             return (fieldName: string) => {
               const arrayToMap = currentState as any[];
@@ -2851,7 +2898,7 @@ export function $cogsSignalStore(proxy: {
   );
   return createElement("text", {}, String(value));
 }
-// This is an internal component. It should NOT be exported.
+
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
@@ -2863,10 +2910,17 @@ function CogsItemWrapper({
   itemPath: string[];
   children: React.ReactNode;
 }) {
-  // This is a real component, so we can safely call hooks.
   const [, forceUpdate] = useState({});
+  const [ref, bounds] = useMeasure();
 
-  // We use useLayoutEffect to register the component and clean up when it unmounts.
+  useEffect(() => {
+    if (bounds.height > 0) {
+      getGlobalStore
+        .getState()
+        .setShadowMetadata(stateKey, itemPath, { itemHeight: bounds.height });
+    }
+  }, [bounds.height]);
+
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore
@@ -2875,15 +2929,13 @@ function CogsItemWrapper({
       components: new Map(),
     };
 
-    // Register the component with its unique ID and its specific, atomic path.
     stateEntry.components.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
-      paths: new Set([itemPath.join(".")]), // ATOMIC: Subscribes only to this item's path.
+      paths: new Set([itemPath.join(".")]),
     });
 
     getGlobalStore.getState().stateComponents.set(stateKey, stateEntry);
 
-    // Return a cleanup function to unregister on unmount.
     return () => {
       const currentEntry = getGlobalStore
         .getState()
@@ -2892,8 +2944,7 @@ function CogsItemWrapper({
         currentEntry.components.delete(fullComponentId);
       }
     };
-  }, [stateKey, itemComponentId, itemPath.join(".")]); // Effect dependency array is stable.
+  }, [stateKey, itemComponentId, itemPath.join(".")]);
 
-  // Render the actual component the user provided.
-  return <>{children}</>;
+  return <div ref={ref}>{children}</div>;
 }
