@@ -1803,7 +1803,7 @@ function createProxyHandler<T>(
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
               const {
-                itemHeight = 50, // Default/estimated height
+                itemHeight = 50,
                 overscan = 5,
                 stickToBottom = false,
               } = options;
@@ -1820,6 +1820,11 @@ function createProxyHandler<T>(
                 []
               );
 
+              // Track scroll position
+              const isAtBottomRef = useRef(stickToBottom);
+              const previousTotalCountRef = useRef(0);
+              const isInitialMountRef = useRef(true);
+
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1830,10 +1835,6 @@ function createProxyHandler<T>(
                   clearTimeout(timer);
                 };
               }, [stateKey, forceRecalculate]);
-
-              const isAtBottomRef = useRef(stickToBottom);
-              const isInitialMountRef = useRef(true);
-              const previousTotalCountRef = useRef(0);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1868,46 +1869,46 @@ function createProxyHandler<T>(
                   ...meta,
                   validIndices,
                 });
-              }, [range.startIndex, range.endIndex, sourceArray]);
+              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
+                const wasAtBottom = isAtBottomRef.current;
                 const listGrew = totalCount > previousTotalCountRef.current;
                 previousTotalCountRef.current = totalCount;
 
-                const wasAtBottom = isAtBottomRef.current;
-
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
+                  // Consider "at bottom" if within 10px
                   isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 5;
+                    scrollHeight - scrollTop - clientHeight < 10;
 
-                  let search = (list: number[], value: number) => {
-                    let low = 0,
-                      high = list.length - 1;
-                    while (low <= high) {
-                      const mid = Math.floor((low + high) / 2);
-                      const midValue = list[mid]!;
-                      if (midValue < value) {
-                        low = mid + 1;
-                      } else {
-                        high = mid - 1;
-                      }
+                  // Binary search for start index
+                  let low = 0,
+                    high = totalCount - 1;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) {
+                      low = mid + 1;
+                    } else {
+                      high = mid - 1;
                     }
-                    return low;
-                  };
-                  let startIndex = search(positions, scrollTop);
+                  }
+                  const startIndex = Math.max(0, high - overscan);
+
+                  // Find end index
                   let endIndex = startIndex;
+                  const visibleEnd = scrollTop + clientHeight;
                   while (
                     endIndex < totalCount &&
-                    positions[endIndex]! < scrollTop + clientHeight
+                    positions[endIndex]! < visibleEnd
                   ) {
                     endIndex++;
                   }
-                  startIndex = Math.max(0, startIndex - overscan);
                   endIndex = Math.min(totalCount, endIndex + overscan);
+
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== startIndex ||
@@ -1922,29 +1923,35 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                handleScroll();
 
+                // Handle stick to bottom
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
+                    // First render - go to bottom instantly
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
-                  } else if (listGrew && wasAtBottom) {
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
+                  } else if (wasAtBottom && listGrew) {
+                    // New items added and we were at bottom - stay at bottom
+                    requestAnimationFrame(() => {
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
+                      });
                     });
                   }
                 }
 
-                if (totalCount > 0) {
-                  isInitialMountRef.current = false;
-                }
+                // Mark as no longer initial mount after first render
+                isInitialMountRef.current = false;
+
+                // Run handleScroll once to set initial range
+                handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, overscan, stickToBottom, positions]);
+              }, [totalCount, positions, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1960,9 +1967,9 @@ function createProxyHandler<T>(
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current) {
+                  if (containerRef.current && positions[index] !== undefined) {
                     containerRef.current.scrollTo({
-                      top: positions[index] || 0,
+                      top: positions[index],
                       behavior,
                     });
                   }
@@ -1973,10 +1980,13 @@ function createProxyHandler<T>(
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto", height: "100%" },
+                  style: { overflowY: "auto" as const, height: "100%" },
                 },
                 inner: {
-                  style: { height: `${totalHeight}px`, position: "relative" },
+                  style: {
+                    height: `${totalHeight}px`,
+                    position: "relative" as const,
+                  },
                 },
                 list: {
                   style: {
@@ -1987,7 +1997,7 @@ function createProxyHandler<T>(
 
               return {
                 virtualState,
-                virtualizerProps: virtualizerProps as any,
+                virtualizerProps,
                 scrollToBottom,
                 scrollToIndex,
               };
