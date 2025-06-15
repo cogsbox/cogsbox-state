@@ -42,7 +42,7 @@ import useMeasure from "react-use-measure";
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 export type VirtualViewOptions = {
-  itemHeight: number;
+  itemHeight?: number;
   overscan?: number;
   stickToBottom?: boolean;
 };
@@ -1466,6 +1466,8 @@ function createProxyHandler<T>(
       if (localStorage.getItem(storageKey)) {
         localStorage.removeItem(storageKey);
       }
+
+      console.log("udpating intial State", stateKey, newState);
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
         getGlobalStore.getState().initializeShadowState(stateKey, newState);
@@ -1802,7 +1804,7 @@ function createProxyHandler<T>(
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
               const {
-                itemHeight = 50, // Now optional with default
+                itemHeight = 50, // Default height for unmeasured items
                 overscan = 5,
                 stickToBottom = false,
               } = options;
@@ -1813,34 +1815,7 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              // Get item height from shadow state or fall back to default
-              const getItemHeight = useCallback(
-                (index: number) => {
-                  const metadata = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, [...path, index.toString()]);
-                  return metadata?.virtualizer?.itemHeight || itemHeight;
-                },
-                [itemHeight]
-              );
-
-              // Calculate total height and item positions
-              const calculateHeights = useCallback(() => {
-                const sourceArray = getGlobalStore
-                  .getState()
-                  .getNestedState(stateKey, path) as any[];
-
-                let totalHeight = 0;
-                const positions: number[] = [];
-
-                for (let i = 0; i < sourceArray.length; i++) {
-                  positions[i] = totalHeight;
-                  totalHeight += getItemHeight(i);
-                }
-
-                return { totalHeight, positions };
-              }, [getItemHeight]);
-
+              // --- State Tracking Refs for stickToBottom ---
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
@@ -1850,6 +1825,28 @@ function createProxyHandler<T>(
                 path
               ) as any[];
               const totalCount = sourceArray.length;
+
+              // Helper to get an item's measured height or the default
+              const getItemHeight = useCallback(
+                (index: number): number => {
+                  const metadata = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, [...path, index.toString()]);
+                  return metadata?.virtualizer?.itemHeight || itemHeight;
+                },
+                [itemHeight, stateKey, path]
+              );
+
+              // Pre-calculate total height and the top offset of each item
+              const { totalHeight, positions } = useMemo(() => {
+                let currentHeight = 0;
+                const pos: number[] = [];
+                for (let i = 0; i < totalCount; i++) {
+                  pos[i] = currentHeight;
+                  currentHeight += getItemHeight(i);
+                }
+                return { totalHeight: currentHeight, positions: pos };
+              }, [totalCount, getItemHeight]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1873,43 +1870,39 @@ function createProxyHandler<T>(
                 const listGrew = totalCount > previousTotalCountRef.current;
                 previousTotalCountRef.current = totalCount;
 
-                const { totalHeight, positions } = calculateHeights();
-
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
 
-                  // Find start index using binary search
-                  let start = 0;
-                  let end = positions.length - 1;
-                  while (start < end) {
-                    const mid = Math.floor((start + end) / 2);
-                    if (positions[mid]! < scrollTop) {
-                      start = mid + 1;
-                    } else {
-                      end = mid;
+                  // Find the start index by searching for the first item in the viewport
+                  let startIndex = 0;
+                  for (let i = 0; i < positions.length; i++) {
+                    if (positions[i]! >= scrollTop) {
+                      startIndex = i;
+                      break;
                     }
                   }
-                  start = Math.max(0, start - overscan);
 
-                  // Find end index
-                  const visibleEnd = scrollTop + clientHeight;
-                  let endIndex = start;
+                  // Find the end index by seeing how many items fit in the viewport
+                  let endIndex = startIndex;
                   while (
-                    endIndex < positions.length &&
-                    positions[endIndex]! < visibleEnd
+                    endIndex < totalCount &&
+                    positions[endIndex]! < scrollTop + clientHeight
                   ) {
                     endIndex++;
                   }
+
+                  // Apply overscan
+                  startIndex = Math.max(0, startIndex - overscan);
                   endIndex = Math.min(totalCount, endIndex + overscan);
 
                   setRange((prevRange) => {
                     if (
-                      prevRange.startIndex !== start ||
+                      prevRange.startIndex !== startIndex ||
                       prevRange.endIndex !== endIndex
                     ) {
-                      return { startIndex: start, endIndex: endIndex };
+                      return { startIndex, endIndex };
                     }
                     return prevRange;
                   });
@@ -1919,6 +1912,7 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
+                // Logic to keep the view scrolled to the bottom
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
                     container.scrollTo({
@@ -1936,11 +1930,11 @@ function createProxyHandler<T>(
                 }
 
                 isInitialMountRef.current = false;
-                handleScroll();
+                handleScroll(); // Initial calculation
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, calculateHeights, overscan, stickToBottom]);
+              }, [totalCount, overscan, stickToBottom, positions]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1956,45 +1950,37 @@ function createProxyHandler<T>(
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current) {
-                    const { positions } = calculateHeights();
+                  if (containerRef.current && positions[index] !== undefined) {
                     containerRef.current.scrollTo({
-                      top: positions[index] || 0,
+                      top: positions[index],
                       behavior,
                     });
                   }
                 },
-                [calculateHeights]
+                [positions] // Depends on the calculated positions
               );
-
-              // Calculate actual heights for rendering
-              const {
-                totalHeight: totalHeightForRender,
-                positions: positionsForRender,
-              } = calculateHeights();
-              const offsetY = positionsForRender[range.startIndex] || 0;
 
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto", height: "100%" } as CSSProperties,
+                  style: { overflowY: "auto", height: "100%" },
                 },
                 inner: {
                   style: {
-                    height: `${totalHeightForRender}px`,
+                    height: `${totalHeight}px`,
                     position: "relative",
-                  } as CSSProperties,
+                  },
                 },
                 list: {
                   style: {
-                    transform: `translateY(${offsetY}px)`,
-                  } as CSSProperties,
+                    transform: `translateY(${positions[range.startIndex] || 0}px)`,
+                  },
                 },
               };
 
               return {
                 virtualState,
-                virtualizerProps,
+                virtualizerProps: virtualizerProps as any,
                 scrollToBottom,
                 scrollToIndex,
               };
