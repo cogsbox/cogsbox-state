@@ -1464,6 +1464,7 @@ function createProxyHandler<T>(
       }
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
+        getGlobalStore.getState().initializeShadowState(stateKey, newState);
         setUpdaterState(stateKey, newUpdaterState);
         setState(stateKey, newState);
         const stateEntry = getGlobalStore
