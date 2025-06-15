@@ -37,6 +37,7 @@ import { z } from "zod";
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
+import useMeasure from "react-use-measure";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -1470,7 +1471,13 @@ function createProxyHandler<T>(
   function rebuildStateShape(
     currentState: T,
     path: string[] = [],
-    meta?: { filtered?: string[][]; validIndices?: number[] }
+    meta?: {
+      filtered?: string[][];
+      validIndices?: number[];
+      // --- NEW, OPTIONAL PROPERTIES ---
+      isVirtual?: boolean;
+      setVirtualItemHeight?: (index: number, height: number) => void;
+    }
   ): any {
     const cacheKey = path.map(String).join(".");
 
@@ -1767,12 +1774,16 @@ function createProxyHandler<T>(
             };
           }
 
+          // This replaces the old `useVirtualView` implementation completely.
+
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
+              // We rename `itemHeight` to `estimatedItemHeight` for clarity.
+              // It's now just a fallback for items that haven't been measured yet.
               const {
-                itemHeight,
+                itemHeight: estimatedItemHeight = 50, // A sensible default
                 overscan = 5,
                 stickToBottom = false,
               } = options;
@@ -1783,31 +1794,48 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              // --- State Tracking Refs ---
-              const isAtBottomRef = useRef(stickToBottom);
-              const previousTotalCountRef = useRef(0);
-              // NEW: Ref to explicitly track if this is the component's first render cycle.
-              const isInitialMountRef = useRef(true);
+              // --- 1. LOCAL HEIGHT MANAGEMENT ---
+              // The heights are stored in state LOCAL to this hook.
+              const [measuredHeights, setMeasuredHeights] = useState(
+                () => new Map<number, number>()
+              );
 
+              // The "height setter" function that will be passed down.
+              const setVirtualItemHeight = useCallback(
+                (index: number, height: number) => {
+                  setMeasuredHeights((prev) => {
+                    if (prev.get(index) === height) return prev; // Avoids infinite loops
+                    const newMap = new Map(prev);
+                    newMap.set(index, height);
+                    return newMap;
+                  });
+                },
+                []
+              );
+
+              // --- 2. DATA AND META SETUP ---
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
                 path
               ) as any[];
               const totalCount = sourceArray.length;
 
-              const virtualState = useMemo(() => {
-                const start = Math.max(0, range.startIndex);
-                const end = Math.min(totalCount, range.endIndex);
-                const validIndices = Array.from(
-                  { length: end - start },
-                  (_, i) => start + i
-                );
-                const slicedArray = validIndices.map((idx) => sourceArray[idx]);
-                return rebuildStateShape(slicedArray as any, path, {
-                  ...meta,
-                  validIndices,
-                });
-              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+              // --- 3. DYNAMIC LAYOUT CALCULATION ---
+              const { totalHeight, itemPositions } = useMemo(() => {
+                let total = 0;
+                const positions = Array(totalCount);
+                for (let i = 0; i < totalCount; i++) {
+                  positions[i] = total;
+                  total += measuredHeights.get(i) ?? estimatedItemHeight;
+                }
+                return { totalHeight: total, itemPositions: positions };
+              }, [totalCount, measuredHeights, estimatedItemHeight]);
+
+              // --- 4. SCROLL HANDLING & RANGE CALCULATION ---
+              // Refs for the "stick to bottom" logic
+              const isAtBottomRef = useRef(stickToBottom);
+              const previousTotalCountRef = useRef(totalCount);
+              const isInitialMountRef = useRef(true);
 
               useLayoutEffect(() => {
                 const container = containerRef.current;
@@ -1821,43 +1849,41 @@ function createProxyHandler<T>(
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
-                  const start = Math.max(
-                    0,
-                    Math.floor(scrollTop / itemHeight) - overscan
-                  );
-                  const end = Math.min(
-                    totalCount,
-                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
-                      overscan
-                  );
-                  setRange((prevRange) => {
-                    if (
-                      prevRange.startIndex !== start ||
-                      prevRange.endIndex !== end
-                    ) {
-                      return { startIndex: start, endIndex: end };
-                    }
-                    return prevRange;
+
+                  // Find the start index by searching through our dynamic positions array.
+                  let startIndex = 0;
+                  while (
+                    startIndex < totalCount - 1 &&
+                    itemPositions[startIndex + 1] <= scrollTop
+                  ) {
+                    startIndex++;
+                  }
+
+                  // Find the end index.
+                  let endIndex = startIndex;
+                  while (
+                    endIndex < totalCount - 1 &&
+                    itemPositions[endIndex] < scrollTop + clientHeight
+                  ) {
+                    endIndex++;
+                  }
+
+                  setRange({
+                    startIndex: Math.max(0, startIndex - overscan),
+                    endIndex: Math.min(totalCount - 1, endIndex + overscan),
                   });
                 };
 
-                container.addEventListener("scroll", handleScroll, {
-                  passive: true,
-                });
+                handleScroll(); // Initial calculation
 
-                // --- THE CORRECTED DECISION LOGIC ---
+                // Stick to bottom logic
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
-                    // SCENARIO 1: First render of the component.
-                    // Go to the bottom unconditionally. Use `auto` scroll for an instant jump.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
                   } else if (wasAtBottom && listGrew) {
-                    // SCENARIO 2: Subsequent renders (new messages arrive).
-                    // Only scroll if the user was already at the bottom.
-                    // Use `smooth` for a nice animated scroll for new messages.
                     requestAnimationFrame(() => {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1866,17 +1892,16 @@ function createProxyHandler<T>(
                     });
                   }
                 }
-
-                // After the logic runs, it's no longer the initial mount.
                 isInitialMountRef.current = false;
 
-                // Always run handleScroll once to set the initial visible window.
-                handleScroll();
-
+                container.addEventListener("scroll", handleScroll, {
+                  passive: true,
+                });
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, itemHeight, overscan, stickToBottom]);
+              }, [totalCount, overscan, stickToBottom, itemPositions]); // Reruns when positions change
 
+              // --- 5. API AND PROPS ---
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
@@ -1891,38 +1916,57 @@ function createProxyHandler<T>(
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current) {
+                  if (
+                    containerRef.current &&
+                    itemPositions[index] !== undefined
+                  ) {
                     containerRef.current.scrollTo({
-                      top: index * itemHeight,
+                      top: itemPositions[index],
                       behavior,
                     });
                   }
                 },
-                [itemHeight]
+                [itemPositions]
               );
 
-              // Same virtualizer props as before
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto", height: "100%" },
+                  style: { overflowY: "auto" as const, height: "100%" },
                 },
                 inner: {
                   style: {
-                    height: `${totalCount * itemHeight}px`,
-                    position: "relative",
+                    height: `${totalHeight}px`, // Use the dynamic total height
+                    position: "relative" as const,
                   },
                 },
+                // This is now just a slice of the full array to map over.
                 list: {
-                  style: {
-                    transform: `translateY(${range.startIndex * itemHeight}px)`,
-                  },
+                  // We no longer need to apply a transform here because CogsItemWrapper
+                  // will eventually be positioned absolutely by its index.
+                  // For now, let's keep it simple. The user's code will map over virtualState.
+                  style: {},
                 },
               };
 
+              // We only want to render the items in the current virtual range.
+              // We achieve this by setting the `validIndices` in the meta object for the final render pass.
+              const finalVirtualState = useMemo(() => {
+                const visibleIndices = [];
+                for (let i = range.startIndex; i <= range.endIndex; i++) {
+                  if (i < totalCount) visibleIndices.push(i);
+                }
+                return rebuildStateShape(sourceArray as any, path, {
+                  ...meta,
+                  isVirtual: true,
+                  setVirtualItemHeight,
+                  validIndices: visibleIndices,
+                });
+              }, [range, sourceArray, setVirtualItemHeight]);
+
               return {
-                virtualState,
-                virtualizerProps: virtualizerProps as any,
+                virtualState: finalVirtualState,
+                virtualizerProps,
                 scrollToBottom,
                 scrollToIndex,
               };
@@ -1974,12 +2018,16 @@ function createProxyHandler<T>(
             };
           }
 
+          // This is the complete code for the `stateMap` property inside your proxy's `get` trap.
+
           if (prop === "stateMap") {
             return (
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
                 info: {
+                  // The `register` function is no longer needed for reactivity because
+                  // CogsItemWrapper handles it, but we keep it for API compatibility.
                   register: () => void;
                   index: number;
                   originalIndex: number;
@@ -1990,7 +2038,6 @@ function createProxyHandler<T>(
                 .getState()
                 .getNestedState(stateKey, path) as any[];
 
-              // Defensive check to make sure we are mapping over an array
               if (!Array.isArray(arrayToMap)) {
                 console.warn(
                   `stateMap called on a non-array value at path: ${path.join(".")}. The current value is:`,
@@ -1999,54 +2046,55 @@ function createProxyHandler<T>(
                 return null;
               }
 
-              // If we have validIndices, only map those items
               const indicesToMap =
                 meta?.validIndices ||
                 Array.from({ length: arrayToMap.length }, (_, i) => i);
 
               return indicesToMap.map((originalIndex, localIndex) => {
                 const item = arrayToMap[originalIndex];
-                const finalPath = [...path, originalIndex.toString()];
-                const setter = rebuildStateShape(item, finalPath, meta);
+                const itemPath = [...path, originalIndex.toString()];
+                const itemPathKey = itemPath.join(".");
 
-                // Create the register function right here. It closes over the necessary variables.
-                const register = () => {
-                  const [, forceUpdate] = useState({});
-                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                // This is the unique ID for your existing reactivity system.
+                const itemComponentId = `${componentId}-${itemPathKey}`;
 
-                  useLayoutEffect(() => {
-                    const fullComponentId = `${stateKey}////${itemComponentId}`;
-                    const stateEntry = getGlobalStore
-                      .getState()
-                      .stateComponents.get(stateKey) || {
-                      components: new Map(),
-                    };
+                const setter = rebuildStateShape(item, itemPath, meta);
 
-                    stateEntry.components.set(fullComponentId, {
-                      forceUpdate: () => forceUpdate({}),
-                      paths: new Set([finalPath.join(".")]),
-                    });
-
-                    getGlobalStore
-                      .getState()
-                      .stateComponents.set(stateKey, stateEntry);
-
-                    return () => {
-                      const currentEntry = getGlobalStore
-                        .getState()
-                        .stateComponents.get(stateKey);
-                      if (currentEntry) {
-                        currentEntry.components.delete(fullComponentId);
-                      }
-                    };
-                  }, [stateKey, itemComponentId]);
-                };
-
-                return callbackfn(item, setter, {
-                  register,
+                // Get the user's rendered component (e.g., <Message />)
+                const userRenderedItem = callbackfn(item, setter, {
+                  // This function is now a no-op because CogsItemWrapper handles registration.
+                  register: () => {
+                    console.warn(
+                      "The `register` function in stateMap is deprecated. Item reactivity is now automatic."
+                    );
+                  },
                   index: localIndex,
                   originalIndex,
                 });
+
+                // --- This is the bridge between the virtualizer and the wrapper ---
+
+                // Check if we are in a virtual context by looking for the setter in the meta object.
+                // `meta.setVirtualItemHeight` is passed down from `useVirtualView`.
+                const onMeasure =
+                  meta?.isVirtual && meta!.setVirtualItemHeight
+                    ? (height: number) =>
+                        meta!.setVirtualItemHeight!(originalIndex, height)
+                    : undefined; // If not in a virtual context, this will be undefined.
+
+                // --- Wrap the user's output in your enhanced CogsItemWrapper ---
+                // This wrapper handles BOTH reactivity AND optional measurement.
+                return (
+                  <CogsItemWrapper
+                    key={itemPathKey} // Use the unique path for React's key.
+                    stateKey={stateKey}
+                    itemComponentId={itemComponentId}
+                    itemPath={itemPath}
+                    onMeasure={onMeasure} // Pass the onMeasure function (or undefined)
+                  >
+                    {userRenderedItem}
+                  </CogsItemWrapper>
+                );
               });
             };
           }
@@ -2714,7 +2762,13 @@ function SignalMapRenderer({
   rebuildStateShape: (
     currentState: any,
     path: string[],
-    meta?: { filtered?: string[][]; validIndices?: number[] }
+    meta?: {
+      filtered?: string[][];
+      validIndices?: number[];
+      // --- NEW, OPTIONAL PROPERTIES ---
+      isVirtual?: boolean;
+      setVirtualItemHeight?: (index: number, height: number) => void;
+    }
   ) => any;
 }) {
   const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
@@ -2831,11 +2885,13 @@ function CogsItemWrapper({
   itemComponentId,
   itemPath,
   children,
+  onMeasure, // OPTIONAL PROP
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
   children: React.ReactNode;
+  onMeasure?: (height: number) => void; // The type definition
 }) {
   // This is a real component, so we can safely call hooks.
   const [, forceUpdate] = useState({});
@@ -2867,7 +2923,14 @@ function CogsItemWrapper({
       }
     };
   }, [stateKey, itemComponentId, itemPath.join(".")]); // Effect dependency array is stable.
+  const [measureRef, bounds] = useMeasure();
 
+  useLayoutEffect(() => {
+    if (!onMeasure || bounds.height === 0) return;
+
+    onMeasure(bounds.height);
+  }, [bounds.height, onMeasure]);
+
+  return <div ref={measureRef}>{children}</div>;
   // Render the actual component the user provided.
-  return <>{children}</>;
 }
