@@ -1263,8 +1263,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
         case "insert":
           // For array insert, add empty element to shadow array
+
           const parentPath = path.slice(0, -1);
-          store.insertShadowArrayElement(thisKey, parentPath);
+          store.insertShadowArrayElement(thisKey, parentPath, newValue);
           break;
 
         case "cut":

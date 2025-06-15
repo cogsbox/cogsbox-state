@@ -102,7 +102,11 @@ export type CogsGlobalState = {
   shadowStateStore: { [key: string]: any };
   initializeShadowState: (key: string, initialState: any) => void;
   updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
-  insertShadowArrayElement: (key: string, arrayPath: string[]) => void;
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any
+  ) => void;
   removeShadowArrayElement: (
     key: string,
     arrayPath: string[],
@@ -325,17 +329,41 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
 
-  insertShadowArrayElement: (key: string, arrayPath: string[]) => {
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any
+  ) => {
     set((state) => {
       const newShadow = { ...state.shadowStateStore };
-      let current = newShadow[key];
+      if (!newShadow[key]) return state;
+
+      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
+
+      let current: any = newShadow[key];
 
       for (const segment of arrayPath) {
-        current = current?.[segment];
+        current = current[segment];
+        if (!current) return state;
       }
 
       if (Array.isArray(current)) {
-        current.push({});
+        // Create shadow structure based on the actual new item
+        const createShadowStructure = (obj: any): any => {
+          if (Array.isArray(obj)) {
+            return obj.map((item) => createShadowStructure(item));
+          }
+          if (typeof obj === "object" && obj !== null) {
+            const shadow: any = {};
+            for (const k in obj) {
+              shadow[k] = createShadowStructure(obj[k]);
+            }
+            return shadow;
+          }
+          return {}; // Leaf nodes get empty object for metadata
+        };
+
+        current.push(createShadowStructure(newItem));
       }
 
       return { shadowStateStore: newShadow };
