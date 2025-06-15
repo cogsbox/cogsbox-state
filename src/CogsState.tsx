@@ -1817,6 +1817,7 @@ function createProxyHandler<T>(
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
+              const hasMeasurementsRef = useRef(false);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1831,14 +1832,17 @@ function createProxyHandler<T>(
                   [];
                 let height = 0;
                 const pos: number[] = [];
+                let hasMeasurements = false;
 
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
+                  if (measuredHeight) hasMeasurements = true;
                   height += measuredHeight || itemHeight;
                 }
 
+                hasMeasurementsRef.current = hasMeasurements;
                 return { totalHeight: height, positions: pos };
               }, [totalCount, stateKey, path.join("."), itemHeight]);
 
@@ -1909,20 +1913,9 @@ function createProxyHandler<T>(
                 });
 
                 // Handle stick to bottom
-                if (stickToBottom) {
-                  if (isInitialMountRef.current && totalCount > 0) {
-                    // Delay initial scroll to ensure items are rendered
-                    setTimeout(() => {
-                      if (containerRef.current) {
-                        containerRef.current.scrollTo({
-                          top: containerRef.current.scrollHeight,
-                          behavior: "auto",
-                        });
-                      }
-                    }, 0);
-                    isInitialMountRef.current = false;
-                  } else if (wasAtBottom && listGrew) {
-                    // New items added and we were at bottom - stay at bottom
+                if (stickToBottom && !isInitialMountRef.current) {
+                  // Only auto-scroll for new items after initial mount
+                  if (wasAtBottom && listGrew) {
                     requestAnimationFrame(() => {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1930,8 +1923,6 @@ function createProxyHandler<T>(
                       });
                     });
                   }
-                } else {
-                  isInitialMountRef.current = false;
                 }
 
                 // Run handleScroll once to set initial range
@@ -1940,6 +1931,30 @@ function createProxyHandler<T>(
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
               }, [totalCount, positions, overscan, stickToBottom]);
+
+              // Separate effect for initial scroll to bottom
+              useEffect(() => {
+                if (
+                  stickToBottom &&
+                  isInitialMountRef.current &&
+                  totalCount > 0 &&
+                  hasMeasurementsRef.current
+                ) {
+                  const container = containerRef.current;
+                  if (container) {
+                    // Use rAF to ensure DOM is updated
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        container.scrollTo({
+                          top: container.scrollHeight,
+                          behavior: "auto",
+                        });
+                        isInitialMountRef.current = false;
+                      });
+                    });
+                  }
+                }
+              }, [stickToBottom, totalCount, positions]); // positions change triggers this when measurements come in
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
