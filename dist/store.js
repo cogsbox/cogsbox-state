@@ -35,7 +35,9 @@ const w = u((s, l) => ({
       let a = o[e];
       for (const i of r)
         a[i] || (a[i] = {}), a = a[i];
-      return Object.assign(a, t), { shadowStateStore: o };
+      return Object.keys(t).forEach((i) => {
+        a[i] || (a[i] = {}), Object.assign(a[i], t[i]);
+      }), { shadowStateStore: o };
     });
   },
   initializeShadowState: (e, r) => {
@@ -62,10 +64,10 @@ const w = u((s, l) => ({
       const o = { ...n.shadowStateStore };
       if (!o[e]) return n;
       let a = o[e];
-      const i = [...r], d = i.pop();
+      const i = [...r], S = i.pop();
       for (const c of i)
         a[c] || (a[c] = {}), a = a[c];
-      return d !== void 0 && (Array.isArray(t) ? a[d] = new Array(t.length) : typeof t == "object" && t !== null ? a[d] = {} : a[d] = a[d] || {}), { shadowStateStore: o };
+      return S !== void 0 && (Array.isArray(t) ? a[S] = new Array(t.length) : typeof t == "object" && t !== null ? a[S] = {} : a[S] = a[S] || {}), { shadowStateStore: o };
     });
   },
   insertShadowArrayElement: (e, r) => {
@@ -242,13 +244,13 @@ const w = u((s, l) => ({
       return Array.from(t.keys()).forEach((a) => {
         const i = a.split(".");
         if (i.length >= o.length) {
-          let d = !0;
+          let S = !0;
           for (let c = 0; c < o.length; c++)
             if (i[c] !== o[c]) {
-              d = !1;
+              S = !1;
               break;
             }
-          d && (n = !0, t.delete(a));
+          S && (n = !0, t.delete(a));
         }
       }), n ? { validationErrors: t } : r;
     });
@@ -258,25 +260,25 @@ const w = u((s, l) => ({
     return Array.from(t.keys()).forEach((a) => {
       const i = a.split(".");
       if (i.length >= n.length) {
-        let d = !0;
+        let S = !0;
         for (let c = 0; c < n.length; c++) {
-          const S = n[c], f = i[c];
-          if (S === "[*]" || Array.isArray(S)) {
+          const d = n[c], f = i[c];
+          if (d === "[*]" || Array.isArray(d)) {
             const p = parseInt(f);
             if (isNaN(p)) {
-              d = !1;
+              S = !1;
               break;
             }
-            if (!o(S, f)) {
-              d = !1;
+            if (!o(d, f)) {
+              S = !1;
               break;
             }
-          } else if (S !== f) {
-            d = !1;
+          } else if (d !== f) {
+            S = !1;
             break;
           }
         }
-        if (d) {
+        if (S) {
           const c = t.get(a);
           c && r.push(...c);
         }
@@ -287,21 +289,21 @@ const w = u((s, l) => ({
   getNestedState: (e, r) => {
     const t = l().cogsStateStore[e], n = (o, a) => {
       if (a.length === 0) return o;
-      const i = a[0], d = a.slice(1);
+      const i = a[0], S = a.slice(1);
       if (i === "[*]") {
         if (!Array.isArray(o)) {
           console.warn("Asterisk notation used on non-array value");
           return;
         }
-        if (d.length === 0) return o;
-        const S = o.map(
-          (f) => n(f, d)
+        if (S.length === 0) return o;
+        const d = o.map(
+          (f) => n(f, S)
         );
-        return Array.isArray(S[0]) ? S.flat() : S;
+        return Array.isArray(d[0]) ? d.flat() : d;
       }
       const c = o[i];
       if (c !== void 0)
-        return n(c, d);
+        return n(c, S);
     };
     return n(t, r);
   },

@@ -180,6 +180,15 @@ export type ArrayEndType<TShape extends unknown> = {
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
+  stateList: (
+    callbackfn: (
+      value: InferArrayElement<TShape>,
+      setter: StateObject<InferArrayElement<TShape>>,
+      index: number,
+      array: TShape,
+      arraySetter: StateObject<TShape>
+    ) => void
+  ) => any;
   stateMap: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -1809,7 +1818,12 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-
+              const getItemHeight = useCallback((index: number) => {
+                const metadata = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, [...path, index.toString()]);
+                return metadata?.virtualizer?.itemHeight || options.itemHeight;
+              }, []);
               // --- State Tracking Refs ---
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
@@ -2915,9 +2929,11 @@ function CogsItemWrapper({
 
   useEffect(() => {
     if (bounds.height > 0) {
-      getGlobalStore
-        .getState()
-        .setShadowMetadata(stateKey, itemPath, { itemHeight: bounds.height });
+      getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
+        virtualizer: {
+          itemHeight: bounds.height,
+        },
+      });
     }
   }, [bounds.height]);
 

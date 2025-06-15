@@ -253,13 +253,19 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
       newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
 
-      let current = newShadow[key];
+      let current: any = newShadow[key];
       for (const segment of path) {
         if (!current[segment]) current[segment] = {};
         current = current[segment];
       }
 
-      Object.assign(current, metadata);
+      // Merge the metadata into the existing structure
+      Object.keys(metadata).forEach((category) => {
+        if (!current[category]) {
+          current[category] = {};
+        }
+        Object.assign(current[category], metadata[category]);
+      });
 
       return { shadowStateStore: newShadow };
     });
