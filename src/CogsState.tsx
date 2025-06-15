@@ -1880,16 +1880,24 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
-                const wasAtBottom = isAtBottomRef.current;
                 const listGrew = totalCount > previousTotalCountRef.current;
+
+                // --- THE FIX for BOTH initial load and new entries ---
+                // We capture the scroll position *before* we do anything else.
+                // We also check if we are VERY close to the bottom. This will be true
+                // on initial load (0 scrollHeight, 0 scrollTop) and when user is at the end.
+                const wasAtBottom =
+                  container.scrollHeight -
+                    container.scrollTop -
+                    container.clientHeight <
+                  5;
+
+                // Now we update the ref for the *next* render cycle.
                 previousTotalCountRef.current = totalCount;
 
                 const handleScroll = () => {
+                  // ... (binary search logic to setRange is the same) ...
                   const { scrollTop, clientHeight, scrollHeight } = container;
-                  isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 5; // Use a small tolerance
-
-                  // ... (binary search logic to setRange) ...
                   let search = (list: number[], value: number) => {
                     let low = 0;
                     let high = list.length - 1;
@@ -1927,26 +1935,23 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                handleScroll(); // Run once to set initial view
+                handleScroll();
 
-                // --- THE SIMPLE FIX ---
-                // We check the flags *after* handleScroll has updated them.
-                if (stickToBottom) {
-                  if (isInitialMountRef.current) {
-                    // On first load, always go to the bottom.
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
-                    });
-                    isInitialMountRef.current = false;
-                  } else if (listGrew && wasAtBottom) {
-                    // If a new item was added AND we were already at the bottom,
-                    // scroll to the new bottom.
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
-                    });
-                  }
+                // This single block now handles all cases.
+                if (
+                  stickToBottom &&
+                  (listGrew || isInitialMountRef.current) &&
+                  wasAtBottom
+                ) {
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: "auto",
+                  });
+                }
+
+                // We only set this to false after the first correct layout has been established.
+                if (positions.length > 0) {
+                  isInitialMountRef.current = false;
                 }
 
                 return () =>
