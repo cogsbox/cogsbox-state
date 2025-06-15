@@ -1838,9 +1838,17 @@ function createProxyHandler<T>(
                 const handleScroll = () => {
                   // Update "at bottom" status
                   const { scrollTop, scrollHeight, clientHeight } = container;
+
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 5;
 
+                  console.log(
+                    "isAtBottomRef",
+                    isAtBottomRef.current,
+                    scrollTop,
+                    scrollHeight,
+                    clientHeight
+                  );
                   // Debounce range updates slightly for smoothness
                   clearTimeout(scrollTimeout);
                   scrollTimeout = setTimeout(updateVisibleRange, 10);
@@ -1895,7 +1903,7 @@ function createProxyHandler<T>(
                   if (containerRef.current) {
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
-                      behavior,
+                      behavior: behavior,
                     });
                   }
                 },
