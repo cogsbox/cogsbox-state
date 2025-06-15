@@ -1817,6 +1817,20 @@ function createProxyHandler<T>(
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
+              // Subscribe to shadow state changes
+              const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+
+              useEffect(() => {
+                // Subscribe to shadow state updates for this stateKey
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToShadowState(stateKey, () => {
+                    // Force recalculation when shadow state updates
+                    setShadowUpdateTrigger((prev) => prev + 1);
+                  });
+
+                return unsubscribe;
+              }, [stateKey]);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1840,7 +1854,14 @@ function createProxyHandler<T>(
                 }
 
                 return { totalHeight: height, positions: pos };
-              }, [totalCount, stateKey, path.join("."), itemHeight]);
+              }, [
+                totalCount,
+                stateKey,
+                path.join("."),
+                itemHeight,
+                shadowUpdateTrigger,
+              ]);
+
               console.log("height", totalHeight);
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
