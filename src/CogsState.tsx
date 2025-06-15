@@ -1814,10 +1814,20 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
+              // Force re-render when heights change
+              const [, forceUpdate] = useState({});
+
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
-              const hasMeasurementsRef = useRef(false);
+
+              // Subscribe to shadow state changes
+              useEffect(() => {
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToShadowState(stateKey, () => forceUpdate({}));
+                return unsubscribe;
+              }, [stateKey]);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1832,17 +1842,14 @@ function createProxyHandler<T>(
                   [];
                 let height = 0;
                 const pos: number[] = [];
-                let hasMeasurements = false;
 
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
-                  if (measuredHeight) hasMeasurements = true;
                   height += measuredHeight || itemHeight;
                 }
 
-                hasMeasurementsRef.current = hasMeasurements;
                 return { totalHeight: height, positions: pos };
               }, [totalCount, stateKey, path.join("."), itemHeight]);
 
@@ -1913,9 +1920,26 @@ function createProxyHandler<T>(
                 });
 
                 // Handle stick to bottom
-                if (stickToBottom && !isInitialMountRef.current) {
-                  // Only auto-scroll for new items after initial mount
-                  if (wasAtBottom && listGrew) {
+                if (stickToBottom) {
+                  if (isInitialMountRef.current && totalCount > 0) {
+                    // Double rAF to ensure everything is rendered and measured
+                    requestAnimationFrame(() => {
+                      requestAnimationFrame(() => {
+                        if (containerRef.current) {
+                          containerRef.current.scrollTo({
+                            top: containerRef.current.scrollHeight,
+                            behavior: "auto",
+                          });
+                          isInitialMountRef.current = false;
+                        }
+                      });
+                    });
+                  } else if (
+                    !isInitialMountRef.current &&
+                    wasAtBottom &&
+                    listGrew
+                  ) {
+                    // New items added and we were at bottom - stay at bottom
                     requestAnimationFrame(() => {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1931,30 +1955,6 @@ function createProxyHandler<T>(
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
               }, [totalCount, positions, overscan, stickToBottom]);
-
-              // Separate effect for initial scroll to bottom
-              useEffect(() => {
-                if (
-                  stickToBottom &&
-                  isInitialMountRef.current &&
-                  totalCount > 0 &&
-                  hasMeasurementsRef.current
-                ) {
-                  const container = containerRef.current;
-                  if (container) {
-                    // Use rAF to ensure DOM is updated
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(() => {
-                        container.scrollTo({
-                          top: container.scrollHeight,
-                          behavior: "auto",
-                        });
-                        isInitialMountRef.current = false;
-                      });
-                    });
-                  }
-                }
-              }, [stickToBottom, totalCount, positions]); // positions change triggers this when measurements come in
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
