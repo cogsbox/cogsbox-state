@@ -1847,7 +1847,7 @@ function createProxyHandler<T>(
                   currentHeight += getItemHeight(i);
                 }
 
-                console.log("totalHeight", totalHeight);
+                console.log("totalHeight", currentHeight);
                 return { totalHeight: currentHeight, positions: pos };
               }, [totalCount, getItemHeight]);
 
