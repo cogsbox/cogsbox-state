@@ -1814,10 +1814,11 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              const isAtBottomRef = useRef(stickToBottom);
-              const previousTotalCountRef = useRef(0);
+              // --- State and Lock Management Refs ---
+              const isLockedToBottomRef = useRef(stickToBottom);
               const isInitialMountRef = useRef(true);
-              const previousTotalHeightRef = useRef(0);
+
+              // Subscribe to shadow state changes for height updates
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
@@ -1862,7 +1863,6 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              console.log("height", totalHeight);
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1881,16 +1881,15 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
-                const wasAtBottom = isAtBottomRef.current;
-                const listGrew = totalCount > previousTotalCountRef.current;
-                const heightGrew = totalHeight > previousTotalHeightRef.current;
-                previousTotalCountRef.current = totalCount;
-                previousTotalHeightRef.current = totalHeight;
-
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
-                  isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 30;
+
+                  // Determine if the user is at the bottom
+                  const isNowAtBottom =
+                    scrollHeight - scrollTop - clientHeight < 1;
+
+                  // If the user scrolls up, unlock. If they scroll back down, re-lock.
+                  isLockedToBottomRef.current = isNowAtBottom;
 
                   // Binary search for start index
                   let low = 0,
@@ -1931,33 +1930,28 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Handle stick to bottom
-                if (stickToBottom) {
-                  if (isInitialMountRef.current) {
-                    console.log(
-                      "stickToBottom initial mount",
-                      container.scrollHeight
-                    );
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "auto",
-                    });
-                    isInitialMountRef.current = false;
-                  } else if (wasAtBottom && (listGrew || heightGrew)) {
-                    console.log(
-                      "stickToBottom wasAtBottom && listGrew",
-                      container.scrollHeight
-                    );
-                    requestAnimationFrame(() => {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    });
-                  }
+                // --- REFINED STICK-TO-BOTTOM LOGIC ---
+                if (stickToBottom && isLockedToBottomRef.current) {
+                  // Use 'auto' for instant snap on first load, 'smooth' for subsequent updates.
+                  const behavior = isInitialMountRef.current
+                    ? "auto"
+                    : "smooth";
+
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior,
+                  });
                 }
-                console.log("wasAtBottom && listGrew", wasAtBottom, listGrew);
-                // Run handleScroll once to set initial range
+
+                // After the first layout effect, it's no longer the initial mount.
+                // queueMicrotask ensures this is set *after* the current render cycle.
+                queueMicrotask(() => {
+                  if (isInitialMountRef.current) {
+                    isInitialMountRef.current = false;
+                  }
+                });
+
+                // Run handleScroll once on setup to set initial range and lock status
                 handleScroll();
 
                 return () =>
