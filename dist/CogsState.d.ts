@@ -7,7 +7,7 @@ type Prettify<T> = {
     [K in keyof T]: T[K];
 } & {};
 export type VirtualViewOptions = {
-    itemHeight?: number;
+    itemHeight: number;
     overscan?: number;
     stickToBottom?: boolean;
 };

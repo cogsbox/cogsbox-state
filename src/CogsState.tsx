@@ -42,7 +42,7 @@ import useMeasure from "react-use-measure";
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 export type VirtualViewOptions = {
-  itemHeight?: number;
+  itemHeight: number;
   overscan?: number;
   stickToBottom?: boolean;
 };
@@ -1466,8 +1466,6 @@ function createProxyHandler<T>(
       if (localStorage.getItem(storageKey)) {
         localStorage.removeItem(storageKey);
       }
-
-      console.log("udpating intial State", stateKey, newState);
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
         getGlobalStore.getState().initializeShadowState(stateKey, newState);
@@ -1803,9 +1801,8 @@ function createProxyHandler<T>(
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
-              // --- CHANGE 1: itemHeight is now optional with a default ---
               const {
-                itemHeight = 50, // Serves as a fallback for unmeasured items
+                itemHeight,
                 overscan = 5,
                 stickToBottom = false,
               } = options;
@@ -1815,20 +1812,16 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-
-              // --- CHANGE 2: Add a helper to get heights from shadow store ---
-              const getItemHeight = useCallback(
-                (index: number): number => {
-                  const metadata = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, [...path, index.toString()]);
-                  return metadata?.virtualizer?.itemHeight || itemHeight;
-                },
-                [itemHeight, stateKey, path]
-              );
-
+              // const getItemHeight = useCallback((index: number) => {
+              //   const metadata = getGlobalStore
+              //     .getState()
+              //     .getShadowMetadata(stateKey, [...path, index.toString()]);
+              //   return metadata?.virtualizer?.itemHeight || options.itemHeight;
+              // }, []);
+              // --- State Tracking Refs ---
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
+              // NEW: Ref to explicitly track if this is the component's first render cycle.
               const isInitialMountRef = useRef(true);
 
               const sourceArray = getGlobalStore().getNestedState(
@@ -1837,19 +1830,6 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // --- CHANGE 3: Pre-calculate total height and item positions ---
-              // This replaces all instances of `totalCount * itemHeight`.
-              const { totalHeight, positions } = useMemo(() => {
-                let currentHeight = 0;
-                const pos: number[] = [];
-                for (let i = 0; i < totalCount; i++) {
-                  pos[i] = currentHeight;
-                  currentHeight += getItemHeight(i);
-                }
-                return { totalHeight: currentHeight, positions: pos };
-              }, [totalCount, getItemHeight]);
-
-              // This part is IDENTICAL to your original code
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1876,36 +1856,21 @@ function createProxyHandler<T>(
                   const { scrollTop, clientHeight, scrollHeight } = container;
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
-
-                  // --- CHANGE 4: Update scroll logic to use positions array ---
-                  // This is the dynamic equivalent of `Math.floor(scrollTop / itemHeight)`.
-                  let startIndex = 0;
-                  // A simple loop is robust and easy to understand.
-                  for (let i = 0; i < positions.length; i++) {
-                    if (positions[i]! >= scrollTop) {
-                      startIndex = i;
-                      break;
-                    }
-                  }
-
-                  let endIndex = startIndex;
-                  while (
-                    endIndex < totalCount &&
-                    positions[endIndex] &&
-                    positions[endIndex]! < scrollTop + clientHeight
-                  ) {
-                    endIndex++;
-                  }
-
-                  startIndex = Math.max(0, startIndex - overscan);
-                  endIndex = Math.min(totalCount, endIndex + overscan);
-
+                  const start = Math.max(
+                    0,
+                    Math.floor(scrollTop / itemHeight) - overscan
+                  );
+                  const end = Math.min(
+                    totalCount,
+                    Math.ceil((scrollTop + clientHeight) / itemHeight) +
+                      overscan
+                  );
                   setRange((prevRange) => {
                     if (
-                      prevRange.startIndex !== startIndex ||
-                      prevRange.endIndex !== endIndex
+                      prevRange.startIndex !== start ||
+                      prevRange.endIndex !== end
                     ) {
-                      return { startIndex: startIndex, endIndex: endIndex };
+                      return { startIndex: start, endIndex: end };
                     }
                     return prevRange;
                   });
@@ -1915,14 +1880,19 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // This logic is IDENTICAL to your original code
+                // --- THE CORRECTED DECISION LOGIC ---
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
+                    // SCENARIO 1: First render of the component.
+                    // Go to the bottom unconditionally. Use `auto` scroll for an instant jump.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "auto",
                     });
                   } else if (wasAtBottom && listGrew) {
+                    // SCENARIO 2: Subsequent renders (new messages arrive).
+                    // Only scroll if the user was already at the bottom.
+                    // Use `smooth` for a nice animated scroll for new messages.
                     requestAnimationFrame(() => {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1931,13 +1901,16 @@ function createProxyHandler<T>(
                     });
                   }
                 }
+
+                // After the logic runs, it's no longer the initial mount.
                 isInitialMountRef.current = false;
+
+                // Always run handleScroll once to set the initial visible window.
                 handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-                // The dependencies are almost identical, just swapping itemHeight for `positions`
-              }, [totalCount, overscan, stickToBottom, positions]);
+              }, [totalCount, itemHeight, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1951,20 +1924,19 @@ function createProxyHandler<T>(
                 []
               );
 
-              // --- CHANGE 5: Update scrollToIndex to use positions array ---
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current && positions[index] !== undefined) {
+                  if (containerRef.current) {
                     containerRef.current.scrollTo({
-                      top: positions[index], // Instead of `index * itemHeight`
+                      top: index * itemHeight,
                       behavior,
                     });
                   }
                 },
-                [positions] // Depends on `positions` now instead of `itemHeight`
+                [itemHeight]
               );
 
-              // --- CHANGE 6: Update props to use dynamic totalHeight and offsets ---
+              // Same virtualizer props as before
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
@@ -1972,14 +1944,13 @@ function createProxyHandler<T>(
                 },
                 inner: {
                   style: {
-                    height: `${totalHeight}px`, // Use calculated total height
+                    height: `${totalCount * itemHeight}px`,
                     position: "relative",
                   },
                 },
                 list: {
                   style: {
-                    // Use the pre-calculated position of the first visible item
-                    transform: `translateY(${positions[range.startIndex] || 0}px)`,
+                    transform: `translateY(${range.startIndex * itemHeight}px)`,
                   },
                 },
               };
