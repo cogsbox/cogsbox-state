@@ -1788,7 +1788,6 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 50,
               });
-              const isFirstRender = useRef(true);
 
               // Get source array
               const sourceArray = getGlobalStore().getNestedState(
@@ -1841,10 +1840,8 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Initial setup
-                if (isFirstRender.current && stickToBottom && totalCount > 0) {
-                  isFirstRender.current = false;
-                  // Start from bottom
+                // Always handle initial scroll position
+                if (stickToBottom && totalCount > 0) {
                   const startIdx = Math.max(
                     0,
                     totalCount -
@@ -1852,7 +1849,6 @@ function createProxyHandler<T>(
                       overscan
                   );
                   setRange({ startIndex: startIdx, endIndex: totalCount });
-                  // Actually scroll to bottom after DOM updates
                   setTimeout(() => {
                     container.scrollTop = container.scrollHeight;
                   }, 0);
@@ -1863,21 +1859,17 @@ function createProxyHandler<T>(
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                 };
-              }, [totalCount, itemHeight, overscan]);
+              }, [totalCount, itemHeight, overscan, stickToBottom]);
 
               // Auto-scroll on new messages
               useEffect(() => {
-                if (
-                  stickToBottom &&
-                  containerRef.current &&
-                  !isFirstRender.current
-                ) {
+                if (stickToBottom && containerRef.current) {
                   const container = containerRef.current;
                   const isNearBottom =
                     container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    100;
+                    container.scrollTop -
+                    container.clientHeight;
+                  100;
                   if (isNearBottom) {
                     container.scrollTop = container.scrollHeight;
                   }
