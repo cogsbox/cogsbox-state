@@ -1814,21 +1814,9 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              // Force re-render when heights change
-              const [, forceUpdate] = useState({});
-
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
-              const previousTotalHeightRef = useRef(0);
-
-              // Subscribe to shadow state changes
-              useEffect(() => {
-                const unsubscribe = getGlobalStore
-                  .getState()
-                  .subscribeToShadowState(stateKey, () => forceUpdate({}));
-                return unsubscribe;
-              }, [stateKey]);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1853,29 +1841,7 @@ function createProxyHandler<T>(
 
                 return { totalHeight: height, positions: pos };
               }, [totalCount, stateKey, path.join("."), itemHeight]);
-
-              // Adjust scroll when height changes while at bottom
-              useLayoutEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
-
-                const heightChanged =
-                  totalHeight !== previousTotalHeightRef.current;
-                previousTotalHeightRef.current = totalHeight;
-
-                // If we're at bottom and height changed, maintain bottom position
-                if (
-                  heightChanged &&
-                  isAtBottomRef.current &&
-                  !isInitialMountRef.current
-                ) {
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: "auto",
-                  });
-                }
-              }, [totalHeight]);
-
+              console.log("height", totalHeight);
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1942,38 +1908,32 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Handle stick to bottom for initial mount only
-                if (
-                  stickToBottom &&
-                  isInitialMountRef.current &&
-                  totalCount > 0
-                ) {
-                  // Set flag first to prevent height adjustment from interfering
-                  isAtBottomRef.current = true;
-                  // Wait for next frame to ensure everything is rendered
-                  requestAnimationFrame(() => {
-                    if (containerRef.current) {
-                      containerRef.current.scrollTo({
-                        top: containerRef.current.scrollHeight,
-                        behavior: "auto",
-                      });
-                      isInitialMountRef.current = false;
-                    }
-                  });
-                } else if (
-                  !isInitialMountRef.current &&
-                  wasAtBottom &&
-                  listGrew
-                ) {
-                  // New items added and we were at bottom - stay at bottom
-                  requestAnimationFrame(() => {
+                // Handle stick to bottom
+                if (stickToBottom) {
+                  if (isInitialMountRef.current) {
+                    console.log(
+                      "stickToBottom initial mount",
+                      container.scrollHeight
+                    );
                     container.scrollTo({
                       top: container.scrollHeight,
-                      behavior: "smooth",
+                      behavior: "auto",
                     });
-                  });
+                    isInitialMountRef.current = false;
+                  } else if (wasAtBottom && listGrew) {
+                    console.log(
+                      "stickToBottom wasAtBottom && listGrew",
+                      container.scrollHeight
+                    );
+                    requestAnimationFrame(() => {
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
+                      });
+                    });
+                  }
                 }
-
+                console.log("wasAtBottom && listGrew", wasAtBottom, listGrew);
                 // Run handleScroll once to set initial range
                 handleScroll();
 
