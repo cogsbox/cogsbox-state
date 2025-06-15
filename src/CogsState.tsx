@@ -1802,7 +1802,6 @@ function createProxyHandler<T>(
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
-              // --- CHANGE 1: itemHeight is now optional, with a default fallback.
               const {
                 itemHeight = 50, // Default/estimated height
                 overscan = 5,
@@ -1815,7 +1814,6 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              // --- CHANGE 2: Add a helper to get the real height of each item. ---
               const getItemHeight = useCallback(
                 (index: number): number => {
                   const metadata = getGlobalStore
@@ -1826,7 +1824,6 @@ function createProxyHandler<T>(
                 [itemHeight, stateKey, path]
               );
 
-              // --- These refs are from your original code. NO CHANGE. ---
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
@@ -1837,19 +1834,18 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // --- CHANGE 3: Calculate the total height and position of each item. ---
-              // This is the only new block of logic required.
               const { totalHeight, positions } = useMemo(() => {
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
                   height += getItemHeight(i);
+                  console.log("height", getItemHeight(i), height);
                 }
                 return { totalHeight: height, positions: pos };
               }, [totalCount, getItemHeight]);
 
-              // --- The virtualState logic is IDENTICAL to your original. NO CHANGE. ---
+              // This logic is IDENTICAL to your original code.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1864,8 +1860,7 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- This useLayoutEffect is from your original code. ---
-              // --- We only change the math inside handleScroll. ---
+              // This useLayoutEffect is from your original code.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1879,19 +1874,26 @@ function createProxyHandler<T>(
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
 
-                  // --- CHANGE 4: The math to find the start and end index. ---
-                  // This replaces `scrollTop / itemHeight` with a more accurate search.
-                  let startIndex = 0;
-                  // Find the first item whose top position is past the scroll top.
-                  for (let i = 0; i < positions.length; i++) {
-                    if (positions[i]! >= scrollTop) {
-                      startIndex = i;
-                      break;
+                  // --- THE ROBUST FIX: Binary search to find the start index ---
+                  // This is extremely fast and correctly handles all scroll positions.
+                  let search = (list: number[], value: number) => {
+                    let low = 0;
+                    let high = list.length - 1;
+                    while (low <= high) {
+                      const mid = Math.floor((low + high) / 2);
+                      const midValue = list[mid]!;
+                      if (midValue < value) {
+                        low = mid + 1;
+                      } else {
+                        high = mid - 1;
+                      }
                     }
-                  }
+                    return low;
+                  };
+
+                  let startIndex = search(positions, scrollTop);
 
                   let endIndex = startIndex;
-                  // Find the first item whose top position is past the bottom of the viewport.
                   while (
                     endIndex < totalCount &&
                     positions[endIndex]! < scrollTop + clientHeight
@@ -1899,23 +1901,15 @@ function createProxyHandler<T>(
                     endIndex++;
                   }
 
-                  // Apply overscan, identical to your original code.
                   startIndex = Math.max(0, startIndex - overscan);
                   endIndex = Math.min(totalCount, endIndex + overscan);
-                  console.log(
-                    "startIndex",
-                    startIndex,
-                    "endIndex",
-                    endIndex,
-                    "totalHeight",
-                    totalHeight
-                  );
+                  console.log("startIndex", startIndex, "endIndex", endIndex);
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== startIndex ||
                       prevRange.endIndex !== endIndex
                     ) {
-                      return { startIndex: startIndex, endIndex: endIndex };
+                      return { startIndex, endIndex };
                     }
                     return prevRange;
                   });
@@ -1925,7 +1919,7 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- This stickToBottom logic is IDENTICAL to your original. NO CHANGE. ---
+                // This stickToBottom logic is IDENTICAL to your original.
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
                     container.scrollTo({
@@ -1947,7 +1941,6 @@ function createProxyHandler<T>(
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
-                // --- We swap `itemHeight` for `positions` in the dependency array. ---
               }, [totalCount, overscan, stickToBottom, positions]);
 
               const scrollToBottom = useCallback(
@@ -1962,34 +1955,29 @@ function createProxyHandler<T>(
                 []
               );
 
-              // --- CHANGE 5: Update scrollToIndex to use the positions array. ---
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
                     containerRef.current.scrollTo({
-                      top: positions[index] || 0, // Use the calculated position
+                      top: positions[index] || 0,
                       behavior,
                     });
                   }
                 },
-                [positions] // Dependency is now `positions`
+                [positions]
               );
 
-              // --- CHANGE 6: Update virtualizer props to use dynamic values. ---
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
                   style: { overflowY: "auto", height: "100%" },
                 },
                 inner: {
-                  style: {
-                    height: `${totalHeight}px`, // Use calculated dynamic height
-                    position: "relative",
-                  },
+                  style: { height: `${totalHeight}px`, position: "relative" },
                 },
                 list: {
                   style: {
-                    transform: `translateY(${positions[range.startIndex] || 0}px)`, // Use calculated position
+                    transform: `translateY(${positions[range.startIndex] || 0}px)`,
                   },
                 },
               };
