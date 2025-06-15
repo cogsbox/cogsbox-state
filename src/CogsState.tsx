@@ -1767,7 +1767,6 @@ function createProxyHandler<T>(
             };
           }
 
-          // Drop-in replacement for your existing `useVirtualView` function
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1782,13 +1781,13 @@ function createProxyHandler<T>(
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
-              }); // Initial small range
+              });
 
-              // --- NEW: Refs to track scroll state without causing re-renders ---
-              // Ref to track if the user is currently at the bottom.
+              // --- State Tracking Refs ---
               const isAtBottomRef = useRef(stickToBottom);
-              // Ref to track the previous item count to detect when new items are added.
               const previousTotalCountRef = useRef(0);
+              // NEW: Ref to explicitly track if this is the component's first render cycle.
+              const isInitialMountRef = useRef(true);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1799,39 +1798,29 @@ function createProxyHandler<T>(
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
-
                 const validIndices = Array.from(
                   { length: end - start },
                   (_, i) => start + i
                 );
                 const slicedArray = validIndices.map((idx) => sourceArray[idx]);
-
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- REWRITTEN: The core logic for scrolling and sticking ---
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                // Check if we were at the bottom BEFORE this effect ran (before new items were rendered)
                 const wasAtBottom = isAtBottomRef.current;
-                // Check if the list has grown since the last render
                 const listGrew = totalCount > previousTotalCountRef.current;
-                // Update the previous count for the next run
                 previousTotalCountRef.current = totalCount;
 
                 const handleScroll = () => {
                   const { scrollTop, clientHeight, scrollHeight } = container;
-
-                  // On every scroll event, update our "at bottom" status.
-                  // The threshold (e.g., 10) gives a little leeway.
                   isAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 30;
-
+                    scrollHeight - scrollTop - clientHeight < 10;
                   const start = Math.max(
                     0,
                     Math.floor(scrollTop / itemHeight) - overscan
@@ -1841,7 +1830,6 @@ function createProxyHandler<T>(
                     Math.ceil((scrollTop + clientHeight) / itemHeight) +
                       overscan
                   );
-
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== start ||
@@ -1857,30 +1845,41 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- DECISION LOGIC ---
+                // --- THE CORRECTED DECISION LOGIC ---
                 if (stickToBottom) {
-                  if (wasAtBottom && listGrew) {
-                    // SCENARIO 1: We were at the bottom and new items arrived.
-                    // Scroll down to show them. Using requestAnimationFrame is ideal
-                    // as it waits for the browser's next paint cycle.
+                  if (isInitialMountRef.current) {
+                    // SCENARIO 1: First render of the component.
+                    // Go to the bottom unconditionally. Use `auto` scroll for an instant jump.
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
+                    });
+                  } else if (wasAtBottom && listGrew) {
+                    // SCENARIO 2: Subsequent renders (new messages arrive).
+                    // Only scroll if the user was already at the bottom.
+                    // Use `smooth` for a nice animated scroll for new messages.
                     requestAnimationFrame(() => {
-                      container.scrollTop = container.scrollHeight;
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
+                      });
                     });
                   }
                 }
 
-                // Always run the scroll handler once on setup to render the initial view.
+                // After the logic runs, it's no longer the initial mount.
+                isInitialMountRef.current = false;
+
+                // Always run handleScroll once to set the initial visible window.
                 handleScroll();
 
                 return () =>
                   container.removeEventListener("scroll", handleScroll);
               }, [totalCount, itemHeight, overscan, stickToBottom]);
 
-              // --- UNCHANGED: The manually triggered scroll functions ---
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
-                    // This is now more reliable because the container's state is better managed.
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
                       behavior,
@@ -1902,30 +1901,28 @@ function createProxyHandler<T>(
                 [itemHeight]
               );
 
+              // Same virtualizer props as before
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: {
-                    overflowY: "auto" as const,
-                    height: "100%", // Ensure the container has a defined height to scroll within
-                  },
+                  style: { overflowY: "auto", height: "100%" },
                 },
                 inner: {
                   style: {
                     height: `${totalCount * itemHeight}px`,
-                    position: "relative" as const, // Added for containment
+                    position: "relative",
                   },
                 },
                 list: {
                   style: {
-                    transform: `translateY(${range.startIndex * itemHeight}px)`, // Use transform for better performance
+                    transform: `translateY(${range.startIndex * itemHeight}px)`,
                   },
                 },
               };
 
               return {
                 virtualState,
-                virtualizerProps,
+                virtualizerProps: virtualizerProps as any,
                 scrollToBottom,
                 scrollToIndex,
               };
