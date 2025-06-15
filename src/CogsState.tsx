@@ -1814,15 +1814,25 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
-              const getItemHeight = useCallback(
-                (index: number): number => {
-                  const metadata = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, [...path, index.toString()]);
-                  return metadata?.virtualizer?.itemHeight || itemHeight;
-                },
-                [itemHeight, stateKey, path]
+              // --- STATE AND CALLBACKS FOR HEIGHTS ---
+              // This state value is the key. We increment it to force a re-calculation.
+              const [heightsVersion, setHeightsVersion] = useState(0);
+              // This callback is stable and won't cause re-renders itself.
+              const forceRecalculate = useCallback(
+                () => setHeightsVersion((v) => v + 1),
+                []
               );
+
+              // --- ON MOUNT: SCHEDULE A RECALCULATION ---
+              // This solves the "initial load" problem. It ensures that after the first
+              // items render and measure themselves, we run the calculations again
+              // with the new, correct height data.
+              useEffect(() => {
+                const timer = setTimeout(() => {
+                  forceRecalculate();
+                }, 50); // A small delay helps batch initial measurements.
+                return () => clearTimeout(timer);
+              }, [forceRecalculate]);
 
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
@@ -1834,18 +1844,27 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
+              // --- EFFICIENT HEIGHT & POSITION CALCULATION ---
               const { totalHeight, positions } = useMemo(() => {
+                // Get the shadow object for the whole array ONCE. This is fast.
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  height += getItemHeight(i);
-                  console.log("height", getItemHeight(i), height);
+                  // Access the height from the local shadowArray. No repeated deep lookups.
+                  const measuredHeight =
+                    shadowArray[i]?.virtualizer?.itemHeight;
+                  height += measuredHeight || itemHeight;
                 }
                 return { totalHeight: height, positions: pos };
-              }, [totalCount, getItemHeight]);
+                // This now depends on `heightsVersion`, so it re-runs when we force it.
+              }, [totalCount, stateKey, path, itemHeight, heightsVersion]);
 
-              // This logic is IDENTICAL to your original code.
+              // This logic is from your original working code.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1860,7 +1879,7 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // This useLayoutEffect is from your original code.
+              // This is your original useLayoutEffect with the robust index calculation.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1874,15 +1893,13 @@ function createProxyHandler<T>(
                   isAtBottomRef.current =
                     scrollHeight - scrollTop - clientHeight < 10;
 
-                  // --- THE ROBUST FIX: Binary search to find the start index ---
-                  // This is extremely fast and correctly handles all scroll positions.
+                  // ROBUST: Binary search to find the start index. Prevents errors.
                   let search = (list: number[], value: number) => {
                     let low = 0;
                     let high = list.length - 1;
                     while (low <= high) {
                       const mid = Math.floor((low + high) / 2);
-                      const midValue = list[mid]!;
-                      if (midValue < value) {
+                      if (list[mid]! < value) {
                         low = mid + 1;
                       } else {
                         high = mid - 1;
@@ -1903,7 +1920,7 @@ function createProxyHandler<T>(
 
                   startIndex = Math.max(0, startIndex - overscan);
                   endIndex = Math.min(totalCount, endIndex + overscan);
-                  console.log("startIndex", startIndex, "endIndex", endIndex);
+
                   setRange((prevRange) => {
                     if (
                       prevRange.startIndex !== startIndex ||
@@ -1919,7 +1936,7 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // This stickToBottom logic is IDENTICAL to your original.
+                // This stickToBottom logic is from your original working code.
                 if (stickToBottom) {
                   if (isInitialMountRef.current) {
                     container.scrollTo({
