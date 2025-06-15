@@ -1788,6 +1788,7 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 50,
               });
+              const isAtBottomRef = useRef(true);
 
               // Get source array
               const sourceArray = getGlobalStore().getNestedState(
@@ -1816,6 +1817,8 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
+                let scrollTimeout: any;
+
                 const updateVisibleRange = () => {
                   const { scrollTop, clientHeight } = container;
 
@@ -1833,14 +1836,21 @@ function createProxyHandler<T>(
                 };
 
                 const handleScroll = () => {
-                  updateVisibleRange();
+                  // Update "at bottom" status
+                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  isAtBottomRef.current =
+                    scrollHeight - scrollTop - clientHeight < 5;
+
+                  // Debounce range updates slightly for smoothness
+                  clearTimeout(scrollTimeout);
+                  scrollTimeout = setTimeout(updateVisibleRange, 10);
                 };
 
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
 
-                // Always handle initial scroll position
+                // Initial setup
                 if (stickToBottom && totalCount > 0) {
                   const startIdx = Math.max(
                     0,
@@ -1849,38 +1859,44 @@ function createProxyHandler<T>(
                       overscan
                   );
                   setRange({ startIndex: startIdx, endIndex: totalCount });
-                  setTimeout(() => {
+                  // Use requestAnimationFrame for smoother initial scroll
+                  requestAnimationFrame(() => {
                     container.scrollTop = container.scrollHeight;
-                  }, 0);
+                    isAtBottomRef.current = true;
+                  });
                 } else {
                   updateVisibleRange();
                 }
 
                 return () => {
+                  clearTimeout(scrollTimeout);
                   container.removeEventListener("scroll", handleScroll);
                 };
               }, [totalCount, itemHeight, overscan, stickToBottom]);
 
-              // Auto-scroll on new messages
+              // Auto-scroll ONLY if already at bottom
               useEffect(() => {
-                if (stickToBottom && containerRef.current) {
+                if (
+                  stickToBottom &&
+                  containerRef.current &&
+                  isAtBottomRef.current
+                ) {
                   const container = containerRef.current;
-                  const isNearBottom =
-                    container.scrollHeight -
-                    container.scrollTop -
-                    container.clientHeight;
-                  100;
-                  if (isNearBottom) {
-                    container.scrollTop = container.scrollHeight;
-                  }
+                  // Smooth scroll to bottom
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: "smooth",
+                  });
                 }
-              }, [totalCount]);
+              }, [totalCount, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
-                    containerRef.current.scrollTop =
-                      containerRef.current.scrollHeight;
+                    containerRef.current.scrollTo({
+                      top: containerRef.current.scrollHeight,
+                      behavior,
+                    });
                   }
                 },
                 []
