@@ -1820,6 +1820,7 @@ function createProxyHandler<T>(
               const isAtBottomRef = useRef(stickToBottom);
               const previousTotalCountRef = useRef(0);
               const isInitialMountRef = useRef(true);
+              const previousTotalHeightRef = useRef(0);
 
               // Subscribe to shadow state changes
               useEffect(() => {
@@ -1852,6 +1853,28 @@ function createProxyHandler<T>(
 
                 return { totalHeight: height, positions: pos };
               }, [totalCount, stateKey, path.join("."), itemHeight]);
+
+              // Adjust scroll when height changes while at bottom
+              useLayoutEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                const heightChanged =
+                  totalHeight !== previousTotalHeightRef.current;
+                previousTotalHeightRef.current = totalHeight;
+
+                // If we're at bottom and height changed, maintain bottom position
+                if (
+                  heightChanged &&
+                  isAtBottomRef.current &&
+                  !isInitialMountRef.current
+                ) {
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: "auto",
+                  });
+                }
+              }, [totalHeight]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1919,34 +1942,36 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Handle stick to bottom
-                if (stickToBottom) {
-                  if (isInitialMountRef.current && totalCount > 0) {
-                    // Double rAF to ensure everything is rendered and measured
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(() => {
-                        if (containerRef.current) {
-                          containerRef.current.scrollTo({
-                            top: containerRef.current.scrollHeight,
-                            behavior: "auto",
-                          });
-                          isInitialMountRef.current = false;
-                        }
+                // Handle stick to bottom for initial mount only
+                if (
+                  stickToBottom &&
+                  isInitialMountRef.current &&
+                  totalCount > 0
+                ) {
+                  // Set flag first to prevent height adjustment from interfering
+                  isAtBottomRef.current = true;
+                  // Wait for next frame to ensure everything is rendered
+                  requestAnimationFrame(() => {
+                    if (containerRef.current) {
+                      containerRef.current.scrollTo({
+                        top: containerRef.current.scrollHeight,
+                        behavior: "auto",
                       });
+                      isInitialMountRef.current = false;
+                    }
+                  });
+                } else if (
+                  !isInitialMountRef.current &&
+                  wasAtBottom &&
+                  listGrew
+                ) {
+                  // New items added and we were at bottom - stay at bottom
+                  requestAnimationFrame(() => {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "smooth",
                     });
-                  } else if (
-                    !isInitialMountRef.current &&
-                    wasAtBottom &&
-                    listGrew
-                  ) {
-                    // New items added and we were at bottom - stay at bottom
-                    requestAnimationFrame(() => {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    });
-                  }
+                  });
                 }
 
                 // Run handleScroll once to set initial range
