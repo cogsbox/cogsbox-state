@@ -10,6 +10,7 @@ export type VirtualViewOptions = {
     itemHeight?: number;
     overscan?: number;
     stickToBottom?: boolean;
+    dependencies?: any[];
 };
 export type VirtualStateObjectResult<T extends any[]> = {
     /**

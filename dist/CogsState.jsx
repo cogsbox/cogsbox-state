@@ -684,7 +684,7 @@ function lt(t, i, h, f) {
                 return () => {
                   console.log("ALGORITHM: Cleaning up loop."), clearInterval(x);
                 };
-              }, [N]), tt(() => {
+              }, [N, ...e.dependencies ?? []]), tt(() => {
                 const m = g.current;
                 if (!m) return;
                 const $ = () => {

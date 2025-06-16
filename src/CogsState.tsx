@@ -45,6 +45,7 @@ export type VirtualViewOptions = {
   itemHeight?: number;
   overscan?: number;
   stickToBottom?: boolean;
+  dependencies?: any[];
 };
 
 // The result now returns a real StateObject
@@ -1269,7 +1270,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           break;
 
         case "cut":
-          // For array cut, remove element from shadow array
+          // For array cut, remove element from shadow a
           const arrayPath = path.slice(0, -1);
           const index = parseInt(path[path.length - 1]!);
           store.removeShadowArrayElement(thisKey, arrayPath, index);
@@ -1813,6 +1814,7 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
+
               const isLockedToBottomRef = useRef(stickToBottom);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
@@ -1936,7 +1938,7 @@ function createProxyHandler<T>(
                   console.log("ALGORITHM: Cleaning up loop.");
                   clearInterval(intervalId);
                 };
-              }, [totalCount]); // This whole process triggers ONLY when totalCount changes.
+              }, [totalCount, ...(options.dependencies ?? [])]); // This whole process triggers ONLY when totalCount changes.
 
               // Effect to handle user scrolling.
               useEffect(() => {
@@ -2538,10 +2540,6 @@ function createProxyHandler<T>(
                 componentId,
                 sessionId
               );
-
-              // ===================================================================
-              // REPLACE THE OLD LOGIC WITH THIS DIRECT COPY
-              // ===================================================================
 
               const stateEntry = getGlobalStore
                 .getState()
