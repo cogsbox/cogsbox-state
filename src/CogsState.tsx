@@ -1816,7 +1816,7 @@ function createProxyHandler<T>(
               });
 
               const isLockedToBottomRef = useRef(stickToBottom);
-
+              const isAutoScrolling = useRef(false);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
@@ -1915,12 +1915,15 @@ function createProxyHandler<T>(
                       "color: green; font-weight: bold;"
                     );
                     clearInterval(intervalId); // Stop the loop.
-
+                    isAutoScrolling.current = true;
                     // STEP 3: Scroll.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "smooth",
                     });
+                    setTimeout(() => {
+                      isAutoScrolling.current = false;
+                    }, 1000);
                   } else {
                     console.log("...WAITING. Height is not ready.");
                     if (loopCount > 20) {
@@ -1938,7 +1941,7 @@ function createProxyHandler<T>(
                   console.log("ALGORITHM: Cleaning up loop.");
                   clearInterval(intervalId);
                 };
-              }, [totalCount, ...(options.dependencies ?? [])]); // This whole process triggers ONLY when totalCount changes.
+              }, [totalCount, totalHeight, ...(options.dependencies ?? [])]); // This whole process triggers ONLY when totalCount changes.
 
               // Effect to handle user scrolling.
               useEffect(() => {
@@ -1970,6 +1973,10 @@ function createProxyHandler<T>(
                 };
 
                 const handleUserScroll = () => {
+                  if (isAutoScrolling.current) {
+                    // <--- ADD THIS CHECK
+                    return;
+                  }
                   const isAtBottom =
                     container.scrollHeight -
                       container.scrollTop -
