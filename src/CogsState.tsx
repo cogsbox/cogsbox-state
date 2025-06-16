@@ -1813,15 +1813,9 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
+
               const isLockedToBottomRef = useRef(stickToBottom);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const hasScrolledToBottomRef = useRef(false);
-
-              const sourceArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
-              const totalCount = sourceArray.length;
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1832,51 +1826,32 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, [stateKey]);
 
-              const { totalHeight, positions, bottomItemsMeasured } =
-                useMemo(() => {
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
-                  let height = 0;
-                  const pos: number[] = [];
-                  let bottomMeasuredCount = 0;
+              const sourceArray = getGlobalStore().getNestedState(
+                stateKey,
+                path
+              ) as any[];
+              const totalCount = sourceArray.length;
 
-                  // Check how many of the last 20 items are measured
-                  const checkFromIndex = Math.max(0, totalCount - 20);
-
-                  for (let i = 0; i < totalCount; i++) {
-                    pos[i] = height;
-                    const measuredHeight =
-                      shadowArray[i]?.virtualizer?.itemHeight;
-
-                    if (measuredHeight) {
-                      height += measuredHeight;
-                      if (i >= checkFromIndex) {
-                        bottomMeasuredCount++;
-                      }
-                    } else {
-                      height += itemHeight;
-                    }
-                  }
-
-                  // Bottom items are measured if we have measurements for the last 20 items
-                  const bottomReady =
-                    bottomMeasuredCount >=
-                    Math.min(20, totalCount - checkFromIndex);
-
-                  return {
-                    totalHeight: height,
-                    positions: pos,
-                    bottomItemsMeasured: bottomReady,
-                  };
-                }, [
-                  totalCount,
-                  stateKey,
-                  path.join("."),
-                  itemHeight,
-                  shadowUpdateTrigger,
-                ]);
+              const { totalHeight, positions } = useMemo(() => {
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                let height = 0;
+                const pos: number[] = [];
+                for (let i = 0; i < totalCount; i++) {
+                  pos[i] = height;
+                  const measuredHeight =
+                    shadowArray[i]?.virtualizer?.itemHeight;
+                  height += measuredHeight || itemHeight;
+                }
+                return { totalHeight: height, positions: pos };
+              }, [
+                totalCount,
+                stateKey,
+                path.join("."),
+                itemHeight,
+                shadowUpdateTrigger,
+              ]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1932,39 +1907,20 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // STICK TO BOTTOM LOGIC
-                if (
-                  stickToBottom &&
-                  !hasScrolledToBottomRef.current &&
-                  totalCount > 0
-                ) {
-                  if (!bottomItemsMeasured) {
-                    // Step 1: Jump to near bottom to trigger rendering of bottom items
-                    console.log(
-                      "[VirtualView] Jumping to near bottom to trigger measurements"
-                    );
-                    const jumpPosition = Math.max(
-                      0,
-                      (totalCount - 30) * itemHeight
-                    );
-                    container.scrollTop = jumpPosition;
-                  } else {
-                    // Step 2: Bottom items are measured, now scroll to actual bottom
-                    console.log(
-                      "[VirtualView] Bottom items measured, scrolling to true bottom"
-                    );
-                    hasScrolledToBottomRef.current = true;
-                    container.scrollTop = container.scrollHeight;
-                    isLockedToBottomRef.current = true;
-                  }
-                }
-
                 updateVirtualRange();
 
                 return () => {
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-              }, [totalCount, positions, stickToBottom, bottomItemsMeasured]);
+              }, [totalCount, positions]);
+
+              // SEPARATE EFFECT JUST FOR SCROLLING TO BOTTOM
+              useEffect(() => {
+                if (stickToBottom && containerRef.current && totalCount > 0) {
+                  // Just scroll to a massive number every time count changes
+                  containerRef.current.scrollTop = 999999999;
+                }
+              }, [totalCount, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1995,13 +1951,7 @@ function createProxyHandler<T>(
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: {
-                    overflowY: "auto" as const,
-                    height: "100%",
-                    overflowAnchor: stickToBottom
-                      ? ("auto" as const)
-                      : ("none" as const),
-                  },
+                  style: { overflowY: "auto" as const, height: "100%" },
                 },
                 inner: {
                   style: {
