@@ -1813,9 +1813,13 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
+
+              // This ref tracks if the user is locked to the bottom.
+              const isLockedToBottomRef = useRef(stickToBottom);
+
+              // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
-              // Subscribe to shadow updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1831,18 +1835,20 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate total height
-              const totalHeight = useMemo(() => {
+              // Calculate heights from shadow state. This runs when data or measurements change.
+              const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
                 let height = 0;
+                const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
+                  pos[i] = height;
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
                   height += measuredHeight || itemHeight;
                 }
-                return height;
+                return { totalHeight: height, positions: pos };
               }, [
                 totalCount,
                 stateKey,
@@ -1851,7 +1857,7 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // Create virtual slice
+              // Memoize the virtualized slice of data.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1865,47 +1871,123 @@ function createProxyHandler<T>(
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
-
-              // Handle scroll
               useEffect(() => {
+                if (stickToBottom && totalCount > 0 && containerRef.current) {
+                  // When count increases, immediately adjust range to show bottom
+                  const container = containerRef.current;
+                  const visibleCount = Math.ceil(
+                    container.clientHeight / itemHeight
+                  );
+
+                  // Set range to show the last items including the new one
+                  setRange({
+                    startIndex: Math.max(
+                      0,
+                      totalCount - visibleCount - overscan
+                    ),
+                    endIndex: totalCount,
+                  });
+
+                  // Then scroll to bottom after a short delay
+                  setTimeout(() => {
+                    container.scrollTop = container.scrollHeight;
+                  }, 100);
+                }
+              }, [totalCount]);
+              // This is the main effect that handles all scrolling and updates.
+              useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const handleScroll = () => {
-                  const { scrollTop, clientHeight } = container;
-                  const startIndex = Math.floor(scrollTop / itemHeight);
-                  const visibleCount = Math.ceil(clientHeight / itemHeight);
+                let scrollTimeoutId: NodeJS.Timeout;
 
-                  setRange({
-                    startIndex: Math.max(0, startIndex - overscan),
-                    endIndex: Math.min(
-                      totalCount,
-                      startIndex + visibleCount + overscan
-                    ),
-                  });
+                // This function determines what's visible in the viewport.
+                const updateVirtualRange = () => {
+                  if (!container) return;
+                  const { scrollTop } = container;
+                  let low = 0,
+                    high = totalCount - 1;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) low = mid + 1;
+                    else high = mid - 1;
+                  }
+                  const startIndex = Math.max(0, high - overscan);
+                  let endIndex = startIndex;
+                  const visibleEnd = scrollTop + container.clientHeight;
+                  while (
+                    endIndex < totalCount &&
+                    positions[endIndex]! < visibleEnd
+                  ) {
+                    endIndex++;
+                  }
+                  endIndex = Math.min(totalCount, endIndex + overscan);
+                  setRange({ startIndex, endIndex });
                 };
 
-                container.addEventListener("scroll", handleScroll);
-                handleScroll(); // Initial calculation
+                // This function handles ONLY user-initiated scrolls.
+                const handleUserScroll = () => {
+                  isLockedToBottomRef.current =
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
+                  updateVirtualRange();
+                };
 
-                return () =>
-                  container.removeEventListener("scroll", handleScroll);
-              }, [totalCount, itemHeight, overscan]);
+                container.addEventListener("scroll", handleUserScroll, {
+                  passive: true,
+                });
 
-              const scrollToBottom = useCallback(() => {
-                if (containerRef.current) {
-                  containerRef.current.scrollTop =
-                    containerRef.current.scrollHeight;
+                // --- THE CORE FIX ---
+                if (stickToBottom && isLockedToBottomRef.current) {
+                  // We use a timeout to wait for React to render AND for useMeasure to update heights.
+                  // This is the CRUCIAL part that fixes the race condition.
+                  scrollTimeoutId = setTimeout(() => {
+                    console.log("totalHeight", totalHeight);
+                    if (isLockedToBottomRef.current) {
+                      container.scrollTo({
+                        top: 999999999,
+                        behavior: "smooth", // ALWAYS 'auto' for an instant, correct jump.
+                      });
+                    }
+                  }, 200); // A small 50ms delay is a robust buffer.
                 }
-              }, []);
 
-              const scrollToIndex = useCallback(
-                (index: number) => {
+                updateVirtualRange();
+
+                // Cleanup function is vital to prevent memory leaks.
+                return () => {
+                  clearTimeout(scrollTimeoutId);
+                  container.removeEventListener("scroll", handleUserScroll);
+                };
+                // This effect re-runs whenever the list size or item heights change.
+              }, [totalCount, positions, totalHeight, stickToBottom]);
+
+              const scrollToBottom = useCallback(
+                (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
-                    containerRef.current.scrollTop = index * itemHeight;
+                    isLockedToBottomRef.current = true;
+                    containerRef.current.scrollTo({
+                      top: containerRef.current.scrollHeight,
+                      behavior,
+                    });
                   }
                 },
-                [itemHeight]
+                []
+              );
+
+              const scrollToIndex = useCallback(
+                (index: number, behavior: ScrollBehavior = "smooth") => {
+                  if (containerRef.current && positions[index] !== undefined) {
+                    isLockedToBottomRef.current = false;
+                    containerRef.current.scrollTo({
+                      top: positions[index],
+                      behavior,
+                    });
+                  }
+                },
+                [positions]
               );
 
               const virtualizerProps = {
@@ -1921,10 +2003,7 @@ function createProxyHandler<T>(
                 },
                 list: {
                   style: {
-                    position: "absolute" as const,
-                    top: `${range.startIndex * itemHeight}px`,
-                    left: 0,
-                    right: 0,
+                    transform: `translateY(${positions[range.startIndex] || 0}px)`,
                   },
                 },
               };
@@ -2136,24 +2215,21 @@ function createProxyHandler<T>(
                 return null;
               }
 
-              const arrayLength = arrayToMap.length;
               const indicesToMap =
                 meta?.validIndices ||
-                Array.from({ length: arrayLength }, (_, i) => i);
+                Array.from({ length: arrayToMap.length }, (_, i) => i);
 
               return indicesToMap.map((originalIndex, localIndex) => {
                 const item = arrayToMap[originalIndex];
                 const finalPath = [...path, originalIndex.toString()];
                 const setter = rebuildStateShape(item, finalPath, meta);
                 const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
-                const isLastItem = originalIndex === arrayLength - 1;
 
                 return createElement(CogsItemWrapper, {
                   key: originalIndex,
                   stateKey,
                   itemComponentId,
                   itemPath: finalPath,
-                  isLastItem, // Pass it here!
                   children: callbackfn(
                     item,
                     setter,
@@ -2883,25 +2959,21 @@ export function $cogsSignalStore(proxy: {
   );
   return createElement("text", {}, String(value));
 }
-
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
   itemPath,
-  isLastItem,
   children,
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
-  isLastItem: boolean;
   children: React.ReactNode;
 }) {
   // This hook handles the re-rendering when the item's own data changes.
   const [, forceUpdate] = useState({});
   // This hook measures the element.
-  const [measureRef, bounds] = useMeasure();
-  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [ref, bounds] = useMeasure();
   // This ref prevents sending the same height update repeatedly.
   const lastReportedHeight = useRef<number | null>(null);
 
@@ -2947,25 +3019,7 @@ function CogsItemWrapper({
       }
     };
   }, [stateKey, itemComponentId, itemPath.join(".")]);
-  useEffect(() => {
-    if (isLastItem && scrollRef.current) {
-      setTimeout(() => {
-        scrollRef.current?.scrollIntoView({
-          behavior: "smooth",
-          block: "end",
-        });
-      }, 50);
-    }
-  }, [isLastItem]);
+
   // The rendered output is a simple div that gets measured.
-  return (
-    <div
-      ref={(el) => {
-        measureRef(el);
-        scrollRef.current = el;
-      }}
-    >
-      {children}
-    </div>
-  );
+  return <div ref={ref}>{children}</div>;
 }
