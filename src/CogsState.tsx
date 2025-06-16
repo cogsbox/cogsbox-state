@@ -1951,7 +1951,7 @@ function createProxyHandler<T>(
                 if (stickToBottom && isLockedToBottomRef.current) {
                   // If we were at the bottom before this new item was added,
                   // scroll to the new bottom.
-                  container.scrollTop = container.scrollHeight; // <--- THIS IS THE SCROLL LOGIC
+                  container.scrollTop = container.scrollHeight + 999999999;
                 }
 
                 // Always calculate the initial visible range.

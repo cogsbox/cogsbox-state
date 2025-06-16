@@ -694,7 +694,7 @@ function dt(t, c, h, S) {
                 };
                 return f.addEventListener("scroll", C, {
                   passive: !0
-                }), i && T.current && (f.scrollTop = f.scrollHeight), $(), () => {
+                }), i && T.current && (f.scrollTop = f.scrollHeight + 999999999), $(), () => {
                   f.removeEventListener("scroll", C);
                 };
               }, [k, F, D, i]);
