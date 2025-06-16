@@ -1807,10 +1807,16 @@ function createProxyHandler<T>(
                 overscan = 6,
                 stickToBottom = false,
               } = options;
-
+              const sourceArray = getGlobalStore().getNestedState(
+                stateKey,
+                path
+              ) as any[];
               const containerRef = useRef<HTMLDivElement | null>(null);
               // We'll set the range to the end first, then let an effect handle the scroll.
               const initialRange = () => {
+                const sourceArray = getGlobalStore
+                  .getState()
+                  .getNestedState(stateKey, path) as any[];
                 if (stickToBottom) {
                   const visibleCount = 10; // A reasonable guess for initial render
                   return {
@@ -1837,10 +1843,6 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, [stateKey]);
 
-              const sourceArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
               const totalCount = sourceArray.length;
 
               const { totalHeight, positions } = useMemo(() => {
