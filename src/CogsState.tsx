@@ -1808,7 +1808,7 @@ function createProxyHandler<T>(
                 stickToBottom = false,
                 dependencies = [],
               } = options;
-              const [instanceKey, setInstanceKey] = useState(0);
+
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
@@ -1816,8 +1816,11 @@ function createProxyHandler<T>(
               });
               const isLockedToBottomRef = useRef(stickToBottom);
 
-              // This ref will hold the ID of our loop so we can stop it.
-              const scrollLoopId = useRef<NodeJS.Timeout | null>(null);
+              // This flag prevents our own scroll animation from breaking the lock.
+              const isAutoScrolling = useRef(false);
+
+              const prevDepsRef = useRef(dependencies);
+              const prevTotalCountRef = useRef(0);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
@@ -1837,6 +1840,7 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
 
               const { totalHeight, positions } = useMemo(() => {
+                // ... same as before ...
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
@@ -1872,116 +1876,110 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- EFFECT #1: THE SCROLL ALGORITHM ---
-              // This runs when the data or dependencies change.
+              // The single, authoritative effect for ALL layout logic.
               useLayoutEffect(() => {
-                const container = containerRef.current;
-                if (
-                  !container ||
-                  !stickToBottom ||
-                  !isLockedToBottomRef.current
-                ) {
-                  return;
-                }
-
-                // If a loop is already running, stop it before starting a new one.
-                if (scrollLoopId.current) {
-                  clearInterval(scrollLoopId.current);
-                }
-
-                console.log("ALGORITHM: Starting...");
-
-                // STEP 1: Set range to render the last item.
-                setRange({
-                  startIndex: Math.max(0, totalCount - 10 - overscan),
-                  endIndex: totalCount,
-                });
-
-                // STEP 2: Start the LOOP.
-                console.log(
-                  "ALGORITHM: Starting LOOP to wait for measurement."
-                );
-                let loopCount = 0;
-                scrollLoopId.current = setInterval(() => {
-                  loopCount++;
-                  console.log(`LOOP ${loopCount}: Checking last item...`);
-
-                  const lastItemIndex = totalCount - 1;
-                  if (lastItemIndex < 0) {
-                    clearInterval(scrollLoopId.current!);
-                    return;
-                  }
-
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
-                  const lastItemHeight =
-                    shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
-
-                  if (lastItemHeight > 0) {
-                    console.log(
-                      `%cSUCCESS: Last item is measured. Scrolling.`,
-                      "color: green; font-weight: bold;"
-                    );
-                    clearInterval(scrollLoopId.current!);
-                    scrollLoopId.current = null;
-
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "smooth",
-                    });
-                  } else {
-                    console.log("...WAITING. Height is not ready.");
-                    if (loopCount > 30) {
-                      console.error("LOOP TIMEOUT. Stopping.");
-                      clearInterval(scrollLoopId.current!);
-                      scrollLoopId.current = null;
-                    }
-                  }
-                }, 100);
-
-                return () => {
-                  if (scrollLoopId.current) {
-                    clearInterval(scrollLoopId.current);
-                  }
-                };
-              }, [totalCount, ...dependencies]);
-
-              // --- EFFECT #2: USER INTERACTION & RESET ---
-              // This handles manual scrolling and resetting when the chat changes.
-              useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                // When the chat changes (dependencies change), reset the lock.
-                console.log(
-                  "DEPENDENCY CHANGE: Resetting scroll lock to:",
-                  stickToBottom
+                const depsChanged = !isDeepEqual(
+                  dependencies,
+                  prevDepsRef.current
                 );
-                isLockedToBottomRef.current = stickToBottom;
+                const hasNewItems = totalCount > prevTotalCountRef.current;
+
+                if (depsChanged) {
+                  console.log("DEPENDENCY CHANGE: Resetting scroll lock.");
+                  isLockedToBottomRef.current = stickToBottom;
+                }
+
+                const shouldStartLoop =
+                  isLockedToBottomRef.current && (hasNewItems || depsChanged);
 
                 const updateVirtualRange = () => {
-                  /* ... same as before ... */
+                  // This is the full, non-placeholder function.
+                  const { scrollTop, clientHeight } = container;
+                  let low = 0,
+                    high = totalCount - 1;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) low = mid + 1;
+                    else high = mid - 1;
+                  }
+                  const startIndex = Math.max(0, high - overscan);
+                  let endIndex = startIndex;
+                  const visibleEnd = scrollTop + clientHeight;
+                  while (
+                    endIndex < totalCount &&
+                    positions[endIndex]! < visibleEnd
+                  ) {
+                    endIndex++;
+                  }
+                  setRange({
+                    startIndex,
+                    endIndex: Math.min(totalCount, endIndex + overscan),
+                  });
                 };
 
+                let intervalId: NodeJS.Timeout | undefined;
+
+                if (shouldStartLoop) {
+                  // --- YOUR ALGORITHM ---
+                  console.log("ALGORITHM: Starting...");
+                  setRange({
+                    startIndex: Math.max(0, totalCount - 10 - overscan),
+                    endIndex: totalCount,
+                  });
+
+                  intervalId = setInterval(() => {
+                    const lastItemIndex = totalCount - 1;
+                    if (lastItemIndex < 0) {
+                      clearInterval(intervalId);
+                      return;
+                    }
+
+                    const shadowArray =
+                      getGlobalStore
+                        .getState()
+                        .getShadowMetadata(stateKey, path) || [];
+                    const lastItemHeight =
+                      shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
+
+                    if (lastItemHeight > 0) {
+                      clearInterval(intervalId);
+                      console.log("%cSUCCESS: Scrolling now.", "color: green;");
+
+                      // Set the flag to true before we start our animation.
+                      isAutoScrolling.current = true;
+
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
+                      });
+
+                      // After 1 second, assume animation is done and unset the flag.
+                      setTimeout(() => {
+                        isAutoScrolling.current = false;
+                      }, 1000);
+                    }
+                  }, 100);
+                } else {
+                  updateVirtualRange();
+                }
+
                 const handleUserScroll = () => {
+                  // If our code is scrolling, ignore this event.
+                  if (isAutoScrolling.current) return;
+
                   const isAtBottom =
                     container.scrollHeight -
                       container.scrollTop -
                       container.clientHeight <
                     1;
-                  if (!isAtBottom) {
-                    if (isLockedToBottomRef.current) {
-                      console.log("USER SCROLL: Lock broken.");
-                      isLockedToBottomRef.current = false;
-                      // If a scroll loop was running, kill it.
-                      if (scrollLoopId.current) {
-                        clearInterval(scrollLoopId.current);
-                        scrollLoopId.current = null;
-                        console.log("...Auto-scroll loop terminated by user.");
-                      }
-                    }
+                  if (!isAtBottom && isLockedToBottomRef.current) {
+                    console.log("USER SCROLL: Lock broken.");
+                    isLockedToBottomRef.current = false;
+                    // If a loop was somehow running, kill it.
+                    if (intervalId) clearInterval(intervalId);
                   }
                   updateVirtualRange();
                 };
@@ -1989,24 +1987,17 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-                updateVirtualRange();
 
-                return () =>
+                // Update refs for the next render.
+                prevDepsRef.current = dependencies;
+                prevTotalCountRef.current = totalCount;
+
+                return () => {
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions]);
-              useEffect(() => {
-                console.log(
-                  "DEPENDENCY CHANGE: Resetting scroll lock and scrolling to bottom."
-                );
-                if (containerRef.current) {
-                  // Reset the lock so the main effect can take over on the next data load.
-                  isLockedToBottomRef.current = stickToBottom;
-                  // Scroll to the top to show the loading state for the new chat.
-                  containerRef.current.scrollTop = 0;
-                  // Reset the range
-                  setRange({ startIndex: 0, endIndex: 10 });
-                }
-              }, dependencies);
+                  if (intervalId) clearInterval(intervalId);
+                };
+              }, [totalCount, positions, ...dependencies]);
+
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
