@@ -1971,10 +1971,14 @@ function createProxyHandler<T>(
                   ) {
                     endIndex++;
                   }
-                  setRange({
-                    startIndex,
-                    endIndex: Math.min(totalCount, endIndex + overscan),
-                  });
+                  const newEndIndex = Math.min(totalCount, endIndex + overscan);
+
+                  // --- LOGGING ADDED HERE ---
+                  console.log(
+                    `RANGE UPDATE: Start: ${startIndex}, End: ${newEndIndex}, Total: ${totalCount}`
+                  );
+
+                  setRange({ startIndex, endIndex: newEndIndex });
                 };
 
                 const handleUserScroll = () => {
@@ -1997,7 +2001,7 @@ function createProxyHandler<T>(
 
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [...dependencies]);
+              }, [...dependencies, totalCount, positions]); // <--- THE FIX
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
