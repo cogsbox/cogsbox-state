@@ -1820,10 +1820,23 @@ function createProxyHandler<T>(
               // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
+              // Track when we've attempted initial scroll
+              const hasAttemptedScrollRef = useRef(false);
+              const lastTotalCountRef = useRef(0);
+
+              // Subscribe to shadow state changes with limited logging
               useEffect(() => {
+                let updateCount = 0;
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToShadowState(stateKey, () => {
+                    updateCount++;
+                    if (updateCount <= 5) {
+                      // Only log first 5 updates to avoid spam
+                      console.log(
+                        `[VirtualView] Shadow update #${updateCount}`
+                      );
+                    }
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
                 return unsubscribe;
@@ -1835,20 +1848,44 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights from shadow state. This runs when data or measurements change.
-              const { totalHeight, positions } = useMemo(() => {
+              console.log(
+                `[VirtualView] Initial setup - totalCount: ${totalCount}, itemHeight: ${itemHeight}, stickToBottom: ${stickToBottom}`
+              );
+
+              // Reset scroll attempt when array size changes
+              if (totalCount !== lastTotalCountRef.current) {
+                console.log(
+                  `[VirtualView] Array size changed from ${lastTotalCountRef.current} to ${totalCount}`
+                );
+                hasAttemptedScrollRef.current = false;
+                lastTotalCountRef.current = totalCount;
+              }
+
+              // Calculate heights from shadow state and track if all measured
+              const { totalHeight, positions, allMeasured } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
                 let height = 0;
                 const pos: number[] = [];
+                let measuredCount = 0;
+
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
                   const measuredHeight =
                     shadowArray[i]?.virtualizer?.itemHeight;
+                  if (measuredHeight) measuredCount++;
                   height += measuredHeight || itemHeight;
                 }
-                return { totalHeight: height, positions: pos };
+
+                const allMeasured =
+                  measuredCount === totalCount && totalCount > 0;
+
+                console.log(
+                  `[VirtualView] Heights calc - measured: ${measuredCount}/${totalCount}, allMeasured: ${allMeasured}, totalHeight: ${height}`
+                );
+
+                return { totalHeight: height, positions: pos, allMeasured };
               }, [
                 totalCount,
                 stateKey,
@@ -1861,6 +1898,11 @@ function createProxyHandler<T>(
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
+
+                console.log(
+                  `[VirtualView] Creating virtual slice - range: ${start}-${end} (${end - start} items)`
+                );
+
                 const validIndices = Array.from(
                   { length: end - start },
                   (_, i) => start + i
@@ -1872,12 +1914,10 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // This is the main effect that handles all scrolling and updates.
+              // Simplified layout effect that waits for all measurements
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-
-                let scrollTimeoutId: NodeJS.Timeout;
 
                 // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
@@ -1917,32 +1957,38 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- THE CORE FIX ---
-                if (stickToBottom) {
-                  // We use a timeout to wait for React to render AND for useMeasure to update heights.
-                  // This is the CRUCIAL part that fixes the race condition.
-                  scrollTimeoutId = setTimeout(() => {
-                    // By the time this runs, `container.scrollHeight` is accurate.
-                    // We only scroll if the user hasn't manually scrolled up in the meantime.
-                    if (isLockedToBottomRef.current) {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "auto", // ALWAYS 'auto' for an instant, correct jump.
-                      });
-                    }
-                  }, 200); // A small 50ms delay is a robust buffer.
+                // Scroll to bottom logic
+                if (
+                  stickToBottom &&
+                  !hasAttemptedScrollRef.current &&
+                  totalCount > 0
+                ) {
+                  if (allMeasured) {
+                    // All items measured, safe to scroll
+                    console.log(
+                      `[VirtualView] All items measured, scrolling to bottom`
+                    );
+                    hasAttemptedScrollRef.current = true;
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "auto",
+                    });
+                  } else {
+                    // Still waiting for measurements, try again next render
+                    console.log(
+                      `[VirtualView] Waiting for all measurements before scroll`
+                    );
+                  }
                 }
 
                 // Update the visible range on initial load.
                 updateVirtualRange();
 
-                // Cleanup function is vital to prevent memory leaks.
+                // Cleanup function
                 return () => {
-                  clearTimeout(scrollTimeoutId);
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-                // This effect re-runs whenever the list size or item heights change.
-              }, [totalCount, positions, stickToBottom]);
+              }, [totalCount, positions, stickToBottom, allMeasured]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
