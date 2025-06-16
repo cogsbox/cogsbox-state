@@ -2011,7 +2011,7 @@ function createProxyHandler<T>(
                     console.log(
                       "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
                     );
-
+                    shouldNotScroll.current = true;
                     setStatus("IDLE_NOT_AT_BOTTOM");
                   } else {
                     shouldNotScroll.current = false;

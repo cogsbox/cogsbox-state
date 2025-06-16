@@ -718,7 +718,7 @@ function me(e, i, m, g) {
                 const b = () => {
                   $.scrollHeight - $.scrollTop - $.clientHeight < 1 ? u.current = !1 : (console.log(
                     "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
-                  ), A("IDLE_NOT_AT_BOTTOM"));
+                  ), u.current = !0, A("IDLE_NOT_AT_BOTTOM"));
                   const { scrollTop: B, clientHeight: te } = $;
                   let se = 0, ue = _ - 1;
                   for (; se <= ue; ) {
