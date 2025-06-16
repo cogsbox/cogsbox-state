@@ -1871,29 +1871,29 @@ function createProxyHandler<T>(
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
-              useEffect(() => {
-                if (stickToBottom && totalCount > 0 && containerRef.current) {
-                  // When count increases, immediately adjust range to show bottom
-                  const container = containerRef.current;
-                  const visibleCount = Math.ceil(
-                    container.clientHeight / itemHeight
-                  );
+              // useEffect(() => {
+              //   if (stickToBottom && totalCount > 0 && containerRef.current) {
+              //     // When count increases, immediately adjust range to show bottom
+              //     const container = containerRef.current;
+              //     const visibleCount = Math.ceil(
+              //       container.clientHeight / itemHeight
+              //     );
 
-                  // Set range to show the last items including the new one
-                  setRange({
-                    startIndex: Math.max(
-                      0,
-                      totalCount - visibleCount - overscan
-                    ),
-                    endIndex: totalCount,
-                  });
+              //     // Set range to show the last items including the new one
+              //     setRange({
+              //       startIndex: Math.max(
+              //         0,
+              //         totalCount - visibleCount - overscan
+              //       ),
+              //       endIndex: totalCount,
+              //     });
 
-                  // Then scroll to bottom after a short delay
-                  setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
-                  }, 100);
-                }
-              }, [totalCount]);
+              //     // Then scroll to bottom after a short delay
+              //     setTimeout(() => {
+              //       container.scrollTop = container.scrollHeight + 9999;
+              //     }, 200);
+              //   }
+              // }, [totalCount]);
               // This is the main effect that handles all scrolling and updates.
               useLayoutEffect(() => {
                 const container = containerRef.current;
@@ -1905,7 +1905,7 @@ function createProxyHandler<T>(
                   container.scrollHeight -
                     container.scrollTop -
                     container.clientHeight <
-                  1;
+                  itemHeight;
 
                 // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
