@@ -1949,16 +1949,16 @@ function createProxyHandler<T>(
 
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
-                      console.log(
-                        "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
-                      );
-                      setStatus("SCROLLING_TO_BOTTOM");
+                      if (!shouldNotScroll.current) {
+                        console.log(
+                          "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
+                        );
+
+                        setStatus("SCROLLING_TO_BOTTOM");
+                      }
                     }
                   }, 100);
-                } else if (
-                  status === "SCROLLING_TO_BOTTOM" &&
-                  !shouldNotScroll.current
-                ) {
+                } else if (status === "SCROLLING_TO_BOTTOM") {
                   console.log(
                     "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
                   );
@@ -2000,20 +2000,23 @@ function createProxyHandler<T>(
 
                 const handleUserScroll = () => {
                   // This is the core logic you wanted.
-                  if (status !== "IDLE_NOT_AT_BOTTOM") {
-                    const isAtBottom =
-                      container.scrollHeight -
-                        container.scrollTop -
-                        container.clientHeight <
-                      1;
-                    if (!isAtBottom) {
-                      console.log(
-                        "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
-                      );
-                      shouldNotScroll.current = true;
-                      setStatus("IDLE_NOT_AT_BOTTOM");
-                    }
+
+                  const isAtBottom =
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
+
+                  if (!isAtBottom) {
+                    console.log(
+                      "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
+                    );
+
+                    setStatus("IDLE_NOT_AT_BOTTOM");
+                  } else {
+                    shouldNotScroll.current = false;
                   }
+
                   // We always update the range, regardless of state.
                   // This is the full, non-placeholder function.
                   const { scrollTop, clientHeight } = container;
