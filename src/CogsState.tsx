@@ -1895,12 +1895,13 @@ function createProxyHandler<T>(
               //   }
               // }, [totalCount]);
               // This is the main effect that handles all scrolling and updates.
+              // This is the main effect that handles all scrolling and updates.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 // --- STEP 1: Remember if we were scrolled to the bottom BEFORE this render ---
-                // We check this now, before the new items might have pushed the scrollbar up.
+                // The check is made more forgiving (< itemHeight) to handle measurement delays.
                 const wasScrolledToBottom =
                   container.scrollHeight -
                     container.scrollTop -
@@ -1911,8 +1912,7 @@ function createProxyHandler<T>(
                 const updateVirtualRange = () => {
                   if (!container) return;
                   const { scrollTop, clientHeight } = container;
-
-                  // Find the first visible item
+                  // ... (rest of the function is the same, no changes needed)
                   let low = 0,
                     high = totalCount - 1;
                   while (low <= high) {
@@ -1921,8 +1921,6 @@ function createProxyHandler<T>(
                     else high = mid - 1;
                   }
                   const startIndex = Math.max(0, high - overscan);
-
-                  // Find the last visible item
                   let endIndex = startIndex;
                   const visibleEnd = scrollTop + clientHeight;
                   while (
@@ -1932,8 +1930,6 @@ function createProxyHandler<T>(
                     endIndex++;
                   }
                   endIndex = Math.min(totalCount, endIndex + overscan);
-
-                  // Update the state to render the correct slice
                   setRange({ startIndex, endIndex });
                 };
 
@@ -1944,7 +1940,7 @@ function createProxyHandler<T>(
                     container.scrollHeight -
                       container.scrollTop -
                       container.clientHeight <
-                    1;
+                    itemHeight; // Strict check for user action
                   // Then, just render what's visible at the new position.
                   updateVirtualRange();
                 };
@@ -1954,14 +1950,21 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- STEP 2: Apply the scroll AFTER the render, based on what we remembered ---
+                let scrollTimeoutId: NodeJS.Timeout | undefined;
+
+                // --- STEP 2: Conditionally schedule the SMOOTH scroll ---
                 if (
                   stickToBottom &&
                   (isLockedToBottomRef.current || wasScrolledToBottom)
                 ) {
-                  // If we are "locked" OR if we were at the bottom just before this render,
-                  // then scroll to the new bottom. This handles both initial load and new items.
-                  container.scrollTop = container.scrollHeight;
+                  // A timeout is crucial for smooth scroll. It schedules the scroll
+                  // for *after* the browser has painted the new items, preventing jank.
+                  scrollTimeoutId = setTimeout(() => {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  }, 0); // 0ms is enough to defer it to the next event loop tick.
                 }
 
                 // Always calculate the visible range after any potential scroll changes.
@@ -1970,8 +1973,17 @@ function createProxyHandler<T>(
                 // Cleanup function is vital to prevent memory leaks.
                 return () => {
                   container.removeEventListener("scroll", handleUserScroll);
+                  if (scrollTimeoutId) {
+                    clearTimeout(scrollTimeoutId);
+                  }
                 };
-              }, [totalCount, positions, totalHeight, stickToBottom]);
+              }, [
+                totalCount,
+                positions,
+                totalHeight,
+                stickToBottom,
+                itemHeight,
+              ]); // Add itemHeight to dependencies
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
