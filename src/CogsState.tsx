@@ -1809,16 +1809,22 @@ function createProxyHandler<T>(
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
+
+              const sourceArray = getGlobalStore().getNestedState(
+                stateKey,
+                path
+              ) as any[];
+              const totalCount = sourceArray.length;
+
+              // Start at top, will adjust once container is measured
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
 
-              // This ref tracks if the user is locked to the bottom.
               const isLockedToBottomRef = useRef(stickToBottom);
-
-              // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+              const hasInitializedRef = useRef(false);
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1829,13 +1835,6 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, [stateKey]);
 
-              const sourceArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
-              const totalCount = sourceArray.length;
-
-              // Calculate heights from shadow state. This runs when data or measurements change.
               const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
@@ -1857,7 +1856,6 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // Memoize the virtualized slice of data.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1872,14 +1870,10 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // This is the main effect that handles all scrolling and updates.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                let scrollTimeoutId: NodeJS.Timeout;
-
-                // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
                   if (!container) return;
                   const { scrollTop } = container;
@@ -1903,7 +1897,6 @@ function createProxyHandler<T>(
                   setRange({ startIndex, endIndex });
                 };
 
-                // This function handles ONLY user-initiated scrolls.
                 const handleUserScroll = () => {
                   isLockedToBottomRef.current =
                     container.scrollHeight -
@@ -1917,28 +1910,40 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // In useLayoutEffect, replace this section:
-                if (stickToBottom) {
-                  scrollTimeoutId = setTimeout(() => {
-                    if (isLockedToBottomRef.current) {
-                      container.scrollTo({
-                        top: container.scrollHeight + 1000, // ADD A BUFFER HERE
-                        behavior: "auto",
-                      });
-                    }
-                  }, 200);
+                // Initialize at bottom if needed
+                if (
+                  stickToBottom &&
+                  !hasInitializedRef.current &&
+                  totalCount > 0 &&
+                  container.clientHeight > 0
+                ) {
+                  hasInitializedRef.current = true;
+
+                  // Now we have the actual container height, calculate visible items
+                  const visibleCount = Math.ceil(
+                    container.clientHeight / itemHeight
+                  );
+                  const startIdx = Math.max(
+                    0,
+                    totalCount - visibleCount - overscan
+                  );
+
+                  // Set range to show bottom items
+                  setRange({
+                    startIndex: startIdx,
+                    endIndex: totalCount,
+                  });
+
+                  // Scroll to bottom
+                  container.scrollTop = container.scrollHeight;
                 }
 
-                // Update the visible range on initial load.
                 updateVirtualRange();
 
-                // Cleanup function is vital to prevent memory leaks.
                 return () => {
-                  clearTimeout(scrollTimeoutId);
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-                // This effect re-runs whenever the list size or item heights change.
-              }, [totalCount, positions, stickToBottom]);
+              }, [totalCount, positions, stickToBottom, itemHeight, overscan]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
