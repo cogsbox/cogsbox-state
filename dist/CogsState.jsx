@@ -269,8 +269,8 @@ function Bt(t, {
       if (T) {
         let M = !1, b = g.signalDomElements.get(T);
         if ((!b || b.size === 0) && (s.updateType === "insert" || s.updateType === "cut")) {
-          const O = r.slice(0, -1), D = z(E, O);
-          if (Array.isArray(D)) {
+          const O = r.slice(0, -1), W = z(E, O);
+          if (Array.isArray(W)) {
             M = !0;
             const S = `${v}-${O.join(".")}`;
             b = g.signalDomElements.get(S);
@@ -278,9 +278,9 @@ function Bt(t, {
         }
         if (b) {
           const O = M ? z(E, r.slice(0, -1)) : z(E, r);
-          b.forEach(({ parentId: D, position: S, effect: k }) => {
+          b.forEach(({ parentId: W, position: S, effect: k }) => {
             const C = document.querySelector(
-              `[data-parent-id="${D}"]`
+              `[data-parent-id="${W}"]`
             );
             if (C) {
               const _ = Array.from(C.childNodes);
@@ -301,8 +301,8 @@ function Bt(t, {
       ), s.updateType === "insert" && j.current?.validation?.key && Dt(
         j.current?.validation?.key + "." + A.join(".")
       ).filter(([b, O]) => {
-        let D = b?.split(".").length;
-        if (b == A.join(".") && D == A.length - 1) {
+        let W = b?.split(".").length;
+        if (b == A.join(".") && W == A.length - 1) {
           let S = b + "." + A;
           q(b), Lt(S, O);
         }
@@ -311,7 +311,7 @@ function Bt(t, {
       if (console.log("stateEntry >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", P), P) {
         const M = vt(u, E), b = new Set(M), O = s.updateType === "update" ? r.join(".") : r.slice(0, -1).join(".") || "";
         for (const [
-          D,
+          W,
           S
         ] of P.components.entries()) {
           let k = !1;
@@ -360,22 +360,22 @@ function Bt(t, {
       }
       const N = Date.now();
       r = r.map((M, b) => {
-        const O = r.slice(0, -1), D = z(E, O);
-        return b === r.length - 1 && ["insert", "cut"].includes(s.updateType) ? (D.length - 1).toString() : M;
+        const O = r.slice(0, -1), W = z(E, O);
+        return b === r.length - 1 && ["insert", "cut"].includes(s.updateType) ? (W.length - 1).toString() : M;
       });
-      const { oldValue: V, newValue: W } = zt(
+      const { oldValue: V, newValue: F } = zt(
         s.updateType,
         u,
         E,
         r
-      ), F = {
+      ), D = {
         timeStamp: N,
         stateKey: v,
         path: r,
         updateType: s.updateType,
         status: "new",
         oldValue: V,
-        newValue: W
+        newValue: F
       };
       switch (s.updateType) {
         case "update":
@@ -383,7 +383,7 @@ function Bt(t, {
           break;
         case "insert":
           const M = r.slice(0, -1);
-          g.insertShadowArrayElement(v, M, W);
+          g.insertShadowArrayElement(v, M, F);
           break;
         case "cut":
           const b = r.slice(0, -1), O = parseInt(r[r.length - 1]);
@@ -391,9 +391,9 @@ function Bt(t, {
           break;
       }
       if (Wt(v, (M) => {
-        const O = [...M ?? [], F].reduce((D, S) => {
-          const k = `${S.stateKey}:${JSON.stringify(S.path)}`, C = D.get(k);
-          return C ? (C.timeStamp = Math.max(C.timeStamp, S.timeStamp), C.newValue = S.newValue, C.oldValue = C.oldValue ?? S.oldValue, C.updateType = S.updateType) : D.set(k, { ...S }), D;
+        const O = [...M ?? [], D].reduce((W, S) => {
+          const k = `${S.stateKey}:${JSON.stringify(S.path)}`, C = W.get(k);
+          return C ? (C.timeStamp = Math.max(C.timeStamp, S.timeStamp), C.newValue = S.newValue, C.oldValue = C.oldValue ?? S.oldValue, C.updateType = S.updateType) : W.set(k, { ...S }), W;
         }, /* @__PURE__ */ new Map());
         return Array.from(O.values());
       }), $t(
@@ -403,7 +403,7 @@ function Bt(t, {
         U
       ), j.current?.middleware && j.current.middleware({
         updateLog: l,
-        update: F
+        update: D
       }), j.current?.serverSync) {
         const M = g.serverState[v], b = j.current?.serverSync;
         Gt(v, {
@@ -631,7 +631,7 @@ function dt(t, c, h, f) {
               const N = o().getNestedState(
                 t,
                 n
-              ), V = N.length, { totalHeight: W, positions: F } = ht(() => {
+              ), V = N.length, { totalHeight: F, positions: D } = ht(() => {
                 const S = o.getState().getShadowMetadata(t, n) || [];
                 let k = 0;
                 const C = [];
@@ -667,12 +667,12 @@ function dt(t, c, h, f) {
                   let B = 0, Z = V - 1;
                   for (; B <= Z; ) {
                     const ft = Math.floor((B + Z) / 2);
-                    F[ft] < x ? B = ft + 1 : Z = ft - 1;
+                    D[ft] < x ? B = ft + 1 : Z = ft - 1;
                   }
                   const pt = Math.max(0, Z - s);
                   let tt = pt;
                   const Ct = x + S.clientHeight;
-                  for (; tt < V && F[tt] < Ct; )
+                  for (; tt < V && D[tt] < Ct; )
                     tt++;
                   tt = Math.min(V, tt + s), E({ startIndex: pt, endIndex: tt });
                 }, _ = () => {
@@ -681,7 +681,7 @@ function dt(t, c, h, f) {
                 return S.addEventListener("scroll", _, {
                   passive: !0
                 }), i && (k = setTimeout(() => {
-                  T.current && S.scrollTo({
+                  console.log("totalHeight", F), T.current && S.scrollTo({
                     top: S.scrollHeight,
                     behavior: "auto"
                     // ALWAYS 'auto' for an instant, correct jump.
@@ -689,7 +689,7 @@ function dt(t, c, h, f) {
                 }, 1e3)), C(), () => {
                   clearTimeout(k), S.removeEventListener("scroll", _);
                 };
-              }, [V, F, i]);
+              }, [V, D, F, i]);
               const b = wt(
                 (S = "smooth") => {
                   g.current && (T.current = !0, g.current.scrollTo({
@@ -700,32 +700,32 @@ function dt(t, c, h, f) {
                 []
               ), O = wt(
                 (S, k = "smooth") => {
-                  g.current && F[S] !== void 0 && (T.current = !1, g.current.scrollTo({
-                    top: F[S],
+                  g.current && D[S] !== void 0 && (T.current = !1, g.current.scrollTo({
+                    top: D[S],
                     behavior: k
                   }));
                 },
-                [F]
-              ), D = {
+                [D]
+              ), W = {
                 outer: {
                   ref: g,
                   style: { overflowY: "auto", height: "100%" }
                 },
                 inner: {
                   style: {
-                    height: `${W}px`,
+                    height: `${F}px`,
                     position: "relative"
                   }
                 },
                 list: {
                   style: {
-                    transform: `translateY(${F[u.startIndex] || 0}px)`
+                    transform: `translateY(${D[u.startIndex] || 0}px)`
                   }
                 }
               };
               return {
                 virtualState: M,
-                virtualizerProps: D,
+                virtualizerProps: W,
                 scrollToBottom: b,
                 scrollToIndex: O
               };
@@ -763,15 +763,15 @@ function dt(t, c, h, f) {
                   register: () => {
                     const [, P] = X({}), N = `${h}-${n.join(".")}-${i}`;
                     ct(() => {
-                      const V = `${t}////${N}`, W = o.getState().stateComponents.get(t) || {
+                      const V = `${t}////${N}`, F = o.getState().stateComponents.get(t) || {
                         components: /* @__PURE__ */ new Map()
                       };
-                      return W.components.set(V, {
+                      return F.components.set(V, {
                         forceUpdate: () => P({}),
                         paths: /* @__PURE__ */ new Set([E.join(".")])
-                      }), o.getState().stateComponents.set(t, W), () => {
-                        const F = o.getState().stateComponents.get(t);
-                        F && F.components.delete(V);
+                      }), o.getState().stateComponents.set(t, F), () => {
+                        const D = o.getState().stateComponents.get(t);
+                        D && D.components.delete(V);
                       };
                     }, [t, N]);
                   },
@@ -1009,18 +1009,18 @@ function dt(t, c, h, f) {
                         }
                         let V = N.lastIndexOf(".");
                         for (; V !== -1; ) {
-                          const W = N.substring(0, V);
-                          if (T.paths.has(W)) {
+                          const F = N.substring(0, V);
+                          if (T.paths.has(F)) {
                             A = !0;
                             break;
                           }
-                          const F = N.substring(
+                          const D = N.substring(
                             V + 1
                           );
-                          if (!isNaN(Number(F))) {
-                            const M = W.lastIndexOf(".");
+                          if (!isNaN(Number(D))) {
+                            const M = F.lastIndexOf(".");
                             if (M !== -1) {
-                              const b = W.substring(
+                              const b = F.substring(
                                 0,
                                 M
                               );
@@ -1030,7 +1030,7 @@ function dt(t, c, h, f) {
                               }
                             }
                           }
-                          V = W.lastIndexOf(".");
+                          V = F.lastIndexOf(".");
                         }
                         if (A) break;
                       }

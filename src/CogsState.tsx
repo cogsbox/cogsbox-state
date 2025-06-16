@@ -1922,8 +1922,7 @@ function createProxyHandler<T>(
                   // We use a timeout to wait for React to render AND for useMeasure to update heights.
                   // This is the CRUCIAL part that fixes the race condition.
                   scrollTimeoutId = setTimeout(() => {
-                    // By the time this runs, `container.scrollHeight` is accurate.
-                    // We only scroll if the user hasn't manually scrolled up in the meantime.
+                    console.log("totalHeight", totalHeight);
                     if (isLockedToBottomRef.current) {
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1941,7 +1940,7 @@ function createProxyHandler<T>(
                   container.removeEventListener("scroll", handleUserScroll);
                 };
                 // This effect re-runs whenever the list size or item heights change.
-              }, [totalCount, positions, stickToBottom]);
+              }, [totalCount, positions, totalHeight, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
