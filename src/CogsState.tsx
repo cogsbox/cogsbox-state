@@ -1820,6 +1820,7 @@ function createProxyHandler<T>(
               });
               const [status, setStatus] = useState<Status>("IDLE");
               const prevTotalCountRef = useRef(0);
+
               const prevDepsRef = useRef(dependencies);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
