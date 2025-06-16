@@ -1804,19 +1804,27 @@ function createProxyHandler<T>(
             ): VirtualStateObjectResult<any[]> => {
               const {
                 itemHeight = 50,
-                overscan = 6, // Keeping your working overscan value
+                overscan = 6,
                 stickToBottom = false,
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
-              const [range, setRange] = useState({
-                startIndex: 0,
-                endIndex: 10,
-              });
-              // The MASTER SWITCH for auto-scrolling. Starts true.
+              // We'll set the range to the end first, then let an effect handle the scroll.
+              const initialRange = () => {
+                if (stickToBottom) {
+                  const visibleCount = 10; // A reasonable guess for initial render
+                  return {
+                    startIndex: Math.max(
+                      0,
+                      sourceArray.length - visibleCount - overscan
+                    ),
+                    endIndex: sourceArray.length,
+                  };
+                }
+                return { startIndex: 0, endIndex: 10 };
+              };
+              const [range, setRange] = useState(initialRange);
               const isLockedToBottomRef = useRef(stickToBottom);
-              // Store the previous item count to detect when new items are added.
-              const prevTotalCountRef = useRef(0);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
@@ -1870,16 +1878,48 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // This layout effect is for SCROLLING and RANGE updates ONLY
+              // This is the implementation of YOUR ALGORITHM.
               useLayoutEffect(() => {
+                const container = containerRef.current;
+                if (
+                  !container ||
+                  !stickToBottom ||
+                  !isLockedToBottomRef.current
+                ) {
+                  return;
+                }
+
+                // STEP 1: Check if the last item is measured. This is our "ready" signal.
+                const lastItemIndex = totalCount - 1;
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                const lastItemIsMeasured =
+                  lastItemIndex >= 0 &&
+                  shadowArray[lastItemIndex]?.virtualizer?.itemHeight > 0;
+
+                // STEP 2: If it's measured, we know totalHeight is correct. We can now scroll.
+                if (lastItemIsMeasured || totalCount === 0) {
+                  // A timeout is essential for 'smooth' to work reliably after a render.
+                  const scrollTimeout = setTimeout(() => {
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  }, 50); // A small buffer is safer than 0ms.
+
+                  return () => clearTimeout(scrollTimeout);
+                }
+                // If the last item is NOT measured, this effect does nothing and simply waits.
+                // It will automatically re-run when the measurement comes in (via shadowUpdateTrigger).
+              }, [totalCount, totalHeight, stickToBottom]); // Re-run when layout changes.
+
+              // This effect ONLY handles user interaction and range updates.
+              useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const hasNewItems = totalCount > prevTotalCountRef.current;
-
-                // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
-                  if (!container) return;
                   const { scrollTop, clientHeight } = container;
                   let low = 0,
                     high = totalCount - 1;
@@ -1897,53 +1937,13 @@ function createProxyHandler<T>(
                   ) {
                     endIndex++;
                   }
-                  endIndex = Math.min(totalCount, endIndex + overscan);
-                  setRange({ startIndex, endIndex });
+                  setRange({
+                    startIndex,
+                    endIndex: Math.min(totalCount, endIndex + overscan),
+                  });
                 };
 
-                // If new items were added AND we are locked to the bottom, scroll smoothly.
-                if (
-                  stickToBottom &&
-                  hasNewItems &&
-                  isLockedToBottomRef.current
-                ) {
-                  // A timeout is essential for smooth scrolling to work after a render.
-                  const scrollTimeout = setTimeout(() => {
-                    if (container) {
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    }
-                  }, 50); // A small buffer (50ms) is more robust for measurement to catch up.
-
-                  // Cleanup the timeout if the component unmounts or effect re-runs.
-                  return () => clearTimeout(scrollTimeout);
-                }
-
-                // Always update the visible range.
-                updateVirtualRange();
-              }, [
-                totalCount,
-                positions,
-                totalHeight,
-                stickToBottom,
-                itemHeight,
-              ]); // Dependencies for scrolling/range.
-
-              // This effect is ONLY for handling USER SCROLLS and the initial scroll.
-              useEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
-
-                // On initial mount, if we need to stick to the bottom, do it instantly.
-                if (isLockedToBottomRef.current) {
-                  container.scrollTop = container.scrollHeight;
-                }
-
                 const handleUserScroll = () => {
-                  if (!container) return;
-                  // If the user scrolls up, break the lock.
                   const isAtBottom =
                     container.scrollHeight -
                       container.scrollTop -
@@ -1952,24 +1952,22 @@ function createProxyHandler<T>(
                   if (!isAtBottom) {
                     isLockedToBottomRef.current = false;
                   }
+                  updateVirtualRange();
                 };
 
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
+                // Initial range calculation
+                updateVirtualRange();
+
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, []); // This runs only once on mount.
-
-              // After every render, update the previous count ref.
-              useEffect(() => {
-                prevTotalCountRef.current = totalCount;
-              });
+              }, [totalCount, positions]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
-                    // Re-enable the lock when the user explicitly asks to scroll to bottom.
                     isLockedToBottomRef.current = true;
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
@@ -1983,7 +1981,6 @@ function createProxyHandler<T>(
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
-                    // Scrolling to a specific index should break the lock.
                     isLockedToBottomRef.current = false;
                     containerRef.current.scrollTo({
                       top: positions[index],
