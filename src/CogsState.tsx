@@ -1816,7 +1816,7 @@ function createProxyHandler<T>(
               });
 
               const isLockedToBottomRef = useRef(stickToBottom);
-              const isAutoScrolling = useRef(false);
+
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
@@ -1915,15 +1915,12 @@ function createProxyHandler<T>(
                       "color: green; font-weight: bold;"
                     );
                     clearInterval(intervalId); // Stop the loop.
-                    isAutoScrolling.current = true;
+
                     // STEP 3: Scroll.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: "smooth",
                     });
-                    setTimeout(() => {
-                      isAutoScrolling.current = false;
-                    }, 1000);
                   } else {
                     console.log("...WAITING. Height is not ready.");
                     if (loopCount > 20) {
@@ -1936,11 +1933,12 @@ function createProxyHandler<T>(
                   }
                 }, 100); // Check every 100ms.
 
+                // Cleanup: Stop the loop if the component unmounts.
                 return () => {
                   console.log("ALGORITHM: Cleaning up loop.");
                   clearInterval(intervalId);
                 };
-              }, [totalCount, totalHeight, ...(options.dependencies ?? [])]); // This whole process triggers ONLY when totalCount changes.
+              }, [totalCount, ...(options.dependencies ?? [])]); // This whole process triggers ONLY when totalCount changes.
 
               // Effect to handle user scrolling.
               useEffect(() => {
@@ -1970,12 +1968,7 @@ function createProxyHandler<T>(
                     endIndex: Math.min(totalCount, endIndex + overscan),
                   });
                 };
-
                 const handleUserScroll = () => {
-                  if (isAutoScrolling.current) {
-                    // <--- ADD THIS CHECK
-                    return;
-                  }
                   const isAtBottom =
                     container.scrollHeight -
                       container.scrollTop -
@@ -1987,16 +1980,12 @@ function createProxyHandler<T>(
                   }
                   updateVirtualRange();
                 };
-
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-                // Always run on mount and when data changes to show correct initial view
-                updateVirtualRange();
-
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions]);
+              }, []);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
