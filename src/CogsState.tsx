@@ -1814,24 +1814,16 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
 
+              // This ref tracks if the user is locked to the bottom.
               const isLockedToBottomRef = useRef(stickToBottom);
+
+              // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
-              // Track if we've scrolled to bottom after initial load
-              const hasScrolledToBottomRef = useRef(false);
-              const lastTotalCountRef = useRef(0);
-
               useEffect(() => {
-                let updateCount = 0;
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToShadowState(stateKey, () => {
-                    updateCount++;
-                    if (updateCount <= 5) {
-                      console.log(
-                        `[VirtualView] Shadow update #${updateCount}`
-                      );
-                    }
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
                 return unsubscribe;
@@ -1843,77 +1835,32 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              console.log(
-                `[VirtualView] Initial setup - totalCount: ${totalCount}, itemHeight: ${itemHeight}, stickToBottom: ${stickToBottom}`
-              );
+              // Calculate heights from shadow state. This runs when data or measurements change.
+              const { totalHeight, positions } = useMemo(() => {
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                let height = 0;
+                const pos: number[] = [];
+                for (let i = 0; i < totalCount; i++) {
+                  pos[i] = height;
+                  const measuredHeight =
+                    shadowArray[i]?.virtualizer?.itemHeight;
+                  height += measuredHeight || itemHeight;
+                }
+                return { totalHeight: height, positions: pos };
+              }, [
+                totalCount,
+                stateKey,
+                path.join("."),
+                itemHeight,
+                shadowUpdateTrigger,
+              ]);
 
-              // Reset when array size changes significantly
-              if (totalCount !== lastTotalCountRef.current) {
-                console.log(
-                  `[VirtualView] Array size changed from ${lastTotalCountRef.current} to ${totalCount}`
-                );
-                hasScrolledToBottomRef.current = false;
-                lastTotalCountRef.current = totalCount;
-              }
-
-              // Calculate heights from shadow state
-              const { totalHeight, positions, visibleMeasured } =
-                useMemo(() => {
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
-                  let height = 0;
-                  const pos: number[] = [];
-                  let measuredCount = 0;
-                  let visibleMeasuredCount = 0;
-
-                  for (let i = 0; i < totalCount; i++) {
-                    pos[i] = height;
-                    const measuredHeight =
-                      shadowArray[i]?.virtualizer?.itemHeight;
-                    if (measuredHeight) {
-                      measuredCount++;
-                      // Count measured items in current visible range
-                      if (i >= range.startIndex && i < range.endIndex) {
-                        visibleMeasuredCount++;
-                      }
-                    }
-                    height += measuredHeight || itemHeight;
-                  }
-
-                  // Check if all VISIBLE items are measured
-                  const visibleCount = range.endIndex - range.startIndex;
-                  const allVisibleMeasured =
-                    visibleMeasuredCount === visibleCount && visibleCount > 0;
-
-                  console.log(
-                    `[VirtualView] Heights calc - measured: ${measuredCount}/${totalCount}, visible measured: ${visibleMeasuredCount}/${visibleCount}, totalHeight: ${height}`
-                  );
-
-                  return {
-                    totalHeight: height,
-                    positions: pos,
-                    visibleMeasured: allVisibleMeasured,
-                  };
-                }, [
-                  totalCount,
-                  stateKey,
-                  path.join("."),
-                  itemHeight,
-                  shadowUpdateTrigger,
-                  range, // Add range dependency
-                ]);
-
-              // Memoize the virtualized slice
+              // Memoize the virtualized slice of data.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
-
-                console.log(
-                  `[VirtualView] Creating virtual slice - range: ${start}-${end} (${end - start} items)`
-                );
-
                 const validIndices = Array.from(
                   { length: end - start },
                   (_, i) => start + i
@@ -1925,11 +1872,14 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // Main layout effect
+              // This is the main effect that handles all scrolling and updates.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
+                let scrollTimeoutId: NodeJS.Timeout;
+
+                // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
                   if (!container) return;
                   const { scrollTop } = container;
@@ -1953,6 +1903,7 @@ function createProxyHandler<T>(
                   setRange({ startIndex, endIndex });
                 };
 
+                // This function handles ONLY user-initiated scrolls.
                 const handleUserScroll = () => {
                   isLockedToBottomRef.current =
                     container.scrollHeight -
@@ -1966,52 +1917,28 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // For stick to bottom: check conditions without triggering re-renders
-                if (
-                  stickToBottom &&
-                  !hasScrolledToBottomRef.current &&
-                  totalCount > 0
-                ) {
-                  // Check current range without dependency
-                  const currentRange = range;
-                  const atEnd = currentRange.endIndex >= totalCount - 5; // Close to end
-
-                  if (atEnd) {
-                    console.log(
-                      `[VirtualView] At end of list, scrolling to bottom`
-                    );
-                    hasScrolledToBottomRef.current = true;
-
-                    setTimeout(() => {
-                      const scrollTarget = container.scrollHeight + 1000;
+                // In useLayoutEffect, replace this section:
+                if (stickToBottom) {
+                  scrollTimeoutId = setTimeout(() => {
+                    if (isLockedToBottomRef.current) {
                       container.scrollTo({
-                        top: scrollTarget,
+                        top: container.scrollHeight + 1000, // ADD A BUFFER HERE
                         behavior: "auto",
                       });
-                      isLockedToBottomRef.current = true;
-                    }, 50);
-                  } else {
-                    // Jump close to the bottom
-                    console.log(
-                      `[VirtualView] Jumping near bottom to trigger measurements`
-                    );
-                    const estimatedScrollPosition = Math.max(
-                      0,
-                      (totalCount - 20) * itemHeight
-                    );
-                    container.scrollTo({
-                      top: estimatedScrollPosition,
-                      behavior: "auto",
-                    });
-                  }
+                    }
+                  }, 200);
                 }
 
+                // Update the visible range on initial load.
                 updateVirtualRange();
 
+                // Cleanup function is vital to prevent memory leaks.
                 return () => {
+                  clearTimeout(scrollTimeoutId);
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-              }, [totalCount, positions, stickToBottom]); // Removed visibleMeasured and range.endIndex
+                // This effect re-runs whenever the list size or item heights change.
+              }, [totalCount, positions, stickToBottom]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
