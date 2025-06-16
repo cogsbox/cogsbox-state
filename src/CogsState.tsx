@@ -1813,12 +1813,7 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-              const sourceArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
               const isLockedToBottomRef = useRef(stickToBottom);
-              const prevTotalCountRef = useRef(sourceArray.length);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
@@ -1831,6 +1826,10 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, [stateKey]);
 
+              const sourceArray = getGlobalStore().getNestedState(
+                stateKey,
+                path
+              ) as any[];
               const totalCount = sourceArray.length;
 
               const { totalHeight, positions } = useMemo(() => {
@@ -1868,71 +1867,85 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // The one and only layout effect.
+              // --- YOUR ALGORITHM IMPLEMENTED ---
+              // This effect is the entry point. It triggers when new items are added.
               useLayoutEffect(() => {
+                const container = containerRef.current;
+                // Only run if we have new items and are supposed to be at the bottom.
+                if (
+                  !container ||
+                  !isLockedToBottomRef.current ||
+                  totalCount === 0
+                ) {
+                  return;
+                }
+
+                // STEP 1: Set the range to the end so the last items are rendered.
+                console.log("ALGORITHM: Starting...");
+                const visibleCount = 10;
+                setRange({
+                  startIndex: Math.max(0, totalCount - visibleCount - overscan),
+                  endIndex: totalCount,
+                });
+
+                // STEP 2: Start the LOOP.
+                console.log(
+                  "ALGORITHM: Starting LOOP to wait for measurement."
+                );
+                let loopCount = 0;
+                const intervalId = setInterval(() => {
+                  loopCount++;
+                  console.log(`LOOP ${loopCount}: Checking last item...`);
+
+                  // The Check: Get the last item's height FROM THE SHADOW OBJECT.
+                  const lastItemIndex = totalCount - 1;
+                  const shadowArray =
+                    getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, path) || [];
+                  const lastItemHeight =
+                    shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
+
+                  if (lastItemHeight > 0) {
+                    // EXIT CONDITION MET
+                    console.log(
+                      `%cSUCCESS: Last item height is ${lastItemHeight}. Scrolling now.`,
+                      "color: green; font-weight: bold;"
+                    );
+                    clearInterval(intervalId); // Stop the loop.
+
+                    // STEP 3: Scroll.
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: "smooth",
+                    });
+                  } else {
+                    console.log("...WAITING. Height is not ready.");
+                    if (loopCount > 20) {
+                      // Safety break to prevent infinite loops
+                      console.error(
+                        "LOOP TIMEOUT: Last item was never measured. Stopping loop."
+                      );
+                      clearInterval(intervalId);
+                    }
+                  }
+                }, 100); // Check every 100ms.
+
+                // Cleanup: Stop the loop if the component unmounts.
+                return () => {
+                  console.log("ALGORITHM: Cleaning up loop.");
+                  clearInterval(intervalId);
+                };
+              }, [totalCount]); // This whole process triggers ONLY when totalCount changes.
+
+              // Effect to handle user scrolling.
+              useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const hasNewItems = totalCount > prevTotalCountRef.current;
-
-                // This function is now ALWAYS fresh.
                 const updateVirtualRange = () => {
-                  const { scrollTop, clientHeight } = container;
-                  let low = 0,
-                    high = totalCount - 1;
-                  while (low <= high) {
-                    const mid = Math.floor((low + high) / 2);
-                    if (positions[mid]! < scrollTop) low = mid + 1;
-                    else high = mid - 1;
-                  }
-                  const startIndex = Math.max(0, high - overscan);
-                  let endIndex = startIndex;
-                  const visibleEnd = scrollTop + clientHeight;
-                  while (
-                    endIndex < totalCount &&
-                    positions[endIndex]! < visibleEnd
-                  ) {
-                    endIndex++;
-                  }
-                  setRange({
-                    startIndex,
-                    endIndex: Math.min(totalCount, endIndex + overscan),
-                  });
+                  /* ... same as before ... */
                 };
-
-                // --- YOUR SCROLLING LOGIC ---
-                // It only runs if we have new items and are locked to the bottom.
-                if (hasNewItems && isLockedToBottomRef.current) {
-                  // STEP 1: Set range to the end to start measuring.
-                  setRange({
-                    startIndex: Math.max(0, totalCount - 10 - overscan),
-                    endIndex: totalCount,
-                  });
-
-                  // STEP 2: Start the LOOP.
-                  const intervalId = setInterval(() => {
-                    const lastItemIndex = totalCount - 1;
-                    const shadowArray =
-                      getGlobalStore
-                        .getState()
-                        .getShadowMetadata(stateKey, path) || [];
-                    const lastItemHeight =
-                      shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
-
-                    if (lastItemHeight > 0) {
-                      clearInterval(intervalId);
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    }
-                  }, 100);
-
-                  // This return is the cleanup for the if-block.
-                  return () => clearInterval(intervalId);
-                }
-
-                // --- USER SCROLL HANDLING ---
                 const handleUserScroll = () => {
                   const isAtBottom =
                     container.scrollHeight -
@@ -1941,28 +1954,23 @@ function createProxyHandler<T>(
                     1;
                   if (!isAtBottom) {
                     isLockedToBottomRef.current = false;
+                    console.log("USER ACTION: Scroll lock DISABLED.");
                   }
                   updateVirtualRange();
                 };
-
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-                updateVirtualRange(); // Always update range for current view.
-
-                // This return is the cleanup for the whole effect.
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions]); // Re-run when layout-related data changes.
+              }, []);
 
-              // This simple effect tracks the item count for the next render.
-              useEffect(() => {
-                prevTotalCountRef.current = totalCount;
-              });
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
                     isLockedToBottomRef.current = true;
+                    console.log("USER ACTION: Scroll lock ENABLED.");
+                    // This is a manual trigger, so we don't need the loop. Just scroll.
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
                       behavior,
@@ -1976,6 +1984,7 @@ function createProxyHandler<T>(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
                     isLockedToBottomRef.current = false;
+                    console.log("USER ACTION: Scroll lock DISABLED.");
                     containerRef.current.scrollTo({
                       top: positions[index],
                       behavior,
@@ -2002,6 +2011,7 @@ function createProxyHandler<T>(
                   },
                 },
               };
+
               return {
                 virtualState,
                 virtualizerProps,
