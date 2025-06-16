@@ -1966,29 +1966,32 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // For stick to bottom: first jump to approximate bottom position
+                // For stick to bottom: check conditions without triggering re-renders
                 if (
                   stickToBottom &&
                   !hasScrolledToBottomRef.current &&
                   totalCount > 0
                 ) {
-                  if (visibleMeasured || range.endIndex === totalCount) {
-                    // If we're showing the last items OR current visible items are measured
+                  // Check current range without dependency
+                  const currentRange = range;
+                  const atEnd = currentRange.endIndex >= totalCount - 5; // Close to end
+
+                  if (atEnd) {
                     console.log(
-                      `[VirtualView] Scrolling to bottom - visible measured: ${visibleMeasured}, at end: ${range.endIndex === totalCount}`
+                      `[VirtualView] At end of list, scrolling to bottom`
                     );
                     hasScrolledToBottomRef.current = true;
 
-                    // Use setTimeout to ensure DOM updates are complete
                     setTimeout(() => {
+                      const scrollTarget = container.scrollHeight + 1000;
                       container.scrollTo({
-                        top: container.scrollHeight + 1000,
+                        top: scrollTarget,
                         behavior: "auto",
                       });
                       isLockedToBottomRef.current = true;
-                    }, 0);
+                    }, 50);
                   } else {
-                    // Jump close to the bottom to trigger rendering of bottom items
+                    // Jump close to the bottom
                     console.log(
                       `[VirtualView] Jumping near bottom to trigger measurements`
                     );
@@ -2008,13 +2011,7 @@ function createProxyHandler<T>(
                 return () => {
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-              }, [
-                totalCount,
-                positions,
-                stickToBottom,
-                visibleMeasured,
-                range.endIndex,
-              ]);
+              }, [totalCount, positions, stickToBottom]); // Removed visibleMeasured and range.endIndex
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
