@@ -1809,13 +1809,19 @@ function createProxyHandler<T>(
                 dependencies = [],
               } = options;
 
+              type Status =
+                | "WAITING_FOR_ARRAY"
+                | "GETTING_ARRAY_HEIGHTS"
+                | "MOVING_TO_BOTTOM"
+                | "LOCKED_AT_BOTTOM"
+                | "IDLE_NOT_AT_BOTTOM";
+
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
-              const isLockedToBottomRef = useRef(stickToBottom);
-              const isAutoScrolling = useRef(false);
+              const [status, setStatus] = useState<Status>("WAITING_FOR_ARRAY");
               const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
 
@@ -1871,103 +1877,136 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- PHASE 1: Detect change & SET THE RANGE ---
-              // This effect's ONLY job is to decide if we need to auto-scroll and then set the range to the end.
+              // --- STATE MACHINE CONTROLLER ---
+              // This effect decides which state to transition to based on external changes.
               useLayoutEffect(() => {
-                const hasNewItems = totalCount > prevTotalCountRef.current;
                 const depsChanged = !isDeepEqual(
                   dependencies,
                   prevDepsRef.current
                 );
+                const hasNewItems = totalCount > prevTotalCountRef.current;
 
                 if (depsChanged) {
-                  isLockedToBottomRef.current = stickToBottom;
+                  console.log(
+                    "STATE_TRANSITION: Deps changed. -> WAITING_FOR_ARRAY"
+                  );
+                  setStatus("WAITING_FOR_ARRAY");
+                  return;
                 }
 
                 if (
-                  isLockedToBottomRef.current &&
-                  (hasNewItems || depsChanged)
+                  hasNewItems &&
+                  status === "LOCKED_AT_BOTTOM" &&
+                  stickToBottom
                 ) {
                   console.log(
-                    "PHASE 1: Auto-scroll needed. Setting range to render the last item."
+                    "STATE_TRANSITION: New items arrived while locked. -> GETTING_ARRAY_HEIGHTS"
                   );
-                  setRange({
-                    startIndex: Math.max(0, totalCount - 10 - overscan),
-                    endIndex: totalCount,
-                  });
+                  setStatus("GETTING_ARRAY_HEIGHTS");
                 }
 
                 prevTotalCountRef.current = totalCount;
                 prevDepsRef.current = dependencies;
               }, [totalCount, ...dependencies]);
 
-              // --- PHASE 2: Wait for measurement & SCROLL ---
-              // This effect's ONLY job is to run YOUR loop after Phase 1 is complete.
+              // --- STATE MACHINE ACTIONS ---
+              // This effect handles the actions for each state.
               useLayoutEffect(() => {
                 const container = containerRef.current;
-                const isRangeSetToEnd =
-                  range.endIndex === totalCount && totalCount > 0;
+                if (!container) return;
 
-                // We only start the loop if the range is correctly set to the end and we are locked.
+                let intervalId: NodeJS.Timeout | undefined;
+
                 if (
-                  !container ||
-                  !isLockedToBottomRef.current ||
-                  !isRangeSetToEnd
+                  status === "WAITING_FOR_ARRAY" &&
+                  totalCount > 0 &&
+                  stickToBottom
                 ) {
-                  return;
+                  console.log(
+                    "ACTION: WAITING_FOR_ARRAY -> GETTING_ARRAY_HEIGHTS"
+                  );
+                  setStatus("GETTING_ARRAY_HEIGHTS");
+                } else if (status === "GETTING_ARRAY_HEIGHTS") {
+                  console.log(
+                    "ACTION: GETTING_ARRAY_HEIGHTS. Setting range and starting loop."
+                  );
+                  setRange({
+                    startIndex: Math.max(0, totalCount - 10 - overscan),
+                    endIndex: totalCount,
+                  });
+
+                  intervalId = setInterval(() => {
+                    const lastItemIndex = totalCount - 1;
+                    const shadowArray =
+                      getGlobalStore
+                        .getState()
+                        .getShadowMetadata(stateKey, path) || [];
+                    const lastItemHeight =
+                      shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
+
+                    if (lastItemHeight > 0) {
+                      clearInterval(intervalId);
+                      console.log(
+                        "ACTION: Measurement success. -> MOVING_TO_BOTTOM"
+                      );
+                      setStatus("MOVING_TO_BOTTOM");
+                    }
+                  }, 100);
+                } else if (status === "MOVING_TO_BOTTOM") {
+                  console.log("ACTION: MOVING_TO_BOTTOM. Executing scroll.");
+                  const scrollBehavior =
+                    prevTotalCountRef.current === 0 ? "auto" : "smooth";
+
+                  container.scrollTo({
+                    top: container.scrollHeight,
+                    behavior: scrollBehavior,
+                  });
+
+                  // After scrolling, we are locked at the bottom.
+                  // Use a timeout to wait for the animation to finish.
+                  const timeoutId = setTimeout(
+                    () => {
+                      console.log(
+                        "ACTION: Scroll finished. -> LOCKED_AT_BOTTOM"
+                      );
+                      setStatus("LOCKED_AT_BOTTOM");
+                    },
+                    scrollBehavior === "smooth" ? 500 : 50
+                  );
+
+                  return () => clearTimeout(timeoutId);
                 }
 
-                console.log(
-                  "PHASE 2: Range is set to the end. Starting the measurement loop."
-                );
-                let loopCount = 0;
-                const intervalId = setInterval(() => {
-                  loopCount++;
-                  console.log(`LOOP ${loopCount}: Checking last item...`);
+                return () => {
+                  if (intervalId) clearInterval(intervalId);
+                };
+              }, [status, totalCount, positions]);
 
-                  const lastItemIndex = totalCount - 1;
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
-                  const lastItemHeight =
-                    shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
-
-                  if (lastItemHeight > 0) {
-                    console.log(
-                      `%cSUCCESS: Last item height is ${lastItemHeight}. Scrolling now.`,
-                      "color: green; font-weight: bold;"
-                    );
-                    clearInterval(intervalId);
-
-                    isAutoScrolling.current = true;
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "smooth",
-                    });
-                    // Give the animation time to finish before unsetting the flag
-                    setTimeout(() => {
-                      isAutoScrolling.current = false;
-                    }, 1000);
-                  } else if (loopCount > 30) {
-                    console.error(
-                      "LOOP TIMEOUT: Last item was never measured. Stopping loop."
-                    );
-                    clearInterval(intervalId);
-                  } else {
-                    console.log("...WAITING. Height is not ready.");
-                  }
-                }, 100);
-
-                return () => clearInterval(intervalId);
-              }, [range]); // This effect is triggered by the `setRange` call in Phase 1.
-
-              // --- PHASE 3: Handle User Scrolling ---
+              // --- USER INTERACTION ---
+              // This effect only handles user scrolls.
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const updateVirtualRange = () => {
+                const handleUserScroll = () => {
+                  const isAtBottom =
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
+                  // If the user scrolls up from a locked or scrolling state, move to idle.
+                  if (
+                    !isAtBottom &&
+                    (status === "LOCKED_AT_BOTTOM" ||
+                      status === "MOVING_TO_BOTTOM")
+                  ) {
+                    console.log(
+                      "USER_ACTION: Scrolled up. -> IDLE_NOT_AT_BOTTOM"
+                    );
+                    setStatus("IDLE_NOT_AT_BOTTOM");
+                  }
+
+                  // Update the rendered range based on scroll position.
                   const { scrollTop, clientHeight } = container;
                   let low = 0,
                     high = totalCount - 1;
@@ -1991,50 +2030,32 @@ function createProxyHandler<T>(
                   });
                 };
 
-                const handleUserScroll = () => {
-                  if (isAutoScrolling.current) return;
-                  const isAtBottom =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    1;
-                  if (!isAtBottom) {
-                    isLockedToBottomRef.current = false;
-                  }
-                  updateVirtualRange();
-                };
-
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-                updateVirtualRange(); // Always run to set the initial view
-
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, ...dependencies]);
+              }, [totalCount, positions, status]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current) {
-                    isLockedToBottomRef.current = true;
-                    containerRef.current.scrollTo({
-                      top: containerRef.current.scrollHeight,
-                      behavior,
-                    });
-                  }
+                  console.log(
+                    "USER_ACTION: Clicked scroll to bottom button. -> MOVING_TO_BOTTOM"
+                  );
+                  setStatus("MOVING_TO_BOTTOM");
                 },
                 []
               );
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  if (containerRef.current && positions[index] !== undefined) {
-                    isLockedToBottomRef.current = false;
-                    containerRef.current.scrollTo({
-                      top: positions[index],
-                      behavior,
-                    });
-                  }
+                  // if (containerRef.current && positions[index] !== undefined) {
+                  //   isLockedToBottomRef.current = false;
+                  //   containerRef.current.scrollTo({
+                  //     top: positions[index],
+                  //     behavior,
+                  //   });
+                  // }
                 },
                 [positions]
               );
