@@ -1936,7 +1936,6 @@ function createProxyHandler<T>(
                   }
                 }, 100); // Check every 100ms.
 
-                // Cleanup: Stop the loop if the component unmounts.
                 return () => {
                   console.log("ALGORITHM: Cleaning up loop.");
                   clearInterval(intervalId);
