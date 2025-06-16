@@ -1867,11 +1867,11 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- YOUR ALGORITHM IMPLEMENTED ---
+              // --- YOUR SCROLLING ALGORITHM (UNCHANGED and WORKING) ---
               // This effect is the entry point. It triggers when new items are added.
               useLayoutEffect(() => {
                 const container = containerRef.current;
-                // Only run if we have new items and are supposed to be at the bottom.
+                // Only run if we are supposed to be at the bottom.
                 if (
                   !container ||
                   !isLockedToBottomRef.current ||
@@ -1881,7 +1881,6 @@ function createProxyHandler<T>(
                 }
 
                 // STEP 1: Set the range to the end so the last items are rendered.
-                console.log("ALGORITHM: Starting...");
                 const visibleCount = 10;
                 setRange({
                   startIndex: Math.max(0, totalCount - visibleCount - overscan),
@@ -1889,14 +1888,9 @@ function createProxyHandler<T>(
                 });
 
                 // STEP 2: Start the LOOP.
-                console.log(
-                  "ALGORITHM: Starting LOOP to wait for measurement."
-                );
                 let loopCount = 0;
                 const intervalId = setInterval(() => {
                   loopCount++;
-                  console.log(`LOOP ${loopCount}: Checking last item...`);
-
                   // The Check: Get the last item's height FROM THE SHADOW OBJECT.
                   const lastItemIndex = totalCount - 1;
                   const shadowArray =
@@ -1908,10 +1902,6 @@ function createProxyHandler<T>(
 
                   if (lastItemHeight > 0) {
                     // EXIT CONDITION MET
-                    console.log(
-                      `%cSUCCESS: Last item height is ${lastItemHeight}. Scrolling now.`,
-                      "color: green; font-weight: bold;"
-                    );
                     clearInterval(intervalId); // Stop the loop.
 
                     // STEP 3: Scroll.
@@ -1920,32 +1910,48 @@ function createProxyHandler<T>(
                       behavior: "smooth",
                     });
                   } else {
-                    console.log("...WAITING. Height is not ready.");
                     if (loopCount > 20) {
-                      // Safety break to prevent infinite loops
-                      console.error(
-                        "LOOP TIMEOUT: Last item was never measured. Stopping loop."
-                      );
+                      // Safety break
                       clearInterval(intervalId);
                     }
                   }
-                }, 100); // Check every 100ms.
+                }, 100);
 
                 // Cleanup: Stop the loop if the component unmounts.
-                return () => {
-                  console.log("ALGORITHM: Cleaning up loop.");
-                  clearInterval(intervalId);
-                };
+                return () => clearInterval(intervalId);
               }, [totalCount]); // This whole process triggers ONLY when totalCount changes.
 
-              // Effect to handle user scrolling.
+              // --- THE FIX IS HERE ---
+              // This effect now correctly handles user scrolling AND updates the view.
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
+                // This function now always has the LATEST totalCount and positions.
                 const updateVirtualRange = () => {
-                  /* ... same as before ... */
+                  const { scrollTop, clientHeight } = container;
+                  let low = 0,
+                    high = totalCount - 1;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) low = mid + 1;
+                    else high = mid - 1;
+                  }
+                  const startIndex = Math.max(0, high - overscan);
+                  let endIndex = startIndex;
+                  const visibleEnd = scrollTop + clientHeight;
+                  while (
+                    endIndex < totalCount &&
+                    positions[endIndex]! < visibleEnd
+                  ) {
+                    endIndex++;
+                  }
+                  setRange({
+                    startIndex,
+                    endIndex: Math.min(totalCount, endIndex + overscan),
+                  });
                 };
+
                 const handleUserScroll = () => {
                   const isAtBottom =
                     container.scrollHeight -
@@ -1954,23 +1960,25 @@ function createProxyHandler<T>(
                     1;
                   if (!isAtBottom) {
                     isLockedToBottomRef.current = false;
-                    console.log("USER ACTION: Scroll lock DISABLED.");
                   }
+                  // This always calls the fresh version of updateVirtualRange.
                   updateVirtualRange();
                 };
+
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
+                updateVirtualRange(); // Update range on initial load and when data changes.
+
+                // This cleanup is crucial. It removes the old listener before adding a new one.
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, []);
+              }, [totalCount, positions]); // Its dependency array now includes totalCount and positions.
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
                     isLockedToBottomRef.current = true;
-                    console.log("USER ACTION: Scroll lock ENABLED.");
-                    // This is a manual trigger, so we don't need the loop. Just scroll.
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
                       behavior,
@@ -1984,7 +1992,6 @@ function createProxyHandler<T>(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
                     isLockedToBottomRef.current = false;
-                    console.log("USER ACTION: Scroll lock DISABLED.");
                     containerRef.current.scrollTo({
                       top: positions[index],
                       behavior,
