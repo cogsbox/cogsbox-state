@@ -1816,11 +1816,9 @@ function createProxyHandler<T>(
 
               // This ref tracks if the user is locked to the bottom.
               const isLockedToBottomRef = useRef(stickToBottom);
-
+              const lastScrollPositionRef = useRef(0);
               // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const hasInitiallyLoadedRef = useRef(false);
-              const prevTotalCountRef = useRef(0);
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1941,38 +1939,31 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // In your useLayoutEffect:
-                if (stickToBottom) {
-                  // Check if this is initial load or new item
-                  const isInitialLoad =
-                    !hasInitiallyLoadedRef.current && totalCount > 0;
-                  const isNewItem =
-                    hasInitiallyLoadedRef.current &&
-                    totalCount > prevTotalCountRef.current;
+                if (stickToBottom && isLockedToBottomRef.current) {
+                  const currentScrollHeight = container.scrollHeight;
 
-                  scrollTimeoutId = setTimeout(() => {
-                    console.log("totalHeight", totalHeight);
-                    if (isLockedToBottomRef.current) {
-                      container.scrollTo({
-                        top: 999999999,
-                        behavior: isNewItem ? "smooth" : "auto", // Only smooth for NEW items after initial load
-                      });
-                    }
-                  }, 200);
+                  // Only scroll if the height actually changed (new content rendered)
+                  if (currentScrollHeight > lastScrollPositionRef.current) {
+                    // Check if we're far from bottom (initial loads or large batches)
+                    const distanceFromBottom =
+                      currentScrollHeight -
+                      container.scrollTop -
+                      container.clientHeight;
+                    const isLargeGap =
+                      distanceFromBottom > container.clientHeight * 2;
 
-                  // Mark as initially loaded after first run
-                  if (isInitialLoad) {
-                    hasInitiallyLoadedRef.current = true;
+                    container.scrollTo({
+                      top: 999999999,
+                      behavior: isLargeGap ? "auto" : "smooth", // Instant for big jumps, smooth for small
+                    });
+
+                    lastScrollPositionRef.current = currentScrollHeight;
                   }
                 }
-
-                // Update ref at the end
-                prevTotalCountRef.current = totalCount;
                 updateVirtualRange();
 
                 // Cleanup function is vital to prevent memory leaks.
                 return () => {
-                  clearTimeout(scrollTimeoutId);
                   container.removeEventListener("scroll", handleUserScroll);
                 };
                 // This effect re-runs whenever the list size or item heights change.
