@@ -1817,6 +1817,7 @@ function createProxyHandler<T>(
               const isLockedToBottomRef = useRef(stickToBottom);
               const isAutoScrolling = useRef(false);
               const prevTotalCountRef = useRef(0);
+              const prevDepsRef = useRef(dependencies);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
@@ -1870,10 +1871,23 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- PHASE 1: Detect auto-scroll need and SET THE RANGE ---
+              // --- PHASE 1: Detect change & SET THE RANGE ---
+              // This effect's ONLY job is to decide if we need to auto-scroll and then set the range to the end.
               useLayoutEffect(() => {
                 const hasNewItems = totalCount > prevTotalCountRef.current;
-                if (isLockedToBottomRef.current && hasNewItems) {
+                const depsChanged = !isDeepEqual(
+                  dependencies,
+                  prevDepsRef.current
+                );
+
+                if (depsChanged) {
+                  isLockedToBottomRef.current = stickToBottom;
+                }
+
+                if (
+                  isLockedToBottomRef.current &&
+                  (hasNewItems || depsChanged)
+                ) {
                   console.log(
                     "PHASE 1: Auto-scroll needed. Setting range to render the last item."
                   );
@@ -1882,25 +1896,29 @@ function createProxyHandler<T>(
                     endIndex: totalCount,
                   });
                 }
-                prevTotalCountRef.current = totalCount;
-              }, [totalCount]);
 
-              // --- PHASE 2: Wait for measurement and SCROLL ---
+                prevTotalCountRef.current = totalCount;
+                prevDepsRef.current = dependencies;
+              }, [totalCount, ...dependencies]);
+
+              // --- PHASE 2: Wait for measurement & SCROLL ---
+              // This effect's ONLY job is to run YOUR loop after Phase 1 is complete.
               useLayoutEffect(() => {
                 const container = containerRef.current;
-                const isRangeAtEnd =
+                const isRangeSetToEnd =
                   range.endIndex === totalCount && totalCount > 0;
 
+                // We only start the loop if the range is correctly set to the end and we are locked.
                 if (
                   !container ||
                   !isLockedToBottomRef.current ||
-                  !isRangeAtEnd
+                  !isRangeSetToEnd
                 ) {
                   return;
                 }
 
                 console.log(
-                  "PHASE 2: Range is at the end. Starting the measurement loop."
+                  "PHASE 2: Range is set to the end. Starting the measurement loop."
                 );
                 let loopCount = 0;
                 const intervalId = setInterval(() => {
@@ -1927,10 +1945,11 @@ function createProxyHandler<T>(
                       top: container.scrollHeight,
                       behavior: "smooth",
                     });
+                    // Give the animation time to finish before unsetting the flag
                     setTimeout(() => {
                       isAutoScrolling.current = false;
                     }, 1000);
-                  } else if (loopCount > 20) {
+                  } else if (loopCount > 30) {
                     console.error(
                       "LOOP TIMEOUT: Last item was never measured. Stopping loop."
                     );
@@ -1941,17 +1960,12 @@ function createProxyHandler<T>(
                 }, 100);
 
                 return () => clearInterval(intervalId);
-              }, [range.endIndex, totalCount, positions]);
+              }, [range]); // This effect is triggered by the `setRange` call in Phase 1.
 
-              // --- PHASE 3: Handle User Interaction and Resets ---
+              // --- PHASE 3: Handle User Scrolling ---
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
-
-                console.log(
-                  "DEPENDENCY CHANGE: Resetting scroll lock and initial view."
-                );
-                isLockedToBottomRef.current = stickToBottom;
 
                 const updateVirtualRange = () => {
                   const { scrollTop, clientHeight } = container;
@@ -1971,14 +1985,10 @@ function createProxyHandler<T>(
                   ) {
                     endIndex++;
                   }
-                  const newEndIndex = Math.min(totalCount, endIndex + overscan);
-
-                  // --- LOGGING ADDED HERE ---
-                  console.log(
-                    `RANGE UPDATE: Start: ${startIndex}, End: ${newEndIndex}, Total: ${totalCount}`
-                  );
-
-                  setRange({ startIndex, endIndex: newEndIndex });
+                  setRange({
+                    startIndex,
+                    endIndex: Math.min(totalCount, endIndex + overscan),
+                  });
                 };
 
                 const handleUserScroll = () => {
@@ -1997,11 +2007,11 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-                updateVirtualRange();
+                updateVirtualRange(); // Always run to set the initial view
 
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [...dependencies, totalCount, positions]); // <--- THE FIX
+              }, [totalCount, positions, ...dependencies]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
