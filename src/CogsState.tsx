@@ -1899,6 +1899,14 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
+                // --- STEP 1: Remember if we were scrolled to the bottom BEFORE this render ---
+                // We check this now, before the new items might have pushed the scrollbar up.
+                const wasScrolledToBottom =
+                  container.scrollHeight -
+                    container.scrollTop -
+                    container.clientHeight <
+                  1;
+
                 // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
                   if (!container) return;
@@ -1925,19 +1933,19 @@ function createProxyHandler<T>(
                   }
                   endIndex = Math.min(totalCount, endIndex + overscan);
 
+                  // Update the state to render the correct slice
                   setRange({ startIndex, endIndex });
                 };
 
                 // This function handles ONLY user-initiated scrolls.
                 const handleUserScroll = () => {
-                  // The key: check if we are scrolled to the bottom.
+                  // When the user scrolls, update the ref so we know their intent for the *next* update.
                   isLockedToBottomRef.current =
                     container.scrollHeight -
                       container.scrollTop -
                       container.clientHeight <
                     1;
-
-                  // After any scroll, update what's visible.
+                  // Then, just render what's visible at the new position.
                   updateVirtualRange();
                 };
 
@@ -1946,15 +1954,17 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- THE AUTO-SCROLL LOGIC ---
-                // This checks if we should auto-scroll *after* a render has occurred.
-                if (stickToBottom && isLockedToBottomRef.current) {
-                  // If we were at the bottom before this new item was added,
-                  // scroll to the new bottom.
-                  container.scrollTop = container.scrollHeight + 999999999;
+                // --- STEP 2: Apply the scroll AFTER the render, based on what we remembered ---
+                if (
+                  stickToBottom &&
+                  (isLockedToBottomRef.current || wasScrolledToBottom)
+                ) {
+                  // If we are "locked" OR if we were at the bottom just before this render,
+                  // then scroll to the new bottom. This handles both initial load and new items.
+                  container.scrollTop = container.scrollHeight;
                 }
 
-                // Always calculate the initial visible range.
+                // Always calculate the visible range after any potential scroll changes.
                 updateVirtualRange();
 
                 // Cleanup function is vital to prevent memory leaks.
