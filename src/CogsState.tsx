@@ -1809,18 +1809,22 @@ function createProxyHandler<T>(
                 dependencies = [],
               } = options;
 
+              // YOUR STATE MACHINE STATES
               type Status =
-                | "IDLE" // User is in control, or we are resting at the bottom.
-                | "SCROLLING_TO_BOTTOM"; // Performing a scroll animation.
+                | "IDLE_AT_TOP"
+                | "GETTING_HEIGHTS"
+                | "SCROLLING_TO_BOTTOM"
+                | "LOCKED_AT_BOTTOM"
+                | "IDLE_NOT_AT_BOTTOM";
 
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
-              const [status, setStatus] = useState<Status>("IDLE");
-              const prevTotalCountRef = useRef(0);
+              const [status, setStatus] = useState<Status>("IDLE_AT_TOP");
 
+              const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
@@ -1861,6 +1865,7 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
+              // THIS IS THE FULL, NON-PLACEHOLDER FUNCTION
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1875,82 +1880,136 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- Main Controller Effect ---
+              // --- 1. STATE CONTROLLER ---
+              // This effect decides which state to transition TO.
               useLayoutEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
-
                 const depsChanged = !isDeepEqual(
                   dependencies,
                   prevDepsRef.current
                 );
                 const hasNewItems = totalCount > prevTotalCountRef.current;
 
-                // 1. On Chat Change: Reset to a clean state and trigger an instant scroll.
                 if (depsChanged) {
-                  console.log(
-                    "EVENT: Chat changed. Resetting state and scrolling."
-                  );
-                  setStatus("SCROLLING_TO_BOTTOM");
-                  // This return is important. It lets the effect re-run with the new status.
-                  return;
+                  console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
+                  setStatus("IDLE_AT_TOP");
+                  return; // Stop here, let the next effect handle the action for the new state.
                 }
 
-                // 2. On New Message: Check if we SHOULD scroll.
-                // This will only happen if we are IDLE (meaning we are already at the bottom).
-                if (hasNewItems && status === "IDLE") {
-                  const isAtBottom =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    itemHeight;
-                  if (isAtBottom && stickToBottom) {
-                    console.log(
-                      "EVENT: New message arrived while at bottom. -> SCROLLING_TO_BOTTOM"
-                    );
-                    setStatus("SCROLLING_TO_BOTTOM");
-                    return; // Let the effect re-run with the new status.
-                  }
+                if (
+                  hasNewItems &&
+                  status === "LOCKED_AT_BOTTOM" &&
+                  stickToBottom
+                ) {
+                  console.log(
+                    "TRANSITION: New items arrived while locked -> GETTING_HEIGHTS"
+                  );
+                  setStatus("GETTING_HEIGHTS");
                 }
 
-                let scrollTimeoutId: NodeJS.Timeout | undefined;
+                prevTotalCountRef.current = totalCount;
+                prevDepsRef.current = dependencies;
+              }, [totalCount, ...dependencies]);
 
-                // 3. If we are in the SCROLLING state, perform the scroll action.
-                if (status === "SCROLLING_TO_BOTTOM") {
-                  // A chat change or initial load should be instant. New messages should be smooth.
-                  const isInitial =
-                    prevTotalCountRef.current === 0 || depsChanged;
-                  const scrollBehavior = isInitial ? "auto" : "smooth";
+              // --- 2. STATE ACTION HANDLER ---
+              // This effect performs the ACTION for the current state.
+              useLayoutEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                let intervalId: NodeJS.Timeout | undefined;
+
+                if (
+                  status === "IDLE_AT_TOP" &&
+                  stickToBottom &&
+                  totalCount > 0
+                ) {
+                  // If we just loaded a new chat, start the process.
                   console.log(
-                    `ACTION: Scrolling to bottom. Behavior: ${scrollBehavior}`
+                    "ACTION (IDLE_AT_TOP): Data has arrived -> GETTING_HEIGHTS"
                   );
+                  setStatus("GETTING_HEIGHTS");
+                } else if (status === "GETTING_HEIGHTS") {
+                  console.log(
+                    "ACTION (GETTING_HEIGHTS): Setting range to end and starting loop."
+                  );
+                  setRange({
+                    startIndex: Math.max(0, totalCount - 10 - overscan),
+                    endIndex: totalCount,
+                  });
+
+                  intervalId = setInterval(() => {
+                    const lastItemIndex = totalCount - 1;
+                    const shadowArray =
+                      getGlobalStore
+                        .getState()
+                        .getShadowMetadata(stateKey, path) || [];
+                    const lastItemHeight =
+                      shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
+
+                    if (lastItemHeight > 0) {
+                      clearInterval(intervalId);
+                      console.log(
+                        "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
+                      );
+                      setStatus("SCROLLING_TO_BOTTOM");
+                    }
+                  }, 100);
+                } else if (status === "SCROLLING_TO_BOTTOM") {
+                  console.log(
+                    "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
+                  );
+                  // Use 'auto' for initial load, 'smooth' for new messages.
+                  const scrollBehavior =
+                    prevTotalCountRef.current === 0 ? "auto" : "smooth";
 
                   container.scrollTo({
                     top: container.scrollHeight,
                     behavior: scrollBehavior,
                   });
 
-                  // After the scroll, transition back to IDLE.
-                  // The timeout lets the animation finish so this doesn't happen too early.
-                  scrollTimeoutId = setTimeout(
+                  const timeoutId = setTimeout(
                     () => {
-                      console.log("ACTION: Scroll finished. -> IDLE");
-                      setStatus("IDLE");
+                      console.log(
+                        "ACTION (SCROLLING_TO_BOTTOM): Scroll finished -> LOCKED_AT_BOTTOM"
+                      );
+                      setStatus("LOCKED_AT_BOTTOM");
                     },
-                    isInitial ? 50 : 500
+                    scrollBehavior === "smooth" ? 500 : 50
                   );
+
+                  return () => clearTimeout(timeoutId);
                 }
 
-                // --- User Scroll Handling & Range Update ---
-                const handleUserScroll = () => {
-                  // If the user scrolls, they are in control. Immediately go to IDLE.
-                  // This will also cancel any pending scroll-end timeouts.
-                  if (status === "SCROLLING_TO_BOTTOM") {
-                    console.log("USER ACTION: Interrupted scroll. -> IDLE");
-                    setStatus("IDLE");
-                  }
+                // If status is IDLE_NOT_AT_BOTTOM or LOCKED_AT_BOTTOM, we do nothing here.
+                // The scroll has either finished or been disabled by the user.
 
-                  // This is the full range update function.
+                return () => {
+                  if (intervalId) clearInterval(intervalId);
+                };
+              }, [status, totalCount, positions]);
+
+              // --- 3. USER INTERACTION & RANGE UPDATER ---
+              useEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                const handleUserScroll = () => {
+                  // This is the core logic you wanted.
+                  if (status !== "IDLE_NOT_AT_BOTTOM") {
+                    const isAtBottom =
+                      container.scrollHeight -
+                        container.scrollTop -
+                        container.clientHeight <
+                      1;
+                    if (!isAtBottom) {
+                      console.log(
+                        "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
+                      );
+                      setStatus("IDLE_NOT_AT_BOTTOM");
+                    }
+                  }
+                  // We always update the range, regardless of state.
+                  // This is the full, non-placeholder function.
                   const { scrollTop, clientHeight } = container;
                   let low = 0,
                     high = totalCount - 1;
@@ -1977,21 +2036,9 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-
-                // Always update range on render if we are IDLE.
-                if (status === "IDLE") {
-                  handleUserScroll();
-                }
-
-                // Update refs for the next render cycle.
-                prevTotalCountRef.current = totalCount;
-                prevDepsRef.current = dependencies;
-
-                return () => {
+                return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-                  if (scrollTimeoutId) clearTimeout(scrollTimeoutId);
-                };
-              }, [totalCount, positions, status, ...dependencies]);
+              }, [totalCount, positions, status]); // Depends on status to know if it should break the lock
 
               const scrollToBottom = useCallback(() => {
                 console.log(
@@ -2003,7 +2050,7 @@ function createProxyHandler<T>(
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
-                    setStatus("IDLE");
+                    setStatus("IDLE_NOT_AT_BOTTOM");
                     containerRef.current.scrollTo({
                       top: positions[index],
                       behavior,
