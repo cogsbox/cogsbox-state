@@ -1939,21 +1939,36 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // --- THE CORE FIX ---
+                const hasInitiallyLoadedRef = useRef(false);
+                const prevTotalCountRef = useRef(0);
+
+                // In your useLayoutEffect:
                 if (stickToBottom) {
-                  // We use a timeout to wait for React to render AND for useMeasure to update heights.
-                  // This is the CRUCIAL part that fixes the race condition.
+                  // Check if this is initial load or new item
+                  const isInitialLoad =
+                    !hasInitiallyLoadedRef.current && totalCount > 0;
+                  const isNewItem =
+                    hasInitiallyLoadedRef.current &&
+                    totalCount > prevTotalCountRef.current;
+
                   scrollTimeoutId = setTimeout(() => {
                     console.log("totalHeight", totalHeight);
                     if (isLockedToBottomRef.current) {
                       container.scrollTo({
                         top: 999999999,
-                        behavior: "auto", // ALWAYS 'auto' for an instant, correct jump.
+                        behavior: isNewItem ? "smooth" : "auto", // Only smooth for NEW items after initial load
                       });
                     }
-                  }, 1000); // A small 50ms delay is a robust buffer.
+                  }, 200);
+
+                  // Mark as initially loaded after first run
+                  if (isInitialLoad) {
+                    hasInitiallyLoadedRef.current = true;
+                  }
                 }
 
+                // Update ref at the end
+                prevTotalCountRef.current = totalCount;
                 updateVirtualRange();
 
                 // Cleanup function is vital to prevent memory leaks.
