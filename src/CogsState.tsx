@@ -1808,7 +1808,7 @@ function createProxyHandler<T>(
                 stickToBottom = false,
                 dependencies = [],
               } = options;
-
+              const [instanceKey, setInstanceKey] = useState(0);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
@@ -1993,8 +1993,20 @@ function createProxyHandler<T>(
 
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, ...dependencies]);
-
+              }, [totalCount, positions]);
+              useEffect(() => {
+                console.log(
+                  "DEPENDENCY CHANGE: Resetting scroll lock and scrolling to bottom."
+                );
+                if (containerRef.current) {
+                  // Reset the lock so the main effect can take over on the next data load.
+                  isLockedToBottomRef.current = stickToBottom;
+                  // Scroll to the top to show the loading state for the new chat.
+                  containerRef.current.scrollTop = 0;
+                  // Reset the range
+                  setRange({ startIndex: 0, endIndex: 10 });
+                }
+              }, dependencies);
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
