@@ -1809,22 +1809,19 @@ function createProxyHandler<T>(
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
+              const [range, setRange] = useState({
+                startIndex: 0,
+                endIndex: 10,
+              });
+              const isLockedToBottomRef = useRef(stickToBottom);
+              const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+              const hasScrolledToBottomRef = useRef(false);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
                 path
               ) as any[];
               const totalCount = sourceArray.length;
-
-              // Start at top, will adjust once container is measured
-              const [range, setRange] = useState({
-                startIndex: 0,
-                endIndex: 10,
-              });
-
-              const isLockedToBottomRef = useRef(stickToBottom);
-              const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const hasInitializedRef = useRef(false);
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1835,26 +1832,51 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, [stateKey]);
 
-              const { totalHeight, positions } = useMemo(() => {
-                const shadowArray =
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                  [];
-                let height = 0;
-                const pos: number[] = [];
-                for (let i = 0; i < totalCount; i++) {
-                  pos[i] = height;
-                  const measuredHeight =
-                    shadowArray[i]?.virtualizer?.itemHeight;
-                  height += measuredHeight || itemHeight;
-                }
-                return { totalHeight: height, positions: pos };
-              }, [
-                totalCount,
-                stateKey,
-                path.join("."),
-                itemHeight,
-                shadowUpdateTrigger,
-              ]);
+              const { totalHeight, positions, bottomItemsMeasured } =
+                useMemo(() => {
+                  const shadowArray =
+                    getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, path) || [];
+                  let height = 0;
+                  const pos: number[] = [];
+                  let bottomMeasuredCount = 0;
+
+                  // Check how many of the last 20 items are measured
+                  const checkFromIndex = Math.max(0, totalCount - 20);
+
+                  for (let i = 0; i < totalCount; i++) {
+                    pos[i] = height;
+                    const measuredHeight =
+                      shadowArray[i]?.virtualizer?.itemHeight;
+
+                    if (measuredHeight) {
+                      height += measuredHeight;
+                      if (i >= checkFromIndex) {
+                        bottomMeasuredCount++;
+                      }
+                    } else {
+                      height += itemHeight;
+                    }
+                  }
+
+                  // Bottom items are measured if we have measurements for the last 20 items
+                  const bottomReady =
+                    bottomMeasuredCount >=
+                    Math.min(20, totalCount - checkFromIndex);
+
+                  return {
+                    totalHeight: height,
+                    positions: pos,
+                    bottomItemsMeasured: bottomReady,
+                  };
+                }, [
+                  totalCount,
+                  stateKey,
+                  path.join("."),
+                  itemHeight,
+                  shadowUpdateTrigger,
+                ]);
 
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
@@ -1910,32 +1932,31 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Initialize at bottom if needed
+                // STICK TO BOTTOM LOGIC
                 if (
                   stickToBottom &&
-                  !hasInitializedRef.current &&
-                  totalCount > 0 &&
-                  container.clientHeight > 0
+                  !hasScrolledToBottomRef.current &&
+                  totalCount > 0
                 ) {
-                  hasInitializedRef.current = true;
-
-                  // Now we have the actual container height, calculate visible items
-                  const visibleCount = Math.ceil(
-                    container.clientHeight / itemHeight
-                  );
-                  const startIdx = Math.max(
-                    0,
-                    totalCount - visibleCount - overscan
-                  );
-
-                  // Set range to show bottom items
-                  setRange({
-                    startIndex: startIdx,
-                    endIndex: totalCount,
-                  });
-
-                  // Scroll to bottom
-                  container.scrollTop = container.scrollHeight;
+                  if (!bottomItemsMeasured) {
+                    // Step 1: Jump to near bottom to trigger rendering of bottom items
+                    console.log(
+                      "[VirtualView] Jumping to near bottom to trigger measurements"
+                    );
+                    const jumpPosition = Math.max(
+                      0,
+                      (totalCount - 30) * itemHeight
+                    );
+                    container.scrollTop = jumpPosition;
+                  } else {
+                    // Step 2: Bottom items are measured, now scroll to actual bottom
+                    console.log(
+                      "[VirtualView] Bottom items measured, scrolling to true bottom"
+                    );
+                    hasScrolledToBottomRef.current = true;
+                    container.scrollTop = container.scrollHeight;
+                    isLockedToBottomRef.current = true;
+                  }
                 }
 
                 updateVirtualRange();
@@ -1943,7 +1964,7 @@ function createProxyHandler<T>(
                 return () => {
                   container.removeEventListener("scroll", handleUserScroll);
                 };
-              }, [totalCount, positions, stickToBottom, itemHeight, overscan]);
+              }, [totalCount, positions, stickToBottom, bottomItemsMeasured]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
@@ -1974,7 +1995,13 @@ function createProxyHandler<T>(
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto" as const, height: "100%" },
+                  style: {
+                    overflowY: "auto" as const,
+                    height: "100%",
+                    overflowAnchor: stickToBottom
+                      ? ("auto" as const)
+                      : ("none" as const),
+                  },
                 },
                 inner: {
                   style: {
