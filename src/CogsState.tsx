@@ -1804,7 +1804,7 @@ function createProxyHandler<T>(
             ): VirtualStateObjectResult<any[]> => {
               const {
                 itemHeight = 50,
-                overscan = 5,
+                overscan = 6, // Keeping your working overscan value
                 stickToBottom = false,
               } = options;
 
@@ -1813,11 +1813,11 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-
-              // This ref tracks if the user is locked to the bottom.
+              // The MASTER SWITCH for auto-scrolling. Starts true.
               const isLockedToBottomRef = useRef(stickToBottom);
+              // Store the previous item count to detect when new items are added.
+              const prevTotalCountRef = useRef(0);
 
-              // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
               useEffect(() => {
@@ -1835,7 +1835,6 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights from shadow state. This runs when data or measurements change.
               const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
@@ -1857,7 +1856,6 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // Memoize the virtualized slice of data.
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1871,48 +1869,18 @@ function createProxyHandler<T>(
                   validIndices,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
-              // useEffect(() => {
-              //   if (stickToBottom && totalCount > 0 && containerRef.current) {
-              //     // When count increases, immediately adjust range to show bottom
-              //     const container = containerRef.current;
-              //     const visibleCount = Math.ceil(
-              //       container.clientHeight / itemHeight
-              //     );
 
-              //     // Set range to show the last items including the new one
-              //     setRange({
-              //       startIndex: Math.max(
-              //         0,
-              //         totalCount - visibleCount - overscan
-              //       ),
-              //       endIndex: totalCount,
-              //     });
-
-              //     // Then scroll to bottom after a short delay
-              //     setTimeout(() => {
-              //       container.scrollTop = container.scrollHeight + 9999;
-              //     }, 200);
-              //   }
-              // }, [totalCount]);
-              // This is the main effect that handles all scrolling and updates.
-              // This is the main effect that handles all scrolling and updates.
+              // This layout effect is for SCROLLING and RANGE updates ONLY.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                // --- STEP 1: Remember if we were scrolled to the bottom BEFORE this render ---
-                // The check is made more forgiving (< itemHeight) to handle measurement delays.
-                const wasScrolledToBottom =
-                  container.scrollHeight -
-                    container.scrollTop -
-                    container.clientHeight <
-                  itemHeight;
+                const hasNewItems = totalCount > prevTotalCountRef.current;
 
                 // This function determines what's visible in the viewport.
                 const updateVirtualRange = () => {
                   if (!container) return;
                   const { scrollTop, clientHeight } = container;
-                  // ... (rest of the function is the same, no changes needed)
                   let low = 0,
                     high = totalCount - 1;
                   while (low <= high) {
@@ -1933,61 +1901,75 @@ function createProxyHandler<T>(
                   setRange({ startIndex, endIndex });
                 };
 
-                // This function handles ONLY user-initiated scrolls.
-                const handleUserScroll = () => {
-                  // When the user scrolls, update the ref so we know their intent for the *next* update.
-                  isLockedToBottomRef.current =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    itemHeight; // Strict check for user action
-                  // Then, just render what's visible at the new position.
-                  updateVirtualRange();
-                };
-
-                // Add the listener for user scrolling.
-                container.addEventListener("scroll", handleUserScroll, {
-                  passive: true,
-                });
-
-                let scrollTimeoutId: NodeJS.Timeout | undefined;
-
-                // --- STEP 2: Conditionally schedule the SMOOTH scroll ---
+                // If new items were added AND we are locked to the bottom, scroll smoothly.
                 if (
                   stickToBottom &&
-                  (isLockedToBottomRef.current || wasScrolledToBottom)
+                  hasNewItems &&
+                  isLockedToBottomRef.current
                 ) {
-                  // A timeout is crucial for smooth scroll. It schedules the scroll
-                  // for *after* the browser has painted the new items, preventing jank.
-                  scrollTimeoutId = setTimeout(() => {
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: "smooth",
-                    });
-                  }, 0); // 0ms is enough to defer it to the next event loop tick.
+                  // A timeout is essential for smooth scrolling to work after a render.
+                  const scrollTimeout = setTimeout(() => {
+                    if (container) {
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
+                      });
+                    }
+                  }, 50); // A small buffer (50ms) is more robust for measurement to catch up.
+
+                  // Cleanup the timeout if the component unmounts or effect re-runs.
+                  return () => clearTimeout(scrollTimeout);
                 }
 
-                // Always calculate the visible range after any potential scroll changes.
+                // Always update the visible range.
                 updateVirtualRange();
-
-                // Cleanup function is vital to prevent memory leaks.
-                return () => {
-                  container.removeEventListener("scroll", handleUserScroll);
-                  if (scrollTimeoutId) {
-                    clearTimeout(scrollTimeoutId);
-                  }
-                };
               }, [
                 totalCount,
                 positions,
                 totalHeight,
                 stickToBottom,
                 itemHeight,
-              ]); // Add itemHeight to dependencies
+              ]); // Dependencies for scrolling/range.
+
+              // This effect is ONLY for handling USER SCROLLS and the initial scroll.
+              useEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                // On initial mount, if we need to stick to the bottom, do it instantly.
+                if (isLockedToBottomRef.current) {
+                  container.scrollTop = container.scrollHeight;
+                }
+
+                const handleUserScroll = () => {
+                  if (!container) return;
+                  // If the user scrolls up, break the lock.
+                  const isAtBottom =
+                    container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight <
+                    1;
+                  if (!isAtBottom) {
+                    isLockedToBottomRef.current = false;
+                  }
+                };
+
+                container.addEventListener("scroll", handleUserScroll, {
+                  passive: true,
+                });
+                return () =>
+                  container.removeEventListener("scroll", handleUserScroll);
+              }, []); // This runs only once on mount.
+
+              // After every render, update the previous count ref.
+              useEffect(() => {
+                prevTotalCountRef.current = totalCount;
+              });
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current) {
+                    // Re-enable the lock when the user explicitly asks to scroll to bottom.
                     isLockedToBottomRef.current = true;
                     containerRef.current.scrollTo({
                       top: containerRef.current.scrollHeight,
@@ -2001,6 +1983,7 @@ function createProxyHandler<T>(
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
+                    // Scrolling to a specific index should break the lock.
                     isLockedToBottomRef.current = false;
                     containerRef.current.scrollTo({
                       top: positions[index],
