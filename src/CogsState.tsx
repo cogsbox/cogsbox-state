@@ -1933,7 +1933,6 @@ function createProxyHandler<T>(
                   }, 1000); // A small 50ms delay is a robust buffer.
                 }
 
-                // Update the visible range on initial load.
                 updateVirtualRange();
 
                 // Cleanup function is vital to prevent memory leaks.
