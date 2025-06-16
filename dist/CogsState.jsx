@@ -686,7 +686,7 @@ function dt(t, c, h, f) {
                     behavior: "auto"
                     // ALWAYS 'auto' for an instant, correct jump.
                   });
-                }, 50)), C(), () => {
+                }, 200)), C(), () => {
                   clearTimeout(k), S.removeEventListener("scroll", _);
                 };
               }, [V, F, i]);

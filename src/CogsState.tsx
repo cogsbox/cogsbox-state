@@ -1930,7 +1930,7 @@ function createProxyHandler<T>(
                         behavior: "auto", // ALWAYS 'auto' for an instant, correct jump.
                       });
                     }
-                  }, 50); // A small 50ms delay is a robust buffer.
+                  }, 200); // A small 50ms delay is a robust buffer.
                 }
 
                 // Update the visible range on initial load.
