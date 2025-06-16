@@ -1907,13 +1907,14 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-
+                console.log("totalCount", totalCount);
                 // Handle scrolling
                 if (stickToBottom && totalCount > 0) {
                   const isInitialLoad =
                     lastTotalCountRef.current === 0 && totalCount > 0;
                   const hasNewItems = totalCount > lastTotalCountRef.current;
-
+                  console.log("isInitialLoad", isInitialLoad);
+                  console.log("hasNewItems", hasNewItems);
                   if (isInitialLoad) {
                     // First load - always scroll to bottom
                     setTimeout(() => {
