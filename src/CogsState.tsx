@@ -1946,8 +1946,29 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 const updateVirtualRange = () => {
-                  /* ... same as before ... */
+                  const { scrollTop, clientHeight } = container;
+                  let low = 0,
+                    high = totalCount - 1;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) low = mid + 1;
+                    else high = mid - 1;
+                  }
+                  const startIndex = Math.max(0, high - overscan);
+                  let endIndex = startIndex;
+                  const visibleEnd = scrollTop + clientHeight;
+                  while (
+                    endIndex < totalCount &&
+                    positions[endIndex]! < visibleEnd
+                  ) {
+                    endIndex++;
+                  }
+                  setRange({
+                    startIndex,
+                    endIndex: Math.min(totalCount, endIndex + overscan),
+                  });
                 };
+
                 const handleUserScroll = () => {
                   const isAtBottom =
                     container.scrollHeight -
@@ -1960,12 +1981,16 @@ function createProxyHandler<T>(
                   }
                   updateVirtualRange();
                 };
+
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
+                // Always run on mount and when data changes to show correct initial view
+                updateVirtualRange();
+
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, []);
+              }, [totalCount, positions]);
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "smooth") => {
