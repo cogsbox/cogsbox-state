@@ -1809,19 +1809,21 @@ function createProxyHandler<T>(
                 dependencies = [],
               } = options;
 
+              // YOUR STATE MACHINE STATES
               type Status =
-                | "WAITING_FOR_ARRAY"
-                | "GETTING_ARRAY_HEIGHTS"
-                | "MOVING_TO_BOTTOM"
-                | "LOCKED_AT_BOTTOM"
-                | "IDLE_NOT_AT_BOTTOM";
+                | "IDLE_AT_TOP" // Initial state for a new chat
+                | "GETTING_HEIGHTS" // Waiting for the last item to be measured
+                | "SCROLLING_TO_BOTTOM" // Performing the scroll animation
+                | "LOCKED_AT_BOTTOM" // Idle at the bottom, waiting for new messages
+                | "IDLE_NOT_AT_BOTTOM"; // User has scrolled up and broken the lock
 
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
-              const [status, setStatus] = useState<Status>("WAITING_FOR_ARRAY");
+              const [status, setStatus] = useState<Status>("IDLE_AT_TOP");
+
               const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
 
@@ -1877,8 +1879,8 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- STATE MACHINE CONTROLLER ---
-              // This effect decides which state to transition to based on external changes.
+              // --- 1. STATE CONTROLLER ---
+              // This effect decides which state to transition TO.
               useLayoutEffect(() => {
                 const depsChanged = !isDeepEqual(
                   dependencies,
@@ -1887,11 +1889,9 @@ function createProxyHandler<T>(
                 const hasNewItems = totalCount > prevTotalCountRef.current;
 
                 if (depsChanged) {
-                  console.log(
-                    "STATE_TRANSITION: Deps changed. -> WAITING_FOR_ARRAY"
-                  );
-                  setStatus("WAITING_FOR_ARRAY");
-                  return;
+                  console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
+                  setStatus("IDLE_AT_TOP");
+                  return; // Stop here, let the next effect handle the action for the new state.
                 }
 
                 if (
@@ -1900,36 +1900,36 @@ function createProxyHandler<T>(
                   stickToBottom
                 ) {
                   console.log(
-                    "STATE_TRANSITION: New items arrived while locked. -> GETTING_ARRAY_HEIGHTS"
+                    "TRANSITION: New items arrived while locked -> GETTING_HEIGHTS"
                   );
-                  setStatus("GETTING_ARRAY_HEIGHTS");
+                  setStatus("GETTING_HEIGHTS");
                 }
 
                 prevTotalCountRef.current = totalCount;
                 prevDepsRef.current = dependencies;
               }, [totalCount, ...dependencies]);
 
-              // --- STATE MACHINE ACTIONS ---
-              // This effect handles the actions for each state.
+              // --- 2. STATE ACTION HANDLER ---
+              // This effect performs the ACTION for the current state.
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 let intervalId: NodeJS.Timeout | undefined;
-                let scrollTimeoutId: NodeJS.Timeout | undefined;
 
                 if (
-                  status === "WAITING_FOR_ARRAY" &&
-                  totalCount > 0 &&
-                  stickToBottom
+                  status === "IDLE_AT_TOP" &&
+                  stickToBottom &&
+                  totalCount > 0
                 ) {
+                  // If we just loaded a new chat, start the process.
                   console.log(
-                    "ACTION: WAITING_FOR_ARRAY -> GETTING_ARRAY_HEIGHTS"
+                    "ACTION (IDLE_AT_TOP): Data has arrived -> GETTING_HEIGHTS"
                   );
-                  setStatus("GETTING_ARRAY_HEIGHTS");
-                } else if (status === "GETTING_ARRAY_HEIGHTS") {
+                  setStatus("GETTING_HEIGHTS");
+                } else if (status === "GETTING_HEIGHTS") {
                   console.log(
-                    "ACTION: GETTING_ARRAY_HEIGHTS. Setting range and starting loop."
+                    "ACTION (GETTING_HEIGHTS): Setting range to end and starting loop."
                   );
                   setRange({
                     startIndex: Math.max(0, totalCount - 10 - overscan),
@@ -1948,13 +1948,16 @@ function createProxyHandler<T>(
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
                       console.log(
-                        "ACTION: Measurement success. -> MOVING_TO_BOTTOM"
+                        "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
                       );
-                      setStatus("MOVING_TO_BOTTOM");
+                      setStatus("SCROLLING_TO_BOTTOM");
                     }
                   }, 100);
-                } else if (status === "MOVING_TO_BOTTOM") {
-                  console.log("ACTION: MOVING_TO_BOTTOM. Executing scroll.");
+                } else if (status === "SCROLLING_TO_BOTTOM") {
+                  console.log(
+                    "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
+                  );
+                  // Use 'auto' for initial load, 'smooth' for new messages.
                   const scrollBehavior =
                     prevTotalCountRef.current === 0 ? "auto" : "smooth";
 
@@ -1963,55 +1966,49 @@ function createProxyHandler<T>(
                     behavior: scrollBehavior,
                   });
 
-                  scrollTimeoutId = setTimeout(
+                  const timeoutId = setTimeout(
                     () => {
                       console.log(
-                        "ACTION: Scroll finished. -> LOCKED_AT_BOTTOM"
+                        "ACTION (SCROLLING_TO_BOTTOM): Scroll finished -> LOCKED_AT_BOTTOM"
                       );
                       setStatus("LOCKED_AT_BOTTOM");
                     },
                     scrollBehavior === "smooth" ? 500 : 50
                   );
+
+                  return () => clearTimeout(timeoutId);
                 }
 
-                // THE FIX: This cleanup runs whenever the state changes, killing any active timers.
+                // If status is IDLE_NOT_AT_BOTTOM or LOCKED_AT_BOTTOM, we do nothing here.
+                // The scroll has either finished or been disabled by the user.
+
                 return () => {
-                  if (intervalId) {
-                    console.log("CLEANUP: Clearing measurement loop timer.");
-                    clearInterval(intervalId);
-                  }
-                  if (scrollTimeoutId) {
-                    console.log("CLEANUP: Clearing scroll-end timer.");
-                    clearTimeout(scrollTimeoutId);
-                  }
+                  if (intervalId) clearInterval(intervalId);
                 };
               }, [status, totalCount, positions]);
 
-              // --- USER INTERACTION ---
-              // This effect only handles user scrolls.
+              // --- 3. USER INTERACTION & RANGE UPDATER ---
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 const handleUserScroll = () => {
-                  const isAtBottom =
-                    container.scrollHeight -
-                      container.scrollTop -
-                      container.clientHeight <
-                    1;
-                  // If the user scrolls up from a locked or scrolling state, move to idle.
-                  if (
-                    !isAtBottom &&
-                    (status === "LOCKED_AT_BOTTOM" ||
-                      status === "MOVING_TO_BOTTOM")
-                  ) {
-                    console.log(
-                      "USER_ACTION: Scrolled up. -> IDLE_NOT_AT_BOTTOM"
-                    );
-                    setStatus("IDLE_NOT_AT_BOTTOM");
+                  // This is the core logic you wanted.
+                  if (status !== "IDLE_NOT_AT_BOTTOM") {
+                    const isAtBottom =
+                      container.scrollHeight -
+                        container.scrollTop -
+                        container.clientHeight <
+                      1;
+                    if (!isAtBottom) {
+                      console.log(
+                        "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
+                      );
+                      setStatus("IDLE_NOT_AT_BOTTOM");
+                    }
                   }
-
-                  // Update the rendered range based on scroll position.
+                  // We always update the range, regardless of state.
+                  // This is the full, non-placeholder function.
                   const { scrollTop, clientHeight } = container;
                   let low = 0,
                     high = totalCount - 1;
@@ -2040,27 +2037,24 @@ function createProxyHandler<T>(
                 });
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, status]);
+              }, [totalCount, positions, status]); // Depends on status to know if it should break the lock
 
-              const scrollToBottom = useCallback(
-                (behavior: ScrollBehavior = "smooth") => {
-                  console.log(
-                    "USER_ACTION: Clicked scroll to bottom button. -> MOVING_TO_BOTTOM"
-                  );
-                  setStatus("MOVING_TO_BOTTOM");
-                },
-                []
-              );
+              const scrollToBottom = useCallback(() => {
+                console.log(
+                  "USER ACTION: Clicked scroll button -> SCROLLING_TO_BOTTOM"
+                );
+                setStatus("SCROLLING_TO_BOTTOM");
+              }, []);
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  // if (containerRef.current && positions[index] !== undefined) {
-                  //   isLockedToBottomRef.current = false;
-                  //   containerRef.current.scrollTo({
-                  //     top: positions[index],
-                  //     behavior,
-                  //   });
-                  // }
+                  if (containerRef.current && positions[index] !== undefined) {
+                    setStatus("IDLE_NOT_AT_BOTTOM");
+                    containerRef.current.scrollTo({
+                      top: positions[index],
+                      behavior,
+                    });
+                  }
                 },
                 [positions]
               );
