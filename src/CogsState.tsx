@@ -1817,6 +1817,7 @@ function createProxyHandler<T>(
                 | "LOCKED_AT_BOTTOM"
                 | "IDLE_NOT_AT_BOTTOM";
 
+              const shouldNotScroll = useRef(false);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
@@ -1954,7 +1955,10 @@ function createProxyHandler<T>(
                       setStatus("SCROLLING_TO_BOTTOM");
                     }
                   }, 100);
-                } else if (status === "SCROLLING_TO_BOTTOM") {
+                } else if (
+                  status === "SCROLLING_TO_BOTTOM" &&
+                  !shouldNotScroll.current
+                ) {
                   console.log(
                     "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
                   );
@@ -1972,6 +1976,7 @@ function createProxyHandler<T>(
                       console.log(
                         "ACTION (SCROLLING_TO_BOTTOM): Scroll finished -> LOCKED_AT_BOTTOM"
                       );
+                      shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
                     },
                     scrollBehavior === "smooth" ? 500 : 50
@@ -2005,6 +2010,7 @@ function createProxyHandler<T>(
                       console.log(
                         "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
                       );
+                      shouldNotScroll.current = true;
                       setStatus("IDLE_NOT_AT_BOTTOM");
                     }
                   }
