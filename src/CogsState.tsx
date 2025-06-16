@@ -1870,7 +1870,7 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // This layout effect is for SCROLLING and RANGE updates ONLY.
+              // This layout effect is for SCROLLING and RANGE updates ONLY
               useLayoutEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
