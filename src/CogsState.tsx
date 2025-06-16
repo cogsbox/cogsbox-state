@@ -1916,6 +1916,7 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 let intervalId: NodeJS.Timeout | undefined;
+                let scrollTimeoutId: NodeJS.Timeout | undefined;
 
                 if (
                   status === "WAITING_FOR_ARRAY" &&
@@ -1962,9 +1963,7 @@ function createProxyHandler<T>(
                     behavior: scrollBehavior,
                   });
 
-                  // After scrolling, we are locked at the bottom.
-                  // Use a timeout to wait for the animation to finish.
-                  const timeoutId = setTimeout(
+                  scrollTimeoutId = setTimeout(
                     () => {
                       console.log(
                         "ACTION: Scroll finished. -> LOCKED_AT_BOTTOM"
@@ -1973,12 +1972,18 @@ function createProxyHandler<T>(
                     },
                     scrollBehavior === "smooth" ? 500 : 50
                   );
-
-                  return () => clearTimeout(timeoutId);
                 }
 
+                // THE FIX: This cleanup runs whenever the state changes, killing any active timers.
                 return () => {
-                  if (intervalId) clearInterval(intervalId);
+                  if (intervalId) {
+                    console.log("CLEANUP: Clearing measurement loop timer.");
+                    clearInterval(intervalId);
+                  }
+                  if (scrollTimeoutId) {
+                    console.log("CLEANUP: Clearing scroll-end timer.");
+                    clearTimeout(scrollTimeoutId);
+                  }
                 };
               }, [status, totalCount, positions]);
 
