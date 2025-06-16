@@ -1819,6 +1819,8 @@ function createProxyHandler<T>(
 
               // This state triggers a re-render when item heights change.
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+              const hasInitiallyLoadedRef = useRef(false);
+              const prevTotalCountRef = useRef(0);
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1938,9 +1940,6 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleUserScroll, {
                   passive: true,
                 });
-
-                const hasInitiallyLoadedRef = useRef(false);
-                const prevTotalCountRef = useRef(0);
 
                 // In your useLayoutEffect:
                 if (stickToBottom) {
