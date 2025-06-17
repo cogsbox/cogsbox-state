@@ -2001,19 +2001,17 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
-                // Define our threshold. Updating every half-item feels very smooth.
-                // You can adjust this value. Using a full itemHeight also works well.
-                const scrollThreshold = itemHeight / 2;
+                // We no longer need a manual threshold. The `positions` array is our threshold.
 
                 const handleUserScroll = () => {
-                  // Exit early for programmatic scrolls. This is still essential.
+                  // Essential check to ignore our own programmatic scrolls.
                   if (isProgrammaticScroll.current) {
                     return;
                   }
 
-                  const scrollTop = container.scrollTop;
+                  const { scrollTop, clientHeight } = container;
 
-                  // --- Part 1: Handle state changes immediately (this is cheap) ---
+                  // --- Part 1: Quick state update logic (still important) ---
                   const isAtBottom =
                     container.scrollHeight -
                       scrollTop -
@@ -2022,51 +2020,52 @@ function createProxyHandler<T>(
 
                   if (!isAtBottom) {
                     if (status !== "IDLE_NOT_AT_BOTTOM") {
-                      console.log(
-                        "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
-                      );
                       setStatus("IDLE_NOT_AT_BOTTOM");
                     }
-                    shouldNotScroll.current = true;
                   } else {
                     if (status === "IDLE_NOT_AT_BOTTOM") {
-                      console.log(
-                        "USER ACTION: Scrolled back to bottom -> LOCKED_AT_BOTTOM"
-                      );
                       setStatus("LOCKED_AT_BOTTOM");
                     }
-                    shouldNotScroll.current = false;
+                  }
+                  // NOTE: We've removed `shouldNotScroll` as its purpose is now better
+                  // served by the state machine itself. The state `IDLE_NOT_AT_BOTTOM`
+                  // already tells us the user has scrolled up.
+
+                  // --- Part 2: Index-Based Invalidation (The real optimization) ---
+
+                  // Find the index of the item at the top of the viewport.
+                  // This binary search is extremely fast.
+                  let high = totalCount - 1;
+                  let low = 0;
+                  let potentialTopIndex = 0;
+                  while (low <= high) {
+                    const mid = Math.floor((low + high) / 2);
+                    if (positions[mid]! < scrollTop) {
+                      potentialTopIndex = mid;
+                      low = mid + 1;
+                    } else {
+                      high = mid - 1;
+                    }
                   }
 
-                  // --- Part 2: The "Smarter" Threshold Check ---
-
-                  // Check if the scroll distance is greater than our threshold.
-                  // Math.abs() handles both scrolling up and down.
-                  if (
-                    Math.abs(scrollTop - lastScrollTopRef.current) <
-                    scrollThreshold
-                  ) {
-                    // Not scrolled far enough, do nothing.
+                  // Compare the potential new start index with the current one.
+                  // Remember to account for the overscan!
+                  const potentialStartIndex = Math.max(
+                    0,
+                    potentialTopIndex - overscan
+                  );
+                  if (potentialStartIndex === range.startIndex) {
+                    // The visible items haven't changed, so we do nothing.
+                    // This is the core of the optimization.
                     return;
                   }
 
-                  // If we've passed the threshold, update our reference for the next check.
-                  lastScrollTopRef.current = scrollTop;
+                  // --- Part 3: If we're here, we MUST update the range ---
+                  console.log(
+                    `Index changed from ${range.startIndex} to ${potentialStartIndex}. Updating range.`
+                  );
 
-                  console.log("Threshold passed: Updating virtual range."); // For debugging
-
-                  // --- Part 3: Run the expensive calculation ---
-                  // This code now only runs when it's actually needed.
-                  const { clientHeight } = container;
-                  let low = 0,
-                    high = totalCount - 1;
-                  while (low <= high) {
-                    const mid = Math.floor((low + high) / 2);
-                    if (positions[mid]! < scrollTop) low = mid + 1;
-                    else high = mid - 1;
-                  }
-                  const startIndex = Math.max(0, high - overscan);
-                  let endIndex = startIndex;
+                  let endIndex = potentialStartIndex;
                   const visibleEnd = scrollTop + clientHeight;
                   while (
                     endIndex < totalCount &&
@@ -2074,8 +2073,9 @@ function createProxyHandler<T>(
                   ) {
                     endIndex++;
                   }
+
                   setRange({
-                    startIndex,
+                    startIndex: potentialStartIndex,
                     endIndex: Math.min(totalCount, endIndex + overscan),
                   });
                 };
@@ -2085,7 +2085,7 @@ function createProxyHandler<T>(
                 });
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, status, itemHeight]); // Added itemHeight to deps
+              }, [totalCount, positions, status, range.startIndex]); // Add range.startIndex!
 
               const scrollToBottom = useCallback(() => {
                 console.log(
