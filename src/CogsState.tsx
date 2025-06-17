@@ -1827,6 +1827,7 @@ function createProxyHandler<T>(
               const isProgrammaticScroll = useRef(false);
               const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
+              const lastScrollTopRef = useRef(0);
 
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
 
@@ -2000,30 +2001,63 @@ function createProxyHandler<T>(
                 const container = containerRef.current;
                 if (!container) return;
 
+                // Define our threshold. Updating every half-item feels very smooth.
+                // You can adjust this value. Using a full itemHeight also works well.
+                const scrollThreshold = itemHeight / 2;
+
                 const handleUserScroll = () => {
-                  // This is the core logic you wanted.
+                  // Exit early for programmatic scrolls. This is still essential.
                   if (isProgrammaticScroll.current) {
                     return;
                   }
+
+                  const scrollTop = container.scrollTop;
+
+                  // --- Part 1: Handle state changes immediately (this is cheap) ---
                   const isAtBottom =
                     container.scrollHeight -
-                      container.scrollTop -
+                      scrollTop -
                       container.clientHeight <
                     1;
 
                   if (!isAtBottom) {
-                    console.log(
-                      "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
-                    );
+                    if (status !== "IDLE_NOT_AT_BOTTOM") {
+                      console.log(
+                        "USER ACTION: Scrolled up -> IDLE_NOT_AT_BOTTOM"
+                      );
+                      setStatus("IDLE_NOT_AT_BOTTOM");
+                    }
                     shouldNotScroll.current = true;
-                    setStatus("IDLE_NOT_AT_BOTTOM");
                   } else {
+                    if (status === "IDLE_NOT_AT_BOTTOM") {
+                      console.log(
+                        "USER ACTION: Scrolled back to bottom -> LOCKED_AT_BOTTOM"
+                      );
+                      setStatus("LOCKED_AT_BOTTOM");
+                    }
                     shouldNotScroll.current = false;
                   }
 
-                  // We always update the range, regardless of state.
-                  // This is the full, non-placeholder function.
-                  const { scrollTop, clientHeight } = container;
+                  // --- Part 2: The "Smarter" Threshold Check ---
+
+                  // Check if the scroll distance is greater than our threshold.
+                  // Math.abs() handles both scrolling up and down.
+                  if (
+                    Math.abs(scrollTop - lastScrollTopRef.current) <
+                    scrollThreshold
+                  ) {
+                    // Not scrolled far enough, do nothing.
+                    return;
+                  }
+
+                  // If we've passed the threshold, update our reference for the next check.
+                  lastScrollTopRef.current = scrollTop;
+
+                  console.log("Threshold passed: Updating virtual range."); // For debugging
+
+                  // --- Part 3: Run the expensive calculation ---
+                  // This code now only runs when it's actually needed.
+                  const { clientHeight } = container;
                   let low = 0,
                     high = totalCount - 1;
                   while (low <= high) {
@@ -2051,7 +2085,7 @@ function createProxyHandler<T>(
                 });
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, status]); // Depends on status to know if it should break the lock
+              }, [totalCount, positions, status, itemHeight]); // Added itemHeight to deps
 
               const scrollToBottom = useCallback(() => {
                 console.log(
