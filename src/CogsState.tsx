@@ -1824,7 +1824,7 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
               const [status, setStatus] = useState<Status>("IDLE_AT_TOP");
-
+              const isProgrammaticScroll = useRef(false);
               const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
 
@@ -1962,6 +1962,7 @@ function createProxyHandler<T>(
                   console.log(
                     "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
                   );
+                  isProgrammaticScroll.current = true;
                   // Use 'auto' for initial load, 'smooth' for new messages.
                   const scrollBehavior =
                     prevTotalCountRef.current === 0 ? "auto" : "smooth";
@@ -1976,6 +1977,7 @@ function createProxyHandler<T>(
                       console.log(
                         "ACTION (SCROLLING_TO_BOTTOM): Scroll finished -> LOCKED_AT_BOTTOM"
                       );
+                      isProgrammaticScroll.current = false;
                       shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
                     },
@@ -2000,7 +2002,9 @@ function createProxyHandler<T>(
 
                 const handleUserScroll = () => {
                   // This is the core logic you wanted.
-
+                  if (isProgrammaticScroll.current) {
+                    return;
+                  }
                   const isAtBottom =
                     container.scrollHeight -
                       container.scrollTop -
