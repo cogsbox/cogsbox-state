@@ -1829,7 +1829,10 @@ function createProxyHandler<T>(
               const prevDepsRef = useRef(dependencies);
               const lastUpdateAtScrollTop = useRef(0);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-
+              const scrollAnchorRef = useRef<{
+                top: number;
+                height: number;
+              } | null>(null);
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1884,27 +1887,46 @@ function createProxyHandler<T>(
               // --- 1. STATE CONTROLLER ---
               // This effect decides which state to transition TO.
               useLayoutEffect(() => {
-                const depsChanged = !isDeepEqual(
-                  dependencies,
-                  prevDepsRef.current
-                );
+                // THIS `IF` BLOCK IS THE NEW LOGIC
+                const container = containerRef.current;
                 const hasNewItems = totalCount > prevTotalCountRef.current;
 
-                if (depsChanged) {
-                  console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
-                  setStatus("IDLE_AT_TOP");
-                  return; // Stop here, let the next effect handle the action for the new state.
-                }
+                if (hasNewItems && scrollAnchorRef.current && container) {
+                  // User was scrolled up, new items arrived. Restore the scroll position.
+                  const { top: prevScrollTop, height: prevScrollHeight } =
+                    scrollAnchorRef.current;
+                  container.scrollTop =
+                    prevScrollTop + (container.scrollHeight - prevScrollHeight);
 
-                if (
-                  hasNewItems &&
-                  status === "LOCKED_AT_BOTTOM" &&
-                  stickToBottom
-                ) {
+                  // IMPORTANT: Clear the anchor after using it.
+                  scrollAnchorRef.current = null;
                   console.log(
-                    "TRANSITION: New items arrived while locked -> GETTING_HEIGHTS"
+                    `ANCHOR RESTORED to scrollTop: ${container.scrollTop}`
                   );
-                  setStatus("GETTING_HEIGHTS");
+                }
+                // YOUR EXISTING LOGIC CONTINUES BELOW in an else-if structure
+                else {
+                  const depsChanged = !isDeepEqual(
+                    dependencies,
+                    prevDepsRef.current
+                  );
+
+                  if (depsChanged) {
+                    console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
+                    setStatus("IDLE_AT_TOP");
+                    return; // Stop here, let the next effect handle the action for the new state.
+                  }
+
+                  if (
+                    hasNewItems &&
+                    status === "LOCKED_AT_BOTTOM" &&
+                    stickToBottom
+                  ) {
+                    console.log(
+                      "TRANSITION: New items arrived while locked -> GETTING_HEIGHTS"
+                    );
+                    setStatus("GETTING_HEIGHTS");
+                  }
                 }
 
                 prevTotalCountRef.current = totalCount;
@@ -2005,26 +2027,24 @@ function createProxyHandler<T>(
 
                   const { scrollTop, scrollHeight, clientHeight } = container;
 
-                  // --- START OF MINIMAL FIX ---
-                  // This block is the only thing added. It updates the master 'status'.
-                  // This is the critical missing piece that tells the component if it should auto-scroll.
-                  // A 10px buffer prevents jittering when you are scrolled to the very bottom.
                   const isAtBottom =
                     scrollHeight - scrollTop - clientHeight < 10;
 
                   if (isAtBottom) {
-                    // If we scroll back to the bottom, re-lock.
                     if (status !== "LOCKED_AT_BOTTOM") {
-                      console.log("OCKED_AT_BOTTOM");
-                      shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
+                      // We are at the bottom, so we don't need an anchor.
+                      scrollAnchorRef.current = null;
                     }
                   } else {
-                    // If we have scrolled up, unlock from the bottom.
                     if (status !== "IDLE_NOT_AT_BOTTOM") {
-                      console.log("Scrolled up -> IDLE_NOT_AT_BOTTOM");
-                      shouldNotScroll.current = true;
                       setStatus("IDLE_NOT_AT_BOTTOM");
+                      // THE USER SCROLLED UP. SET THE ANCHOR.
+                      scrollAnchorRef.current = {
+                        top: scrollTop,
+                        height: scrollHeight,
+                      };
+                      console.log(`ANCHOR SET at scrollTop: ${scrollTop}`);
                     }
                   }
                   // --- END OF MINIMAL FIX ---
