@@ -1933,11 +1933,13 @@ function createProxyHandler<T>(
                   console.log(
                     "ACTION (GETTING_HEIGHTS): Setting range to end and starting loop."
                   );
+
                   setRange({
                     startIndex: Math.max(0, totalCount - 10 - overscan),
                     endIndex: totalCount,
                   });
 
+                  let intervalId: NodeJS.Timeout;
                   intervalId = setInterval(() => {
                     const lastItemIndex = totalCount - 1;
                     const shadowArray =
@@ -1949,15 +1951,36 @@ function createProxyHandler<T>(
 
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
-                      if (!shouldNotScroll.current) {
-                        console.log(
-                          "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
-                        );
 
-                        setStatus("SCROLLING_TO_BOTTOM");
+                      if (!shouldNotScroll.current) {
+                        const prevCount = prevTotalCountRef.current;
+                        const addedItems = totalCount - prevCount;
+                        const smallAddition = addedItems > 0 && addedItems <= 3;
+
+                        if (smallAddition) {
+                          const addedHeight =
+                            positions[totalCount - 1]! -
+                            (positions[prevCount] ?? 0);
+                          container.scrollBy({
+                            top: addedHeight,
+                            behavior: "smooth",
+                          });
+
+                          console.log(
+                            "ACTION (GETTING_HEIGHTS): Small addition -> LOCKED_AT_BOTTOM"
+                          );
+                          setStatus("LOCKED_AT_BOTTOM");
+                        } else {
+                          console.log(
+                            "ACTION (GETTING_HEIGHTS): Large change -> SCROLLING_TO_BOTTOM"
+                          );
+                          setStatus("SCROLLING_TO_BOTTOM");
+                        }
                       }
                     }
                   }, 100);
+
+                  return () => clearInterval(intervalId);
                 } else if (status === "SCROLLING_TO_BOTTOM") {
                   console.log(
                     "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
@@ -1987,41 +2010,29 @@ function createProxyHandler<T>(
                   return () => clearTimeout(timeoutId);
                 }
 
-                // If status is IDLE_NOT_AT_BOTTOM or LOCKED_AT_BOTTOM, we do nothing here.
-                // The scroll has either finished or been disabled by the user.
-
                 return () => {
                   if (intervalId) clearInterval(intervalId);
                 };
               }, [status, totalCount, positions]);
 
-              // --- 3. USER INTERACTION & RANGE UPDATER ---
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                // The scroll distance threshold. One item's height is a great default.
                 const scrollThreshold = itemHeight;
 
                 const handleUserScroll = () => {
-                  // Essential guard for our own programmatic scrolls.
                   if (isProgrammaticScroll.current) {
                     return;
                   }
 
                   const scrollTop = container.scrollTop;
-
-                  // --- THE CORE LOGIC YOU REQUESTED ---
-                  // Is the user just wiggling the scrollbar? If so, exit.
-                  // This is a very cheap check that runs on every scroll event.
                   if (
                     Math.abs(scrollTop - lastUpdateAtScrollTop.current) <
                     scrollThreshold
                   ) {
                     return;
                   }
-
-                  // --- IF WE ARE HERE, WE HAVE SCROLLED A "DECENT AMOUNT" ---
 
                   console.log(
                     `Threshold passed at ${scrollTop}px. Recalculating range...`
