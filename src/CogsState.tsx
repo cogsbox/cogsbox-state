@@ -1907,7 +1907,6 @@ function createProxyHandler<T>(
                   setStatus("GETTING_HEIGHTS");
                 }
 
-                prevTotalCountRef.current = totalCount;
                 prevDepsRef.current = dependencies;
               }, [totalCount, ...dependencies]);
 
@@ -1971,6 +1970,7 @@ function createProxyHandler<T>(
                                 behavior: "smooth",
                               });
                             }
+                            prevTotalCountRef.current = totalCount;
 
                             console.log(
                               "ACTION (GETTING_HEIGHTS): Small addition -> LOCKED_AT_BOTTOM"
@@ -2010,6 +2010,7 @@ function createProxyHandler<T>(
                       isProgrammaticScroll.current = false;
                       shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
+                      prevTotalCountRef.current = totalCount;
                     },
                     scrollBehavior === "smooth" ? 500 : 50
                   );
