@@ -1885,26 +1885,37 @@ function createProxyHandler<T>(
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
               // --- 1. STATE CONTROLLER ---
-              // This effect decides which state to transition TO.
+              // --- 1. STATE CONTROLLER (CORRECTED) ---
               useLayoutEffect(() => {
-                // THIS `IF` BLOCK IS THE NEW LOGIC
                 const container = containerRef.current;
+                if (!container) return;
+
                 const hasNewItems = totalCount > prevTotalCountRef.current;
 
-                if (hasNewItems && scrollAnchorRef.current && container) {
-                  // User was scrolled up, new items arrived. Restore the scroll position.
+                // THIS IS THE NEW, IMPORTANT LOGIC FOR ANCHORING
+                if (hasNewItems && scrollAnchorRef.current) {
                   const { top: prevScrollTop, height: prevScrollHeight } =
                     scrollAnchorRef.current;
+
+                  // This is the key: Tell the app we are about to programmatically scroll.
+                  isProgrammaticScroll.current = true;
+
+                  // Restore the scroll position.
                   container.scrollTop =
                     prevScrollTop + (container.scrollHeight - prevScrollHeight);
-
-                  // IMPORTANT: Clear the anchor after using it.
-                  scrollAnchorRef.current = null;
                   console.log(
                     `ANCHOR RESTORED to scrollTop: ${container.scrollTop}`
                   );
+
+                  // IMPORTANT: After the scroll, allow user scroll events again.
+                  // Use a timeout to ensure this runs after the scroll event has fired and been ignored.
+                  setTimeout(() => {
+                    isProgrammaticScroll.current = false;
+                  }, 100);
+
+                  scrollAnchorRef.current = null; // Clear the anchor after using it.
                 }
-                // YOUR EXISTING LOGIC CONTINUES BELOW in an else-if structure
+                // YOUR ORIGINAL LOGIC CONTINUES UNCHANGED IN THE `ELSE` BLOCK
                 else {
                   const depsChanged = !isDeepEqual(
                     dependencies,
@@ -1914,7 +1925,7 @@ function createProxyHandler<T>(
                   if (depsChanged) {
                     console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
                     setStatus("IDLE_AT_TOP");
-                    return; // Stop here, let the next effect handle the action for the new state.
+                    return;
                   }
 
                   if (
@@ -2021,35 +2032,35 @@ function createProxyHandler<T>(
                 const scrollThreshold = itemHeight;
 
                 const handleUserScroll = () => {
+                  // This guard is now critical. It will ignore our anchor restoration scroll.
                   if (isProgrammaticScroll.current) {
                     return;
                   }
 
                   const { scrollTop, scrollHeight, clientHeight } = container;
 
+                  // Part 1: Handle Status and Anchoring
                   const isAtBottom =
                     scrollHeight - scrollTop - clientHeight < 10;
 
                   if (isAtBottom) {
                     if (status !== "LOCKED_AT_BOTTOM") {
                       setStatus("LOCKED_AT_BOTTOM");
-                      // We are at the bottom, so we don't need an anchor.
-                      scrollAnchorRef.current = null;
                     }
+                    // If we are at the bottom, there is no anchor needed.
+                    scrollAnchorRef.current = null;
                   } else {
                     if (status !== "IDLE_NOT_AT_BOTTOM") {
                       setStatus("IDLE_NOT_AT_BOTTOM");
-                      // THE USER SCROLLED UP. SET THE ANCHOR.
-                      scrollAnchorRef.current = {
-                        top: scrollTop,
-                        height: scrollHeight,
-                      };
-                      console.log(`ANCHOR SET at scrollTop: ${scrollTop}`);
                     }
+                    // User is scrolled up. Continuously update the anchor with their latest position.
+                    scrollAnchorRef.current = {
+                      top: scrollTop,
+                      height: scrollHeight,
+                    };
                   }
-                  // --- END OF MINIMAL FIX ---
 
-                  // The rest is YOUR original, working logic for updating the visible items.
+                  // Part 2: YOUR original, working logic for updating the visible range.
                   if (
                     Math.abs(scrollTop - lastUpdateAtScrollTop.current) <
                     scrollThreshold
@@ -2061,7 +2072,7 @@ function createProxyHandler<T>(
                     `Threshold passed at ${scrollTop}px. Recalculating range...`
                   );
 
-                  // NOW we do the expensive work.
+                  // ... your logic to find startIndex and endIndex ...
                   let high = totalCount - 1;
                   let low = 0;
                   let topItemIndex = 0;
@@ -2090,7 +2101,6 @@ function createProxyHandler<T>(
                     endIndex: Math.min(totalCount, endIndex + overscan),
                   });
 
-                  // Finally, we record that we did the work at THIS scroll position.
                   lastUpdateAtScrollTop.current = scrollTop;
                 };
 
