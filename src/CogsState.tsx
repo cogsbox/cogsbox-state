@@ -2004,27 +2004,26 @@ function createProxyHandler<T>(
                   }
 
                   const { scrollTop, scrollHeight, clientHeight } = container;
-                  console.log(
-                    "scrollTop, scrollHeight, clientHeight ",
-                    scrollTop,
-                    scrollHeight,
-                    clientHeight
-                  );
+
                   // --- START OF MINIMAL FIX ---
                   // This block is the only thing added. It updates the master 'status'.
                   // This is the critical missing piece that tells the component if it should auto-scroll.
                   // A 10px buffer prevents jittering when you are scrolled to the very bottom.
                   const isAtBottom =
                     scrollHeight - scrollTop - clientHeight < 10;
-                  console.log("isAtBottom", isAtBottom);
+
                   if (isAtBottom) {
                     // If we scroll back to the bottom, re-lock.
                     if (status !== "LOCKED_AT_BOTTOM") {
+                      console.log("OCKED_AT_BOTTOM");
+                      shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
                     }
                   } else {
                     // If we have scrolled up, unlock from the bottom.
                     if (status !== "IDLE_NOT_AT_BOTTOM") {
+                      console.log("Scrolled up -> IDLE_NOT_AT_BOTTOM");
+                      shouldNotScroll.current = true;
                       setStatus("IDLE_NOT_AT_BOTTOM");
                     }
                   }
