@@ -1958,18 +1958,25 @@ function createProxyHandler<T>(
                         const smallAddition = addedItems > 0 && addedItems <= 3;
 
                         if (smallAddition) {
-                          const addedHeight =
-                            positions[totalCount - 1]! -
-                            (positions[prevCount] ?? 0);
-                          container.scrollBy({
-                            top: addedHeight,
-                            behavior: "smooth",
-                          });
+                          // Let DOM render before measuring + scrolling
+                          requestAnimationFrame(() => {
+                            const prevBottom =
+                              positions[prevCount] ?? container.scrollHeight;
+                            const newBottom = container.scrollHeight;
+                            const delta = newBottom - prevBottom;
 
-                          console.log(
-                            "ACTION (GETTING_HEIGHTS): Small addition -> LOCKED_AT_BOTTOM"
-                          );
-                          setStatus("LOCKED_AT_BOTTOM");
+                            if (delta > 0) {
+                              container.scrollBy({
+                                top: delta,
+                                behavior: "smooth",
+                              });
+                            }
+
+                            console.log(
+                              "ACTION (GETTING_HEIGHTS): Small addition -> LOCKED_AT_BOTTOM"
+                            );
+                            setStatus("LOCKED_AT_BOTTOM");
+                          });
                         } else {
                           console.log(
                             "ACTION (GETTING_HEIGHTS): Large change -> SCROLLING_TO_BOTTOM"
@@ -1978,7 +1985,7 @@ function createProxyHandler<T>(
                         }
                       }
                     }
-                  }, 100);
+                  }, 50);
 
                   return () => clearInterval(intervalId);
                 } else if (status === "SCROLLING_TO_BOTTOM") {
