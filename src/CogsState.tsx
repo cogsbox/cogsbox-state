@@ -1828,8 +1828,14 @@ function createProxyHandler<T>(
               const prevTotalCountRef = useRef(0);
               const prevDepsRef = useRef(dependencies);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+              // CHANGE: Add a ref to store the scroll position BEFORE new items are added.
+              // This is the key to preventing the jump when scrolled up.
+              const scrollAnchorRef = useRef<{
+                scrollTop: number;
+                scrollHeight: number;
+              } | null>(null);
 
-              // Subscribe to external state updates for item heights
+              // ... (Your existing useEffect for shadow state and useMemo for data are fine) ...
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1845,7 +1851,6 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Memoize positions and total height based on measured items
               const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
@@ -1867,7 +1872,6 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // Memoize the virtualized data slice
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1882,23 +1886,28 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- 1. STATE CONTROLLER ---
-              // Decides which state to transition TO based on data changes.
+              // --- 1. STATE CONTROLLER (REVISED LOGIC) ---
               useLayoutEffect(() => {
+                const container = containerRef.current;
+                if (!container) return;
+
+                const hasNewItems = totalCount > prevTotalCountRef.current;
                 const depsChanged = !isDeepEqual(
                   dependencies,
                   prevDepsRef.current
                 );
-                const hasNewItems = totalCount > prevTotalCountRef.current;
 
+                // Condition 1: Hard Reset.
+                // This happens when you load a completely new list (e.g., switch chats).
                 if (depsChanged) {
-                  console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
+                  console.log(
+                    "TRANSITION (Hard Reset): Deps changed -> IDLE_AT_TOP"
+                  );
                   setStatus("IDLE_AT_TOP");
-                  return;
+                  container.scrollTo({ top: 0 }); // Reset scroll position
                 }
-
-                // THIS IS THE CRITICAL CHECK: It only scrolls if new items arrive AND we are already locked.
-                if (
+                // Condition 2: New items arrive while we're locked to the bottom.
+                else if (
                   hasNewItems &&
                   status === "LOCKED_AT_BOTTOM" &&
                   stickToBottom
@@ -1908,14 +1917,29 @@ function createProxyHandler<T>(
                   );
                   setStatus("GETTING_HEIGHTS");
                 }
+                // CHANGE: Condition 3: New items arrive while we are scrolled up.
+                // This is the "scroll anchoring" logic that prevents the jump.
+                else if (hasNewItems && scrollAnchorRef.current) {
+                  console.log(
+                    "ACTION: Maintaining scroll position after new items added."
+                  );
+                  // We adjust the scroll position by the amount of height that was just added.
+                  container.scrollTop =
+                    scrollAnchorRef.current.scrollTop +
+                    (container.scrollHeight -
+                      scrollAnchorRef.current.scrollHeight);
+                }
 
+                // Finally, update the refs for the next render.
                 prevTotalCountRef.current = totalCount;
                 prevDepsRef.current = dependencies;
-              }, [totalCount, ...dependencies]);
+                // Clear the anchor after using it. It will be re-set by the user scroll handler.
+                scrollAnchorRef.current = null;
+              }, [totalCount, ...dependencies]); // This dependency array is correct.
 
-              // --- 2. STATE ACTION HANDLER ---
-              // Performs the ACTION for the current state (e.g., scrolling).
+              // --- 2. STATE ACTION HANDLER (Mostly Unchanged) ---
               useLayoutEffect(() => {
+                // ... (This effect's logic for GETTING_HEIGHTS and SCROLLING_TO_BOTTOM is correct and can remain the same)
                 const container = containerRef.current;
                 if (!container) return;
 
@@ -1982,10 +2006,13 @@ function createProxyHandler<T>(
                 };
               }, [status, totalCount, positions]);
 
-              // --- 3. USER INTERACTION & RANGE UPDATER (THE CORRECTED VERSION) ---
+              // --- 3. USER INTERACTION & RANGE UPDATER (REVISED) ---
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
+
+                // CHANGE: Add a buffer to prevent jittering at the bottom.
+                const bottomLockThreshold = 10; // 10px buffer
 
                 const handleUserScroll = () => {
                   if (isProgrammaticScroll.current) {
@@ -1994,10 +2021,14 @@ function createProxyHandler<T>(
 
                   const { scrollTop, clientHeight, scrollHeight } = container;
 
-                  // Part 1: UPDATE THE STATE MACHINE STATUS (The critical fix)
-                  // This tells the rest of the component whether we should auto-scroll on new messages.
+                  // CHANGE: Before the next state update, save the current scroll positions.
+                  // This 'anchors' our view, so the State Controller knows where we were.
+                  scrollAnchorRef.current = { scrollTop, scrollHeight };
+
+                  // Part 1: Update the state machine with a tolerance
                   const isAtBottom =
-                    scrollHeight - scrollTop - clientHeight < 1;
+                    scrollHeight - scrollTop - clientHeight <
+                    bottomLockThreshold;
 
                   if (isAtBottom) {
                     if (status !== "LOCKED_AT_BOTTOM") {
@@ -2015,9 +2046,7 @@ function createProxyHandler<T>(
                     }
                   }
 
-                  // Part 2: EFFICIENTLY UPDATE THE RENDERED RANGE
-                  // This is the superior optimization from your first version. It only
-                  // re-renders if the actual items in view have changed.
+                  // Part 2: Efficiently update the rendered range (this logic is good)
                   let high = totalCount - 1;
                   let low = 0;
                   let potentialTopIndex = 0;
@@ -2036,12 +2065,10 @@ function createProxyHandler<T>(
                     potentialTopIndex - overscan
                   );
 
-                  // Only update state if the visible start index has actually changed.
                   if (potentialStartIndex === range.startIndex) {
                     return;
                   }
 
-                  // If we must update, calculate the new end index.
                   let endIndex = potentialStartIndex;
                   const visibleEnd = scrollTop + clientHeight;
                   while (
@@ -2065,14 +2092,13 @@ function createProxyHandler<T>(
                 });
                 return () =>
                   container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, status, range.startIndex]); // Dependencies are correct
+              }, [totalCount, positions, status, range.startIndex]);
 
-              // --- 4. EXPOSED ACTIONS ---
+              // --- (The rest of your code: scrollToBottom, scrollToIndex, virtualizerProps is fine) ---
               const scrollToBottom = useCallback(() => {
                 console.log(
                   "USER ACTION: Clicked scroll button -> SCROLLING_TO_BOTTOM"
                 );
-                // Don't scroll if there's nothing to scroll to.
                 if (totalCount === 0) return;
                 setStatus("SCROLLING_TO_BOTTOM");
               }, [totalCount]);
@@ -2080,7 +2106,6 @@ function createProxyHandler<T>(
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
-                    // Manually scrolling to an index means we are no longer at the bottom.
                     setStatus("IDLE_NOT_AT_BOTTOM");
                     containerRef.current.scrollTo({
                       top: positions[index],
@@ -2091,7 +2116,6 @@ function createProxyHandler<T>(
                 [positions]
               );
 
-              // --- 5. RENDER PROPS ---
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
