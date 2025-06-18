@@ -1907,6 +1907,7 @@ function createProxyHandler<T>(
                   setStatus("GETTING_HEIGHTS");
                 }
 
+                prevTotalCountRef.current = totalCount;
                 prevDepsRef.current = dependencies;
               }, [totalCount, ...dependencies]);
 
@@ -1932,13 +1933,11 @@ function createProxyHandler<T>(
                   console.log(
                     "ACTION (GETTING_HEIGHTS): Setting range to end and starting loop."
                   );
-
                   setRange({
                     startIndex: Math.max(0, totalCount - 10 - overscan),
                     endIndex: totalCount,
                   });
 
-                  let intervalId: NodeJS.Timeout;
                   intervalId = setInterval(() => {
                     const lastItemIndex = totalCount - 1;
                     const shadowArray =
@@ -1950,44 +1949,15 @@ function createProxyHandler<T>(
 
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
-
                       if (!shouldNotScroll.current) {
-                        const prevCount = prevTotalCountRef.current;
-                        const addedItems = totalCount - prevCount;
-                        const smallAddition = addedItems > 0 && addedItems <= 3;
+                        console.log(
+                          "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
+                        );
 
-                        if (smallAddition) {
-                          // Let DOM render before measuring + scrolling
-                          requestAnimationFrame(() => {
-                            const prevBottom =
-                              positions[prevCount] ?? container.scrollHeight;
-                            const newBottom = container.scrollHeight;
-                            const delta = newBottom - prevBottom;
-
-                            if (delta > 0) {
-                              container.scrollBy({
-                                top: delta,
-                                behavior: "smooth",
-                              });
-                            }
-                            prevTotalCountRef.current = totalCount;
-
-                            console.log(
-                              "ACTION (GETTING_HEIGHTS): Small addition -> LOCKED_AT_BOTTOM"
-                            );
-                            setStatus("LOCKED_AT_BOTTOM");
-                          });
-                        } else {
-                          console.log(
-                            "ACTION (GETTING_HEIGHTS): Large change -> SCROLLING_TO_BOTTOM"
-                          );
-                          setStatus("SCROLLING_TO_BOTTOM");
-                        }
+                        setStatus("SCROLLING_TO_BOTTOM");
                       }
                     }
-                  }, 50);
-
-                  return () => clearInterval(intervalId);
+                  }, 100);
                 } else if (status === "SCROLLING_TO_BOTTOM") {
                   console.log(
                     "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
@@ -2010,7 +1980,6 @@ function createProxyHandler<T>(
                       isProgrammaticScroll.current = false;
                       shouldNotScroll.current = false;
                       setStatus("LOCKED_AT_BOTTOM");
-                      prevTotalCountRef.current = totalCount;
                     },
                     scrollBehavior === "smooth" ? 500 : 50
                   );
