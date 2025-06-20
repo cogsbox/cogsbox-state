@@ -323,47 +323,6 @@ export function getArrayLengthDifferencesArray(obj1: any, obj2: any) {
 
   return convertedDiff;
 }
-// export function determineUpdateType(prevState: any, newState: any): UpdateTypeDetail[] {
-//     console.time("determineUpdateType");
-//     const updateDetails: UpdateTypeDetail[] = [];
-
-//     function checkForUpdates(prev: any, next: any, path: string[] = []) {
-//         if (Array.isArray(prev) && Array.isArray(next)) {
-//             if (prev.length !== next.length) {
-//                 updateDetails.push({
-//                     updateType: prev.length < next.length ? "push" : "cut",
-//                     path,
-//                     oldValue: prev,
-//                     newValue: next,
-//                 });
-//                 // If an array has changed size, no need to check deeper for this path
-//                 return;
-//             } else {
-//                 // Check for updates within the array
-//                 for (let i = 0; i < prev.length; i++) {
-//                     checkForUpdates(prev[i], next[i], path.concat(i.toString()));
-//                 }
-//             }
-//         } else if (typeof prev === "object" && typeof next === "object" && prev !== null && next !== null) {
-//             const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
-//             for (let key of keys) {
-//                 checkForUpdates(prev[key], next[key], path.concat(key));
-//             }
-//         } else if (prev !== next) {
-//             updateDetails.push({
-//                 updateType: "updated",
-//                 path,
-//                 oldValue: prev,
-//                 newValue: next,
-//             });
-//         }
-//     }
-
-//     checkForUpdates(prevState, newState);
-//     console.timeEnd("determineUpdateType");
-//     console.log("updateDetails", updateDetails);
-//     return updateDetails;
-// }
 
 export function transformStateFunc<State extends unknown>(initialState: State) {
   const isInitialStateType = (state: any): state is InitialStateType<State> => {
