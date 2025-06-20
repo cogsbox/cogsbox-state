@@ -2376,20 +2376,13 @@ function createProxyHandler<T>(
                   stateKey,
                   itemComponentId,
                   itemPath: finalPath,
-                  children: createElement(FormControlComponent, {
-                    setState: effectiveSetState as any,
-                    stateKey: stateKey,
-                    path: finalPath,
-                    child: () =>
-                      callbackfn(
-                        item,
-                        setter,
-                        { localIndex, originalIndex },
-                        arrayToMap as any,
-                        rebuildStateShape(arrayToMap as any, path, meta)
-                      ),
-                    formOpts: undefined,
-                  }),
+                  children: callbackfn(
+                    item,
+                    setter,
+                    { localIndex, originalIndex },
+                    arrayToMap as any,
+                    rebuildStateShape(arrayToMap as any, path, meta)
+                  ),
                 });
               });
             };
