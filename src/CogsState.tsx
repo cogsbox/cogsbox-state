@@ -185,7 +185,7 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (
       value: InferArrayElement<TShape>,
       setter: StateObject<InferArrayElement<TShape>>,
-      index: number,
+      index: { localIndex: number; originalIndex: number },
       array: TShape,
       arraySetter: StateObject<TShape>
     ) => void
