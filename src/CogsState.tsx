@@ -2345,7 +2345,7 @@ function createProxyHandler<T>(
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                index: number,
+                index: { localIndex: number; originalIndex: number },
                 array: T,
                 arraySetter: StateObject<T>
               ) => any
@@ -2379,7 +2379,7 @@ function createProxyHandler<T>(
                   children: callbackfn(
                     item,
                     setter,
-                    localIndex,
+                    { localIndex, originalIndex },
                     arrayToMap as any,
                     rebuildStateShape(arrayToMap as any, path, meta)
                   ),
