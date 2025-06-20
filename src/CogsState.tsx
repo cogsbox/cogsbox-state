@@ -2379,7 +2379,7 @@ function createProxyHandler<T>(
                   children: callbackfn(
                     item,
                     setter,
-                    originalIndex,
+                    localIndex,
                     arrayToMap as any,
                     rebuildStateShape(arrayToMap as any, path, meta)
                   ),
