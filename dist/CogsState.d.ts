@@ -123,8 +123,13 @@ export type ObjectEndType<T> = EndType<T> & {
     stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
     delete: () => void;
 };
+export type ValidationError = {
+    path: (string | number)[];
+    message: string;
+};
 type EffectFunction<T, R> = (state: T) => R;
 export type EndType<T, IsArrayElement = false> = {
+    addValidation: (errors: ValidationError[]) => void;
     applyJsonPatch: (patches: any[]) => void;
     update: UpdateType<T>;
     _path: string[];

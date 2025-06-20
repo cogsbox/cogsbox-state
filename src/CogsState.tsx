@@ -261,8 +261,13 @@ export type ObjectEndType<T> = EndType<T> & {
   stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
   delete: () => void;
 };
+export type ValidationError = {
+  path: (string | number)[];
+  message: string;
+};
 type EffectFunction<T, R> = (state: T) => R;
 export type EndType<T, IsArrayElement = false> = {
+  addValidation: (errors: ValidationError[]) => void;
   applyJsonPatch: (patches: any[]) => void;
   update: UpdateType<T>;
   _path: string[];
@@ -2658,6 +2663,29 @@ function createProxyHandler<T>(
           };
         }
         if (path.length == 0) {
+          if (prop === "addValidation") {
+            return (errors: ValidationError[]) => {
+              const init = getGlobalStore
+                .getState()
+                .getInitialOptions(stateKey)?.validation;
+
+              if (!init?.key) {
+                throw new Error("Validation key not found");
+              }
+
+              // Clear existing errors for this validation key
+              removeValidationError(init.key);
+
+              // Add each new error
+              errors.forEach((error) => {
+                const fullErrorPath = [init.key, ...error.path].join(".");
+                addValidationError(fullErrorPath, error.message);
+              });
+
+              // Notify components to update
+              notifyComponents(stateKey);
+            };
+          }
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
               // This part is correct.
