@@ -2675,10 +2675,11 @@ function createProxyHandler<T>(
 
               // Clear existing errors for this validation key
               removeValidationError(init.key);
-
+              console.log("addValidationError", errors);
               // Add each new error
               errors.forEach((error) => {
                 const fullErrorPath = [init.key, ...error.path].join(".");
+                console.log("fullErrorPath", fullErrorPath);
                 addValidationError(fullErrorPath, error.message);
               });
 

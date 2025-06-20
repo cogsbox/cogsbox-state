@@ -1045,9 +1045,9 @@ function It(t, c, m, g) {
               const e = o.getState().getInitialOptions(t)?.validation;
               if (!e?.key)
                 throw new Error("Validation key not found");
-              X(e.key), d.forEach((n) => {
+              X(e.key), console.log("addValidationError", d), d.forEach((n) => {
                 const a = [e.key, ...n.path].join(".");
-                Rt(a, n.message);
+                console.log("fullErrorPath", a), Rt(a, n.message);
               }), dt(t);
             };
           if (l === "applyJsonPatch")
