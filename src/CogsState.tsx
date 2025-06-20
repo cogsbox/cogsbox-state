@@ -2345,7 +2345,7 @@ function createProxyHandler<T>(
               callbackfn: (
                 value: InferArrayElement<T>,
                 setter: StateObject<InferArrayElement<T>>,
-                index: { localIndex: number; originalIndex: number },
+                index: number,
                 array: T,
                 arraySetter: StateObject<T>
               ) => any
@@ -2371,19 +2371,42 @@ function createProxyHandler<T>(
                 const setter = rebuildStateShape(item, finalPath, meta);
                 const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
 
-                return createElement(CogsItemWrapper, {
+                // Get the validation wrapper from formElements
+                const options = getGlobalStore
+                  .getState()
+                  .getInitialOptions(stateKey);
+                const validationWrapper = options?.formElements?.validation;
+
+                const childContent = callbackfn(
+                  item,
+                  setter,
+                  originalIndex, // Use originalIndex here
+                  arrayToMap as any,
+                  rebuildStateShape(arrayToMap as any, path, meta)
+                );
+
+                const wrappedContent = createElement(CogsItemWrapper, {
                   key: originalIndex,
                   stateKey,
                   itemComponentId,
                   itemPath: finalPath,
-                  children: callbackfn(
-                    item,
-                    setter,
-                    { localIndex, originalIndex },
-                    arrayToMap as any,
-                    rebuildStateShape(arrayToMap as any, path, meta)
+                  children: validationWrapper ? (
+                    // Automatically wrap with validation wrapper
+                    <ValidationWrapper
+                      formOpts={undefined}
+                      path={finalPath}
+                      validationKey={options?.validation?.key || ""}
+                      stateKey={stateKey}
+                      validIndices={meta?.validIndices}
+                    >
+                      {childContent}
+                    </ValidationWrapper>
+                  ) : (
+                    childContent
                   ),
                 });
+
+                return wrappedContent;
               });
             };
           }
