@@ -380,7 +380,7 @@ export function transformStateFunc<State extends unknown>(initialState: State) {
       if (value?.initialState) {
         initalOptions = { ...(initalOptions ?? {}), [key]: value };
 
-        transformedState[key] = { ...value.initialState };
+        transformedState[key] = value.initialState;
       } else {
         transformedState[key] = value;
       }

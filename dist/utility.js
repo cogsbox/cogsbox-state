@@ -171,7 +171,7 @@ function v(e) {
   const i = (l) => {
     const f = {};
     return Object.entries(l).forEach(([o, s]) => {
-      s?.initialState ? (r = { ...r ?? {}, [o]: s }, f[o] = { ...s.initialState }) : f[o] = s;
+      s?.initialState ? (r = { ...r ?? {}, [o]: s }, f[o] = s.initialState) : f[o] = s;
     }), f;
   };
   return [n(e) ? i(e) : e, r];
