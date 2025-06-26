@@ -1805,6 +1805,7 @@ function createProxyHandler<T>(
           }
           // Simplified useVirtualView approach
           // Optimal approach - replace the useVirtualView implementation
+          // Complete useVirtualView implementation with comprehensive logging
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1815,6 +1816,12 @@ function createProxyHandler<T>(
                 stickToBottom = false,
                 dependencies = [],
               } = options;
+
+              console.log("useVirtualView initialized with:", {
+                itemHeight,
+                overscan,
+                stickToBottom,
+              });
 
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
@@ -1830,9 +1837,11 @@ function createProxyHandler<T>(
 
               // Subscribe to shadow state updates
               useEffect(() => {
+                console.log("Setting up shadow state subscription");
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToShadowState(stateKey, () => {
+                    console.log("Shadow state updated");
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
                 return unsubscribe;
@@ -1843,9 +1852,11 @@ function createProxyHandler<T>(
                 path
               ) as any[];
               const totalCount = sourceArray.length;
+              console.log("Source array length:", totalCount);
 
               // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
+                console.log("Recalculating heights and positions");
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                   [];
@@ -1857,6 +1868,7 @@ function createProxyHandler<T>(
                     shadowArray[i]?.virtualizer?.itemHeight;
                   height += measuredHeight || itemHeight;
                 }
+                console.log("Total height calculated:", height);
                 return { totalHeight: height, positions: pos };
               }, [
                 totalCount,
@@ -1870,6 +1882,10 @@ function createProxyHandler<T>(
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
+                console.log("Creating virtual state for range:", {
+                  start,
+                  end,
+                });
                 const validIndices = Array.from(
                   { length: end - start },
                   (_, i) => start + i
@@ -1882,21 +1898,42 @@ function createProxyHandler<T>(
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
               // Handle auto-scroll to bottom
-              const [hasMounted, setHasMounted] = useState(false);
-
-              // Add this effect to track mounting:
               useEffect(() => {
-                setHasMounted(true);
-              }, []);
+                console.log("Auto-scroll effect triggered:", {
+                  stickToBottom,
+                  hasContainer: !!containerRef.current,
+                  totalCount,
+                  shouldStickToBottom: shouldStickToBottomRef.current,
+                  range,
+                });
 
-              // Replace the auto-scroll effect with this version:
-              useEffect(() => {
-                if (!stickToBottom || !containerRef.current || totalCount === 0)
+                if (!stickToBottom) {
+                  console.log("Stick to bottom is false, skipping");
                   return;
-                if (!shouldStickToBottomRef.current && hasMounted) return; // Only check shouldStickToBottom after mount
+                }
+
+                if (!containerRef.current) {
+                  console.log("No container ref, skipping");
+                  return;
+                }
+
+                if (totalCount === 0) {
+                  console.log("No items, skipping");
+                  return;
+                }
+
+                if (!shouldStickToBottomRef.current) {
+                  console.log(
+                    "Should not stick to bottom (user scrolled), skipping"
+                  );
+                  return;
+                }
+
+                console.log("Proceeding with auto-scroll logic");
 
                 // Clear any existing interval
                 if (scrollToBottomIntervalRef.current) {
+                  console.log("Clearing existing scroll interval");
                   clearInterval(scrollToBottomIntervalRef.current);
                 }
 
@@ -1905,21 +1942,34 @@ function createProxyHandler<T>(
                 const isInitialLoad = range.endIndex < jumpThreshold;
                 const isBigJump = totalCount > range.endIndex + jumpThreshold;
 
+                console.log("Jump check:", {
+                  isInitialLoad,
+                  isBigJump,
+                  totalCount,
+                  currentEndIndex: range.endIndex,
+                });
+
                 if (isInitialLoad || isBigJump) {
-                  // Jump to show the last items immediately
-                  setRange({
+                  const newRange = {
                     startIndex: Math.max(0, totalCount - 20),
                     endIndex: totalCount,
-                  });
+                  };
+                  console.log("Jumping to end range:", newRange);
+                  setRange(newRange);
                 }
 
                 // Keep scrolling to bottom until we're actually there
                 let attempts = 0;
                 const maxAttempts = 50; // 5 seconds max
 
+                console.log("Starting scroll-to-bottom interval");
+
                 scrollToBottomIntervalRef.current = setInterval(() => {
                   const container = containerRef.current;
-                  if (!container) return;
+                  if (!container) {
+                    console.log("Container lost during interval");
+                    return;
+                  }
 
                   attempts++;
 
@@ -1928,41 +1978,54 @@ function createProxyHandler<T>(
                   const actualBottom = scrollHeight;
                   const isAtBottom = actualBottom - currentBottom < 5;
 
-                  console.log(
-                    `Scroll attempt ${attempts}: currentBottom=${currentBottom}, actualBottom=${actualBottom}, isAtBottom=${isAtBottom}, hasMounted=${hasMounted}`
-                  );
+                  console.log(`Scroll attempt ${attempts}:`, {
+                    currentBottom,
+                    actualBottom,
+                    isAtBottom,
+                    scrollTop,
+                    scrollHeight,
+                    clientHeight,
+                  });
 
                   if (isAtBottom || attempts >= maxAttempts) {
+                    console.log(
+                      isAtBottom
+                        ? "Successfully reached bottom!"
+                        : "Timeout - giving up"
+                    );
                     clearInterval(scrollToBottomIntervalRef.current!);
                     scrollToBottomIntervalRef.current = null;
-                    console.log(
-                      isAtBottom ? "Reached bottom!" : "Timeout - giving up"
-                    );
                   } else {
-                    // Use instant scroll, not smooth
+                    console.log("Scrolling to", container.scrollHeight);
                     container.scrollTop = container.scrollHeight;
                   }
                 }, 100);
 
                 // Cleanup
                 return () => {
+                  console.log("Cleaning up scroll interval");
                   if (scrollToBottomIntervalRef.current) {
                     clearInterval(scrollToBottomIntervalRef.current);
                     scrollToBottomIntervalRef.current = null;
                   }
                 };
-              }, [totalCount, stickToBottom, hasMounted]);
+              }, [totalCount, stickToBottom, range.startIndex, range.endIndex]);
 
               // Handle user scroll
               useEffect(() => {
                 const container = containerRef.current;
-                if (!container) return;
+                if (!container) {
+                  console.log("No container for scroll handler");
+                  return;
+                }
+
+                console.log("Setting up scroll handler");
 
                 let scrollTimeout: NodeJS.Timeout;
 
                 const handleScroll = () => {
                   if (scrollToBottomIntervalRef.current) {
-                    // Stop auto-scrolling if user scrolls
+                    console.log("User scrolled - stopping auto-scroll");
                     clearInterval(scrollToBottomIntervalRef.current);
                     scrollToBottomIntervalRef.current = null;
                   }
@@ -1973,12 +2036,14 @@ function createProxyHandler<T>(
 
                   // Update whether we should stick to bottom
                   shouldStickToBottomRef.current = isAtBottom;
+                  console.log("User scroll - at bottom:", isAtBottom);
 
                   // Mark as user scrolling
                   clearTimeout(scrollTimeout);
                   isUserScrollingRef.current = true;
                   scrollTimeout = setTimeout(() => {
                     isUserScrollingRef.current = false;
+                    console.log("User stopped scrolling");
                   }, 150);
 
                   // Update visible range
@@ -1999,18 +2064,23 @@ function createProxyHandler<T>(
                     endIndex = i;
                   }
 
-                  setRange({
+                  const newRange = {
                     startIndex: Math.max(0, startIndex),
                     endIndex: Math.min(totalCount, endIndex + 1 + overscan),
-                  });
+                  };
+
+                  console.log("Updating visible range:", newRange);
+                  setRange(newRange);
                 };
 
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+                console.log("Initial scroll calculation");
                 handleScroll(); // Initial calculation
 
                 return () => {
+                  console.log("Removing scroll handler");
                   container.removeEventListener("scroll", handleScroll);
                   clearTimeout(scrollTimeout);
                 };
@@ -2018,6 +2088,7 @@ function createProxyHandler<T>(
 
               const scrollToBottom = useCallback(
                 (behavior: ScrollBehavior = "auto") => {
+                  console.log("Manual scrollToBottom called");
                   shouldStickToBottomRef.current = true;
                   if (containerRef.current) {
                     containerRef.current.scrollTop =
@@ -2029,6 +2100,7 @@ function createProxyHandler<T>(
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
+                  console.log("scrollToIndex called:", index);
                   if (containerRef.current && positions[index] !== undefined) {
                     containerRef.current.scrollTo({
                       top: positions[index],
@@ -2056,6 +2128,12 @@ function createProxyHandler<T>(
                   },
                 },
               };
+
+              console.log("Returning virtualizer with props:", {
+                range,
+                totalHeight,
+                startPosition: positions[range.startIndex] || 0,
+              });
 
               return {
                 virtualState,
