@@ -1909,13 +1909,8 @@ function createProxyHandler<T>(
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
 
-                // Only auto-scroll if we haven't scrolled away AND we're at bottom
-                if (
-                  (hasNewItems || isInitialLoad) &&
-                  wasAtBottomRef.current &&
-                  !userHasScrolledAwayRef.current
-                ) {
-                  // First, ensure the last items are in range
+                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
+                  // Only update range and scroll if we're at bottom
                   const visibleCount = Math.ceil(
                     (containerRef.current?.clientHeight || 0) / itemHeight
                   );
@@ -1929,18 +1924,12 @@ function createProxyHandler<T>(
 
                   setRange(newRange);
 
-                  // Then scroll to the last item after it renders
                   const timeoutId = setTimeout(() => {
-                    const scrolled = scrollToLastItem();
-                    if (!scrolled && containerRef.current) {
-                      // Fallback if ref not available yet
+                    if (containerRef.current) {
                       containerRef.current.scrollTop =
                         containerRef.current.scrollHeight;
                     }
                   }, 50);
-
-                  previousCountRef.current = totalCount;
-                  return () => clearTimeout(timeoutId);
                 }
 
                 previousCountRef.current = totalCount;
