@@ -1803,10 +1803,6 @@ function createProxyHandler<T>(
               return selectedIndex ?? -1;
             };
           }
-          // Simplified useVirtualView approach
-          // Optimal approach - replace the useVirtualView implementation
-          // Complete useVirtualView implementation with comprehensive logging
-          // Complete fixed useVirtualView implementation
           // Complete fixed useVirtualView implementation
           if (prop === "useVirtualView") {
             return (
@@ -1929,20 +1925,27 @@ function createProxyHandler<T>(
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const currentBottom = scrollTop + clientHeight;
                   const actualBottom = scrollHeight;
-                  const isAtBottom = actualBottom - currentBottom < 5;
+                  const isAtBottom = actualBottom - currentBottom < 50; // Increased tolerance
 
                   if (isAtBottom || attempts >= maxAttempts) {
                     clearInterval(scrollToBottomIntervalRef.current!);
                     scrollToBottomIntervalRef.current = null;
-                  } else {
-                    // Set flag before scrolling
-                    isProgrammaticScrollRef.current = true;
-                    container.scrollTop = container.scrollHeight;
 
-                    // Reset flag after a short delay
-                    setTimeout(() => {
-                      isProgrammaticScrollRef.current = false;
-                    }, 50);
+                    // Do one final scroll to ensure we're truly at bottom
+                    if (
+                      isAtBottom &&
+                      container.scrollTop <
+                        container.scrollHeight - container.clientHeight
+                    ) {
+                      container.scrollTop = container.scrollHeight;
+                    }
+                  } else {
+                    // Only scroll if we're not already scrolling there
+                    const targetScroll =
+                      container.scrollHeight - container.clientHeight;
+                    if (Math.abs(container.scrollTop - targetScroll) > 1) {
+                      container.scrollTop = container.scrollHeight;
+                    }
                   }
                 }, 100);
 
@@ -1967,14 +1970,16 @@ function createProxyHandler<T>(
                   }
 
                   // This is a real user scroll
+                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  const distanceFromBottom =
+                    scrollHeight - scrollTop - clientHeight;
+                  const isAtBottom = distanceFromBottom < 50; // Increased tolerance
+
+                  // Stop any auto-scrolling if user scrolls
                   if (scrollToBottomIntervalRef.current) {
                     clearInterval(scrollToBottomIntervalRef.current);
                     scrollToBottomIntervalRef.current = null;
                   }
-
-                  const { scrollTop, scrollHeight, clientHeight } = container;
-                  const isAtBottom =
-                    scrollHeight - scrollTop - clientHeight < 10;
 
                   // Only update this for real user scrolls
                   shouldStickToBottomRef.current = isAtBottom;
