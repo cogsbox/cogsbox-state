@@ -1821,8 +1821,9 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const wasAtBottomRef = useRef(true);
+              const wasAtBottomRef = useRef(false);
               const previousCountRef = useRef(0);
+              const hasInitializedRef = useRef(false); // Track if we've done initial scroll
 
               // Subscribe to shadow state updates
               useEffect(() => {
@@ -1901,18 +1902,42 @@ function createProxyHandler<T>(
                 return false;
               }, [stateKey, path, totalCount]);
 
-              // Handle new items when at bottom
+              // Handle ONLY new items - not height changes
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
 
                 const hasNewItems = totalCount > previousCountRef.current;
-                const isInitialLoad =
-                  previousCountRef.current === 0 && totalCount > 0;
 
-                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
-                  // First, ensure the last items are in range
+                // Initial load
+                if (
+                  previousCountRef.current === 0 &&
+                  totalCount > 0 &&
+                  !hasInitializedRef.current
+                ) {
+                  hasInitializedRef.current = true;
                   const visibleCount = Math.ceil(
-                    containerRef.current?.clientHeight || 0 / itemHeight
+                    (containerRef.current?.clientHeight || 600) / itemHeight
+                  );
+                  setRange({
+                    startIndex: Math.max(
+                      0,
+                      totalCount - visibleCount - overscan
+                    ),
+                    endIndex: totalCount,
+                  });
+
+                  setTimeout(() => {
+                    if (containerRef.current) {
+                      containerRef.current.scrollTop =
+                        containerRef.current.scrollHeight;
+                      wasAtBottomRef.current = true;
+                    }
+                  }, 100);
+                }
+                // New items added AFTER initial load
+                else if (hasNewItems && wasAtBottomRef.current) {
+                  const visibleCount = Math.ceil(
+                    (containerRef.current?.clientHeight || 600) / itemHeight
                   );
                   const newRange = {
                     startIndex: Math.max(
@@ -1924,29 +1949,13 @@ function createProxyHandler<T>(
 
                   setRange(newRange);
 
-                  // Then scroll to the last item after it renders
-                  const timeoutId = setTimeout(() => {
-                    const scrolled = scrollToLastItem();
-                    if (!scrolled && containerRef.current) {
-                      // Fallback if ref not available yet
-                      containerRef.current.scrollTop =
-                        containerRef.current.scrollHeight;
-                    }
+                  setTimeout(() => {
+                    scrollToLastItem();
                   }, 50);
-
-                  previousCountRef.current = totalCount;
-
-                  return () => clearTimeout(timeoutId);
                 }
 
                 previousCountRef.current = totalCount;
-              }, [
-                totalCount,
-                stickToBottom,
-                itemHeight,
-                overscan,
-                scrollToLastItem,
-              ]);
+              }, [totalCount]); // ONLY depend on totalCount, not positions!
 
               // Handle scroll events
               useEffect(() => {
@@ -1958,7 +1967,7 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
 
-                  // Track if we're at bottom (with tolerance)
+                  // Track if we're at bottom
                   wasAtBottomRef.current = distanceFromBottom < 100;
 
                   // Update visible range based on scroll position
@@ -1989,17 +1998,13 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Initial setup
-                if (stickToBottom && totalCount > 0) {
-                  // For initial load, jump to bottom
-                  container.scrollTop = container.scrollHeight;
-                }
+                // Just calculate visible range, no scrolling
                 handleScroll();
 
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                 };
-              }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
+              }, [positions, totalCount, itemHeight, overscan]);
 
               const scrollToBottom = useCallback(() => {
                 wasAtBottomRef.current = true;
