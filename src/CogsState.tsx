@@ -1824,7 +1824,7 @@ function createProxyHandler<T>(
               const wasAtBottomRef = useRef(true);
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
-
+              const lastRangeRef = useRef(range);
               // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1979,10 +1979,26 @@ function createProxyHandler<T>(
                     endIndex = i;
                   }
 
-                  setRange({
-                    startIndex: Math.max(0, startIndex),
-                    endIndex: Math.min(totalCount, endIndex + 1 + overscan),
-                  });
+                  const newStartIndex = Math.max(0, startIndex);
+                  const newEndIndex = Math.min(
+                    totalCount,
+                    endIndex + 1 + overscan
+                  );
+
+                  // THE FIX: Only update state if the visible range of items has changed.
+                  if (
+                    newStartIndex !== lastRangeRef.current.startIndex ||
+                    newEndIndex !== lastRangeRef.current.endIndex
+                  ) {
+                    lastRangeRef.current = {
+                      startIndex: newStartIndex,
+                      endIndex: newEndIndex,
+                    };
+                    setRange({
+                      startIndex: newStartIndex,
+                      endIndex: newEndIndex,
+                    });
+                  }
                 };
 
                 container.addEventListener("scroll", handleScroll, {
