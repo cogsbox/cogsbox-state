@@ -1952,8 +1952,9 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
 
-                  // Track if we're at bottom (with tolerance)
-                  wasAtBottomRef.current = distanceFromBottom < 100;
+                  // Only consider "at bottom" if we're VERY close (like 5px)
+                  // This prevents the snap-back behavior when scrolling up
+                  wasAtBottomRef.current = distanceFromBottom < 5;
 
                   // Update visible range based on scroll position
                   let startIndex = 0;

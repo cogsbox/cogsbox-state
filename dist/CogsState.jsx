@@ -698,7 +698,7 @@ function St(t, s, S, u) {
                 if (!b) return;
                 const T = () => {
                   const { scrollTop: C, scrollHeight: P, clientHeight: z } = b, lt = P - C - z;
-                  N.current = lt < 100;
+                  N.current = lt < 5;
                   let dt = 0;
                   for (let Y = 0; Y < E.length; Y++)
                     if (E[Y] > C - r * a) {
