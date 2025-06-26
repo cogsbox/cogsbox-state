@@ -732,7 +732,7 @@ function mt(t, s, S, u) {
                   if (j?.virtualizer?.domRef) {
                     const W = j.virtualizer.domRef;
                     if (W && W.scrollIntoView) {
-                      W.scrollIntoView({ behavior: N, block: "center" });
+                      W.scrollIntoView({ behavior: N, block: "end" });
                       return;
                     }
                   }

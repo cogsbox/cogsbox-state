@@ -2035,7 +2035,7 @@ function createProxyHandler<T>(
                   if (itemData?.virtualizer?.domRef) {
                     const element = itemData.virtualizer.domRef;
                     if (element && element.scrollIntoView) {
-                      element.scrollIntoView({ behavior, block: "center" });
+                      element.scrollIntoView({ behavior, block: "end" });
                       return;
                     }
                   }
