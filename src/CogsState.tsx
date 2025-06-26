@@ -1930,22 +1930,15 @@ function createProxyHandler<T>(
                   if (isAtBottom || attempts >= maxAttempts) {
                     clearInterval(scrollToBottomIntervalRef.current!);
                     scrollToBottomIntervalRef.current = null;
-
-                    // Do one final scroll to ensure we're truly at bottom
-                    if (
-                      isAtBottom &&
-                      container.scrollTop <
-                        container.scrollHeight - container.clientHeight
-                    ) {
-                      container.scrollTop = container.scrollHeight;
-                    }
                   } else {
-                    // Only scroll if we're not already scrolling there
-                    const targetScroll =
-                      container.scrollHeight - container.clientHeight;
-                    if (Math.abs(container.scrollTop - targetScroll) > 1) {
-                      container.scrollTop = container.scrollHeight;
-                    }
+                    // Set flag before scrolling
+                    isProgrammaticScrollRef.current = true;
+                    container.scrollTop = container.scrollHeight;
+
+                    // Reset flag after a short delay
+                    setTimeout(() => {
+                      isProgrammaticScrollRef.current = false;
+                    }, 50);
                   }
                 }, 100);
 
