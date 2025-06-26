@@ -1930,12 +1930,8 @@ function createProxyHandler<T>(
                   setRange(newRange);
 
                   const timeoutId = setTimeout(() => {
-                    if (containerRef.current) {
-                      containerRef.current.scrollTop =
-                        containerRef.current.scrollHeight;
-                    }
+                    scrollToIndex(totalCount - 1, "smooth");
                   }, 50);
-
                   return () => clearTimeout(timeoutId);
                 }
 
@@ -2023,32 +2019,48 @@ function createProxyHandler<T>(
                     containerRef.current.scrollHeight;
                 }
               }, [scrollToLastItem]);
-
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
+                  const container = containerRef.current;
+                  if (!container) return;
+
+                  const isLastItem = index === totalCount - 1;
+
+                  // --- Special Case: The Last Item ---
+                  if (isLastItem) {
+                    // For the last item, scrollIntoView can fail. The most reliable method
+                    // is to scroll the parent container to its maximum scroll height.
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: behavior,
+                    });
+                    return; // We're done.
+                  }
+
+                  // --- Standard Case: All Other Items ---
+                  // For all other items, we find the ref and use scrollIntoView.
                   const shadowArray =
                     getGlobalStore
                       .getState()
                       .getShadowMetadata(stateKey, path) || [];
                   const itemData = shadowArray[index];
+                  const element = itemData?.virtualizer?.domRef;
 
-                  if (itemData?.virtualizer?.domRef) {
-                    const element = itemData.virtualizer.domRef;
-                    if (element && element.scrollIntoView) {
-                      element.scrollIntoView({ behavior, block: "end" });
-                      return;
-                    }
-                  }
-
-                  // Fallback to position-based scrolling
-                  if (containerRef.current && positions[index] !== undefined) {
-                    containerRef.current.scrollTo({
+                  if (element) {
+                    // 'center' gives a better user experience for items in the middle of the list.
+                    element.scrollIntoView({
+                      behavior: behavior,
+                      block: "center",
+                    });
+                  } else if (positions[index] !== undefined) {
+                    // Fallback if the ref isn't available for some reason.
+                    container.scrollTo({
                       top: positions[index],
                       behavior,
                     });
                   }
                 },
-                [positions, stateKey, path]
+                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
               );
 
               const virtualizerProps = {
