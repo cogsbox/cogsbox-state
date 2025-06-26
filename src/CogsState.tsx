@@ -1984,7 +1984,12 @@ function createProxyHandler<T>(
                         .getShadowMetadata(stateKey, path) || [];
                     const lastItemHeight =
                       shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
-
+                    console.log(
+                      "ACTION (GETTING_HEIGHTS): lastItemHeight =",
+                      lastItemHeight,
+                      " index =",
+                      lastItemIndex
+                    );
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
                       if (!shouldNotScroll.current) {
