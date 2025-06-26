@@ -1823,7 +1823,7 @@ function createProxyHandler<T>(
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
               const wasAtBottomRef = useRef(true);
               const previousCountRef = useRef(0);
-
+              const userHasScrolledAwayRef = useRef(false);
               // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1909,10 +1909,15 @@ function createProxyHandler<T>(
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
 
-                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
+                // Only auto-scroll if we haven't scrolled away AND we're at bottom
+                if (
+                  (hasNewItems || isInitialLoad) &&
+                  wasAtBottomRef.current &&
+                  !userHasScrolledAwayRef.current
+                ) {
                   // First, ensure the last items are in range
                   const visibleCount = Math.ceil(
-                    containerRef.current?.clientHeight || 0 / itemHeight
+                    (containerRef.current?.clientHeight || 0) / itemHeight
                   );
                   const newRange = {
                     startIndex: Math.max(
@@ -1935,7 +1940,6 @@ function createProxyHandler<T>(
                   }, 50);
 
                   previousCountRef.current = totalCount;
-
                   return () => clearTimeout(timeoutId);
                 }
 
@@ -1952,9 +1956,19 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
 
-                  // Only consider "at bottom" if we're VERY close (like 5px)
-                  // This prevents the snap-back behavior when scrolling up
-                  wasAtBottomRef.current = distanceFromBottom < 5;
+                  // Track if user is at bottom with tight tolerance
+                  const isAtBottom = distanceFromBottom < 5;
+                  wasAtBottomRef.current = isAtBottom;
+
+                  // If user scrolls away from bottom, set the flag
+                  if (!isAtBottom && distanceFromBottom > 50) {
+                    userHasScrolledAwayRef.current = true;
+                  }
+
+                  // If user scrolls back to bottom, clear the flag
+                  if (isAtBottom) {
+                    userHasScrolledAwayRef.current = false;
+                  }
 
                   // Update visible range based on scroll position
                   let startIndex = 0;
@@ -1979,7 +1993,6 @@ function createProxyHandler<T>(
                     endIndex: Math.min(totalCount, endIndex + 1 + overscan),
                   });
                 };
-
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
