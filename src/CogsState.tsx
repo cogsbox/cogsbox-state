@@ -1804,6 +1804,7 @@ function createProxyHandler<T>(
             };
           }
           // Simplified useVirtualView approach
+          // Optimal approach - replace the useVirtualView implementation
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1820,9 +1821,12 @@ function createProxyHandler<T>(
                 startIndex: 0,
                 endIndex: 10,
               });
-              const isUserScrolling = useRef(false);
-              const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
+              const isUserScrollingRef = useRef(false);
+              const shouldStickToBottomRef = useRef(true);
+              const scrollToBottomIntervalRef = useRef<NodeJS.Timeout | null>(
+                null
+              );
 
               // Subscribe to shadow state updates
               useEffect(() => {
@@ -1877,38 +1881,71 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // Simple scroll to bottom when items are added
+              // Handle auto-scroll to bottom
               useEffect(() => {
                 if (!stickToBottom || !containerRef.current || totalCount === 0)
                   return;
+                if (!shouldStickToBottomRef.current) return;
 
-                const container = containerRef.current;
-                const isNearBottom =
-                  container.scrollHeight -
-                    container.scrollTop -
-                    container.clientHeight <
-                  100;
-
-                // If user is near bottom or we're auto-scrolling, scroll to bottom
-                if (isNearBottom || !isUserScrolling.current) {
-                  // Clear any pending scroll
-                  if (scrollTimeoutRef.current) {
-                    clearTimeout(scrollTimeoutRef.current);
-                  }
-
-                  // Delay scroll to allow items to render and measure
-                  scrollTimeoutRef.current = setTimeout(() => {
-                    if (containerRef.current) {
-                      containerRef.current.scrollTo({
-                        top: containerRef.current.scrollHeight,
-                        behavior: "smooth",
-                      });
-                    }
-                  }, 100);
+                // Clear any existing interval
+                if (scrollToBottomIntervalRef.current) {
+                  clearInterval(scrollToBottomIntervalRef.current);
                 }
+
+                // For initial load or big jumps, show the end immediately
+                const jumpThreshold = 50;
+                const isInitialLoad = range.endIndex < jumpThreshold;
+                const isBigJump = totalCount > range.endIndex + jumpThreshold;
+
+                if (isInitialLoad || isBigJump) {
+                  // Jump to show the last items immediately
+                  setRange({
+                    startIndex: Math.max(0, totalCount - 20),
+                    endIndex: totalCount,
+                  });
+                }
+
+                // Keep scrolling to bottom until we're actually there
+                let attempts = 0;
+                const maxAttempts = 50; // 5 seconds max
+
+                scrollToBottomIntervalRef.current = setInterval(() => {
+                  const container = containerRef.current;
+                  if (!container) return;
+
+                  attempts++;
+
+                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  const currentBottom = scrollTop + clientHeight;
+                  const actualBottom = scrollHeight;
+                  const isAtBottom = actualBottom - currentBottom < 5;
+
+                  console.log(
+                    `Scroll attempt ${attempts}: currentBottom=${currentBottom}, actualBottom=${actualBottom}, isAtBottom=${isAtBottom}`
+                  );
+
+                  if (isAtBottom || attempts >= maxAttempts) {
+                    clearInterval(scrollToBottomIntervalRef.current!);
+                    scrollToBottomIntervalRef.current = null;
+                    console.log(
+                      isAtBottom ? "Reached bottom!" : "Timeout - giving up"
+                    );
+                  } else {
+                    // Use instant scroll, not smooth
+                    container.scrollTop = container.scrollHeight;
+                  }
+                }, 100);
+
+                // Cleanup
+                return () => {
+                  if (scrollToBottomIntervalRef.current) {
+                    clearInterval(scrollToBottomIntervalRef.current);
+                    scrollToBottomIntervalRef.current = null;
+                  }
+                };
               }, [totalCount, stickToBottom]);
 
-              // Handle scroll events
+              // Handle user scroll
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1916,21 +1953,27 @@ function createProxyHandler<T>(
                 let scrollTimeout: NodeJS.Timeout;
 
                 const handleScroll = () => {
-                  // Clear existing timeout
-                  clearTimeout(scrollTimeout);
+                  if (scrollToBottomIntervalRef.current) {
+                    // Stop auto-scrolling if user scrolls
+                    clearInterval(scrollToBottomIntervalRef.current);
+                    scrollToBottomIntervalRef.current = null;
+                  }
+
+                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  const isAtBottom =
+                    scrollHeight - scrollTop - clientHeight < 10;
+
+                  // Update whether we should stick to bottom
+                  shouldStickToBottomRef.current = isAtBottom;
 
                   // Mark as user scrolling
-                  isUserScrolling.current = true;
-
-                  // Reset after scrolling stops
+                  clearTimeout(scrollTimeout);
+                  isUserScrollingRef.current = true;
                   scrollTimeout = setTimeout(() => {
-                    isUserScrolling.current = false;
+                    isUserScrollingRef.current = false;
                   }, 150);
 
                   // Update visible range
-                  const { scrollTop, clientHeight } = container;
-
-                  // Find first visible item
                   let startIndex = 0;
                   for (let i = 0; i < positions.length; i++) {
                     if (positions[i]! > scrollTop - itemHeight * overscan) {
@@ -1939,7 +1982,6 @@ function createProxyHandler<T>(
                     }
                   }
 
-                  // Find last visible item
                   let endIndex = startIndex;
                   const viewportEnd = scrollTop + clientHeight;
                   for (let i = startIndex; i < positions.length; i++) {
@@ -1958,9 +2000,7 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-
-                // Initial range calculation
-                handleScroll();
+                handleScroll(); // Initial calculation
 
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
@@ -1968,22 +2008,12 @@ function createProxyHandler<T>(
                 };
               }, [positions, totalCount, itemHeight, overscan]);
 
-              // Cleanup scroll timeout on unmount
-              useEffect(() => {
-                return () => {
-                  if (scrollTimeoutRef.current) {
-                    clearTimeout(scrollTimeoutRef.current);
-                  }
-                };
-              }, []);
-
               const scrollToBottom = useCallback(
-                (behavior: ScrollBehavior = "smooth") => {
+                (behavior: ScrollBehavior = "auto") => {
+                  shouldStickToBottomRef.current = true;
                   if (containerRef.current) {
-                    containerRef.current.scrollTo({
-                      top: containerRef.current.scrollHeight,
-                      behavior,
-                    });
+                    containerRef.current.scrollTop =
+                      containerRef.current.scrollHeight;
                   }
                 },
                 []
