@@ -1882,10 +1882,18 @@ function createProxyHandler<T>(
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
               // Handle auto-scroll to bottom
+              const [hasMounted, setHasMounted] = useState(false);
+
+              // Add this effect to track mounting:
+              useEffect(() => {
+                setHasMounted(true);
+              }, []);
+
+              // Replace the auto-scroll effect with this version:
               useEffect(() => {
                 if (!stickToBottom || !containerRef.current || totalCount === 0)
                   return;
-                if (!shouldStickToBottomRef.current) return;
+                if (!shouldStickToBottomRef.current && hasMounted) return; // Only check shouldStickToBottom after mount
 
                 // Clear any existing interval
                 if (scrollToBottomIntervalRef.current) {
@@ -1921,7 +1929,7 @@ function createProxyHandler<T>(
                   const isAtBottom = actualBottom - currentBottom < 5;
 
                   console.log(
-                    `Scroll attempt ${attempts}: currentBottom=${currentBottom}, actualBottom=${actualBottom}, isAtBottom=${isAtBottom}`
+                    `Scroll attempt ${attempts}: currentBottom=${currentBottom}, actualBottom=${actualBottom}, isAtBottom=${isAtBottom}, hasMounted=${hasMounted}`
                   );
 
                   if (isAtBottom || attempts >= maxAttempts) {
@@ -1943,7 +1951,7 @@ function createProxyHandler<T>(
                     scrollToBottomIntervalRef.current = null;
                   }
                 };
-              }, [totalCount, stickToBottom]);
+              }, [totalCount, stickToBottom, hasMounted]);
 
               // Handle user scroll
               useEffect(() => {
