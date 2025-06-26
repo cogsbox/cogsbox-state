@@ -1803,6 +1803,7 @@ function createProxyHandler<T>(
               return selectedIndex ?? -1;
             };
           }
+          // Simplified useVirtualView approach
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1814,30 +1815,16 @@ function createProxyHandler<T>(
                 dependencies = [],
               } = options;
 
-              // YOUR STATE MACHINE STATES
-              type Status =
-                | "IDLE_AT_TOP"
-                | "GETTING_HEIGHTS"
-                | "SCROLLING_TO_BOTTOM"
-                | "LOCKED_AT_BOTTOM"
-                | "IDLE_NOT_AT_BOTTOM";
-
-              const shouldNotScroll = useRef(false);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
-              const [status, setStatus] = useState<Status>("IDLE_AT_TOP");
-              const isProgrammaticScroll = useRef(false);
-              const prevTotalCountRef = useRef(0);
-              const prevDepsRef = useRef(dependencies);
-              const lastUpdateAtScrollTop = useRef(0);
+              const isUserScrolling = useRef(false);
+              const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const scrollAnchorRef = useRef<{
-                top: number;
-                height: number;
-              } | null>(null);
+
+              // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1853,6 +1840,7 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
+              // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
                 const shadowArray =
                   getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
@@ -1874,7 +1862,7 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // THIS IS THE FULL, NON-PLACEHOLDER FUNCTION
+              // Create virtual state
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
@@ -1889,256 +1877,121 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- 1. STATE CONTROLLER ---
-              // --- 1. STATE CONTROLLER (CORRECTED) ---
-              useLayoutEffect(() => {
+              // Simple scroll to bottom when items are added
+              useEffect(() => {
+                if (!stickToBottom || !containerRef.current || totalCount === 0)
+                  return;
+
                 const container = containerRef.current;
-                if (!container) return;
+                const isNearBottom =
+                  container.scrollHeight -
+                    container.scrollTop -
+                    container.clientHeight <
+                  100;
 
-                const hasNewItems = totalCount > prevTotalCountRef.current;
-
-                // THIS IS THE NEW, IMPORTANT LOGIC FOR ANCHORING
-                if (hasNewItems && scrollAnchorRef.current) {
-                  const { top: prevScrollTop, height: prevScrollHeight } =
-                    scrollAnchorRef.current;
-
-                  // This is the key: Tell the app we are about to programmatically scroll.
-                  isProgrammaticScroll.current = true;
-
-                  // Restore the scroll position.
-                  container.scrollTop =
-                    prevScrollTop + (container.scrollHeight - prevScrollHeight);
-                  console.log(
-                    `ANCHOR RESTORED to scrollTop: ${container.scrollTop}`
-                  );
-
-                  // IMPORTANT: After the scroll, allow user scroll events again.
-                  // Use a timeout to ensure this runs after the scroll event has fired and been ignored.
-                  setTimeout(() => {
-                    isProgrammaticScroll.current = false;
-                  }, 100);
-
-                  scrollAnchorRef.current = null; // Clear the anchor after using it.
-                }
-                // YOUR ORIGINAL LOGIC CONTINUES UNCHANGED IN THE `ELSE` BLOCK
-                else {
-                  const depsChanged = !isDeepEqual(
-                    dependencies,
-                    prevDepsRef.current
-                  );
-
-                  if (depsChanged) {
-                    console.log("TRANSITION: Deps changed -> IDLE_AT_TOP");
-                    setStatus("IDLE_AT_TOP");
-                    return;
+                // If user is near bottom or we're auto-scrolling, scroll to bottom
+                if (isNearBottom || !isUserScrolling.current) {
+                  // Clear any pending scroll
+                  if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
                   }
 
-                  if (
-                    hasNewItems &&
-                    status === "LOCKED_AT_BOTTOM" &&
-                    stickToBottom
-                  ) {
-                    console.log(
-                      "TRANSITION: New items arrived while locked -> GETTING_HEIGHTS"
-                    );
-                    setStatus("GETTING_HEIGHTS");
-                  }
-                }
-
-                prevTotalCountRef.current = totalCount;
-                prevDepsRef.current = dependencies;
-              }, [totalCount, ...dependencies]);
-
-              // --- 2. STATE ACTION HANDLER ---
-              // This effect performs the ACTION for the current state.
-              useLayoutEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
-
-                let intervalId: NodeJS.Timeout | undefined;
-
-                if (
-                  status === "IDLE_AT_TOP" &&
-                  stickToBottom &&
-                  totalCount > 0
-                ) {
-                  // If we just loaded a new chat, start the process.
-                  console.log(
-                    "ACTION (IDLE_AT_TOP): Data has arrived -> GETTING_HEIGHTS"
-                  );
-                  setStatus("GETTING_HEIGHTS");
-                } else if (status === "GETTING_HEIGHTS") {
-                  console.log(
-                    "ACTION (GETTING_HEIGHTS): Setting range to end and starting loop."
-                  );
-                  setRange({
-                    startIndex: Math.max(0, totalCount - 10 - overscan),
-                    endIndex: totalCount,
-                  });
-
-                  let attemptCount = 0;
-                  const maxAttempts = 50;
-
-                  intervalId = setInterval(() => {
-                    attemptCount++;
-                    const lastItemIndex = totalCount - 1;
-                    const shadowArray =
-                      getGlobalStore
-                        .getState()
-                        .getShadowMetadata(stateKey, path) || [];
-                    const lastItemHeight =
-                      shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
-
-                    console.log(
-                      `ACTION (GETTING_HEIGHTS): attempt ${attemptCount}, lastItemHeight =`,
-                      lastItemHeight
-                    );
-
-                    if (lastItemHeight > 0) {
-                      clearInterval(intervalId);
-                      console.log(
-                        "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
-                      );
-                      setStatus("SCROLLING_TO_BOTTOM");
-                    } else if (attemptCount >= maxAttempts) {
-                      clearInterval(intervalId);
-                      console.log(
-                        "ACTION (GETTING_HEIGHTS): Timeout - proceeding anyway"
-                      );
-                      setStatus("SCROLLING_TO_BOTTOM");
+                  // Delay scroll to allow items to render and measure
+                  scrollTimeoutRef.current = setTimeout(() => {
+                    if (containerRef.current) {
+                      containerRef.current.scrollTo({
+                        top: containerRef.current.scrollHeight,
+                        behavior: "smooth",
+                      });
                     }
                   }, 100);
-                } else if (status === "SCROLLING_TO_BOTTOM") {
-                  console.log(
-                    "ACTION (SCROLLING_TO_BOTTOM): Executing scroll."
-                  );
-                  isProgrammaticScroll.current = true;
-                  // Use 'auto' for initial load, 'smooth' for new messages.
-                  const scrollBehavior =
-                    prevTotalCountRef.current === 0 ? "auto" : "smooth";
-
-                  container.scrollTo({
-                    top: container.scrollHeight,
-                    behavior: scrollBehavior,
-                  });
-
-                  const timeoutId = setTimeout(
-                    () => {
-                      console.log(
-                        "ACTION (SCROLLING_TO_BOTTOM): Scroll finished -> LOCKED_AT_BOTTOM"
-                      );
-                      isProgrammaticScroll.current = false;
-                      shouldNotScroll.current = false;
-                      setStatus("LOCKED_AT_BOTTOM");
-                    },
-                    scrollBehavior === "smooth" ? 500 : 50
-                  );
-
-                  return () => clearTimeout(timeoutId);
                 }
+              }, [totalCount, stickToBottom]);
 
-                return () => {
-                  if (intervalId) clearInterval(intervalId);
-                };
-              }, [status, totalCount, positions]);
-
+              // Handle scroll events
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const scrollThreshold = itemHeight;
+                let scrollTimeout: NodeJS.Timeout;
 
-                const handleUserScroll = () => {
-                  // This guard is now critical. It will ignore our anchor restoration scroll.
-                  if (isProgrammaticScroll.current) {
-                    return;
-                  }
+                const handleScroll = () => {
+                  // Clear existing timeout
+                  clearTimeout(scrollTimeout);
 
-                  const { scrollTop, scrollHeight, clientHeight } = container;
+                  // Mark as user scrolling
+                  isUserScrolling.current = true;
 
-                  // Part 1: Handle Status and Anchoring
-                  const isAtBottom =
-                    scrollHeight - scrollTop - clientHeight < 10;
+                  // Reset after scrolling stops
+                  scrollTimeout = setTimeout(() => {
+                    isUserScrolling.current = false;
+                  }, 150);
 
-                  if (isAtBottom) {
-                    if (status !== "LOCKED_AT_BOTTOM") {
-                      setStatus("LOCKED_AT_BOTTOM");
-                    }
-                    // If we are at the bottom, there is no anchor needed.
-                    scrollAnchorRef.current = null;
-                  } else {
-                    if (status !== "IDLE_NOT_AT_BOTTOM") {
-                      setStatus("IDLE_NOT_AT_BOTTOM");
-                    }
-                    // User is scrolled up. Continuously update the anchor with their latest position.
-                    scrollAnchorRef.current = {
-                      top: scrollTop,
-                      height: scrollHeight,
-                    };
-                  }
+                  // Update visible range
+                  const { scrollTop, clientHeight } = container;
 
-                  // Part 2: YOUR original, working logic for updating the visible range.
-                  if (
-                    Math.abs(scrollTop - lastUpdateAtScrollTop.current) <
-                    scrollThreshold
-                  ) {
-                    return;
-                  }
-
-                  console.log(
-                    `Threshold passed at ${scrollTop}px. Recalculating range...`
-                  );
-
-                  // ... your logic to find startIndex and endIndex ...
-                  let high = totalCount - 1;
-                  let low = 0;
-                  let topItemIndex = 0;
-                  while (low <= high) {
-                    const mid = Math.floor((low + high) / 2);
-                    if (positions[mid]! < scrollTop) {
-                      topItemIndex = mid;
-                      low = mid + 1;
-                    } else {
-                      high = mid - 1;
+                  // Find first visible item
+                  let startIndex = 0;
+                  for (let i = 0; i < positions.length; i++) {
+                    if (positions[i]! > scrollTop - itemHeight * overscan) {
+                      startIndex = Math.max(0, i - 1);
+                      break;
                     }
                   }
 
-                  const startIndex = Math.max(0, topItemIndex - overscan);
+                  // Find last visible item
                   let endIndex = startIndex;
-                  const visibleEnd = scrollTop + clientHeight;
-                  while (
-                    endIndex < totalCount &&
-                    positions[endIndex]! < visibleEnd
-                  ) {
-                    endIndex++;
+                  const viewportEnd = scrollTop + clientHeight;
+                  for (let i = startIndex; i < positions.length; i++) {
+                    if (positions[i]! > viewportEnd + itemHeight * overscan) {
+                      break;
+                    }
+                    endIndex = i;
                   }
 
                   setRange({
-                    startIndex,
-                    endIndex: Math.min(totalCount, endIndex + overscan),
+                    startIndex: Math.max(0, startIndex),
+                    endIndex: Math.min(totalCount, endIndex + 1 + overscan),
                   });
-
-                  lastUpdateAtScrollTop.current = scrollTop;
                 };
 
-                container.addEventListener("scroll", handleUserScroll, {
+                container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                return () =>
-                  container.removeEventListener("scroll", handleUserScroll);
-              }, [totalCount, positions, itemHeight, overscan, status]);
 
-              const scrollToBottom = useCallback(() => {
-                console.log(
-                  "USER ACTION: Clicked scroll button -> SCROLLING_TO_BOTTOM"
-                );
-                setStatus("SCROLLING_TO_BOTTOM");
+                // Initial range calculation
+                handleScroll();
+
+                return () => {
+                  container.removeEventListener("scroll", handleScroll);
+                  clearTimeout(scrollTimeout);
+                };
+              }, [positions, totalCount, itemHeight, overscan]);
+
+              // Cleanup scroll timeout on unmount
+              useEffect(() => {
+                return () => {
+                  if (scrollTimeoutRef.current) {
+                    clearTimeout(scrollTimeoutRef.current);
+                  }
+                };
               }, []);
+
+              const scrollToBottom = useCallback(
+                (behavior: ScrollBehavior = "smooth") => {
+                  if (containerRef.current) {
+                    containerRef.current.scrollTo({
+                      top: containerRef.current.scrollHeight,
+                      behavior,
+                    });
+                  }
+                },
+                []
+              );
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   if (containerRef.current && positions[index] !== undefined) {
-                    setStatus("IDLE_NOT_AT_BOTTOM");
                     containerRef.current.scrollTo({
                       top: positions[index],
                       behavior,
