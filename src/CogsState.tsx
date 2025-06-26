@@ -1821,11 +1821,8 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const isProgrammaticScrollRef = useRef(false); // Track if we're scrolling programmatically
-              const shouldStickToBottomRef = useRef(true);
-              const scrollToBottomIntervalRef = useRef<NodeJS.Timeout | null>(
-                null
-              );
+              const wasAtBottomRef = useRef(true);
+              const previousCountRef = useRef(0);
 
               // Subscribe to shadow state updates
               useEffect(() => {
@@ -1880,104 +1877,91 @@ function createProxyHandler<T>(
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // Handle auto-scroll to bottom
-              useEffect(() => {
-                if (!stickToBottom || !containerRef.current || totalCount === 0)
-                  return;
-                if (!shouldStickToBottomRef.current) return;
+              // Helper to scroll to last item using stored ref
+              const scrollToLastItem = useCallback(() => {
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                const lastIndex = totalCount - 1;
 
-                // Clear any existing interval
-                if (scrollToBottomIntervalRef.current) {
-                  clearInterval(scrollToBottomIntervalRef.current);
+                if (lastIndex >= 0) {
+                  const lastItemData = shadowArray[lastIndex];
+                  if (lastItemData?.virtualizer?.domRef) {
+                    const element = lastItemData.virtualizer.domRef;
+                    if (element && element.scrollIntoView) {
+                      element.scrollIntoView({
+                        behavior: "auto",
+                        block: "end",
+                        inline: "nearest",
+                      });
+                      return true;
+                    }
+                  }
                 }
+                return false;
+              }, [stateKey, path, totalCount]);
 
-                // For initial load or big jumps, show the end immediately
-                const jumpThreshold = 50;
-                const isInitialLoad = range.endIndex < jumpThreshold;
-                const isBigJump = totalCount > range.endIndex + jumpThreshold;
+              // Handle new items when at bottom
+              useEffect(() => {
+                if (!stickToBottom || totalCount === 0) return;
 
-                if (isInitialLoad || isBigJump) {
-                  // Set programmatic scroll flag BEFORE changing range
-                  isProgrammaticScrollRef.current = true;
+                const hasNewItems = totalCount > previousCountRef.current;
+                const isInitialLoad =
+                  previousCountRef.current === 0 && totalCount > 0;
 
+                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
+                  // First, ensure the last items are in range
+                  const visibleCount = Math.ceil(
+                    containerRef.current?.clientHeight || 0 / itemHeight
+                  );
                   const newRange = {
-                    startIndex: Math.max(0, totalCount - 20),
+                    startIndex: Math.max(
+                      0,
+                      totalCount - visibleCount - overscan
+                    ),
                     endIndex: totalCount,
                   };
+
                   setRange(newRange);
 
-                  // Reset flag after a delay to ensure scroll events are ignored
-                  setTimeout(() => {
-                    isProgrammaticScrollRef.current = false;
-                  }, 100);
+                  // Then scroll to the last item after it renders
+                  const timeoutId = setTimeout(() => {
+                    const scrolled = scrollToLastItem();
+                    if (!scrolled && containerRef.current) {
+                      // Fallback if ref not available yet
+                      containerRef.current.scrollTop =
+                        containerRef.current.scrollHeight;
+                    }
+                  }, 50);
+
+                  previousCountRef.current = totalCount;
+
+                  return () => clearTimeout(timeoutId);
                 }
 
-                // Keep scrolling to bottom until we're actually there
-                let attempts = 0;
-                const maxAttempts = 50; // 5 seconds max
+                previousCountRef.current = totalCount;
+              }, [
+                totalCount,
+                stickToBottom,
+                itemHeight,
+                overscan,
+                scrollToLastItem,
+              ]);
 
-                scrollToBottomIntervalRef.current = setInterval(() => {
-                  const container = containerRef.current;
-                  if (!container) return;
-
-                  attempts++;
-
-                  const { scrollTop, scrollHeight, clientHeight } = container;
-                  const currentBottom = scrollTop + clientHeight;
-                  const actualBottom = scrollHeight;
-                  const isAtBottom = actualBottom - currentBottom < 10; // Increased tolerance
-
-                  if (isAtBottom || attempts >= maxAttempts) {
-                    clearInterval(scrollToBottomIntervalRef.current!);
-                    scrollToBottomIntervalRef.current = null;
-                  } else {
-                    // Set flag before scrolling
-                    isProgrammaticScrollRef.current = true;
-                    container.scrollTop = container.scrollHeight;
-
-                    // Reset flag after a short delay
-                    setTimeout(() => {
-                      isProgrammaticScrollRef.current = false;
-                    }, 50);
-                  }
-                }, 100);
-
-                // Cleanup
-                return () => {
-                  if (scrollToBottomIntervalRef.current) {
-                    clearInterval(scrollToBottomIntervalRef.current);
-                    scrollToBottomIntervalRef.current = null;
-                  }
-                };
-              }, [totalCount, stickToBottom, range.startIndex, range.endIndex]);
-
-              // Handle user scroll
+              // Handle scroll events
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
                 const handleScroll = () => {
-                  // Ignore programmatic scrolls
-                  if (isProgrammaticScrollRef.current) {
-                    return;
-                  }
-
-                  // This is a real user scroll
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
-                  const isAtBottom = distanceFromBottom < 50; // Increased tolerance
 
-                  // Stop any auto-scrolling if user scrolls
-                  if (scrollToBottomIntervalRef.current) {
-                    clearInterval(scrollToBottomIntervalRef.current);
-                    scrollToBottomIntervalRef.current = null;
-                  }
+                  // Track if we're at bottom (with tolerance)
+                  wasAtBottomRef.current = distanceFromBottom < 100;
 
-                  // Only update this for real user scrolls
-                  shouldStickToBottomRef.current = isAtBottom;
-
-                  // Update visible range
+                  // Update visible range based on scroll position
                   let startIndex = 0;
                   for (let i = 0; i < positions.length; i++) {
                     if (positions[i]! > scrollTop - itemHeight * overscan) {
@@ -2004,42 +1988,53 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-                handleScroll(); // Initial calculation
+
+                // Initial setup
+                if (stickToBottom && totalCount > 0) {
+                  // For initial load, jump to bottom
+                  container.scrollTop = container.scrollHeight;
+                }
+                handleScroll();
 
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                 };
-              }, [positions, totalCount, itemHeight, overscan]);
+              }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
 
-              const scrollToBottom = useCallback(
-                (behavior: ScrollBehavior = "auto") => {
-                  shouldStickToBottomRef.current = true;
-                  isProgrammaticScrollRef.current = true;
-                  if (containerRef.current) {
-                    containerRef.current.scrollTop =
-                      containerRef.current.scrollHeight;
-                  }
-                  setTimeout(() => {
-                    isProgrammaticScrollRef.current = false;
-                  }, 100);
-                },
-                []
-              );
+              const scrollToBottom = useCallback(() => {
+                wasAtBottomRef.current = true;
+                const scrolled = scrollToLastItem();
+                if (!scrolled && containerRef.current) {
+                  containerRef.current.scrollTop =
+                    containerRef.current.scrollHeight;
+                }
+              }, [scrollToLastItem]);
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
-                  isProgrammaticScrollRef.current = true;
+                  const shadowArray =
+                    getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, path) || [];
+                  const itemData = shadowArray[index];
+
+                  if (itemData?.virtualizer?.domRef) {
+                    const element = itemData.virtualizer.domRef;
+                    if (element && element.scrollIntoView) {
+                      element.scrollIntoView({ behavior, block: "center" });
+                      return;
+                    }
+                  }
+
+                  // Fallback to position-based scrolling
                   if (containerRef.current && positions[index] !== undefined) {
                     containerRef.current.scrollTo({
                       top: positions[index],
                       behavior,
                     });
                   }
-                  setTimeout(() => {
-                    isProgrammaticScrollRef.current = false;
-                  }, 100);
                 },
-                [positions]
+                [positions, stateKey, path]
               );
 
               const virtualizerProps = {
@@ -2066,128 +2061,6 @@ function createProxyHandler<T>(
                 scrollToBottom,
                 scrollToIndex,
               };
-            };
-          }
-          if (prop === "stateSort") {
-            return (
-              compareFn: (
-                a: InferArrayElement<T>,
-                b: InferArrayElement<T>
-              ) => number
-            ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const sortedResult = [...sourceWithIndices].sort((a, b) =>
-                compareFn(a.item, b.item)
-              );
-              const newCurrentState = sortedResult.map(({ item }) => item);
-              // We construct the meta object with the CORRECT property name: `validIndices`.
-              const newMeta = {
-                ...meta,
-                validIndices: sortedResult.map(
-                  ({ originalIndex }) => originalIndex
-                ),
-              };
-              return rebuildStateShape(newCurrentState as any, path, newMeta);
-            };
-          }
-
-          if (prop === "stateFilter") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                index: number
-              ) => boolean
-            ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const filteredResult = sourceWithIndices.filter(
-                ({ item }, index) => callbackfn(item, index)
-              );
-              const newCurrentState = filteredResult.map(({ item }) => item);
-              // We construct the meta object with the CORRECT property name: `validIndices`.
-              const newMeta = {
-                ...meta,
-                validIndices: filteredResult.map(
-                  ({ originalIndex }) => originalIndex
-                ),
-              };
-              return rebuildStateShape(newCurrentState as any, path, newMeta);
-            };
-          }
-
-          if (prop === "stateMap") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
-                info: {
-                  register: () => void;
-                  index: number;
-                  originalIndex: number;
-                }
-              ) => any
-            ) => {
-              const arrayToMap = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-
-              // Defensive check to make sure we are mapping over an array
-              if (!Array.isArray(arrayToMap)) {
-                console.warn(
-                  `stateMap called on a non-array value at path: ${path.join(".")}. The current value is:`,
-                  arrayToMap
-                );
-                return null;
-              }
-
-              // If we have validIndices, only map those items
-              const indicesToMap =
-                meta?.validIndices ||
-                Array.from({ length: arrayToMap.length }, (_, i) => i);
-
-              return indicesToMap.map((originalIndex, localIndex) => {
-                const item = arrayToMap[originalIndex];
-                const finalPath = [...path, originalIndex.toString()];
-                const setter = rebuildStateShape(item, finalPath, meta);
-
-                // Create the register function right here. It closes over the necessary variables.
-                const register = () => {
-                  const [, forceUpdate] = useState({});
-                  const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
-
-                  useLayoutEffect(() => {
-                    const fullComponentId = `${stateKey}////${itemComponentId}`;
-                    const stateEntry = getGlobalStore
-                      .getState()
-                      .stateComponents.get(stateKey) || {
-                      components: new Map(),
-                    };
-
-                    stateEntry.components.set(fullComponentId, {
-                      forceUpdate: () => forceUpdate({}),
-                      paths: new Set([finalPath.join(".")]),
-                    });
-
-                    getGlobalStore
-                      .getState()
-                      .stateComponents.set(stateKey, stateEntry);
-
-                    return () => {
-                      const currentEntry = getGlobalStore
-                        .getState()
-                        .stateComponents.get(stateKey);
-                      if (currentEntry) {
-                        currentEntry.components.delete(fullComponentId);
-                      }
-                    };
-                  }, [stateKey, itemComponentId]);
-                };
-
-                return callbackfn(item, setter, {
-                  register,
-                  index: localIndex,
-                  originalIndex,
-                });
-              });
             };
           }
           if (prop === "stateMapNoRender") {
@@ -3031,6 +2904,8 @@ export function $cogsSignalStore(proxy: {
   );
   return createElement("text", {}, String(value));
 }
+
+// Modified CogsItemWrapper that stores the DOM ref
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
@@ -3045,9 +2920,20 @@ function CogsItemWrapper({
   // This hook handles the re-rendering when the item's own data changes.
   const [, forceUpdate] = useState({});
   // This hook measures the element.
-  const [ref, bounds] = useMeasure();
+  const [measureRef, bounds] = useMeasure();
+  // Store the actual DOM element
+  const elementRef = useRef<HTMLDivElement | null>(null);
   // This ref prevents sending the same height update repeatedly.
   const lastReportedHeight = useRef<number | null>(null);
+
+  // Combine both refs
+  const setRefs = useCallback(
+    (element: HTMLDivElement | null) => {
+      measureRef(element);
+      elementRef.current = element;
+    },
+    [measureRef]
+  );
 
   // This is the primary effect for this component.
   useEffect(() => {
@@ -3057,14 +2943,15 @@ function CogsItemWrapper({
       // Store the new height so we don't report it again.
       lastReportedHeight.current = bounds.height;
 
-      // Call the store function to save the height and notify listeners.
+      // Call the store function to save the height AND the ref
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
         virtualizer: {
           itemHeight: bounds.height,
+          domRef: elementRef.current, // Store the actual DOM element reference
         },
       });
     }
-  }, [bounds.height, stateKey, itemPath]); // Reruns whenever the measured height changes.
+  }, [bounds.height, stateKey, itemPath]); // Removed ref.current as dependency
 
   // This effect handles subscribing the item to its own data path for updates.
   useLayoutEffect(() => {
@@ -3093,5 +2980,5 @@ function CogsItemWrapper({
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 
   // The rendered output is a simple div that gets measured.
-  return <div ref={ref}>{children}</div>;
+  return <div ref={setRefs}>{children}</div>;
 }
