@@ -1956,7 +1956,7 @@ function createProxyHandler<T>(
                     userHasScrolledAwayRef.current = true;
                   }
 
-                  // If user scrolls back to bottom, clear flag
+                  // If user scrolls back to bottom, cle
                   if (distanceFromBottom < 5) {
                     userHasScrolledAwayRef.current = false;
                   }
