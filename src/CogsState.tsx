@@ -1976,7 +1976,11 @@ function createProxyHandler<T>(
                     endIndex: totalCount,
                   });
 
+                  let attemptCount = 0;
+                  const maxAttempts = 50;
+
                   intervalId = setInterval(() => {
+                    attemptCount++;
                     const lastItemIndex = totalCount - 1;
                     const shadowArray =
                       getGlobalStore
@@ -1984,21 +1988,24 @@ function createProxyHandler<T>(
                         .getShadowMetadata(stateKey, path) || [];
                     const lastItemHeight =
                       shadowArray[lastItemIndex]?.virtualizer?.itemHeight || 0;
+
                     console.log(
-                      "ACTION (GETTING_HEIGHTS): lastItemHeight =",
-                      lastItemHeight,
-                      " index =",
-                      lastItemIndex
+                      `ACTION (GETTING_HEIGHTS): attempt ${attemptCount}, lastItemHeight =`,
+                      lastItemHeight
                     );
+
                     if (lastItemHeight > 0) {
                       clearInterval(intervalId);
-                      if (!shouldNotScroll.current) {
-                        console.log(
-                          "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
-                        );
-
-                        setStatus("SCROLLING_TO_BOTTOM");
-                      }
+                      console.log(
+                        "ACTION (GETTING_HEIGHTS): Measurement success -> SCROLLING_TO_BOTTOM"
+                      );
+                      setStatus("SCROLLING_TO_BOTTOM");
+                    } else if (attemptCount >= maxAttempts) {
+                      clearInterval(intervalId);
+                      console.log(
+                        "ACTION (GETTING_HEIGHTS): Timeout - proceeding anyway"
+                      );
+                      setStatus("SCROLLING_TO_BOTTOM");
                     }
                   }, 100);
                 } else if (status === "SCROLLING_TO_BOTTOM") {
