@@ -681,7 +681,7 @@ function St(t, c, S, g) {
                   if (!Z) return;
                   L++;
                   const { scrollTop: ht, scrollHeight: ot, clientHeight: ut } = Z, vt = ht + ut;
-                  ot - vt < 50 || L >= Y ? (clearInterval(P.current), P.current = null) : (k.current = !0, Z.scrollTop = Z.scrollHeight, setTimeout(() => {
+                  ot - vt < 10 || L >= Y ? (clearInterval(P.current), P.current = null) : (k.current = !0, Z.scrollTop = Z.scrollHeight, setTimeout(() => {
                     k.current = !1;
                   }, 50));
                 }, 100), () => {

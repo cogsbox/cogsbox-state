@@ -1925,7 +1925,7 @@ function createProxyHandler<T>(
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const currentBottom = scrollTop + clientHeight;
                   const actualBottom = scrollHeight;
-                  const isAtBottom = actualBottom - currentBottom < 50; // Increased tolerance
+                  const isAtBottom = actualBottom - currentBottom < 10; // Increased tolerance
 
                   if (isAtBottom || attempts >= maxAttempts) {
                     clearInterval(scrollToBottomIntervalRef.current!);
