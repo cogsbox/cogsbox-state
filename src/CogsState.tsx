@@ -1822,8 +1822,9 @@ function createProxyHandler<T>(
               });
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
               const wasAtBottomRef = useRef(true);
-              const previousCountRef = useRef(0);
               const userHasScrolledAwayRef = useRef(false);
+              const previousCountRef = useRef(0);
+
               // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -1909,8 +1910,12 @@ function createProxyHandler<T>(
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
 
-                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
-                  // Only update range and scroll if we're at bottom
+                // Only auto-scroll if user hasn't scrolled away
+                if (
+                  (hasNewItems || isInitialLoad) &&
+                  wasAtBottomRef.current &&
+                  !userHasScrolledAwayRef.current
+                ) {
                   const visibleCount = Math.ceil(
                     (containerRef.current?.clientHeight || 0) / itemHeight
                   );
@@ -1930,10 +1935,12 @@ function createProxyHandler<T>(
                         containerRef.current.scrollHeight;
                     }
                   }, 50);
+
+                  return () => clearTimeout(timeoutId);
                 }
 
                 previousCountRef.current = totalCount;
-              }, [totalCount]);
+              }, [totalCount, itemHeight, overscan]);
 
               // Handle scroll events
               useEffect(() => {
@@ -1945,17 +1952,16 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
 
-                  // Track if user is at bottom with tight tolerance
-                  const isAtBottom = distanceFromBottom < 5;
-                  wasAtBottomRef.current = isAtBottom;
+                  // Track if we're at bottom
+                  wasAtBottomRef.current = distanceFromBottom < 5;
 
-                  // If user scrolls away from bottom, set the flag
-                  if (!isAtBottom && distanceFromBottom > 50) {
+                  // If user scrolls away from bottom past threshold, set flag
+                  if (distanceFromBottom > 100) {
                     userHasScrolledAwayRef.current = true;
                   }
 
-                  // If user scrolls back to bottom, clear the flag
-                  if (isAtBottom) {
+                  // If user scrolls back to bottom, clear flag
+                  if (distanceFromBottom < 5) {
                     userHasScrolledAwayRef.current = false;
                   }
 
@@ -1982,15 +1988,25 @@ function createProxyHandler<T>(
                     endIndex: Math.min(totalCount, endIndex + 1 + overscan),
                   });
                 };
+
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
 
-                // Initial setup
-                if (stickToBottom && totalCount > 0) {
-                  // For initial load, jump to bottom
-                  container.scrollTop = container.scrollHeight;
+                // Only auto-scroll on initial load when user hasn't scrolled away
+                if (
+                  stickToBottom &&
+                  totalCount > 0 &&
+                  !userHasScrolledAwayRef.current
+                ) {
+                  const { scrollTop } = container;
+                  // Only if we're at the very top (initial load)
+                  if (scrollTop === 0) {
+                    container.scrollTop = container.scrollHeight;
+                    wasAtBottomRef.current = true;
+                  }
                 }
+
                 handleScroll();
 
                 return () => {
@@ -2000,6 +2016,7 @@ function createProxyHandler<T>(
 
               const scrollToBottom = useCallback(() => {
                 wasAtBottomRef.current = true;
+                userHasScrolledAwayRef.current = false;
                 const scrolled = scrollToLastItem();
                 if (!scrolled && containerRef.current) {
                   containerRef.current.scrollTop =
