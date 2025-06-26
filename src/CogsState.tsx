@@ -1821,7 +1821,7 @@ function createProxyHandler<T>(
                 endIndex: 10,
               });
               const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const wasAtBottomRef = useRef(false);
+              const wasAtBottomRef = useRef(true);
               const previousCountRef = useRef(0);
 
               // Subscribe to shadow state updates
@@ -1832,7 +1832,7 @@ function createProxyHandler<T>(
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
                 return unsubscribe;
-              }, []); // Empty deps - stateKey never changes
+              }, [stateKey]);
 
               const sourceArray = getGlobalStore().getNestedState(
                 stateKey,
@@ -1854,7 +1854,13 @@ function createProxyHandler<T>(
                   height += measuredHeight || itemHeight;
                 }
                 return { totalHeight: height, positions: pos };
-              }, [totalCount, itemHeight, shadowUpdateTrigger]);
+              }, [
+                totalCount,
+                stateKey,
+                path.join("."),
+                itemHeight,
+                shadowUpdateTrigger,
+              ]);
 
               // Create virtual state
               const virtualState = useMemo(() => {
@@ -1869,43 +1875,72 @@ function createProxyHandler<T>(
                   ...meta,
                   validIndices,
                 });
-              }, [range.startIndex, range.endIndex, sourceArray]);
+              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+
+              // Helper to scroll to last item using stored ref
+              const scrollToLastItem = useCallback(() => {
+                const shadowArray =
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                  [];
+                const lastIndex = totalCount - 1;
+
+                if (lastIndex >= 0) {
+                  const lastItemData = shadowArray[lastIndex];
+                  if (lastItemData?.virtualizer?.domRef) {
+                    const element = lastItemData.virtualizer.domRef;
+                    if (element && element.scrollIntoView) {
+                      element.scrollIntoView({
+                        behavior: "auto",
+                        block: "end",
+                        inline: "nearest",
+                      });
+                      return true;
+                    }
+                  }
+                }
+                return false;
+              }, [stateKey, path, totalCount]);
 
               // Handle new items when at bottom
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
 
                 const hasNewItems = totalCount > previousCountRef.current;
+                const isInitialLoad =
+                  previousCountRef.current === 0 && totalCount > 0;
 
-                // Only scroll if we were at bottom AND new items arrived
-                if (
-                  hasNewItems &&
-                  wasAtBottomRef.current &&
-                  previousCountRef.current > 0
-                ) {
-                  const container = containerRef.current;
-                  if (!container) return;
-
-                  // Update range to show end
+                if ((hasNewItems || isInitialLoad) && wasAtBottomRef.current) {
+                  // First, ensure the last items are in range
                   const visibleCount = Math.ceil(
-                    container.clientHeight / itemHeight
+                    containerRef.current?.clientHeight || 0 / itemHeight
                   );
-                  setRange({
+                  const newRange = {
                     startIndex: Math.max(
                       0,
                       totalCount - visibleCount - overscan
                     ),
                     endIndex: totalCount,
-                  });
+                  };
 
-                  // Scroll to bottom after render
-                  setTimeout(() => {
-                    container.scrollTop = container.scrollHeight;
+                  setRange(newRange);
+
+                  // Then scroll to the last item after it renders
+                  const timeoutId = setTimeout(() => {
+                    const scrolled = scrollToLastItem();
+                    if (!scrolled && containerRef.current) {
+                      // Fallback if ref not available yet
+                      containerRef.current.scrollTop =
+                        containerRef.current.scrollHeight;
+                    }
                   }, 50);
+
+                  previousCountRef.current = totalCount;
+
+                  return () => clearTimeout(timeoutId);
                 }
 
                 previousCountRef.current = totalCount;
-              }, [totalCount]); // ONLY totalCount - nothing else matters
+              }, [totalCount]);
 
               // Handle scroll events
               useEffect(() => {
@@ -1914,42 +1949,78 @@ function createProxyHandler<T>(
 
                 const handleScroll = () => {
                   const { scrollTop, scrollHeight, clientHeight } = container;
+                  const distanceFromBottom =
+                    scrollHeight - scrollTop - clientHeight;
 
-                  // Check if at bottom
-                  wasAtBottomRef.current =
-                    scrollHeight - scrollTop - clientHeight < 100;
+                  // Track if we're at bottom (with tolerance)
+                  wasAtBottomRef.current = distanceFromBottom < 100;
 
-                  // Calculate visible range
-                  const firstVisible = Math.floor(scrollTop / itemHeight);
-                  const lastVisible = Math.ceil(
-                    (scrollTop + clientHeight) / itemHeight
-                  );
+                  // Update visible range based on scroll position
+                  let startIndex = 0;
+                  for (let i = 0; i < positions.length; i++) {
+                    if (positions[i]! > scrollTop - itemHeight * overscan) {
+                      startIndex = Math.max(0, i - 1);
+                      break;
+                    }
+                  }
+
+                  let endIndex = startIndex;
+                  const viewportEnd = scrollTop + clientHeight;
+                  for (let i = startIndex; i < positions.length; i++) {
+                    if (positions[i]! > viewportEnd + itemHeight * overscan) {
+                      break;
+                    }
+                    endIndex = i;
+                  }
 
                   setRange({
-                    startIndex: Math.max(0, firstVisible - overscan),
-                    endIndex: Math.min(totalCount, lastVisible + overscan),
+                    startIndex: Math.max(0, startIndex),
+                    endIndex: Math.min(totalCount, endIndex + 1 + overscan),
                   });
                 };
 
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+
+                // Initial setup
+                if (stickToBottom && totalCount > 0) {
+                  // For initial load, jump to bottom
+                  container.scrollTop = container.scrollHeight;
+                }
                 handleScroll();
 
-                return () =>
+                return () => {
                   container.removeEventListener("scroll", handleScroll);
-              }, [positions]); // Only re-attach when positions change
+                };
+              }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(() => {
-                if (containerRef.current) {
+                wasAtBottomRef.current = true;
+                const scrolled = scrollToLastItem();
+                if (!scrolled && containerRef.current) {
                   containerRef.current.scrollTop =
                     containerRef.current.scrollHeight;
-                  wasAtBottomRef.current = true;
                 }
-              }, []);
+              }, [scrollToLastItem]);
 
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
+                  const shadowArray =
+                    getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, path) || [];
+                  const itemData = shadowArray[index];
+
+                  if (itemData?.virtualizer?.domRef) {
+                    const element = itemData.virtualizer.domRef;
+                    if (element && element.scrollIntoView) {
+                      element.scrollIntoView({ behavior, block: "center" });
+                      return;
+                    }
+                  }
+
+                  // Fallback to position-based scrolling
                   if (containerRef.current && positions[index] !== undefined) {
                     containerRef.current.scrollTo({
                       top: positions[index],
@@ -1957,7 +2028,7 @@ function createProxyHandler<T>(
                     });
                   }
                 },
-                [positions]
+                [positions, stateKey, path]
               );
 
               const virtualizerProps = {
