@@ -17,11 +17,12 @@ interface FormControlComponentProps<TStateObject> {
     stateKey: string;
 }
 export declare const FormControlComponent: <TStateObject>({ setState, path, child, formOpts, stateKey, }: FormControlComponentProps<TStateObject>) => import("react/jsx-runtime").JSX.Element;
-export declare function ValidationWrapper({ formOpts, path, stateKey, children, validIndices, }: {
+export type ValidationWrapperProps = {
     formOpts?: FormOptsType;
     path: string[];
-    stateKey?: string;
+    stateKey: string;
     children: React.ReactNode;
     validIndices?: number[];
-}): import("react/jsx-runtime").JSX.Element;
+};
+export declare function ValidationWrapper({ formOpts, path, stateKey, children, validIndices, }: ValidationWrapperProps): import("react/jsx-runtime").JSX.Element;
 export {};

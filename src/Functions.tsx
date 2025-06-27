@@ -344,6 +344,13 @@ export const FormControlComponent = <TStateObject,>({
     </>
   );
 };
+export type ValidationWrapperProps = {
+  formOpts?: FormOptsType;
+  path: string[];
+  stateKey: string;
+  children: React.ReactNode;
+  validIndices?: number[];
+};
 export function ValidationWrapper({
   formOpts,
   path,
@@ -351,14 +358,7 @@ export function ValidationWrapper({
   stateKey,
   children,
   validIndices,
-}: {
-  formOpts?: FormOptsType;
-  path: string[];
-
-  stateKey?: string;
-  children: React.ReactNode;
-  validIndices?: number[];
-}) {
+}: ValidationWrapperProps) {
   const { getInitialOptions } = getGlobalStore.getState();
   const thisStateOpts = getInitialOptions(stateKey!);
   const validationKey = thisStateOpts?.validation?.key ?? stateKey!;

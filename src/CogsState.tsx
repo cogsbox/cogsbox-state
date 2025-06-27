@@ -236,6 +236,7 @@ export type FormOptsType = {
     props?: GenericObject;
     disable?: boolean;
   };
+
   debounceTime?: number;
 };
 
@@ -3019,9 +3020,5 @@ function CogsItemWrapper({
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 
   // The rendered output is a simple div that gets measured.
-  return (
-    <ValidationWrapper {...{ formOpts, path: itemPath, stateKey }}>
-      {children}
-    </ValidationWrapper>
-  );
+  return <div ref={setRefs}>{children}</div>;
 }
