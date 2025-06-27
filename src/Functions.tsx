@@ -338,7 +338,7 @@ export const FormControlComponent = <TStateObject,>({
 
   return (
     <>
-      <ValidationWrapper {...{ formOpts, path, validationKey, stateKey }}>
+      <ValidationWrapper {...{ formOpts, path, stateKey }}>
         {childElement}
       </ValidationWrapper>
     </>
@@ -347,20 +347,21 @@ export const FormControlComponent = <TStateObject,>({
 export function ValidationWrapper({
   formOpts,
   path,
-  validationKey,
+
   stateKey,
   children,
   validIndices,
 }: {
   formOpts?: FormOptsType;
   path: string[];
-  validationKey: string;
+
   stateKey?: string;
   children: React.ReactNode;
   validIndices?: number[];
 }) {
   const { getInitialOptions } = getGlobalStore.getState();
-
+  const thisStateOpts = getInitialOptions(stateKey!);
+  const validationKey = thisStateOpts?.validation?.key ?? stateKey!;
   const validationErrors = useGetValidationErrors(
     validationKey,
     path,
@@ -381,7 +382,6 @@ export function ValidationWrapper({
       thesMessages.push(newMessage);
     }
   }
-  const thisStateOpts = getInitialOptions(stateKey!);
 
   return (
     <>
@@ -398,8 +398,6 @@ export function ValidationWrapper({
               ? formOpts?.validation?.message
               : thesMessages.map((m) => m).join(", "),
           path: path,
-
-          ...(formOpts?.key && { key: formOpts?.key }),
         })
       ) : (
         <React.Fragment key={path.toString()}>{children}</React.Fragment>

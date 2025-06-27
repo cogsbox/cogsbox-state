@@ -101,7 +101,6 @@ export type ArrayEndType<TShape extends unknown> = {
     last: () => StateObject<InferArrayElement<TShape>> | undefined;
 } & EndType<TShape>;
 export type FormOptsType = {
-    key?: string;
     validation?: {
         hideMessage?: boolean;
         message?: string;
@@ -109,9 +108,7 @@ export type FormOptsType = {
         props?: GenericObject;
         disable?: boolean;
     };
-    formElements?: boolean;
     debounceTime?: number;
-    stateServerDifferences?: string[][];
 };
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);

@@ -229,7 +229,6 @@ export type ArrayEndType<TShape extends unknown> = {
 } & EndType<TShape>;
 
 export type FormOptsType = {
-  key?: string;
   validation?: {
     hideMessage?: boolean;
     message?: string;
@@ -237,9 +236,7 @@ export type FormOptsType = {
     props?: GenericObject;
     disable?: boolean;
   };
-  formElements?: boolean;
   debounceTime?: number;
-  stateServerDifferences?: string[][];
 };
 
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
@@ -2169,7 +2166,8 @@ function createProxyHandler<T>(
                 index: { localIndex: number; originalIndex: number },
                 array: T,
                 arraySetter: StateObject<T>
-              ) => any
+              ) => any,
+              formOpts?: FormOptsType
             ) => {
               const arrayToMap = getGlobalStore
                 .getState()
@@ -2196,6 +2194,7 @@ function createProxyHandler<T>(
                   key: originalIndex,
                   stateKey,
                   itemComponentId,
+                  formOpts,
                   itemPath: finalPath,
                   children: callbackfn(
                     item,
@@ -2732,10 +2731,6 @@ function createProxyHandler<T>(
                 hideMessage ? { validation: { message: "" } } : undefined
               }
               path={path}
-              validationKey={
-                getGlobalStore.getState().getInitialOptions(stateKey)
-                  ?.validation?.key || ""
-              }
               stateKey={stateKey}
               validIndices={meta?.validIndices}
             >
@@ -2952,11 +2947,13 @@ function CogsItemWrapper({
   stateKey,
   itemComponentId,
   itemPath,
+  formOpts,
   children,
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
+  formOpts?: FormOptsType;
   children: React.ReactNode;
 }) {
   // This hook handles the re-rendering when the item's own data changes.
@@ -3022,5 +3019,9 @@ function CogsItemWrapper({
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 
   // The rendered output is a simple div that gets measured.
-  return <div ref={setRefs}>{children}</div>;
+  return (
+    <ValidationWrapper {...{ formOpts, path: itemPath, stateKey }}>
+      {children}
+    </ValidationWrapper>
+  );
 }
