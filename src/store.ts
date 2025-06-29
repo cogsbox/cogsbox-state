@@ -86,39 +86,50 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
   },
 }));
 
-type ShadowMetadata = {
-  virtualisedState?: { listItemHeight: number };
-  syncInfo?: { status: string };
-  // Add other metadata fields you need
+export type ItemMeta = {
+  _cogsId: string;
+  virtualizer?: {
+    itemHeight?: number;
+    domRef?: HTMLDivElement | null;
+  };
+  syncStatus?: "new" | "syncing" | "synced" | "failed";
+  error?: string;
 };
 
-type ShadowState<T> =
-  T extends Array<infer U>
-    ? Array<ShadowState<U>> & ShadowMetadata
-    : T extends object
-      ? { [K in keyof T]: ShadowState<T[K]> } & ShadowMetadata
-      : ShadowMetadata;
+// THE NEW, CORRECT, RECURSIVE TYPE FOR THE SHADOW STATE
+// A ShadowNode is either:
+// 1. An array of ItemMeta (if it represents a user's array).
+// 2. An object that can be indexed by any string, whose values are other ShadowNodes.
+export type ShadowNode = ItemMeta[] | { [key: string]: ShadowNode };
+
+// This is the top-level type for the store, mapping state keys to our ShadowNode structure.
+export type ShadowStateStore = {
+  [key: string]: ShadowNode;
+};
 
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
-  shadowStateStore: { [key: string]: any };
-  shadowStateSubscribers: Map<string, Set<() => void>>; // Stores subscribers for shadow state updates
-  subscribeToShadowState: (key: string, callback: () => void) => () => void; // Subscribes a listener, returns an unsubscribe function
-  initializeShadowState: (key: string, initialState: any) => void;
-  updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+  shadowStateStore: ShadowStateStore;
+  shadowStateSubscribers: Map<string, Set<() => void>>;
+  subscribeToShadowState: (key: string, callback: () => void) => () => void;
+  initializeShadowState: <T>(key: string, initialState: T) => void;
+  updateShadowAtPath: <T>(key: string, path: string[], newValue: T) => void;
   insertShadowArrayElement: (
     key: string,
     arrayPath: string[],
-    newItem: any
+    newItemMeta: ItemMeta
   ) => void;
   removeShadowArrayElement: (
     key: string,
     arrayPath: string[],
     index: number
   ) => void;
-  getShadowMetadata: (key: string, path: string[]) => any;
-  setShadowMetadata: (key: string, path: string[], metadata: any) => void;
-
+  getShadowMetadata: (key: string, path: string[]) => ShadowNode | null;
+  setShadowMetadata: (
+    key: string,
+    path: string[],
+    metadata: Partial<ItemMeta>
+  ) => void;
   // --- Selected Item State ---
   selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
   getSelectedIndex: (
@@ -247,7 +258,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const shadow = get().shadowStateStore[key];
     if (!shadow) return null;
 
-    let current = shadow;
+    let current: any = shadow;
     for (const segment of path) {
       current = current?.[segment];
       if (!current) return null;
@@ -286,7 +297,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       const newShadow = { ...state.shadowStateStore };
       if (!newShadow[key]) return state;
 
-      let current = newShadow[key];
+      let current: any = newShadow[key];
       const pathCopy = [...path];
       const lastSegment = pathCopy.pop();
 
@@ -358,7 +369,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   ) => {
     set((state) => {
       const newShadow = { ...state.shadowStateStore };
-      let current = newShadow[key];
+      let current: any = newShadow[key];
 
       for (const segment of arrayPath) {
         current = current?.[segment];

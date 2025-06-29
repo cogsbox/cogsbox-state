@@ -1,5 +1,5 @@
 "use client";
-
+import { ulid } from "ulid";
 import {
   createElement,
   startTransition,
@@ -34,7 +34,12 @@ import superjson from "superjson";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
-import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
+import {
+  formRefStore,
+  getGlobalStore,
+  type ComponentsType,
+  type ItemMeta,
+} from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
 import useMeasure from "react-use-measure";
@@ -1266,14 +1271,21 @@ export function useCogsStateFn<TStateObject extends unknown>(
           break;
 
         case "insert":
-          // For array insert, add empty element to shadow array
-
+          // For array insert, create a new metadata object with a ULID.
           const parentPath = path.slice(0, -1);
-          store.insertShadowArrayElement(thisKey, parentPath, newValue);
+
+          // THE CHANGE IS HERE: Instead of `newValue`, we insert our metadata object.
+          // The `newValue` from your code is the new item itself, which might have an `id` or `key`.
+          const newId = newValue.id ?? newValue.key ?? ulid();
+          const newMeta = { _cogsId: newId };
+
+          store.insertShadowArrayElement(thisKey, parentPath, newMeta);
           break;
 
         case "cut":
-          // For array cut, remove element from shadow a
+          // For array cut, remove element from shadow
+          // THIS PART DOES NOT NEED TO CHANGE. It correctly removes the item
+          // at the specified index from both the data and shadow arrays.
           const arrayPath = path.slice(0, -1);
           const index = parseInt(path[path.length - 1]!);
           store.removeShadowArrayElement(thisKey, arrayPath, index);
@@ -1841,9 +1853,12 @@ function createProxyHandler<T>(
 
               // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
-                const shadowArray =
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                  [];
+                const rawShadowData = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
+                  ? rawShadowData
+                  : [];
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
@@ -1878,9 +1893,12 @@ function createProxyHandler<T>(
 
               // Helper to scroll to last item using stored ref
               const scrollToLastItem = useCallback(() => {
-                const shadowArray =
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                  [];
+                const rawShadowData = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
+                  ? rawShadowData
+                  : [];
                 const lastIndex = totalCount - 1;
 
                 if (lastIndex >= 0) {
@@ -2053,10 +2071,12 @@ function createProxyHandler<T>(
 
                   // --- Standard Case: All Other Items ---
                   // For all other items, we find the ref and use scrollIntoView.
-                  const shadowArray =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, path) || [];
+                  const rawShadowData = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, path);
+                  const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
+                    ? rawShadowData
+                    : [];
                   const itemData = shadowArray[index];
                   const element = itemData?.virtualizer?.domRef;
 
