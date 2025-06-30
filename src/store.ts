@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { ulid } from "ulid";
 import type {
   OptionsType,
   ReactivityType,
@@ -86,51 +87,42 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
   },
 }));
 
-export type ItemMeta = {
-  _cogsId: string;
+export type ShadowMetadata = {
+  id: string;
+  arrayKeys?: string[];
   virtualizer?: {
     itemHeight?: number;
-    domRef?: HTMLDivElement | null;
+    domRef?: HTMLElement | null;
   };
-  syncStatus?: "new" | "syncing" | "synced" | "failed";
-  error?: string;
+  syncInfo?: { status: string };
+  lastUpdated?: number;
 };
-
-// THE NEW, CORRECT, RECURSIVE TYPE FOR THE SHADOW STATE
-// A ShadowNode is either:
-// 1. An array of ItemMeta (if it represents a user's array).
-// 2. An object that can be indexed by any string, whose values are other ShadowNodes.
-export type ShadowNode = ItemMeta[] | { [key: string]: ShadowNode };
-
-// This is the top-level type for the store, mapping state keys to our ShadowNode structure.
-export type ShadowStateStore = {
-  [key: string]: ShadowNode;
-};
-
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
-  shadowStateStore: ShadowStateStore;
-  shadowStateSubscribers: Map<string, Set<() => void>>;
-  subscribeToShadowState: (key: string, callback: () => void) => () => void;
-  initializeShadowState: <T>(key: string, initialState: T) => void;
-  updateShadowAtPath: <T>(key: string, path: string[], newValue: T) => void;
+  shadowStateStore: Map<string, ShadowMetadata>;
+
+  // These method signatures stay the same
+  initializeShadowState: (key: string, initialState: any) => void;
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
   insertShadowArrayElement: (
     key: string,
     arrayPath: string[],
-    newItemMeta: ItemMeta
+    newItem: any
   ) => void;
-  removeShadowArrayElement: (
+  removeShadowArrayElement: (key: string, arrayPath: string[]) => void;
+  getShadowMetadata: (
     key: string,
-    arrayPath: string[],
-    index: number
-  ) => void;
-  getShadowMetadata: (key: string, path: string[]) => ShadowNode | null;
+    path: string[]
+  ) => ShadowMetadata | undefined;
   setShadowMetadata: (
     key: string,
     path: string[],
-    metadata: Partial<ItemMeta>
+    metadata: Omit<ShadowMetadata, "id">
   ) => void;
-  // --- Selected Item State ---
+
+  shadowStateSubscribers: Map<string, Set<() => void>>; // Stores subscribers for shadow state updates
+  subscribeToShadowState: (key: string, callback: () => void) => () => void;
+
   selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
   getSelectedIndex: (
     stateKey: string,
@@ -253,136 +245,8 @@ export type CogsGlobalState = {
 };
 
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
-  shadowStateStore: {},
-  getShadowMetadata: (key: string, path: string[]) => {
-    const shadow = get().shadowStateStore[key];
-    if (!shadow) return null;
-
-    let current: any = shadow;
-    for (const segment of path) {
-      current = current?.[segment];
-      if (!current) return null;
-    }
-
-    return current;
-  },
-
-  initializeShadowState: (key: string, initialState: any) => {
-    const createShadowStructure = (obj: any): any => {
-      if (Array.isArray(obj)) {
-        return new Array(obj.length)
-          .fill(null)
-          .map((_, i) => createShadowStructure(obj[i]));
-      }
-      if (typeof obj === "object" && obj !== null) {
-        const shadow: any = {};
-        for (const k in obj) {
-          shadow[k] = createShadowStructure(obj[k]);
-        }
-        return shadow;
-      }
-      return {}; // Leaf node - empty object for metadata
-    };
-
-    set((state) => ({
-      shadowStateStore: {
-        ...state.shadowStateStore,
-        [key]: createShadowStructure(initialState),
-      },
-    }));
-  },
-
-  updateShadowAtPath: (key: string, path: string[], newValue: any) => {
-    set((state) => {
-      const newShadow = { ...state.shadowStateStore };
-      if (!newShadow[key]) return state;
-
-      let current: any = newShadow[key];
-      const pathCopy = [...path];
-      const lastSegment = pathCopy.pop();
-
-      // Navigate to parent
-      for (const segment of pathCopy) {
-        if (!current[segment]) current[segment] = {};
-        current = current[segment];
-      }
-
-      // Update shadow structure to match new value structure
-      if (lastSegment !== undefined) {
-        if (Array.isArray(newValue)) {
-          current[lastSegment] = new Array(newValue.length);
-        } else if (typeof newValue === "object" && newValue !== null) {
-          current[lastSegment] = {};
-        } else {
-          current[lastSegment] = current[lastSegment] || {};
-        }
-      }
-
-      return { shadowStateStore: newShadow };
-    });
-  },
-
-  insertShadowArrayElement: (
-    key: string,
-    arrayPath: string[],
-    newItem: any
-  ) => {
-    set((state) => {
-      const newShadow = { ...state.shadowStateStore };
-      if (!newShadow[key]) return state;
-
-      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
-
-      let current: any = newShadow[key];
-
-      for (const segment of arrayPath) {
-        current = current[segment];
-        if (!current) return state;
-      }
-
-      if (Array.isArray(current)) {
-        // Create shadow structure based on the actual new item
-        const createShadowStructure = (obj: any): any => {
-          if (Array.isArray(obj)) {
-            return obj.map((item) => createShadowStructure(item));
-          }
-          if (typeof obj === "object" && obj !== null) {
-            const shadow: any = {};
-            for (const k in obj) {
-              shadow[k] = createShadowStructure(obj[k]);
-            }
-            return shadow;
-          }
-          return {}; // Leaf nodes get empty object for metadata
-        };
-
-        current.push(createShadowStructure(newItem));
-      }
-
-      return { shadowStateStore: newShadow };
-    });
-  },
-  removeShadowArrayElement: (
-    key: string,
-    arrayPath: string[],
-    index: number
-  ) => {
-    set((state) => {
-      const newShadow = { ...state.shadowStateStore };
-      let current: any = newShadow[key];
-
-      for (const segment of arrayPath) {
-        current = current?.[segment];
-      }
-
-      if (Array.isArray(current)) {
-        current.splice(index, 1);
-      }
-
-      return { shadowStateStore: newShadow };
-    });
-  },
-  shadowStateSubscribers: new Map<string, Set<() => void>>(), // key -> Set of callbacks
+  shadowStateStore: new Map(),
+  shadowStateSubscribers: new Map(),
 
   subscribeToShadowState: (key: string, callback: () => void) => {
     set((state) => {
@@ -392,53 +256,152 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       newSubs.set(key, subsForKey);
       return { shadowStateSubscribers: newSubs };
     });
-    // Return an unsubscribe function
+
+    // Return unsubscribe function
     return () => {
       set((state) => {
         const newSubs = new Map(state.shadowStateSubscribers);
         const subsForKey = newSubs.get(key);
         if (subsForKey) {
           subsForKey.delete(callback);
+          if (subsForKey.size === 0) {
+            newSubs.delete(key);
+          }
         }
         return { shadowStateSubscribers: newSubs };
       });
     };
   },
+  initializeShadowState: (key: string, initialState: any) => {
+    const newShadowStore = new Map<string, ShadowMetadata>();
+
+    const processValue = (value: any, path: string[]) => {
+      const nodeKey = [key, ...path].join(".");
+
+      if (Array.isArray(value)) {
+        const childIds: string[] = [];
+
+        value.forEach((item) => {
+          if (typeof item === "object" && item !== null && !item.id) {
+            item.id = ulid();
+          }
+
+          const itemId = `id:${item.id}`;
+          childIds.push(itemId);
+
+          const itemPath = [...path, itemId];
+          processValue(item, itemPath);
+        });
+
+        const arrayContainerMetadata: ShadowMetadata = {
+          id: ulid(),
+          arrayKeys: childIds,
+        };
+        newShadowStore.set(nodeKey, arrayContainerMetadata);
+      } else if (typeof value === "object" && value !== null) {
+        newShadowStore.set(nodeKey, { id: ulid() });
+
+        Object.keys(value).forEach((k) => {
+          processValue(value[k], [...path, k]);
+        });
+      } else {
+        newShadowStore.set(nodeKey, { id: ulid() });
+      }
+    };
+
+    processValue(initialState, []);
+
+    set({ shadowStateStore: newShadowStore });
+  },
+  getShadowMetadata: (key: string, path: string[]) => {
+    const fullKey = [key, ...path].join(".");
+    return get().shadowStateStore.get(fullKey);
+  },
 
   setShadowMetadata: (key: string, path: string[], metadata: any) => {
-    let hasChanged = false;
-    set((state) => {
-      const newShadow = { ...state.shadowStateStore };
-      if (!newShadow[key]) return state;
+    const fullKey = [key, ...path].join(".");
+    const newShadowStore = new Map(get().shadowStateStore);
+    const existing = newShadowStore.get(fullKey) || { id: ulid() };
+    newShadowStore.set(fullKey, { ...existing, ...metadata });
+    set({ shadowStateStore: newShadowStore });
 
-      newShadow[key] = JSON.parse(JSON.stringify(newShadow[key]));
-
-      let current: any = newShadow[key];
-      for (const segment of path) {
-        if (!current[segment]) current[segment] = {};
-        current = current[segment];
-      }
-
-      const oldHeight = current.virtualizer?.itemHeight;
-      const newHeight = metadata.virtualizer?.itemHeight;
-
-      if (newHeight && oldHeight !== newHeight) {
-        hasChanged = true;
-        if (!current.virtualizer) current.virtualizer = {};
-        current.virtualizer.itemHeight = newHeight;
-      }
-
-      return { shadowStateStore: newShadow };
-    });
-
-    // If a height value was actually changed, notify the specific subscribers.
-    if (hasChanged) {
+    if (metadata.virtualizer?.itemHeight) {
       const subscribers = get().shadowStateSubscribers.get(key);
-      if (subscribers) {
-        subscribers.forEach((callback) => callback());
-      }
+      subscribers?.forEach((cb) => cb());
     }
   },
+
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any
+  ) => {
+    const newShadowStore = new Map(get().shadowStateStore);
+    const arrayKey = [key, ...arrayPath].join(".");
+    const parentMeta = newShadowStore.get(arrayKey);
+    const newArrayState = get().getNestedState(key, arrayPath) as any[];
+
+    if (!parentMeta || !parentMeta.arrayKeys) return;
+
+    const newItemId = `id:${newItem.id}`;
+    const newIndex = newArrayState.findIndex((item) => item.id === newItem.id);
+
+    if (newIndex === -1) return;
+
+    const newArrayKeys = [...parentMeta.arrayKeys];
+    newArrayKeys.splice(newIndex, 0, newItemId);
+    newShadowStore.set(arrayKey, { ...parentMeta, arrayKeys: newArrayKeys });
+
+    const processNewItem = (value: any, path: string[]) => {
+      const nodeKey = [key, ...path].join(".");
+      if (typeof value === "object" && value !== null) {
+        newShadowStore.set(nodeKey, { id: ulid() });
+        Object.keys(value).forEach((k) => {
+          processNewItem(value[k], [...path, k]);
+        });
+      } else {
+        newShadowStore.set(nodeKey, { id: ulid() });
+      }
+    };
+
+    processNewItem(newItem, [...arrayPath, newItemId]);
+
+    set({ shadowStateStore: newShadowStore });
+  },
+
+  removeShadowArrayElement: (key: string, itemPath: string[]) => {
+    const newShadowStore = new Map(get().shadowStateStore);
+    const itemKey = [key, ...itemPath].join(".");
+    const itemIdToRemove = itemPath[itemPath.length - 1];
+
+    const parentPath = itemPath.slice(0, -1);
+    const parentKey = [key, ...parentPath].join(".");
+    const parentMeta = newShadowStore.get(parentKey);
+
+    if (parentMeta && parentMeta.arrayKeys) {
+      const newArrayKeys = parentMeta.arrayKeys.filter(
+        (id) => id !== itemIdToRemove
+      );
+      newShadowStore.set(parentKey, { ...parentMeta, arrayKeys: newArrayKeys });
+    }
+
+    const prefixToDelete = itemKey + ".";
+    for (const k of Array.from(newShadowStore.keys())) {
+      if (k === itemKey || k.startsWith(prefixToDelete)) {
+        newShadowStore.delete(k);
+      }
+    }
+
+    set({ shadowStateStore: newShadowStore });
+  },
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => {
+    const fullKey = [key, ...path].join(".");
+    const newShadowStore = new Map(get().shadowStateStore);
+    const existing = newShadowStore.get(fullKey) || { id: ulid() };
+    newShadowStore.set(fullKey, { ...existing, lastUpdated: Date.now() });
+    set({ shadowStateStore: newShadowStore });
+  },
+
   selectedIndicesMap: new Map<string, Map<string, number>>(),
 
   // Add the new methods
@@ -745,41 +708,44 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   getNestedState: (key: string, path: string[]) => {
     const rootState = get().cogsStateStore[key];
 
-    const getValueWithAsterisk = (obj: any, pathArray: string[]): any => {
-      if (pathArray.length === 0) return obj;
+    const resolvePath = (obj: any, pathArray: string[]): any => {
+      if (pathArray.length === 0 || obj === undefined) {
+        return obj;
+      }
 
-      const currentPath = pathArray[0];
+      const currentSegment = pathArray[0];
       const remainingPath = pathArray.slice(1);
 
-      if (currentPath === "[*]") {
+      // FIX: Handle ID-based array access like 'id:xyz'
+      if (
+        Array.isArray(obj) &&
+        typeof currentSegment === "string" &&
+        currentSegment.startsWith("id:")
+      ) {
+        const targetId = currentSegment.split(":")[1];
+        const foundItem = obj.find(
+          (item) => item && String(item.id) === targetId
+        );
+        return resolvePath(foundItem, remainingPath);
+      }
+
+      // Handle wildcard array access: '[*]'
+      if (currentSegment === "[*]") {
         if (!Array.isArray(obj)) {
           console.warn("Asterisk notation used on non-array value");
           return undefined;
         }
-
         if (remainingPath.length === 0) return obj;
-
-        // Get result for each array item
-        const results = obj.map((item) =>
-          getValueWithAsterisk(item, remainingPath)
-        );
-
-        // If the next path segment exists and returns arrays, flatten them
-        if (Array.isArray(results[0])) {
-          return results.flat();
-        }
-
-        return results;
+        const results = obj.map((item) => resolvePath(item, remainingPath));
+        return Array.isArray(results[0]) ? results.flat() : results;
       }
 
-      const value = obj[currentPath as keyof typeof obj];
-      if (value === undefined) return undefined;
-
-      return getValueWithAsterisk(value, remainingPath);
+      // Handle standard object property access and numeric array indices
+      const nextObj = obj[currentSegment as keyof typeof obj];
+      return resolvePath(nextObj, remainingPath);
     };
 
-    // This will still get the value but we need to make it reactive only to specific paths
-    return getValueWithAsterisk(rootState, path);
+    return resolvePath(rootState, path);
   },
   setInitialStateOptions: (key, value) => {
     set((prev) => ({

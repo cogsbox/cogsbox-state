@@ -324,7 +324,7 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-export declare const createCogsState: <State extends Record<string, unknown>>(initialState: State, opt?: {
+export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType;
     validation?: ValidationOptionsType;
 }) => {

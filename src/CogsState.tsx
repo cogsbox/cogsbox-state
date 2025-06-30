@@ -1,5 +1,5 @@
 "use client";
-import { ulid } from "ulid";
+
 import {
   createElement,
   startTransition,
@@ -34,15 +34,11 @@ import superjson from "superjson";
 import { v4 as uuidv4 } from "uuid";
 import { z } from "zod";
 
-import {
-  formRefStore,
-  getGlobalStore,
-  type ComponentsType,
-  type ItemMeta,
-} from "./store.js";
+import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
 import useMeasure from "react-use-measure";
+import { ulid } from "ulid";
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -568,7 +564,7 @@ export function addStateOptions<T extends unknown>(
   return { initialState: initialState, formElements, validation } as T;
 }
 
-export const createCogsState = <State extends Record<string, unknown>>(
+export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
 ) => {
@@ -1096,7 +1092,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
 
-      console.log("shadowState", store.shadowStateStore);
       if (
         updateObj.updateType === "update" &&
         (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
@@ -1123,22 +1118,20 @@ export function useCogsStateFn<TStateObject extends unknown>(
         updateObj.updateType === "insert" &&
         latestInitialOptionsRef.current?.validation?.key
       ) {
-        let getValidation = getValidationErrors(
+        const getValidation = getValidationErrors(
           latestInitialOptionsRef.current?.validation?.key +
             "." +
             arrayWithoutIndex.join(".")
         );
 
-        //TODO this is untested its supposed to cahnge teh validation errors alreaady stored when a new entry is push
-
-        getValidation.filter(([k, v]) => {
+        getValidation.filter((k) => {
           let length = k?.split(".").length;
+          const v = ""; // Placeholder as `v` is not used from getValidationErrors
 
           if (
             k == arrayWithoutIndex.join(".") &&
             length == arrayWithoutIndex.length - 1
           ) {
-            //   console.log(length, pathWithoutIndex.length);
             let newKey = k + "." + arrayWithoutIndex;
             removeValidationError(k!);
             addValidationError(newKey, v!);
@@ -1147,7 +1140,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       const stateEntry = store.stateComponents.get(thisKey);
-      console.log("stateEntry >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>", stateEntry);
       if (stateEntry) {
         const changedPaths = getDifferences(prevValue, payload);
         const changedPathsSet = new Set(changedPaths);
@@ -1164,7 +1156,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
-          console.log("component", component);
+
           if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
@@ -1238,17 +1230,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       const timeStamp = Date.now();
 
-      path = path.map((p, i) => {
-        const arrayPath = path.slice(0, -1);
-        const arrayValue = getNestedValue(payload, arrayPath);
-
-        return i === path.length - 1 &&
-          ["insert", "cut"].includes(updateObj.updateType)
-          ? (arrayValue.length - 1).toString()
-          : p;
-      });
-
-      const { oldValue, newValue } = getUpdateValues(
+      let { oldValue, newValue } = getUpdateValues(
         updateObj.updateType,
         prevValue,
         payload,
@@ -1265,56 +1247,59 @@ export function useCogsStateFn<TStateObject extends unknown>(
       } satisfies UpdateTypeDetail;
 
       switch (updateObj.updateType) {
-        case "update":
-          // For updates, just mirror the structure at the path
-          store.updateShadowAtPath(thisKey, path, payload);
-          break;
-
-        case "insert":
-          // For array insert, create a new metadata object with a ULID.
+        case "insert": {
           const parentPath = path.slice(0, -1);
+          const idSegment = path[path.length - 1]!; // e.g., 'id:xyz'
+          const targetId = idSegment.split(":")[1];
+          const newArray = getNestedValue(payload, parentPath);
 
-          // THE CHANGE IS HERE: Instead of `newValue`, we insert our metadata object.
-          // The `newValue` from your code is the new item itself, which might have an `id` or `key`.
-          const newId = newValue.id ?? newValue.key ?? ulid();
-          const newMeta = { _cogsId: newId };
+          newValue = newArray.find((item: any) => item.id == targetId);
+          oldValue = null;
 
-          store.insertShadowArrayElement(thisKey, parentPath, newMeta);
+          store.insertShadowArrayElement(thisKey, parentPath, newValue);
           break;
+        }
 
-        case "cut":
-          // For array cut, remove element from shadow
-          // THIS PART DOES NOT NEED TO CHANGE. It correctly removes the item
-          // at the specified index from both the data and shadow arrays.
-          const arrayPath = path.slice(0, -1);
-          const index = parseInt(path[path.length - 1]!);
-          store.removeShadowArrayElement(thisKey, arrayPath, index);
+        case "cut": {
+          oldValue = getNestedValue(prevValue, path);
+          newValue = null;
+
+          store.removeShadowArrayElement(thisKey, path);
           break;
+        }
+
+        case "update": {
+          oldValue = getNestedValue(prevValue, path);
+          newValue = getNestedValue(payload, path);
+
+          const shadowPath = path.map((p, i) => {
+            const currentSubPath = path.slice(0, i + 1);
+            const subValue = getNestedValue(payload, currentSubPath);
+            return subValue?.id ? `id:${subValue.id}` : p;
+          });
+          store.updateShadowAtPath(thisKey, shadowPath, newValue);
+          break;
+        }
       }
 
       setStateLog(thisKey, (prevLogs) => {
         const logs = [...(prevLogs ?? []), newUpdate];
+        const aggregatedLogs = new Map<string, typeof newUpdate>();
 
-        // Aggregate the updates by stateKey and path
-        const aggregatedLogs = logs.reduce((acc, log) => {
+        logs.forEach((log) => {
           const uniqueKey = `${log.stateKey}:${JSON.stringify(log.path)}`;
-          const existing = acc.get(uniqueKey);
+          const existing = aggregatedLogs.get(uniqueKey);
 
           if (existing) {
-            // Update the existing entry with the most recent details
             existing.timeStamp = Math.max(existing.timeStamp, log.timeStamp);
-            existing.newValue = log.newValue; // Overwrite with the latest value
-            existing.oldValue = existing.oldValue ?? log.oldValue; // Retain the initial oldValue
-            existing.updateType = log.updateType; // Update to the most recent type
+            existing.newValue = log.newValue;
+            existing.oldValue = existing.oldValue ?? log.oldValue;
+            existing.updateType = log.updateType;
           } else {
-            // Add the log if no existing match is found
-            acc.set(uniqueKey, { ...(log as any) });
+            aggregatedLogs.set(uniqueKey, { ...(log as any) });
           }
+        });
 
-          return acc;
-        }, new Map<string, typeof newUpdate>());
-
-        // Convert the aggregated map back to an array
         return Array.from(aggregatedLogs.values());
       });
 
@@ -1367,7 +1352,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }
 
   const updaterFinal = useMemo(() => {
-    // Create proxy with baseObject as target
     return createProxyHandler<TStateObject>(
       thisKey,
       effectiveSetState,
@@ -1388,7 +1372,6 @@ function createProxyHandler<T>(
   componentId: string,
   sessionId?: string
 ): StateObject<T> {
-  // ADDED: Enhanced cache with versioning
   type CacheEntry = {
     proxy: any;
     stateVersion: number;
@@ -1396,7 +1379,6 @@ function createProxyHandler<T>(
   const shapeCache = new Map<string, CacheEntry>();
   let stateVersion = 0;
 
-  // ADDED: Cache invalidation helper
   const invalidateCachePath = (path: string[]) => {
     const pathKey = path.join(".");
     for (const [key] of shapeCache) {
@@ -1428,9 +1410,8 @@ function createProxyHandler<T>(
 
       const initialState =
         getGlobalStore.getState().initialStateGlobal[stateKey];
-
+      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
       getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
-      // ADDED: Clear cache on revert
       shapeCache.clear();
       stateVersion++;
 
@@ -1460,7 +1441,6 @@ function createProxyHandler<T>(
       return initialState;
     },
     updateInitialState: (newState: T) => {
-      // ADDED: Clear cache on initial state update
       shapeCache.clear();
       stateVersion++;
 
@@ -1513,14 +1493,20 @@ function createProxyHandler<T>(
     },
   };
 
+  function getOrderedIds(arrayPath: string[]): string[] | null {
+    const arrayKey = [stateKey, ...arrayPath].join(".");
+    const arrayMeta = getGlobalStore.getState().shadowStateStore.get(arrayKey);
+    return arrayMeta?.arrayKeys || null;
+  }
+
   function rebuildStateShape(
     currentState: T,
     path: string[] = [],
-    meta?: { filtered?: string[][]; validIndices?: number[] }
+    meta?: {
+      validIds?: string[];
+    }
   ): any {
     const cacheKey = path.map(String).join(".");
-
-    // MODIFIED: Cache check with version
     const cachedEntry = shapeCache.get(cacheKey);
 
     type CallableStateObject<T> = {
@@ -1533,24 +1519,16 @@ function createProxyHandler<T>(
       return getGlobalStore().getNestedState(stateKey, path);
     } as unknown as CallableStateObject<T>;
 
-    // Copy properties from baseObj to the function with type assertion
     Object.keys(baseObj).forEach((key) => {
       (baseFunction as any)[key] = (baseObj as any)[key];
     });
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
-        console.log(
-          `PROXY APPLY TRAP HIT: stateKey=${stateKey}, path=${path.join(".")}`
-        ); // <--- ADD LOGGING
-        console.trace("Apply trap stack trace");
         return getGlobalStore().getNestedState(stateKey, path);
       },
 
       get(target: any, prop: string) {
-        if (meta?.validIndices && !Array.isArray(currentState)) {
-          meta = { ...meta, validIndices: undefined };
-        }
         const mutationMethods = new Set([
           "insert",
           "cut",
@@ -1582,51 +1560,40 @@ function createProxyHandler<T>(
           !mutationMethods.has(prop)
         ) {
           const fullComponentId = `${stateKey}////${componentId}`;
-          //  console.log("adding path", fullComponentId, path, prop);
           const stateEntry = getGlobalStore
             .getState()
             .stateComponents.get(stateKey);
 
           if (stateEntry) {
             const component = stateEntry.components.get(fullComponentId);
-
-            if (component) {
-              // Mark as initialized immediately to prevent re-processing
-
-              // Now do the path tracking logic ONCE
-              if (!component.paths.has("")) {
-                const currentPath = path.join(".");
-                let needsAdd = true;
-                for (const existingPath of component.paths) {
-                  if (
-                    currentPath.startsWith(existingPath) &&
-                    (currentPath === existingPath ||
-                      currentPath[existingPath.length] === ".")
-                  ) {
-                    needsAdd = false;
-                    break;
-                  }
+            if (component && !component.paths.has("")) {
+              const currentPath = path.join(".");
+              let needsAdd = true;
+              for (const existingPath of component.paths) {
+                if (
+                  currentPath.startsWith(existingPath) &&
+                  (currentPath === existingPath ||
+                    currentPath[existingPath.length] === ".")
+                ) {
+                  needsAdd = false;
+                  break;
                 }
-
-                if (needsAdd) {
-                  component.paths.add(currentPath);
-                }
+              }
+              if (needsAdd) {
+                component.paths.add(currentPath);
               }
             }
           }
         }
         if (prop === "getDifferences") {
-          return () => {
-            const differences = getDifferences(
+          return () =>
+            getDifferences(
               getGlobalStore.getState().cogsStateStore[stateKey],
               getGlobalStore.getState().initialStateGlobal[stateKey]
             );
-            return differences;
-          };
         }
         if (prop === "sync" && path.length === 0) {
           return async function () {
-            // Get the options for this state key
             const options = getGlobalStore
               .getState()
               .getInitialOptions(stateKey);
@@ -1637,100 +1604,64 @@ function createProxyHandler<T>(
               return { success: false, error: `No mutation defined` };
             }
 
-            // Get the root state
             const state = getGlobalStore
               .getState()
               .getNestedState(stateKey, []);
-
-            // Get validation key
             const validationKey = options?.validation?.key;
 
             try {
-              // Execute the mutation action
               const response = await sync.action(state);
-
-              // Handle validation errors
               if (
                 response &&
                 !response.success &&
                 response.errors &&
                 validationKey
               ) {
-                // Clear existing errors
                 getGlobalStore.getState().removeValidationError(validationKey);
-
-                // Add new validation errors
                 response.errors.forEach((error) => {
                   const errorPath = [validationKey, ...error.path].join(".");
-
                   getGlobalStore
                     .getState()
                     .addValidationError(errorPath, error.message);
                 });
-
-                // Notify components to update
-                const stateEntry = getGlobalStore
-                  .getState()
-                  .stateComponents.get(stateKey);
-                if (stateEntry) {
-                  stateEntry.components.forEach((component) => {
-                    component.forceUpdate();
-                  });
-                }
+                notifyComponents(stateKey);
               }
 
-              // Call success/error callbacks
-              if (response?.success && sync.onSuccess) {
+              if (response?.success && sync.onSuccess)
                 sync.onSuccess(response.data);
-              } else if (!response?.success && sync.onError) {
+              else if (!response?.success && sync.onError)
                 sync.onError(response.error);
-              }
 
               return response;
             } catch (error) {
-              if (sync.onError) {
-                sync.onError(error);
-              }
+              if (sync.onError) sync.onError(error);
               return { success: false, error };
             }
           };
         }
         if (prop === "_status") {
-          // Get current state at this path (non-reactive version)
           const thisReactiveState = getGlobalStore
             .getState()
             .getNestedState(stateKey, path);
-
-          // Get initial state at this path
           const initialState =
             getGlobalStore.getState().initialStateGlobal[stateKey];
           const initialStateAtPath = getNestedValue(initialState, path);
-
-          // Simply compare current state with initial state
-          if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
-            return "fresh"; // Matches initial state
-          } else {
-            return "stale"; // Different from initial state
-          }
+          return isDeepEqual(thisReactiveState, initialStateAtPath)
+            ? "fresh"
+            : "stale";
         }
         if (prop === "getStatus") {
           return function () {
-            // Get current state at this path (reactive version)
             const thisReactiveState = getGlobalStore().getNestedState(
               stateKey,
               path
             );
-
-            // Get initial state at this path
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
             const initialStateAtPath = getNestedValue(initialState, path);
-            // Simply compare current state with initial state
-            if (isDeepEqual(thisReactiveState, initialStateAtPath)) {
-              return "fresh"; // Matches initial state
-            } else {
-              return "stale"; // Different from initial state
-            }
+            return isDeepEqual(thisReactiveState, initialStateAtPath)
+              ? "fresh"
+              : "stale";
           };
         }
         if (prop === "removeStorage") {
@@ -1739,14 +1670,10 @@ function createProxyHandler<T>(
               getGlobalStore.getState().initialStateGlobal[stateKey];
             const initalOptionsGet = getInitialOptions(stateKey as string);
             const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-              ? initalOptionsGet?.localStorage?.key(initialState)
+              ? initalOptionsGet.localStorage.key(initialState)
               : initalOptionsGet?.localStorage?.key;
-
             const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
-            if (storageKey) {
-              localStorage.removeItem(storageKey);
-            }
+            if (storageKey) localStorage.removeItem(storageKey);
           };
         }
         if (prop === "showValidationErrors") {
@@ -1754,49 +1681,30 @@ function createProxyHandler<T>(
             const init = getGlobalStore
               .getState()
               .getInitialOptions(stateKey)?.validation;
-
-            if (!init?.key) {
-              throw new Error("Validation key not found");
-            }
-            const errors = getGlobalStore
+            if (!init?.key) throw new Error("Validation key not found");
+            return getGlobalStore
               .getState()
               .getValidationErrors(init.key + "." + path.join("."));
-
-            return errors;
           };
         }
         if (Array.isArray(currentState)) {
-          const getSourceArrayAndIndices = (): {
-            item: any;
-            originalIndex: number;
-          }[] => {
-            // If meta exists, we're in a chain. Use the currentState and map it to its original index.
-            if (meta?.validIndices) {
-              return (currentState as any[]).map((item, index) => ({
-                item,
-                originalIndex: meta!.validIndices![index]!,
-              }));
-            }
-            // Otherwise, this is the first operation. Use the full array from the global store.
-            const sourceArray = getGlobalStore
-              .getState()
-              .getNestedState(stateKey, path) as any[];
-            return sourceArray.map((item, index) => ({
-              item,
-              originalIndex: index,
-            }));
-          };
           if (prop === "getSelected") {
             return () => {
               const selectedIndex = getGlobalStore
                 .getState()
                 .getSelectedIndex(stateKey, path.join("."));
               if (selectedIndex === undefined) return undefined;
-              return rebuildStateShape(
-                currentState[selectedIndex],
-                [...path, selectedIndex.toString()],
-                meta
-              );
+
+              const sourceArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+              if (!sourceArray || selectedIndex >= sourceArray.length)
+                return undefined;
+
+              const selectedItem = sourceArray[selectedIndex];
+              const itemId = `id:${selectedItem.id}`;
+
+              return rebuildStateShape(selectedItem, [...path, itemId], meta);
             };
           }
           if (prop === "clearSelected") {
@@ -1806,14 +1714,23 @@ function createProxyHandler<T>(
           }
           if (prop === "getSelectedIndex") {
             return () => {
-              const selectedIndex = getGlobalStore
+              const globallySelectedIndex = getGlobalStore
                 .getState()
                 .getSelectedIndex(stateKey, path.join("."));
+              if (globallySelectedIndex === undefined) return -1;
 
-              return selectedIndex ?? -1;
+              if (meta?.validIds) {
+                const sourceIds = getOrderedIds(path) || [];
+                const selectedItemId = sourceIds[globallySelectedIndex];
+                if (!selectedItemId) return -1;
+                const localIndex = meta.validIds.indexOf(selectedItemId);
+                return localIndex;
+              }
+
+              return globallySelectedIndex;
             };
           }
-          // Complete fixed useVirtualView implementation
+          // Replace the entire 'if (prop === "useVirtualView")' block with this
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1835,7 +1752,9 @@ function createProxyHandler<T>(
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
               const lastRangeRef = useRef(range);
-              // Subscribe to shadow state updates
+              const orderedIds = getOrderedIds(path);
+
+              // Subscribe to shadow state updates for dynamic height changes
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1851,21 +1770,23 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights and positions
+              // Calculate total height and individual item positions
               const { totalHeight, positions } = useMemo(() => {
-                const rawShadowData = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
-                  ? rawShadowData
-                  : [];
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  const measuredHeight =
-                    shadowArray[i]?.virtualizer?.itemHeight;
-                  height += measuredHeight || itemHeight;
+                  const itemId = orderedIds?.[i];
+                  if (itemId) {
+                    const itemPath = [...path, itemId];
+                    const itemMeta = getGlobalStore
+                      .getState()
+                      .getShadowMetadata(stateKey, itemPath);
+                    const measuredHeight = itemMeta?.virtualizer?.itemHeight;
+                    height += measuredHeight || itemHeight;
+                  } else {
+                    height += itemHeight;
+                  }
                 }
                 return { totalHeight: height, positions: pos };
               }, [
@@ -1874,87 +1795,65 @@ function createProxyHandler<T>(
                 path.join("."),
                 itemHeight,
                 shadowUpdateTrigger,
+                orderedIds,
               ]);
 
-              // Create virtual state
+              // Create the virtual state object
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
-                const validIndices = Array.from(
-                  { length: end - start },
-                  (_, i) => start + i
-                );
-                const slicedArray = validIndices.map((idx) => sourceArray[idx]);
+                // The sliced array is the `currentState` for the new proxy
+                const slicedArray = sourceArray.slice(start, end);
+                // The `validIds` for the new proxy are the sliced IDs
+                const slicedIds = orderedIds?.slice(start, end);
+
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
-                  validIndices,
+                  validIds: slicedIds,
                 });
-              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+              }, [
+                range.startIndex,
+                range.endIndex,
+                sourceArray,
+                totalCount,
+                orderedIds,
+              ]);
 
-              // Helper to scroll to last item using stored ref
               const scrollToLastItem = useCallback(() => {
-                const rawShadowData = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
-                  ? rawShadowData
-                  : [];
                 const lastIndex = totalCount - 1;
-
-                if (lastIndex >= 0) {
-                  const lastItemData = shadowArray[lastIndex];
-                  if (lastItemData?.virtualizer?.domRef) {
-                    const element = lastItemData.virtualizer.domRef;
-                    if (element && element.scrollIntoView) {
+                if (lastIndex >= 0 && orderedIds?.[lastIndex]) {
+                  const lastItemId = orderedIds[lastIndex];
+                  const lastItemPath = [...path, lastItemId];
+                  const lastItemMeta = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, lastItemPath);
+                  if (lastItemMeta?.virtualizer?.domRef) {
+                    const element = lastItemMeta.virtualizer.domRef;
+                    if (element?.scrollIntoView) {
                       element.scrollIntoView({
                         behavior: "auto",
                         block: "end",
-                        inline: "nearest",
                       });
                       return true;
                     }
                   }
                 }
                 return false;
-              }, [stateKey, path, totalCount]);
+              }, [stateKey, path, totalCount, orderedIds]);
 
-              // Handle new items when at bottom
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
-
                 const hasNewItems = totalCount > previousCountRef.current;
-                const isInitialLoad =
-                  previousCountRef.current === 0 && totalCount > 0;
-
-                // Only auto-scroll if user hasn't scrolled away
                 if (
-                  (hasNewItems || isInitialLoad) &&
+                  hasNewItems &&
                   wasAtBottomRef.current &&
                   !userHasScrolledAwayRef.current
                 ) {
-                  const visibleCount = Math.ceil(
-                    (containerRef.current?.clientHeight || 0) / itemHeight
-                  );
-                  const newRange = {
-                    startIndex: Math.max(
-                      0,
-                      totalCount - visibleCount - overscan
-                    ),
-                    endIndex: totalCount,
-                  };
-
-                  setRange(newRange);
-
-                  const timeoutId = setTimeout(() => {
-                    scrollToIndex(totalCount - 1, "smooth");
-                  }, 50);
-                  return () => clearTimeout(timeoutId);
+                  setTimeout(() => scrollToIndex(totalCount - 1, "smooth"), 50);
                 }
-
                 previousCountRef.current = totalCount;
-              }, [totalCount, itemHeight, overscan]);
+              }, [totalCount, stickToBottom]);
 
-              // Handle scroll events
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1963,21 +1862,12 @@ function createProxyHandler<T>(
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
-
-                  // Track if we're at bottom
                   wasAtBottomRef.current = distanceFromBottom < 5;
-
-                  // If user scrolls away from bottom past threshold, set flag
-                  if (distanceFromBottom > 100) {
+                  if (distanceFromBottom > 100)
                     userHasScrolledAwayRef.current = true;
-                  }
-
-                  // If user scrolls back to bottom, cle
-                  if (distanceFromBottom < 5) {
+                  if (distanceFromBottom < 5)
                     userHasScrolledAwayRef.current = false;
-                  }
 
-                  // Update visible range based on scroll position
                   let startIndex = 0;
                   for (let i = 0; i < positions.length; i++) {
                     if (positions[i]! > scrollTop - itemHeight * overscan) {
@@ -1985,7 +1875,6 @@ function createProxyHandler<T>(
                       break;
                     }
                   }
-
                   let endIndex = startIndex;
                   const viewportEnd = scrollTop + clientHeight;
                   for (let i = startIndex; i < positions.length; i++) {
@@ -1994,14 +1883,12 @@ function createProxyHandler<T>(
                     }
                     endIndex = i;
                   }
-
                   const newStartIndex = Math.max(0, startIndex);
                   const newEndIndex = Math.min(
                     totalCount,
                     endIndex + 1 + overscan
                   );
 
-                  // THE FIX: Only update state if the visible range of items has changed.
                   if (
                     newStartIndex !== lastRangeRef.current.startIndex ||
                     newEndIndex !== lastRangeRef.current.endIndex
@@ -2020,81 +1907,30 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
-
-                // Only auto-scroll on initial load when user hasn't scrolled away
-                if (
-                  stickToBottom &&
-                  totalCount > 0 &&
-                  !userHasScrolledAwayRef.current
-                ) {
-                  const { scrollTop } = container;
-                  // Only if we're at the very top (initial load)
-                  if (scrollTop === 0) {
-                    container.scrollTop = container.scrollHeight;
-                    wasAtBottomRef.current = true;
-                  }
-                }
-
-                handleScroll();
-
-                return () => {
+                handleScroll(); // Initial check
+                return () =>
                   container.removeEventListener("scroll", handleScroll);
-                };
               }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(() => {
                 wasAtBottomRef.current = true;
                 userHasScrolledAwayRef.current = false;
-                const scrolled = scrollToLastItem();
-                if (!scrolled && containerRef.current) {
+                if (!scrollToLastItem() && containerRef.current) {
                   containerRef.current.scrollTop =
                     containerRef.current.scrollHeight;
                 }
               }, [scrollToLastItem]);
+
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   const container = containerRef.current;
                   if (!container) return;
-
-                  const isLastItem = index === totalCount - 1;
-
-                  // --- Special Case: The Last Item ---
-                  if (isLastItem) {
-                    // For the last item, scrollIntoView can fail. The most reliable method
-                    // is to scroll the parent container to its maximum scroll height.
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: behavior,
-                    });
-                    return; // We're done.
-                  }
-
-                  // --- Standard Case: All Other Items ---
-                  // For all other items, we find the ref and use scrollIntoView.
-                  const rawShadowData = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, path);
-                  const shadowArray: ItemMeta[] = Array.isArray(rawShadowData)
-                    ? rawShadowData
-                    : [];
-                  const itemData = shadowArray[index];
-                  const element = itemData?.virtualizer?.domRef;
-
-                  if (element) {
-                    // 'center' gives a better user experience for items in the middle of the list.
-                    element.scrollIntoView({
-                      behavior: behavior,
-                      block: "center",
-                    });
-                  } else if (positions[index] !== undefined) {
-                    // Fallback if the ref isn't available for some reason.
-                    container.scrollTo({
-                      top: positions[index],
-                      behavior,
-                    });
+                  const top = positions[index];
+                  if (top !== undefined) {
+                    container.scrollTo({ top, behavior });
                   }
                 },
-                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
+                [positions]
               );
 
               const virtualizerProps = {
@@ -2123,106 +1959,112 @@ function createProxyHandler<T>(
               };
             };
           }
+          if (prop === "stateMap") {
+            return (
+              callbackfn: (
+                value: any,
+                setter: any,
+                index: number,
+                array: any,
+                arraySetter: any
+              ) => void
+            ) => {
+              const arrayToMap = currentState as any[];
+              const itemIdsForCurrentArray =
+                meta?.validIds || getOrderedIds(path) || [];
+              const arraySetter = rebuildStateShape(currentState, path, meta);
+
+              return arrayToMap.map((item, index) => {
+                const itemId = itemIdsForCurrentArray[index] || `id:${item.id}`;
+                const itemPath = [...path, itemId];
+                const itemSetter = rebuildStateShape(item, itemPath, meta);
+                return callbackfn(
+                  item,
+                  itemSetter,
+                  index,
+                  currentState,
+                  arraySetter
+                );
+              });
+            };
+          }
           if (prop === "stateMapNoRender") {
             return (
               callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
+                value: any,
+                setter: any,
                 index: number,
-                array: T,
-                arraySetter: StateObject<T>
-              ) => any
+                array: any,
+                arraySetter: any
+              ) => void
             ) => {
               const arrayToMap = currentState as any[];
-              return arrayToMap.map((item, index) => {
-                let originalIndex: number;
-                // We READ from the meta object using the CORRECT property name: `validIndices`.
-                if (
-                  meta?.validIndices &&
-                  meta.validIndices[index] !== undefined
-                ) {
-                  originalIndex = meta.validIndices[index]!;
-                } else {
-                  originalIndex = index;
-                }
-                const finalPath = [...path, originalIndex.toString()];
+              const itemIdsForCurrentArray =
+                meta?.validIds || getOrderedIds(path) || [];
+              const arraySetter = rebuildStateShape(currentState, path, meta);
 
-                const setter = rebuildStateShape(item, finalPath, meta); // Pass meta through
+              return arrayToMap.map((item, index) => {
+                const itemId = itemIdsForCurrentArray[index] || `id:${item.id}`;
+                const finalPath = [...path, itemId];
+                const setter = rebuildStateShape(item, finalPath, meta);
                 return callbackfn(
                   item,
                   setter,
                   index,
-                  currentState as any,
-                  rebuildStateShape(currentState as any, path, meta)
+                  currentState,
+                  arraySetter
                 );
               });
             };
           }
           if (prop === "$stateMap") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
-                index: number,
-                array: T,
-                arraySetter: StateObject<T>
-              ) => void
-            ) => {
-              return createElement(SignalMapRenderer, {
-                proxy: {
-                  _stateKey: stateKey,
-                  _path: path,
-                  _mapFn: callbackfn as any, // Pass the actual function, not string
-                },
-
+            return (callbackfn: any) =>
+              createElement(SignalMapRenderer, {
+                proxy: { _stateKey: stateKey, _path: path, _mapFn: callbackfn },
                 rebuildStateShape,
               });
-            };
           }
           if (prop === "stateList") {
             return (
               callbackfn: (
-                value: InferArrayElement<T>,
-                setter: StateObject<InferArrayElement<T>>,
+                value: any,
+                setter: any,
                 index: { localIndex: number; originalIndex: number },
-                array: T,
-                arraySetter: StateObject<T>
-              ) => any,
-              formOpts?: FormOptsType
+                array: any,
+                arraySetter: any
+              ) => ReactNode
             ) => {
-              const arrayToMap = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
+              const arrayToMap = currentState as any[];
+              if (!Array.isArray(arrayToMap)) return null;
 
-              if (!Array.isArray(arrayToMap)) {
-                console.warn(
-                  `stateList called on a non-array value at path: ${path.join(".")}.`
-                );
-                return null;
-              }
+              const itemIdsForCurrentArray =
+                meta?.validIds || getOrderedIds(path) || [];
+              const sourceIds = getOrderedIds(path) || [];
+              const arraySetter = rebuildStateShape(
+                arrayToMap as any,
+                path,
+                meta
+              );
 
-              const indicesToMap =
-                meta?.validIndices ||
-                Array.from({ length: arrayToMap.length }, (_, i) => i);
-
-              return indicesToMap.map((originalIndex, localIndex) => {
-                const item = arrayToMap[originalIndex];
-                const finalPath = [...path, originalIndex.toString()];
+              return arrayToMap.map((item, localIndex) => {
+                const itemId =
+                  itemIdsForCurrentArray[localIndex] || `id:${item.id}`;
+                const originalIndex = sourceIds.indexOf(itemId);
+                const finalPath = [...path, itemId];
                 const setter = rebuildStateShape(item, finalPath, meta);
-                const itemComponentId = `${componentId}-${path.join(".")}-${originalIndex}`;
+                const itemComponentId = `${componentId}-${path.join(".")}-${itemId}`;
 
                 return createElement(CogsItemWrapper, {
-                  key: originalIndex,
+                  key: itemId,
                   stateKey,
                   itemComponentId,
-                  formOpts,
                   itemPath: finalPath,
                   children: callbackfn(
                     item,
                     setter,
                     { localIndex, originalIndex },
                     arrayToMap as any,
-                    rebuildStateShape(arrayToMap as any, path, meta)
+                    arraySetter
                   ),
                 });
               });
@@ -2243,15 +2085,30 @@ function createProxyHandler<T>(
               );
             };
           }
-
           if (prop === "index") {
             return (index: number) => {
-              const indexValue = currentState[index];
-              return rebuildStateShape(indexValue, [...path, index.toString()]);
+              const idList = meta?.validIds || getOrderedIds(path);
+              const itemId = idList?.[index];
+
+              if (!itemId) {
+                return rebuildStateShape(undefined as T, [
+                  ...path,
+                  index.toString(),
+                ]);
+              }
+
+              const sourceArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+              const itemData = sourceArray.find(
+                (item) => `id:${item.id}` === itemId
+              );
+
+              const itemPath = [...path, itemId];
+              return rebuildStateShape(itemData, itemPath, meta);
             };
           }
           if (prop === "last") {
-            // Added handler for 'last'
             return () => {
               const currentArray = getGlobalStore
                 .getState()
@@ -2260,14 +2117,11 @@ function createProxyHandler<T>(
               const lastIndex = currentArray.length - 1;
               const lastValue = currentArray[lastIndex];
               const newPath = [...path, lastIndex.toString()];
-              // shapeCache.clear(); // Decide if you need cache invalidation for 'last' access
-              // stateVersion++;
               return rebuildStateShape(lastValue, newPath);
             };
           }
           if (prop === "insert") {
             return (payload: UpdateArg<T>) => {
-              // ADDED: Invalidate cache on insert
               invalidateCachePath(path);
               pushFunc(effectiveSetState, payload, path, stateKey);
               return rebuildStateShape(
@@ -2276,7 +2130,6 @@ function createProxyHandler<T>(
               );
             };
           }
-
           if (prop === "uniqueInsert") {
             return (
               payload: UpdateArg<T>,
@@ -2292,19 +2145,12 @@ function createProxyHandler<T>(
 
               let matchedItem: any = null;
               const isUnique = !currentArray.some((item) => {
-                if (fields) {
-                  const isMatch = fields.every((field) =>
-                    isDeepEqual(item[field], newValue[field])
-                  );
-                  if (isMatch) {
-                    matchedItem = item;
-                  }
-                  return isMatch;
-                }
-                const isMatch = isDeepEqual(item, newValue);
-                if (isMatch) {
-                  matchedItem = item;
-                }
+                const isMatch = fields
+                  ? fields.every((field) =>
+                      isDeepEqual(item[field], newValue[field])
+                    )
+                  : isDeepEqual(item, newValue);
+                if (isMatch) matchedItem = item;
                 return isMatch;
               });
 
@@ -2321,11 +2167,9 @@ function createProxyHandler<T>(
               }
             };
           }
-
           if (prop === "cut") {
             return (index: number, options?: { waitForSync?: boolean }) => {
               if (options?.waitForSync) return;
-              // ADDED: Invalidate cache on cut
               invalidateCachePath(path);
               cutFunc(effectiveSetState, path, stateKey, index);
               return rebuildStateShape(
@@ -2336,51 +2180,70 @@ function createProxyHandler<T>(
           }
           if (prop === "cutByValue") {
             return (value: string | number | boolean) => {
-              for (let index = 0; index < currentState.length; index++) {
-                if (currentState[index] === value) {
-                  cutFunc(effectiveSetState, path, stateKey, index);
-                }
-              }
+              const index = currentState.findIndex((item) => item === value);
+              if (index > -1) cutFunc(effectiveSetState, path, stateKey, index);
             };
           }
           if (prop === "toggleByValue") {
             return (value: string | number | boolean) => {
               const index = currentState.findIndex((item) => item === value);
               if (index > -1) {
-                // Value exists, so cut it
                 cutFunc(effectiveSetState, path, stateKey, index);
               } else {
-                // Value doesn't exist, so insert it
                 pushFunc(effectiveSetState, value as any, path, stateKey);
               }
             };
           }
-          if (prop === "stateFind") {
-            return (
-              callbackfn: (
-                value: InferArrayElement<T>,
-                index: number
-              ) => boolean
-            ) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const found = sourceWithIndices.find(({ item }, index) =>
-                callbackfn(item, index)
+          if (prop === "stateFilter") {
+            return (callbackfn: (value: any, index: number) => boolean) => {
+              const sourceIds = meta?.validIds || getOrderedIds(path) || [];
+              const sourceArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+              const sourceMap = new Map(
+                sourceArray.map((item) => [`id:${item.id}`, item])
               );
-              if (!found) return undefined;
-              const finalPath = [...path, found.originalIndex.toString()];
-              return rebuildStateShape(found.item, finalPath, meta);
+
+              const newValidIds: string[] = [];
+              const newFilteredArray: any[] = [];
+
+              sourceIds.forEach((id, index) => {
+                const item = sourceMap.get(id);
+                if (item && callbackfn(item, index)) {
+                  newValidIds.push(id);
+                  newFilteredArray.push(item);
+                }
+              });
+
+              return rebuildStateShape(newFilteredArray as any, path, {
+                validIds: newValidIds,
+              });
             };
           }
-
+          if (prop === "stateSort") {
+            return (compareFn: (a: any, b: any) => number) => {
+              const sourceArray = currentState as any[];
+              const itemsWithIds = sourceArray.map((item) => ({
+                item,
+                id: `id:${item.id}`,
+              }));
+              itemsWithIds.sort((a, b) => compareFn(a.item, b.item));
+              const sortedArray = itemsWithIds.map((d) => d.item);
+              const newValidIds = itemsWithIds.map((d) => d.id);
+              return rebuildStateShape(sortedArray as any, path, {
+                validIds: newValidIds,
+              });
+            };
+          }
           if (prop === "findWith") {
             return (thisKey: keyof InferArrayElement<T>, thisValue: any) => {
-              const sourceWithIndices = getSourceArrayAndIndices();
-              const found = sourceWithIndices.find(
-                ({ item }) => item[thisKey] === thisValue
+              const foundItem = (currentState as any[]).find(
+                (item) => item[thisKey] === thisValue
               );
-              if (!found) return undefined;
-              const finalPath = [...path, found.originalIndex.toString()];
-              return rebuildStateShape(found.item, finalPath, meta);
+              if (!foundItem) return undefined;
+              const itemId = `id:${foundItem.id}`;
+              const finalPath = [...path, itemId];
+              return rebuildStateShape(foundItem, finalPath, meta);
             };
           }
         }
@@ -2390,7 +2253,6 @@ function createProxyHandler<T>(
           const parentValue = getGlobalStore
             .getState()
             .getNestedState(stateKey, parentPath);
-
           if (Array.isArray(parentValue) && prop === "cut") {
             return () =>
               cutFunc(
@@ -2401,16 +2263,28 @@ function createProxyHandler<T>(
               );
           }
         }
-
         if (prop === "get") {
           return () => {
-            if (meta?.validIndices && Array.isArray(currentState)) {
-              // For filtered arrays, return only the items at validIndices
-              const fullArray = getGlobalStore
+            // Check if this proxy represents a derived array.
+            // A derived array proxy has `meta.validIds` AND its `currentState` is an array.
+            if (meta?.validIds && Array.isArray(currentState)) {
+              // It IS a derived array proxy. Reconstruct it to ensure freshness.
+              const sourceArray = getGlobalStore
                 .getState()
                 .getNestedState(stateKey, path) as any[];
-              return meta.validIndices.map((index) => fullArray[index]);
+              if (!Array.isArray(sourceArray)) return [];
+
+              const sourceMap = new Map(
+                sourceArray.map((item: any) => [`id:${item.id}`, item])
+              );
+
+              return meta.validIds
+                .map((id) => sourceMap.get(id))
+                .filter(Boolean);
             }
+
+            // For all other cases (non-derived arrays, single items, properties),
+            // the standard lookup is correct.
             return getGlobalStore.getState().getNestedState(stateKey, path);
           };
         }
@@ -2422,19 +2296,13 @@ function createProxyHandler<T>(
               _effect: fn.toString(),
             });
         }
-
         if (prop === "$get") {
-          return () =>
-            $cogsSignal({
-              _stateKey: stateKey,
-              _path: path,
-            });
+          return () => $cogsSignal({ _stateKey: stateKey, _path: path });
         }
         if (prop === "lastSynced") {
           const syncKey = `${stateKey}:${path.join(".")}`;
           return getGlobalStore.getState().getSyncInfo(syncKey);
         }
-
         if (prop == "getLocalStorage") {
           return (key: string) =>
             loadFromLocalStorage(sessionId + "-" + stateKey + "-" + key);
@@ -2442,13 +2310,16 @@ function createProxyHandler<T>(
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
           const parentKey = parentPath.join(".");
-          const parent = getGlobalStore
-            .getState()
-            .getNestedState(stateKey, parentPath);
-          if (Array.isArray(parent)) {
-            const currentIndex = Number(path[path.length - 1]);
+          if (
+            Array.isArray(
+              getGlobalStore.getState().getNestedState(stateKey, parentPath)
+            )
+          ) {
+            const itemId = path[path.length - 1];
+            const orderedIds = getOrderedIds(parentPath);
+            const thisIndex = orderedIds?.indexOf(itemId!);
             return (
-              currentIndex ===
+              thisIndex ===
               getGlobalStore.getState().getSelectedIndex(stateKey, parentKey)
             );
           }
@@ -2457,37 +2328,39 @@ function createProxyHandler<T>(
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
-            const thisIndex = Number(path[path.length - 1]);
+            const itemId = path[path.length - 1];
+            const orderedIds = getOrderedIds(parentPath);
+            const thisIndex = orderedIds?.indexOf(itemId!);
+
+            if (thisIndex === undefined || thisIndex === -1) return;
+
             const parentKey = parentPath.join(".");
-
-            if (value) {
-              getGlobalStore
-                .getState()
-                .setSelectedIndex(stateKey, parentKey, thisIndex);
-            } else {
-              getGlobalStore
-                .getState()
-                .setSelectedIndex(stateKey, parentKey, undefined);
-            }
-
+            getGlobalStore
+              .getState()
+              .setSelectedIndex(
+                stateKey,
+                parentKey,
+                value ? thisIndex : undefined
+              );
             const nested = getGlobalStore
               .getState()
               .getNestedState(stateKey, [...parentPath]);
             updateFn(effectiveSetState, nested, parentPath);
-
-            // Invalidate cache for this path
             invalidateCachePath(parentPath);
           };
         }
         if (prop === "toggleSelected") {
           return () => {
             const parentPath = path.slice(0, -1);
-            const thisIndex = Number(path[path.length - 1]);
+            const itemId = path[path.length - 1];
+            const orderedIds = getOrderedIds(parentPath);
+            const thisIndex = orderedIds?.indexOf(itemId!);
+            if (thisIndex === undefined || thisIndex === -1) return;
+
             const parentKey = parentPath.join(".");
             const selectedIndex = getGlobalStore
               .getState()
               .getSelectedIndex(stateKey, parentKey);
-
             getGlobalStore
               .getState()
               .setSelectedIndex(
@@ -2495,11 +2368,11 @@ function createProxyHandler<T>(
                 parentKey,
                 selectedIndex === thisIndex ? undefined : thisIndex
               );
+
             const nested = getGlobalStore
               .getState()
               .getNestedState(stateKey, [...parentPath]);
             updateFn(effectiveSetState, nested, parentPath);
-
             invalidateCachePath(parentPath);
           };
         }
@@ -2509,34 +2382,20 @@ function createProxyHandler<T>(
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
-
-              if (!init?.key) {
-                throw new Error("Validation key not found");
-              }
-
-              // Clear existing errors for this validation key
+              if (!init?.key) throw new Error("Validation key not found");
               removeValidationError(init.key);
-              console.log("addValidationError", errors);
-              // Add each new error
               errors.forEach((error) => {
                 const fullErrorPath = [init.key, ...error.path].join(".");
-                console.log("fullErrorPath", fullErrorPath);
                 addValidationError(fullErrorPath, error.message);
               });
-
-              // Notify components to update
               notifyComponents(stateKey);
             };
           }
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              // This part is correct.
               const currentState =
                 getGlobalStore.getState().cogsStateStore[stateKey];
-              const patchResult = applyPatch(currentState, patches);
-              const newState = patchResult.newDocument;
-
-              // This is also correct.
+              const newState = applyPatch(currentState, patches).newDocument;
               updateGlobalState(
                 stateKey,
                 getGlobalStore.getState().initialStateGlobal[stateKey],
@@ -2545,105 +2404,7 @@ function createProxyHandler<T>(
                 componentId,
                 sessionId
               );
-
-              const stateEntry = getGlobalStore
-                .getState()
-                .stateComponents.get(stateKey); // Use stateKey here
-
-              if (stateEntry) {
-                // Use `getDifferences` between the state before and after the patch.
-                const changedPaths = getDifferences(currentState, newState);
-                const changedPathsSet = new Set(changedPaths);
-
-                // There is no single `primaryPathToCheck` for a patch, so we just check against the full set.
-
-                for (const [
-                  componentKey,
-                  component,
-                ] of stateEntry.components.entries()) {
-                  let shouldUpdate = false;
-                  const reactiveTypes = Array.isArray(component.reactiveType)
-                    ? component.reactiveType
-                    : [component.reactiveType || "component"];
-
-                  if (reactiveTypes.includes("none")) continue;
-                  if (reactiveTypes.includes("all")) {
-                    component.forceUpdate();
-                    continue;
-                  }
-
-                  if (reactiveTypes.includes("component")) {
-                    // This is the core logic that needs to be copied.
-                    // Check if any of the component's watched paths are in the set of changed paths.
-                    if (component.paths.has("")) {
-                      // Always update for root listeners
-                      shouldUpdate = true;
-                    }
-
-                    if (!shouldUpdate) {
-                      for (const changedPath of changedPathsSet) {
-                        // Direct match first (fastest)
-                        if (component.paths.has(changedPath)) {
-                          shouldUpdate = true;
-                          break;
-                        }
-
-                        // Check parent paths more efficiently
-                        let dotIndex = changedPath.lastIndexOf(".");
-                        while (dotIndex !== -1) {
-                          const parentPath = changedPath.substring(0, dotIndex);
-                          if (component.paths.has(parentPath)) {
-                            shouldUpdate = true;
-                            break;
-                          }
-                          // Skip numeric segments more efficiently
-                          const lastSegment = changedPath.substring(
-                            dotIndex + 1
-                          );
-                          if (!isNaN(Number(lastSegment))) {
-                            // For array indices, check the parent collection path
-                            const parentDotIndex = parentPath.lastIndexOf(".");
-                            if (parentDotIndex !== -1) {
-                              const grandParentPath = parentPath.substring(
-                                0,
-                                parentDotIndex
-                              );
-                              if (component.paths.has(grandParentPath)) {
-                                shouldUpdate = true;
-                                break;
-                              }
-                            }
-                          }
-                          dotIndex = parentPath.lastIndexOf(".");
-                        }
-
-                        if (shouldUpdate) break;
-                      }
-                    }
-                  }
-
-                  if (!shouldUpdate && reactiveTypes.includes("deps")) {
-                    // Use `newState` (the result of the patch) for dependency checks.
-                    if (component.depsFunction) {
-                      const depsResult = component.depsFunction(newState);
-                      let depsChanged = false;
-                      if (typeof depsResult === "boolean") {
-                        if (depsResult) depsChanged = true;
-                      } else if (!isDeepEqual(component.deps, depsResult)) {
-                        component.deps = depsResult;
-                        depsChanged = true;
-                      }
-                      if (depsChanged) {
-                        shouldUpdate = true;
-                      }
-                    }
-                  }
-
-                  if (shouldUpdate) {
-                    component.forceUpdate();
-                  }
-                }
-              }
+              notifyComponents(stateKey); // Simplified notification
             };
           }
           if (prop === "validateZodSchema") {
@@ -2651,75 +2412,31 @@ function createProxyHandler<T>(
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
-              const addValidationError =
-                getGlobalStore.getState().addValidationError;
+              if (!init?.zodSchema || !init?.key)
+                throw new Error("Zod schema or validation key not found");
 
-              if (!init?.zodSchema) {
-                throw new Error("Zod schema not found");
-              }
-
-              if (!init?.key) {
-                throw new Error("Validation key not found");
-              }
               removeValidationError(init.key);
               const thisObject =
                 getGlobalStore.getState().cogsStateStore[stateKey];
+              const result = init.zodSchema.safeParse(thisObject);
 
-              try {
-                // First clear any existing validation errors for this schema
-                // This ensures we don't have stale errors
-                const existingErrors = getGlobalStore
-                  .getState()
-                  .getValidationErrors(init.key);
-                if (existingErrors && existingErrors.length > 0) {
-                  existingErrors.forEach(([errorPath]) => {
-                    if (errorPath && errorPath.startsWith(init.key!)) {
-                      removeValidationError(errorPath);
-                    }
-                  });
-                }
-
-                // Attempt to validate with Zod
-                const result = init.zodSchema.safeParse(thisObject);
-
-                if (!result.success) {
-                  // Process Zod errors and add them to the validation store
-                  const zodErrors = result.error.errors;
-
-                  zodErrors.forEach((error) => {
-                    const errorPath = error.path;
-                    const errorMessage = error.message;
-
-                    // Build the full path for the validation error
-                    // Format: validationKey.path.to.field
-                    const fullErrorPath = [init.key, ...errorPath].join(".");
-
-                    // Add the error to the store
-                    addValidationError(fullErrorPath, errorMessage);
-                  });
-
-                  notifyComponents(stateKey);
-
-                  return false;
-                }
-
-                return true;
-              } catch (error) {
-                console.error("Zod schema validation failed", error);
+              if (!result.success) {
+                result.error.errors.forEach((error) => {
+                  const fullErrorPath = [init.key, ...error.path].join(".");
+                  addValidationError(fullErrorPath, error.message);
+                });
+                notifyComponents(stateKey);
                 return false;
               }
+              return true;
             };
           }
           if (prop === "_componentId") return componentId;
-          if (prop === "getComponents") {
+          if (prop === "getComponents")
             return () => getGlobalStore().stateComponents.get(stateKey);
-          }
-          if (prop === "getAllFormRefs") {
-            return () => {
-              return formRefStore.getState().getFormRefsByStateKey(stateKey);
-            };
-          }
-
+          if (prop === "getAllFormRefs")
+            return () =>
+              formRefStore.getState().getFormRefsByStateKey(stateKey);
           if (prop === "_initialState")
             return getGlobalStore.getState().initialStateGlobal[stateKey];
           if (prop === "_serverState")
@@ -2732,13 +2449,9 @@ function createProxyHandler<T>(
           if (prop === "removeValidation") return baseObj.removeValidation;
         }
         if (prop === "getFormRef") {
-          return () => {
-            return formRefStore
-              .getState()
-              .getFormRef(stateKey + "." + path.join("."));
-          };
+          return () =>
+            formRefStore.getState().getFormRef(stateKey + "." + path.join("."));
         }
-
         if (prop === "validationWrapper") {
           return ({
             children,
@@ -2753,20 +2466,16 @@ function createProxyHandler<T>(
               }
               path={path}
               stateKey={stateKey}
-              validIndices={meta?.validIndices}
             >
               {children}
             </ValidationWrapper>
           );
         }
-
         if (prop === "_stateKey") return stateKey;
         if (prop === "_path") return path;
         if (prop === "_isServerSynced") return baseObj._isServerSynced;
-
         if (prop === "update") {
           return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
-            // ADDED: Invalidate cache on update
             if (opts?.debounce) {
               debounce(() => {
                 updateFn(effectiveSetState, payload, path, "");
@@ -2785,19 +2494,16 @@ function createProxyHandler<T>(
             invalidateCachePath(path);
           };
         }
-
         if (prop === "formElement") {
-          return (child: FormControl<T>, formOpts?: FormOptsType) => {
-            return (
-              <FormControlComponent<T>
-                setState={effectiveSetState}
-                stateKey={stateKey}
-                path={path}
-                child={child}
-                formOpts={formOpts}
-              />
-            );
-          };
+          return (child: FormControl<T>, formOpts?: FormOptsType) => (
+            <FormControlComponent<T>
+              setState={effectiveSetState}
+              stateKey={stateKey}
+              path={path}
+              child={child}
+              formOpts={formOpts}
+            />
+          );
         }
 
         const nextPath = [...path, prop];
@@ -2809,12 +2515,10 @@ function createProxyHandler<T>(
     };
 
     const proxyInstance = new Proxy(baseFunction, handler);
-
     shapeCache.set(cacheKey, {
       proxy: proxyInstance,
       stateVersion: stateVersion,
     });
-
     return proxyInstance;
   }
 
@@ -2833,7 +2537,6 @@ export function $cogsSignal(proxy: {
 
 function SignalMapRenderer({
   proxy,
-
   rebuildStateShape,
 }: {
   proxy: {
@@ -2847,30 +2550,26 @@ function SignalMapRenderer({
       arraySetter: any
     ) => ReactNode;
   };
-
   rebuildStateShape: (
     currentState: any,
     path: string[],
-    meta?: { filtered?: string[][]; validIndices?: number[] }
+    meta?: { validIds?: string[] }
   ) => any;
 }) {
   const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
+  if (!Array.isArray(value)) return null;
 
-  if (!Array.isArray(value)) {
-    return null;
-  }
   const arraySetter = rebuildStateShape(
     value,
     proxy._path
   ) as ArrayEndType<any>;
-  // Use existing global state management
   return arraySetter.stateMapNoRender(
-    (item, setter, index, value, arraysetter) => {
-      // Execute map function in React context with existing state/proxies
-      return proxy._mapFn(item, setter, index, value, arraysetter);
+    (item, setter, index, array, arraySetter) => {
+      return proxy._mapFn(item, setter, index, array, arraySetter);
     }
   );
 }
+
 function SignalRenderer({
   proxy,
 }: {
@@ -2907,12 +2606,10 @@ function SignalRenderer({
 
     getGlobalStore.getState().addSignalElement(signalId, elementInfo);
 
-    // Get the raw value from the store
     const value = getGlobalStore
       .getState()
       .getNestedState(proxy._stateKey, proxy._path);
-
-    let displayValue;
+    let displayValue = value;
     if (proxy._effect) {
       try {
         displayValue = new Function(
@@ -2920,11 +2617,8 @@ function SignalRenderer({
           `return (${proxy._effect})(state)`
         )(value);
       } catch (err) {
-        console.error("Error evaluating effect function during mount:", err);
-        displayValue = value; // Fallback to raw value
+        console.error("Error evaluating effect function:", err);
       }
-    } else {
-      displayValue = value;
     }
 
     if (displayValue !== null && typeof displayValue === "object") {
@@ -2941,6 +2635,7 @@ function SignalRenderer({
     "data-signal-id": signalId,
   });
 }
+
 export function $cogsSignalStore(proxy: {
   _path: string[];
   _stateKey: string;
@@ -2949,13 +2644,14 @@ export function $cogsSignalStore(proxy: {
     (notify) => {
       const stateEntry = getGlobalStore
         .getState()
-        .stateComponents.get(proxy._stateKey) || {
-        components: new Map(),
-      };
+        .stateComponents.get(proxy._stateKey) || { components: new Map() };
       stateEntry.components.set(proxy._stateKey, {
         forceUpdate: notify,
         paths: new Set([proxy._path.join(".")]),
       });
+      getGlobalStore
+        .getState()
+        .stateComponents.set(proxy._stateKey, stateEntry);
       return () => stateEntry.components.delete(proxy._stateKey);
     },
     () => getGlobalStore.getState().getNestedState(proxy._stateKey, proxy._path)
@@ -2963,12 +2659,10 @@ export function $cogsSignalStore(proxy: {
   return createElement("text", {}, String(value));
 }
 
-// Modified CogsItemWrapper that stores the DOM ref
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
   itemPath,
-  formOpts,
   children,
 }: {
   stateKey: string;
@@ -2977,16 +2671,11 @@ function CogsItemWrapper({
   formOpts?: FormOptsType;
   children: React.ReactNode;
 }) {
-  // This hook handles the re-rendering when the item's own data changes.
   const [, forceUpdate] = useState({});
-  // This hook measures the element.
   const [measureRef, bounds] = useMeasure();
-  // Store the actual DOM element
   const elementRef = useRef<HTMLDivElement | null>(null);
-  // This ref prevents sending the same height update repeatedly.
   const lastReportedHeight = useRef<number | null>(null);
 
-  // Combine both refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
       measureRef(element);
@@ -2995,50 +2684,32 @@ function CogsItemWrapper({
     [measureRef]
   );
 
-  // This is the primary effect for this component.
   useEffect(() => {
-    // We only report a height if it's a valid number AND it's different
-    // from the last height we reported. This prevents infinite loops.
     if (bounds.height > 0 && bounds.height !== lastReportedHeight.current) {
-      // Store the new height so we don't report it again.
       lastReportedHeight.current = bounds.height;
-
-      // Call the store function to save the height AND the ref
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
-        virtualizer: {
-          itemHeight: bounds.height,
-          domRef: elementRef.current, // Store the actual DOM element reference
-        },
+        virtualizer: { itemHeight: bounds.height, domRef: elementRef.current },
       });
     }
-  }, [bounds.height, stateKey, itemPath]); // Removed ref.current as dependency
+  }, [bounds.height, stateKey, itemPath]);
 
-  // This effect handles subscribing the item to its own data path for updates.
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore
       .getState()
-      .stateComponents.get(stateKey) || {
-      components: new Map(),
-    };
-
+      .stateComponents.get(stateKey) || { components: new Map() };
     stateEntry.components.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set([itemPath.join(".")]),
     });
-
     getGlobalStore.getState().stateComponents.set(stateKey, stateEntry);
-
     return () => {
       const currentEntry = getGlobalStore
         .getState()
         .stateComponents.get(stateKey);
-      if (currentEntry) {
-        currentEntry.components.delete(fullComponentId);
-      }
+      if (currentEntry) currentEntry.components.delete(fullComponentId);
     };
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 
-  // The rendered output is a simple div that gets measured.
   return <div ref={setRefs}>{children}</div>;
 }

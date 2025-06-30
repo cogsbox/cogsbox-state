@@ -548,7 +548,7 @@ export default function ReactiveMain() {
     <div className="flex flex-col items-center justify-center w-full">
       <div className="h-6" />
       <div className="w-[90%]">
-        <div className="w-full  flex flex gap-4">
+        <div className="w-full  flex  gap-4">
           <div className="bg-white rounded-lg p-6 flex-1 flex gap-4">
             <TabbedSection />
           </div>

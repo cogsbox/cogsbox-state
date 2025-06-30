@@ -72,6 +72,7 @@ export const isDeepEqual = (
     );
   }
 };
+
 export function updateNestedProperty(
   path: string[],
   state: any,
@@ -168,23 +169,100 @@ export function getNestedValue<TStateObject extends unknown>(
   let value: any = obj;
 
   for (let i = 0; i < pathArray.length; i++) {
-    const key = pathArray[i];
-    //  console.log(key, "loooo");
-    if (!key) {
-      throw new Error("Invalid path");
+    const key = pathArray[i]!;
+    if (value === undefined || value === null) {
+      // Cannot traverse further
+      return undefined;
     }
-    if (Array.isArray(value)) {
+
+    if (typeof key === "string" && key.startsWith("id:")) {
+      if (!Array.isArray(value)) {
+        console.error("Path segment with 'id:' requires an array.", {
+          path: pathArray,
+          currentValue: value,
+        });
+        return undefined;
+      }
+      const targetId = key.split(":")[1];
+      value = value.find((item: any) => String(item.id) === targetId);
+    } else if (Array.isArray(value)) {
       value = value[parseInt(key)];
     } else {
-      if (!value) {
-        //  console.log(key, value, pathArray);
-        return;
-      }
-
       value = value[key];
     }
   }
   return value;
+}
+
+export function updateNestedPropertyIds(
+  path: string[],
+  state: any,
+  newValue: any
+) {
+  if (path.length === 0) {
+    return newValue;
+  }
+
+  const newState = Array.isArray(state) ? [...state] : { ...state };
+  let current: any = newState;
+
+  for (let i = 0; i < path.length - 1; i++) {
+    const key = path[i]!;
+
+    if (typeof key === "string" && key.startsWith("id:")) {
+      if (!Array.isArray(current)) {
+        throw new Error(
+          `Path segment "${key}" requires an array, but got a non-array.`
+        );
+      }
+      const targetId = key.split(":")[1];
+      const index = current.findIndex(
+        (item: any) => String(item.id) === targetId
+      );
+
+      if (index === -1) {
+        throw new Error(`Item with id "${targetId}" not found in array.`);
+      }
+      // Create a copy of the object at the found index to avoid direct mutation
+      current[index] = { ...current[index] };
+      current = current[index];
+    } else {
+      // Create a copy of the object/array to avoid direct mutation
+      current[key] = Array.isArray(current[key])
+        ? [...current[key]]
+        : { ...current[key] };
+      current = current[key];
+    }
+  }
+
+  // --- FIX IS HERE ---
+  // The original code only did `current[lastKey] = newValue;`
+  // This new logic handles the `id:` syntax for the *last* segment of the path.
+  const lastKey = path[path.length - 1]!;
+  if (typeof lastKey === "string" && lastKey.startsWith("id:")) {
+    if (!Array.isArray(current)) {
+      throw new Error(
+        `Final path segment "${lastKey}" requires an array, but got a non-array.`
+      );
+    }
+    const targetId = lastKey.split(":")[1];
+    const index = current.findIndex(
+      (item: any) => String(item.id) === targetId
+    );
+    if (index === -1) {
+      throw new Error(
+        `Item with id "${targetId}" not found in array to update.`
+      );
+    }
+    // Replace the item at its correct index
+    current[index] = newValue;
+  } else {
+    // This is the old logic, which works for normal properties.
+    current[lastKey] = newValue;
+  }
+  // --- END OF FIX ---
+
+  return newState;
 }
 type DifferencePaths = string[];
 

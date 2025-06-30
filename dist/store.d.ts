@@ -32,31 +32,28 @@ export type FormRefStoreState = {
     getFormRefsByStateKey: (stateKey: string) => Map<string, React.RefObject<any>>;
 };
 export declare const formRefStore: import('zustand').UseBoundStore<import('zustand').StoreApi<FormRefStoreState>>;
-export type ItemMeta = {
-    _cogsId: string;
+export type ShadowMetadata = {
+    id: string;
+    arrayKeys?: string[];
     virtualizer?: {
         itemHeight?: number;
-        domRef?: HTMLDivElement | null;
+        domRef?: HTMLElement | null;
     };
-    syncStatus?: "new" | "syncing" | "synced" | "failed";
-    error?: string;
-};
-export type ShadowNode = ItemMeta[] | {
-    [key: string]: ShadowNode;
-};
-export type ShadowStateStore = {
-    [key: string]: ShadowNode;
+    syncInfo?: {
+        status: string;
+    };
+    lastUpdated?: number;
 };
 export type CogsGlobalState = {
-    shadowStateStore: ShadowStateStore;
+    shadowStateStore: Map<string, ShadowMetadata>;
+    initializeShadowState: (key: string, initialState: any) => void;
+    updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any) => void;
+    removeShadowArrayElement: (key: string, arrayPath: string[]) => void;
+    getShadowMetadata: (key: string, path: string[]) => ShadowMetadata | undefined;
+    setShadowMetadata: (key: string, path: string[], metadata: Omit<ShadowMetadata, "id">) => void;
     shadowStateSubscribers: Map<string, Set<() => void>>;
     subscribeToShadowState: (key: string, callback: () => void) => () => void;
-    initializeShadowState: <T>(key: string, initialState: T) => void;
-    updateShadowAtPath: <T>(key: string, path: string[], newValue: T) => void;
-    insertShadowArrayElement: (key: string, arrayPath: string[], newItemMeta: ItemMeta) => void;
-    removeShadowArrayElement: (key: string, arrayPath: string[], index: number) => void;
-    getShadowMetadata: (key: string, path: string[]) => ShadowNode | null;
-    setShadowMetadata: (key: string, path: string[], metadata: Partial<ItemMeta>) => void;
     selectedIndicesMap: Map<string, Map<string, number>>;
     getSelectedIndex: (stateKey: string, parentPath: string) => number | undefined;
     setSelectedIndex: (stateKey: string, parentPath: string, index: number | undefined) => void;

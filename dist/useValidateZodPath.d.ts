@@ -23,7 +23,7 @@ type ResultsState = {
 };
 export declare const useResultsStore: import('zustand').UseBoundStore<import('zustand').StoreApi<ResultsState>>;
 export default function useValidateZodPath<T extends ZodRawShape>(validationKey: string, schema: ZodObject<T>, stateKey?: string): {
-    validateZodPath: (path: string[], data: any, results?: Record<string, ResultItem> | undefined) => "error" | "loading" | "success" | "failure";
+    validateZodPath: (path: string[], data: any, results?: Record<string, ResultItem> | undefined) => "loading" | "success" | "failure" | "error";
     getZodPathResults: (path: string[]) => string[] | ResultItem;
     zodPathResults: Record<string, ResultItem> | undefined;
 };

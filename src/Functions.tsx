@@ -7,11 +7,17 @@ import {
   type UpdateOpts,
 } from "./CogsState";
 
-import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
+import {
+  getNestedValue,
+  isFunction,
+  updateNestedProperty,
+  updateNestedPropertyIds,
+} from "./utility";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
 import { getGlobalStore, formRefStore } from "./store";
 import { validateZodPathFunc } from "./useValidateZodPath";
+import { ulid } from "ulid";
 
 export function updateFn<U>(
   setState: EffectiveSetState<U>,
@@ -23,7 +29,9 @@ export function updateFn<U>(
     (prevState) => {
       if (isFunction<U>(payload)) {
         const nestedValue = payload(getNestedValue(prevState, path));
-        let value = updateNestedProperty(path, prevState, nestedValue);
+        console.group("nestedValue", path, nestedValue);
+        let value = updateNestedPropertyIds(path, prevState, nestedValue);
+        console.group("updateFn", value);
         if (typeof value == "string") {
           value = value.trim();
         }
@@ -32,7 +40,7 @@ export function updateFn<U>(
         let value =
           !path || path.length == 0
             ? payload
-            : updateNestedProperty(path, prevState, payload);
+            : updateNestedPropertyIds(path, prevState, payload);
         if (typeof value == "string") {
           value = value.trim();
         }
@@ -44,7 +52,6 @@ export function updateFn<U>(
     validationKey
   );
 }
-
 export function pushFunc<U>(
   setState: EffectiveSetState<U>,
   payload: UpdateArg<U>,
@@ -52,68 +59,69 @@ export function pushFunc<U>(
   stateKey: string,
   index?: number
 ): void {
-  const array = getGlobalStore.getState().getNestedState(stateKey, path) as U[];
+  // --- THE FIX ---
+  // 1. Determine the newItem and its ID BEFORE calling setState.
+  const arrayBeforeUpdate =
+    (getGlobalStore.getState().getNestedState(stateKey, path) as any[]) || [];
+
+  const newItem = isFunction<U>(payload)
+    ? payload(arrayBeforeUpdate as any)
+    : payload;
+
+  // 2. Ensure it has an ID.
+  if (typeof newItem === "object" && newItem !== null && !(newItem as any).id) {
+    (newItem as any).id = ulid();
+  }
+  const finalId = (newItem as any).id;
+  // --- END OF FIX ---
+
   setState(
     (prevState) => {
-      let arrayToUpdate =
-        !path || path.length == 0
-          ? prevState
-          : getNestedValue(prevState, [...path]);
-      let returnedArray = [...arrayToUpdate];
-
-      returnedArray.splice(
-        index || Number(index) == 0 ? index : arrayToUpdate.length,
-        0,
-        isFunction<U>(payload)
-          ? payload(index == -1 ? undefined : arrayToUpdate)
-          : payload
-      );
-      const value =
-        path.length == 0
-          ? returnedArray
-          : updateNestedProperty([...path], prevState, returnedArray);
-
-      return value as U;
+      // The logic inside here is now much simpler.
+      // We already have the final `newItem`.
+      const arrayToUpdate = getNestedValue(prevState, [...path]) || [];
+      const newArray = [...arrayToUpdate];
+      newArray.splice(index ?? newArray.length, 0, newItem);
+      return updateNestedPropertyIds([...path], prevState, newArray);
     },
-    [
-      ...path,
-      index || index === 0 ? index?.toString() : (array!.length - 1).toString(),
-    ],
+    [...path, `id:${finalId}`], // Now we use the ID that is guaranteed to be correct.
     {
       updateType: "insert",
     }
   );
 }
-
 export function cutFunc<U>(
   setState: EffectiveSetState<U>,
   path: string[],
   stateKey: string,
   index: number
 ): void {
-  const array = getGlobalStore.getState().getNestedState(stateKey, path) as U[];
+  // Get the ordered IDs to find the ID for this index
+  const arrayKey = [stateKey, ...path].join(".");
+  const arrayMeta = getGlobalStore.getState().shadowStateStore.get(arrayKey);
+  const itemId = arrayMeta?.arrayKeys?.[index];
+
+  if (!itemId) {
+    throw new Error(`No ID found for index ${index} in array`);
+  }
+
   setState(
     (prevState) => {
       const arrayToUpdate = getNestedValue(prevState, [...path]);
       if (index < 0 || index >= arrayToUpdate?.length) {
         throw new Error(`Index ${index} does not exist in the array.`);
       }
-      const indexToCut =
-        index || Number(index) == 0 ? index : arrayToUpdate.length - 1;
 
       const updatedArray = [
-        ...arrayToUpdate.slice(0, indexToCut),
-        ...arrayToUpdate.slice(indexToCut + 1),
+        ...arrayToUpdate.slice(0, index),
+        ...arrayToUpdate.slice(index + 1),
       ] as U;
 
       return path.length == 0
         ? updatedArray
-        : updateNestedProperty([...path], prevState, updatedArray);
+        : updateNestedPropertyIds([...path], prevState, updatedArray);
     },
-    [
-      ...path,
-      index || index === 0 ? index?.toString() : (array!.length - 1).toString(),
-    ],
+    [...path, itemId], // Use the ID here!
     { updateType: "cut" }
   );
 }

@@ -26,7 +26,7 @@ type StateType = {
 };
 
 // Initial state with user and nested addresses
-const initialState: StateType = {
+const initialState = {
   addresses: [],
   user: {
     firstName: "",
@@ -66,7 +66,8 @@ const userSchema = z.object({
 });
 
 // Create the CogsState with validation
-export const { useCogsState, setCogsOptions } = createCogsState(initialState);
+export const { useCogsState, setCogsOptions } =
+  createCogsState<StateType>(initialState);
 
 // Set up additional options for specific state keys
 
