@@ -1735,7 +1735,6 @@ function createProxyHandler<T>(
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
-              // --- All this setup is from your original, working code ---
               const {
                 itemHeight = 50,
                 overscan = 6,
@@ -1753,8 +1752,8 @@ function createProxyHandler<T>(
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
               const lastRangeRef = useRef(range);
-
-              // This is still the correct way to trigger re-calculations when item heights change.
+              const orderedIds = getOrderedIds(path);
+              // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1770,36 +1769,26 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // --- START OF IMPROVEMENT ---
-              // Get the canonical order of item IDs for this array. This is the most
-              // reliable way to link an item's index to its metadata.
-              const orderedIds = getOrderedIds(path);
-              // --- END OF IMPROVEMENT ---
-
               // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
+                const arrayMeta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                const orderedIds = arrayMeta?.arrayKeys || []; // Get the ordered IDs
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-
-                  // --- START OF IMPROVEMENT ---
-                  // Use the ordered ID to look up the correct metadata for the item at this index.
-                  // This is much more reliable than numeric indexing into a metadata store.
-                  const itemId = orderedIds?.[i];
+                  const itemId = orderedIds[i]; // Get the ID for the item at this index
                   let measuredHeight = itemHeight; // Default height
-
                   if (itemId) {
-                    const itemPathWithId = [...path, itemId];
+                    // Get metadata for the specific item using its full path
                     const itemMeta = getGlobalStore
                       .getState()
-                      .getShadowMetadata(stateKey, itemPathWithId);
-                    // Get the measured height from the shadow state if it exists.
+                      .getShadowMetadata(stateKey, [...path, itemId]);
                     measuredHeight =
                       itemMeta?.virtualizer?.itemHeight || itemHeight;
                   }
-                  // --- END OF IMPROVEMENT ---
-
                   height += measuredHeight;
                 }
                 return { totalHeight: height, positions: pos };
@@ -1809,57 +1798,99 @@ function createProxyHandler<T>(
                 path.join("."),
                 itemHeight,
                 shadowUpdateTrigger,
-                orderedIds, // Add `orderedIds` to the dependency array
               ]);
 
-              // Create virtual state (This part of your original code looks fine)
+              // Create virtual state
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
 
-                // --- START OF IMPROVEMENT ---
-                // We use `orderedIds` here as well to create a `validIds` list for the
-                // virtualized proxy. This ensures that any subsequent operations on `virtualState`
-                // (like `.index()` or `.getSelected()`) will have the correct context.
-                const slicedIds = orderedIds?.slice(start, end);
-                const sourceMap = new Map(
-                  sourceArray.map((item: any) => [`id:${item.id}`, item])
-                );
-                const slicedArray =
-                  slicedIds?.map((id) => sourceMap.get(id)).filter(Boolean) ||
-                  [];
+                // Get the ordered IDs from the parent array's metadata
+                const arrayMeta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                const orderedIds = arrayMeta?.arrayKeys || [];
 
+                // Slice the array of data and the array of IDs to match the virtual range
+                const slicedArray = sourceArray.slice(start, end);
+                const slicedIds = orderedIds.slice(start, end);
+
+                // Create the new proxy, passing the sliced IDs as its `validIds` metadata.
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
-                  validIds: slicedIds, // Pass the sliced IDs as the new `validIds`
+                  validIds: slicedIds,
                 });
-                // --- END OF IMPROVEMENT ---
-              }, [
-                range.startIndex,
-                range.endIndex,
-                sourceArray,
-                totalCount,
-                orderedIds,
-              ]);
+              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // --- All the following logic for scrolling and event handling is from your original code. ---
-              // It is preserved, but we will improve `scrollToIndex` to use the shadow refs.
+              // Helper to scroll to last item using stored ref
+              const scrollToLastItem = useCallback(() => {
+                const shadowArray = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                if (
+                  !shadowArray ||
+                  (shadowArray && shadowArray?.arrayKeys?.length === 0)
+                ) {
+                  return false;
+                }
+                const lastIndex = totalCount - 1;
+                const lastKkey = [...path, shadowArray.arrayKeys![lastIndex]!];
+                if (lastIndex >= 0) {
+                  const lastItemData = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, lastKkey);
+                  if (lastItemData?.virtualizer?.domRef) {
+                    const element = lastItemData.virtualizer.domRef;
+                    if (element && element.scrollIntoView) {
+                      element.scrollIntoView({
+                        behavior: "auto",
+                        block: "end",
+                        inline: "nearest",
+                      });
+                      return true;
+                    }
+                  }
+                }
+                return false;
+              }, [stateKey, path, totalCount]);
 
-              // Handle new items when at bottom (original logic)
+              // Handle new items when at bottom
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
+
                 const hasNewItems = totalCount > previousCountRef.current;
+                const isInitialLoad =
+                  previousCountRef.current === 0 && totalCount > 0;
+
+                // Only auto-scroll if user hasn't scrolled away
                 if (
-                  hasNewItems &&
+                  (hasNewItems || isInitialLoad) &&
                   wasAtBottomRef.current &&
                   !userHasScrolledAwayRef.current
                 ) {
-                  setTimeout(() => scrollToIndex(totalCount - 1, "smooth"), 50);
-                }
-                previousCountRef.current = totalCount;
-              }, [totalCount, stickToBottom]);
+                  const visibleCount = Math.ceil(
+                    (containerRef.current?.clientHeight || 0) / itemHeight
+                  );
+                  const newRange = {
+                    startIndex: Math.max(
+                      0,
+                      totalCount - visibleCount - overscan
+                    ),
+                    endIndex: totalCount,
+                  };
 
-              // Handle scroll events (original logic)
+                  setRange(newRange);
+
+                  const timeoutId = setTimeout(() => {
+                    scrollToIndex(totalCount - 1, "smooth");
+                  }, 50);
+                  return () => clearTimeout(timeoutId);
+                }
+
+                previousCountRef.current = totalCount;
+              }, [totalCount, itemHeight, overscan]);
+
+              // Handle scroll events
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1868,12 +1899,21 @@ function createProxyHandler<T>(
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
-                  wasAtBottomRef.current = distanceFromBottom < 5;
-                  if (distanceFromBottom > 100)
-                    userHasScrolledAwayRef.current = true;
-                  if (distanceFromBottom < 5)
-                    userHasScrolledAwayRef.current = false;
 
+                  // Track if we're at bottom
+                  wasAtBottomRef.current = distanceFromBottom < 5;
+
+                  // If user scrolls away from bottom past threshold, set flag
+                  if (distanceFromBottom > 100) {
+                    userHasScrolledAwayRef.current = true;
+                  }
+
+                  // If user scrolls back to bottom, cle
+                  if (distanceFromBottom < 5) {
+                    userHasScrolledAwayRef.current = false;
+                  }
+
+                  // Update visible range based on scroll position
                   let startIndex = 0;
                   for (let i = 0; i < positions.length; i++) {
                     if (positions[i]! > scrollTop - itemHeight * overscan) {
@@ -1881,6 +1921,7 @@ function createProxyHandler<T>(
                       break;
                     }
                   }
+
                   let endIndex = startIndex;
                   const viewportEnd = scrollTop + clientHeight;
                   for (let i = startIndex; i < positions.length; i++) {
@@ -1889,12 +1930,14 @@ function createProxyHandler<T>(
                     }
                     endIndex = i;
                   }
+
                   const newStartIndex = Math.max(0, startIndex);
                   const newEndIndex = Math.min(
                     totalCount,
                     endIndex + 1 + overscan
                   );
 
+                  // THE FIX: Only update state if the visible range of items has changed.
                   if (
                     newStartIndex !== lastRangeRef.current.startIndex ||
                     newEndIndex !== lastRangeRef.current.endIndex
@@ -1913,59 +1956,98 @@ function createProxyHandler<T>(
                 container.addEventListener("scroll", handleScroll, {
                   passive: true,
                 });
+
+                // Only auto-scroll on initial load when user hasn't scrolled away
+                if (
+                  stickToBottom &&
+                  totalCount > 0 &&
+                  !userHasScrolledAwayRef.current
+                ) {
+                  const { scrollTop } = container;
+                  // Only if we're at the very top (initial load)
+                  if (scrollTop === 0) {
+                    container.scrollTop = container.scrollHeight;
+                    wasAtBottomRef.current = true;
+                  }
+                }
+
                 handleScroll();
-                return () =>
+
+                return () => {
                   container.removeEventListener("scroll", handleScroll);
-              }, [positions, totalCount, itemHeight, overscan]);
+                };
+              }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
 
               const scrollToBottom = useCallback(() => {
                 wasAtBottomRef.current = true;
                 userHasScrolledAwayRef.current = false;
-                if (containerRef.current) {
+                const scrolled = scrollToLastItem();
+                if (!scrolled && containerRef.current) {
                   containerRef.current.scrollTop =
                     containerRef.current.scrollHeight;
                 }
-              }, []);
-
+              }, [scrollToLastItem]);
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   const container = containerRef.current;
                   if (!container) return;
 
-                  // --- START OF IMPROVEMENT ---
-                  // Use the orderedId to reliably get the item's metadata and DOM ref.
-                  const itemId = orderedIds?.[index];
+                  const isLastItem = index === totalCount - 1;
+
+                  // --- Special Case: The Last Item ---
+                  if (isLastItem) {
+                    // For the last item, scrollIntoView can fail. The most reliable method
+                    // is to scroll the parent container to its maximum scroll height.
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: behavior,
+                    });
+                    return; // We're done.
+                  }
+
+                  // --- Standard Case: All Other Items ---
+                  // For all other items, we find the ref and use scrollIntoView.
+                  const arrayMeta = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, path);
+                  const orderedIds = arrayMeta?.arrayKeys || [];
+                  const itemId = orderedIds[index];
+                  let element: HTMLElement | null | undefined = undefined;
+
                   if (itemId) {
-                    const itemPathWithId = [...path, itemId];
                     const itemMeta = getGlobalStore
                       .getState()
-                      .getShadowMetadata(stateKey, itemPathWithId);
-                    const element = itemMeta?.virtualizer?.domRef;
-
-                    // If we have a direct ref to the DOM element from CogsItemWrapper, use it! It's the most reliable.
-                    if (element?.scrollIntoView) {
-                      element.scrollIntoView({ behavior, block: "nearest" });
-                      return;
-                    }
+                      .getShadowMetadata(stateKey, [...path, itemId]);
+                    element = itemMeta?.virtualizer?.domRef;
                   }
-                  // --- END OF IMPROVEMENT ---
 
-                  // Fallback to position-based scrolling if the ref isn't available for any reason.
-                  const top = positions[index];
-                  if (top !== undefined) {
-                    container.scrollTo({ top, behavior });
+                  if (element) {
+                    // 'center' gives a better user experience for items in the middle of the list.
+                    element.scrollIntoView({
+                      behavior: behavior,
+                      block: "center",
+                    });
+                  } else if (positions[index] !== undefined) {
+                    // Fallback if the ref isn't available for some reason.
+                    container.scrollTo({
+                      top: positions[index],
+                      behavior,
+                    });
                   }
                 },
-                [positions, stateKey, path, orderedIds] // Add `orderedIds` to dependency array
+                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
               );
 
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto", height: "100%" },
+                  style: { overflowY: "auto" as const, height: "100%" },
                 },
                 inner: {
-                  style: { height: `${totalHeight}px`, position: "relative" },
+                  style: {
+                    height: `${totalHeight}px`,
+                    position: "relative" as const,
+                  },
                 },
                 list: {
                   style: {
@@ -1976,7 +2058,7 @@ function createProxyHandler<T>(
 
               return {
                 virtualState,
-                virtualizerProps: virtualizerProps as any,
+                virtualizerProps,
                 scrollToBottom,
                 scrollToIndex,
               };
