@@ -1,4 +1,5 @@
 import type { InitialStateType, TransformedStateType } from "./CogsState";
+import { getGlobalStore } from "./store";
 export const isObject = (item: any): item is Record<string, any> => {
   return (
     item && typeof item === "object" && !Array.isArray(item) && item !== null
@@ -161,7 +162,6 @@ export function deleteNestedProperty(path: string[], state: any): any {
     );
   }
 }
-
 export function getNestedValue<TStateObject extends unknown>(
   obj: TStateObject,
   pathArray: string[]
@@ -171,7 +171,6 @@ export function getNestedValue<TStateObject extends unknown>(
   for (let i = 0; i < pathArray.length; i++) {
     const key = pathArray[i]!;
     if (value === undefined || value === null) {
-      // Cannot traverse further
       return undefined;
     }
 
@@ -183,8 +182,31 @@ export function getNestedValue<TStateObject extends unknown>(
         });
         return undefined;
       }
-      const targetId = key.split(":")[1];
-      value = value.find((item: any) => String(item.id) === targetId);
+
+      // Get the shadow state to find the index
+      const parentPath = pathArray.slice(0, i);
+      const shadowKey = ["stateKey", ...parentPath].join("."); // Need stateKey here
+      const shadowMeta = getGlobalStore
+        .getState()
+        .shadowStateStore.get(shadowKey);
+
+      if (!shadowMeta?.arrayKeys) {
+        console.error(
+          "No arrayKeys found in shadow state for path:",
+          parentPath
+        );
+        return undefined;
+      }
+
+      // Find the index of this ID in the arrayKeys
+      const itemIndex = shadowMeta.arrayKeys.indexOf(key);
+      if (itemIndex === -1) {
+        console.error(`ID ${key} not found in arrayKeys`);
+        return undefined;
+      }
+
+      // Get the item at that index
+      value = value[itemIndex];
     } else if (Array.isArray(value)) {
       value = value[parseInt(key)];
     } else {
@@ -193,11 +215,11 @@ export function getNestedValue<TStateObject extends unknown>(
   }
   return value;
 }
-
 export function updateNestedPropertyIds(
   path: string[],
   state: any,
-  newValue: any
+  newValue: any,
+  stateKey?: string // Add stateKey parameter
 ) {
   if (path.length === 0) {
     return newValue;
@@ -215,6 +237,26 @@ export function updateNestedPropertyIds(
           `Path segment "${key}" requires an array, but got a non-array.`
         );
       }
+
+      // Get the shadow state to find the index
+      const parentPath = path.slice(0, i);
+      const shadowKey = stateKey ? [stateKey, ...parentPath].join(".") : null;
+
+      if (shadowKey) {
+        const shadowMeta = getGlobalStore
+          .getState()
+          .shadowStateStore.get(shadowKey);
+        if (shadowMeta?.arrayKeys) {
+          const index = shadowMeta.arrayKeys.indexOf(key);
+          if (index !== -1) {
+            current[index] = { ...current[index] };
+            current = current[index];
+            continue;
+          }
+        }
+      }
+
+      // Fallback to finding by ID if shadow state lookup fails
       const targetId = key.split(":")[1];
       const index = current.findIndex(
         (item: any) => String(item.id) === targetId
@@ -223,11 +265,9 @@ export function updateNestedPropertyIds(
       if (index === -1) {
         throw new Error(`Item with id "${targetId}" not found in array.`);
       }
-      // Create a copy of the object at the found index to avoid direct mutation
       current[index] = { ...current[index] };
       current = current[index];
     } else {
-      // Create a copy of the object/array to avoid direct mutation
       current[key] = Array.isArray(current[key])
         ? [...current[key]]
         : { ...current[key] };
@@ -235,9 +275,6 @@ export function updateNestedPropertyIds(
     }
   }
 
-  // --- FIX IS HERE ---
-  // The original code only did `current[lastKey] = newValue;`
-  // This new logic handles the `id:` syntax for the *last* segment of the path.
   const lastKey = path[path.length - 1]!;
   if (typeof lastKey === "string" && lastKey.startsWith("id:")) {
     if (!Array.isArray(current)) {
@@ -245,6 +282,25 @@ export function updateNestedPropertyIds(
         `Final path segment "${lastKey}" requires an array, but got a non-array.`
       );
     }
+
+    // Same logic for the last key
+    const parentPath = path.slice(0, -1);
+    const shadowKey = stateKey ? [stateKey, ...parentPath].join(".") : null;
+
+    if (shadowKey) {
+      const shadowMeta = getGlobalStore
+        .getState()
+        .shadowStateStore.get(shadowKey);
+      if (shadowMeta?.arrayKeys) {
+        const index = shadowMeta.arrayKeys.indexOf(lastKey);
+        if (index !== -1) {
+          current[index] = newValue;
+          return newState;
+        }
+      }
+    }
+
+    // Fallback
     const targetId = lastKey.split(":")[1];
     const index = current.findIndex(
       (item: any) => String(item.id) === targetId
@@ -254,13 +310,10 @@ export function updateNestedPropertyIds(
         `Item with id "${targetId}" not found in array to update.`
       );
     }
-    // Replace the item at its correct index
     current[index] = newValue;
   } else {
-    // This is the old logic, which works for normal properties.
     current[lastKey] = newValue;
   }
-  // --- END OF FIX ---
 
   return newState;
 }

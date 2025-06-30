@@ -600,6 +600,15 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   getGlobalStore.getState().setInitialStates(statePart);
   getGlobalStore.getState().setCreatedState(statePart);
+
+  Object.keys(initialOptionsPart).forEach((key) => {
+    getGlobalStore.getState().initializeShadowState(key, statePart[key]);
+  });
+
+  console.log(
+    "getGlobalStore.getState()",
+    getGlobalStore.getState().cogsStateStore["advancedTestState"]
+  );
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
@@ -972,7 +981,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
-
+      console.log(
+        "stateobecjt",
+        thisKey,
+        getGlobalStore.getState().cogsStateStore[thisKey]
+      );
       // Save to localStorage if we used server data
       if (isFromServer && localkey && sessionId) {
         saveToLocalStorage(newState, thisKey, options, sessionId, Date.now());
@@ -1249,35 +1262,25 @@ export function useCogsStateFn<TStateObject extends unknown>(
       switch (updateObj.updateType) {
         case "insert": {
           const parentPath = path.slice(0, -1);
-          const idSegment = path[path.length - 1]!; // e.g., 'id:xyz'
-          const targetId = idSegment.split(":")[1];
-          const newArray = getNestedValue(payload, parentPath);
 
-          newValue = newArray.find((item: any) => item.id == targetId);
-          oldValue = null;
-
-          store.insertShadowArrayElement(thisKey, parentPath, newValue);
+          // Ensure `newValue` is not undefined before inserting. It should be the new object.
+          if (newUpdate.newValue) {
+            store.insertShadowArrayElement(
+              thisKey,
+              parentPath,
+              newUpdate.newValue
+            );
+          }
           break;
         }
 
         case "cut": {
-          oldValue = getNestedValue(prevValue, path);
-          newValue = null;
-
           store.removeShadowArrayElement(thisKey, path);
           break;
         }
 
         case "update": {
-          oldValue = getNestedValue(prevValue, path);
-          newValue = getNestedValue(payload, path);
-
-          const shadowPath = path.map((p, i) => {
-            const currentSubPath = path.slice(0, i + 1);
-            const subValue = getNestedValue(payload, currentSubPath);
-            return subValue?.id ? `id:${subValue.id}` : p;
-          });
-          store.updateShadowAtPath(thisKey, shadowPath, newValue);
+          store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
           break;
         }
       }
@@ -1508,7 +1511,7 @@ function createProxyHandler<T>(
   ): any {
     const cacheKey = path.map(String).join(".");
     const cachedEntry = shapeCache.get(cacheKey);
-
+    const stateKeyPathKey = [stateKey, ...path].join(".");
     type CallableStateObject<T> = {
       (): T;
     } & {
@@ -1690,21 +1693,19 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === "getSelected") {
             return () => {
-              const selectedIndex = getGlobalStore
-                .getState()
-                .getSelectedIndex(stateKey, path.join("."));
-              if (selectedIndex === undefined) return undefined;
-
-              const sourceArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-              if (!sourceArray || selectedIndex >= sourceArray.length)
+              const fullKey = stateKey + "." + path.join(".");
+              const selctedIndex = getGlobalStore.getState().selectedIndicesMap;
+              if (!selctedIndex || !selctedIndex.has(fullKey)) {
                 return undefined;
+              }
+              const itemId = selctedIndex.get(fullKey)!;
+              const value = getGlobalStore.getState().getShadowValue(itemId!);
 
-              const selectedItem = sourceArray[selectedIndex];
-              const itemId = `id:${selectedItem.id}`;
-
-              return rebuildStateShape(selectedItem, [...path, itemId], meta);
+              return rebuildStateShape(
+                value,
+                itemId.split(".").slice(1) as string[],
+                meta
+              );
             };
           }
           if (prop === "clearSelected") {
@@ -1716,7 +1717,12 @@ function createProxyHandler<T>(
             return () => {
               const globallySelectedIndex = getGlobalStore
                 .getState()
-                .getSelectedIndex(stateKey, path.join("."));
+                .getSelectedIndex(stateKey + "." + path.join("."));
+
+              console.log(
+                `Globally selected index for ${stateKey} at path ${path.join(".")}:`,
+                globallySelectedIndex
+              );
               if (globallySelectedIndex === undefined) return -1;
 
               if (meta?.validIds) {
@@ -2074,15 +2080,22 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => void
             ) => {
-              const arrayToMap = currentState as any[];
-              const itemIdsForCurrentArray =
-                meta?.validIds || getOrderedIds(path) || [];
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+              if (!arrayKeys) {
+                throw new Error("No array keys found for mapping");
+              }
               const arraySetter = rebuildStateShape(currentState, path, meta);
 
-              return arrayToMap.map((item, index) => {
-                const itemId = itemIdsForCurrentArray[index] || `id:${item.id}`;
-                const itemPath = [...path, itemId];
-                const itemSetter = rebuildStateShape(item, itemPath, meta);
+              return currentState.map((item, index) => {
+                const itemPath = [...path, arrayKeys[index]]!;
+                const itemSetter = rebuildStateShape(
+                  item,
+                  itemPath as any,
+                  meta
+                );
                 return callbackfn(
                   item,
                   itemSetter,
@@ -2192,25 +2205,28 @@ function createProxyHandler<T>(
           }
           if (prop === "index") {
             return (index: number) => {
-              const idList = meta?.validIds || getOrderedIds(path);
-              const itemId = idList?.[index];
-
-              if (!itemId) {
-                return rebuildStateShape(undefined as T, [
-                  ...path,
-                  index.toString(),
-                ]);
-              }
-
-              const sourceArray = getGlobalStore
+              const arrayKeys = getGlobalStore
                 .getState()
-                .getNestedState(stateKey, path) as any[];
-              const itemData = sourceArray.find(
-                (item) => `id:${item.id}` === itemId
+                .getShadowMetadata(stateKey, path)
+                ?.arrayKeys?.filter((key) => meta?.validIds?.includes(key));
+              console.log(
+                `Accessing index ${index} of array at path ${path.join(".")}`,
+                arrayKeys
+              );
+              const itemId = arrayKeys?.[index];
+              if (!itemId) return undefined;
+
+              const value = getGlobalStore
+                .getState()
+                .getShadowValue(itemId, meta?.validIds);
+              console.log(`itemIditemIditemIditemId`, meta?.validIds, value);
+              const state = rebuildStateShape(
+                value,
+                itemId.split(".").slice(1) as string[],
+                meta
               );
 
-              const itemPath = [...path, itemId];
-              return rebuildStateShape(itemData, itemPath, meta);
+              return state;
             };
           }
           if (prop === "last") {
@@ -2301,54 +2317,96 @@ function createProxyHandler<T>(
           }
           if (prop === "stateFilter") {
             return (callbackfn: (value: any, index: number) => boolean) => {
-              const sourceIds = meta?.validIds || getOrderedIds(path) || [];
-              const sourceArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-              const sourceMap = new Map(
-                sourceArray.map((item) => [`id:${item.id}`, item])
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+              if (!arrayKeys) {
+                throw new Error("No array keys found for sorting");
+              }
+              const newValidIds: string[] = [];
+              const filteredArray = currentState.filter(
+                (val: any, index: number) => {
+                  if (callbackfn(val, index)) {
+                    newValidIds.push(arrayKeys[index]!);
+                    return true;
+                  }
+                  return false;
+                }
               );
 
-              const newValidIds: string[] = [];
-              const newFilteredArray: any[] = [];
-
-              sourceIds.forEach((id, index) => {
-                const item = sourceMap.get(id);
-                if (item && callbackfn(item, index)) {
-                  newValidIds.push(id);
-                  newFilteredArray.push(item);
-                }
-              });
-
-              return rebuildStateShape(newFilteredArray as any, path, {
+              return rebuildStateShape(filteredArray! as any, path, {
                 validIds: newValidIds,
               });
             };
           }
           if (prop === "stateSort") {
             return (compareFn: (a: any, b: any) => number) => {
-              const sourceArray = currentState as any[];
-              const itemsWithIds = sourceArray.map((item) => ({
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+              if (!arrayKeys) {
+                throw new Error("No array keys found for sorting");
+              }
+              const itemsWithIds = currentState.map((item, index) => ({
                 item,
-                id: `id:${item.id}`,
+                key: arrayKeys[index],
               }));
-              itemsWithIds.sort((a, b) => compareFn(a.item, b.item));
-              const sortedArray = itemsWithIds.map((d) => d.item);
-              const newValidIds = itemsWithIds.map((d) => d.id);
-              return rebuildStateShape(sortedArray as any, path, {
-                validIds: newValidIds,
-              });
+
+              itemsWithIds
+                .sort((a, b) => compareFn(a.item, b.item))
+                .filter(Boolean);
+
+              return rebuildStateShape(
+                itemsWithIds.map((i) => i.item) as any,
+                path,
+                { validIds: itemsWithIds.map((i) => i.key) as string[] }
+              );
             };
           }
           if (prop === "findWith") {
-            return (thisKey: keyof InferArrayElement<T>, thisValue: any) => {
-              const foundItem = (currentState as any[]).find(
-                (item) => item[thisKey] === thisValue
+            return (
+              searchKey: keyof InferArrayElement<T>,
+              searchValue: any
+            ) => {
+              // 1. Get the LATEST version of the array from the global store.
+              const currentArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
+
+              if (!Array.isArray(currentArray)) {
+                return undefined;
+              }
+              console.log("currentArray", currentArray);
+              console.log("searchKey", searchKey);
+              console.log("searchValue", searchValue);
+              // 2. Perform the find operation on the FRESH array.
+              const foundItemindex = currentArray.findIndex(
+                (item: any) => item && item[searchKey] === searchValue
               );
-              if (!foundItem) return undefined;
-              const itemId = `id:${foundItem.id}`;
-              const finalPath = [...path, itemId];
-              return rebuildStateShape(foundItem, finalPath, meta);
+
+              if (foundItemindex === -1) {
+                return undefined;
+              }
+              const shadowArrayKEy = getGlobalStore
+                .getState()
+                .getShadowMetadata(stateKey, path);
+              console.log("shadowArrayKEy", shadowArrayKEy);
+              if (!shadowArrayKEy?.arrayKeys) {
+                return undefined;
+              }
+              // 3. The store's convention is to use `id` for pathing.
+              // Since the nested property objects don't have one, the store adds one.
+              // We must use that ID for the path.
+              const itemIdSegment = shadowArrayKEy["arrayKeys"][foundItemindex];
+              const finalPath = [...path, itemIdSegment!];
+
+              return rebuildStateShape(
+                currentArray[foundItemindex],
+                finalPath,
+                meta
+              );
             };
           }
         }
@@ -2368,29 +2426,16 @@ function createProxyHandler<T>(
               );
           }
         }
+
         if (prop === "get") {
           return () => {
-            // Check if this proxy represents a derived array.
-            // A derived array proxy has `meta.validIds` AND its `currentState` is an array.
-            if (meta?.validIds && Array.isArray(currentState)) {
-              // It IS a derived array proxy. Reconstruct it to ensure freshness.
-              const sourceArray = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path) as any[];
-              if (!Array.isArray(sourceArray)) return [];
-
-              const sourceMap = new Map(
-                sourceArray.map((item: any) => [`id:${item.id}`, item])
-              );
-
-              return meta.validIds
-                .map((id) => sourceMap.get(id))
-                .filter(Boolean);
-            }
-
-            // For all other cases (non-derived arrays, single items, properties),
-            // the standard lookup is correct.
-            return getGlobalStore.getState().getNestedState(stateKey, path);
+            console.log(
+              `Getting value for ${stateKey} at path ${path.join(".")}`
+            );
+            const value = getGlobalStore;
+            return getGlobalStore
+              .getState()
+              .getShadowValue(stateKeyPathKey, meta?.validIds);
           };
         }
         if (prop === "$derive") {
@@ -2425,7 +2470,9 @@ function createProxyHandler<T>(
             const thisIndex = orderedIds?.indexOf(itemId!);
             return (
               thisIndex ===
-              getGlobalStore.getState().getSelectedIndex(stateKey, parentKey)
+              getGlobalStore
+                .getState()
+                .getSelectedIndex(stateKey + "." + path.join("."))
             );
           }
           return undefined;
@@ -2433,19 +2480,13 @@ function createProxyHandler<T>(
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
-            const itemId = path[path.length - 1];
-            const orderedIds = getOrderedIds(parentPath);
-            const thisIndex = orderedIds?.indexOf(itemId!);
-
-            if (thisIndex === undefined || thisIndex === -1) return;
 
             const parentKey = parentPath.join(".");
             getGlobalStore
               .getState()
               .setSelectedIndex(
-                stateKey,
-                parentKey,
-                value ? thisIndex : undefined
+                stateKey + "." + parentKey,
+                stateKey + "." + path.join(".")
               );
             const nested = getGlobalStore
               .getState()
@@ -2457,21 +2498,14 @@ function createProxyHandler<T>(
         if (prop === "toggleSelected") {
           return () => {
             const parentPath = path.slice(0, -1);
-            const itemId = path[path.length - 1];
-            const orderedIds = getOrderedIds(parentPath);
-            const thisIndex = orderedIds?.indexOf(itemId!);
-            if (thisIndex === undefined || thisIndex === -1) return;
 
             const parentKey = parentPath.join(".");
-            const selectedIndex = getGlobalStore
-              .getState()
-              .getSelectedIndex(stateKey, parentKey);
+
             getGlobalStore
               .getState()
               .setSelectedIndex(
-                stateKey,
-                parentKey,
-                selectedIndex === thisIndex ? undefined : thisIndex
+                stateKey + "." + parentKey,
+                stateKey + "." + path.join(".")
               );
 
             const nested = getGlobalStore
@@ -2583,14 +2617,14 @@ function createProxyHandler<T>(
           return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
             if (opts?.debounce) {
               debounce(() => {
-                updateFn(effectiveSetState, payload, path, "");
+                updateFn(effectiveSetState, payload, path, "", stateKey);
                 const newValue = getGlobalStore
                   .getState()
                   .getNestedState(stateKey, path);
                 if (opts?.afterUpdate) opts.afterUpdate(newValue);
               }, opts.debounce);
             } else {
-              updateFn(effectiveSetState, payload, path, "");
+              updateFn(effectiveSetState, payload, path, "", stateKey);
               const newValue = getGlobalStore
                 .getState()
                 .getNestedState(stateKey, path);

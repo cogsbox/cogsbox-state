@@ -23,12 +23,17 @@ export function updateFn<U>(
   setState: EffectiveSetState<U>,
   payload: UpdateArg<U>,
   path: string[],
-  validationKey?: string
+  validationKey?: string,
+  stateKey?: string
 ): void {
   setState(
     (prevState) => {
       if (isFunction<U>(payload)) {
-        const nestedValue = payload(getNestedValue(prevState, path));
+        const nestedValue = payload(
+          getGlobalStore
+            .getState()
+            .getShadowValue(stateKey + "." + path.join("."))
+        );
         console.group("nestedValue", path, nestedValue);
         let value = updateNestedPropertyIds(path, prevState, nestedValue);
         console.group("updateFn", value);
@@ -59,8 +64,6 @@ export function pushFunc<U>(
   stateKey: string,
   index?: number
 ): void {
-  // --- THE FIX ---
-  // 1. Determine the newItem and its ID BEFORE calling setState.
   const arrayBeforeUpdate =
     (getGlobalStore.getState().getNestedState(stateKey, path) as any[]) || [];
 
@@ -68,12 +71,10 @@ export function pushFunc<U>(
     ? payload(arrayBeforeUpdate as any)
     : payload;
 
-  // 2. Ensure it has an ID.
   if (typeof newItem === "object" && newItem !== null && !(newItem as any).id) {
     (newItem as any).id = ulid();
   }
   const finalId = (newItem as any).id;
-  // --- END OF FIX ---
 
   setState(
     (prevState) => {

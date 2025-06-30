@@ -8,6 +8,7 @@ import type {
   SyncInfo,
   UpdateTypeDetail,
 } from "./CogsState.js";
+import type { object } from "zod";
 
 type StateUpdater<StateValue> =
   | StateValue
@@ -88,14 +89,17 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
 }));
 
 export type ShadowMetadata = {
-  id: string;
+  id?: string;
   arrayKeys?: string[];
+  objectKeys?: string[];
+  fields?: Record<string, any>;
   virtualizer?: {
     itemHeight?: number;
     domRef?: HTMLElement | null;
   };
   syncInfo?: { status: string };
   lastUpdated?: number;
+  value?: any;
 };
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
@@ -110,6 +114,12 @@ export type CogsGlobalState = {
     newItem: any
   ) => void;
   removeShadowArrayElement: (key: string, arrayPath: string[]) => void;
+  getShadowValue: (
+    key: string,
+
+    validArrayIds?: string[]
+  ) => any;
+  setShadowValue: (key: string, value: any, validArrayIds?: string[]) => any;
   getShadowMetadata: (
     key: string,
     path: string[]
@@ -123,16 +133,9 @@ export type CogsGlobalState = {
   shadowStateSubscribers: Map<string, Set<() => void>>; // Stores subscribers for shadow state updates
   subscribeToShadowState: (key: string, callback: () => void) => () => void;
 
-  selectedIndicesMap: Map<string, Map<string, number>>; // stateKey -> (parentPath -> selectedIndex)
-  getSelectedIndex: (
-    stateKey: string,
-    parentPath: string
-  ) => number | undefined;
-  setSelectedIndex: (
-    stateKey: string,
-    parentPath: string,
-    index: number | undefined
-  ) => void;
+  selectedIndicesMap: Map<string, string>; // stateKey -> (parentPath -> selectedIndex)
+  getSelectedIndex: (stateKey: string) => number | undefined;
+  setSelectedIndex: (key: string, itemKey: string) => void;
   clearSelectedIndex: ({
     stateKey,
     path,
@@ -281,40 +284,135 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       if (Array.isArray(value)) {
         const childIds: string[] = [];
 
+        // First, collect all IDs
         value.forEach((item) => {
-          if (typeof item === "object" && item !== null && !item.id) {
-            item.id = ulid();
-          }
-
-          const itemId = `id:${item.id}`;
-          childIds.push(itemId);
-
-          const itemPath = [...path, itemId];
-          processValue(item, itemPath);
+          const itemId = `id:${ulid()}`;
+          childIds.push(nodeKey + "." + itemId);
         });
 
-        const arrayContainerMetadata: ShadowMetadata = {
-          id: ulid(),
-          arrayKeys: childIds,
-        };
-        newShadowStore.set(nodeKey, arrayContainerMetadata);
+        // Set the array metadata FIRST
+        newShadowStore.set(nodeKey, { arrayKeys: childIds });
+
+        // THEN process each item
+        value.forEach((item, index) => {
+          const itemId = childIds[index]!.split(".").pop(); // Extract just the id:xxx part
+
+          processValue(item, [...path!, itemId!]);
+        });
       } else if (typeof value === "object" && value !== null) {
-        newShadowStore.set(nodeKey, { id: ulid() });
+        const fields = Object.fromEntries(
+          Object.keys(value).map((k) => [k, nodeKey + "." + k])
+        );
+        newShadowStore.set(nodeKey, { fields });
 
         Object.keys(value).forEach((k) => {
           processValue(value[k], [...path, k]);
         });
       } else {
-        newShadowStore.set(nodeKey, { id: ulid() });
+        newShadowStore.set(nodeKey, { value });
       }
     };
 
     processValue(initialState, []);
-
+    console.log("newShadowStore", newShadowStore);
     set({ shadowStateStore: newShadowStore });
   },
-  getShadowMetadata: (key: string, path: string[]) => {
+
+  getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
+    const shadowMeta = get().shadowStateStore.get(fullKey);
+
+    // For primitive values, return as is
+    if (shadowMeta?.value !== undefined) {
+      return shadowMeta.value;
+    }
+
+    // For arrays, reconstruct with possible validArrayIds
+    if (shadowMeta?.arrayKeys) {
+      const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
+      const items = arrayKeys.map((itemKey) => {
+        // RECURSIVELY call getShadowValue for each item
+        return get().getShadowValue(itemKey);
+      });
+      return items;
+    }
+
+    // For objects with fields, reconstruct object
+    if (shadowMeta?.fields) {
+      const reconstructedObject: any = {};
+      Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
+        // RECURSIVELY call getShadowValue for each field
+        reconstructedObject[key] = get().getShadowValue(fieldPath as string);
+      });
+      return reconstructedObject;
+    }
+
+    return shadowMeta;
+  },
+  setShadowValue: (key: string, value: any, validArrayIds?: string[]) => {
+    const shadowMeta = get().shadowStateStore.get(key);
+    console.log("setShadowValue", key, value, validArrayIds);
+    // For primitive values, set directly
+    if (shadowMeta?.value !== undefined || !shadowMeta) {
+      get().shadowStateStore.set(key, { value });
+      console.log("setShadowValue22222", shadowMeta);
+      return;
+    }
+
+    // For arrays
+    if (shadowMeta.arrayKeys) {
+      const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
+
+      // Update array metadata
+      get().shadowStateStore.set(key, {
+        ...shadowMeta,
+        arrayKeys: arrayKeys,
+      });
+
+      // Update each array item
+      value.forEach((item: any, index: number) => {
+        const itemKey = arrayKeys[index]!;
+        if (typeof item === "object") {
+          // For object items, update their fields
+          const itemMeta = get().shadowStateStore.get(itemKey);
+          if (itemMeta?.fields) {
+            Object.entries(item).forEach(([fieldKey, fieldValue]) => {
+              const fieldPath = itemMeta.fields![fieldKey];
+              if (fieldPath) {
+                get().shadowStateStore.set(fieldPath as string, {
+                  value: fieldValue,
+                });
+              }
+            });
+          }
+        } else {
+          // For primitive items
+          get().shadowStateStore.set(itemKey, { value: item });
+        }
+      });
+      return;
+    }
+
+    // For objects with fields
+    if (shadowMeta.fields) {
+      Object.entries(value).forEach(([fieldKey, fieldValue]) => {
+        const fieldPath = shadowMeta.fields![fieldKey];
+        if (fieldPath) {
+          get().shadowStateStore.set(fieldPath as string, {
+            value: fieldValue,
+          });
+        }
+      });
+      return;
+    }
+  },
+  getShadowMetadata: (
+    key: string,
+    path: string[],
+    validArrayIds?: string[]
+  ) => {
     const fullKey = [key, ...path].join(".");
+    let data = get().shadowStateStore.get(fullKey);
+
     return get().shadowStateStore.get(fullKey);
   },
 
@@ -402,33 +500,29 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     set({ shadowStateStore: newShadowStore });
   },
 
-  selectedIndicesMap: new Map<string, Map<string, number>>(),
+  selectedIndicesMap: new Map<string, string>(),
+  getSelectedIndex: (arrayKey: string): number => {
+    const itemKey = get().selectedIndicesMap.get(arrayKey);
 
-  // Add the new methods
-  getSelectedIndex: (stateKey: string, parentPath: string) => {
-    const stateMap = get().selectedIndicesMap.get(stateKey);
-    if (!stateMap) return undefined;
-    return stateMap.get(parentPath);
+    console.log("getSelectedIndex", arrayKey, itemKey);
+    if (!itemKey) return -1;
+
+    const arrayKeys = getGlobalStore
+      .getState()
+      .getShadowMetadata(arrayKey, [])?.arrayKeys;
+    if (!arrayKeys) return -1;
+
+    return arrayKeys.indexOf(itemKey);
   },
 
-  setSelectedIndex: (
-    stateKey: string,
-    parentPath: string,
-    index: number | undefined
-  ) => {
+  setSelectedIndex: (arrayKey: string, itemKey: string | undefined) => {
     set((state) => {
-      const newMap = new Map(state.selectedIndicesMap);
-      let stateMap = newMap.get(stateKey);
+      const newMap = state.selectedIndicesMap;
 
-      if (!stateMap) {
-        stateMap = new Map<string, number>();
-        newMap.set(stateKey, stateMap);
-      }
-
-      if (index === undefined) {
-        stateMap.delete(parentPath);
+      if (itemKey === undefined) {
+        newMap.delete(arrayKey);
       } else {
-        stateMap.set(parentPath, index);
+        newMap.set(arrayKey, itemKey);
       }
 
       return {
@@ -443,13 +537,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   }: {
     stateKey: string;
     path: string[];
-  }) => {
+  }): void => {
     set((state) => {
       const newMap = new Map(state.selectedIndicesMap);
-      const stateMap = newMap.get(stateKey);
-      if (!stateMap) return state;
-      const parentPath = path.join(".");
-      stateMap.delete(parentPath);
+      const fullPath = [stateKey, ...path].join(".");
+      newMap.delete(fullPath);
       return {
         ...state,
         selectedIndicesMap: newMap,
