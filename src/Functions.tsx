@@ -7,12 +7,7 @@ import {
   type UpdateOpts,
 } from "./CogsState";
 
-import {
-  getNestedValue,
-  isFunction,
-  updateNestedProperty,
-  updateNestedPropertyIds,
-} from "./utility";
+import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
 import { useEffect, useRef, useState } from "react";
 import React from "react";
 import { getGlobalStore, formRefStore } from "./store";
@@ -35,7 +30,9 @@ export function updateFn<U>(
             .getShadowValue(stateKey + "." + path.join("."))
         );
         console.group("nestedValue", path, nestedValue);
-        let value = updateNestedPropertyIds(path, prevState, nestedValue);
+        let value = getGlobalStore
+          .getState()
+          .setShadowValue(stateKey + "." + path.join("."), nestedValue);
         console.group("updateFn", value);
         if (typeof value == "string") {
           value = value.trim();
@@ -45,7 +42,9 @@ export function updateFn<U>(
         let value =
           !path || path.length == 0
             ? payload
-            : updateNestedPropertyIds(path, prevState, payload);
+            : getGlobalStore
+                .getState()
+                .setShadowValue(stateKey + "." + path.join("."), payload);
         if (typeof value == "string") {
           value = value.trim();
         }
@@ -83,7 +82,9 @@ export function pushFunc<U>(
       const arrayToUpdate = getNestedValue(prevState, [...path]) || [];
       const newArray = [...arrayToUpdate];
       newArray.splice(index ?? newArray.length, 0, newItem);
-      return updateNestedPropertyIds([...path], prevState, newArray);
+      return getGlobalStore
+        .getState()
+        .setShadowValue(stateKey + "." + path.join("."), payload);
     },
     [...path, `id:${finalId}`], // Now we use the ID that is guaranteed to be correct.
     {
@@ -120,7 +121,9 @@ export function cutFunc<U>(
 
       return path.length == 0
         ? updatedArray
-        : updateNestedPropertyIds([...path], prevState, updatedArray);
+        : getGlobalStore
+            .getState()
+            .setShadowValue(stateKey + "." + path.join("."), updatedArray);
     },
     [...path, itemId], // Use the ID here!
     { updateType: "cut" }

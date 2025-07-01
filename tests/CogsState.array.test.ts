@@ -17,7 +17,6 @@ vi.mock("react", async (importOriginal) => {
     useRef: (initialValue: any) => ({ current: initialValue }),
     useCallback: (fn: any) => fn,
     useMemo: (fn: any) => fn(),
-    useSyncExternalStore: (subscribe: any, getSnapshot: any) => getSnapshot(),
   };
 });
 // --- END OF MOCK ---
@@ -179,6 +178,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
     // 2. Select an item within the context of the *filtered* array.
     // Let's select the 2nd item in the filtered list, which is 'Headphones' (p4).
     // The original index of 'p4' is 3. The filtered index is 2.
+    console.log("inStockData", inStockProxy.get());
     const itemToSelect = inStockProxy.index(2); // 'Headphones'
 
     expect(itemToSelect.get().id).toBe("p4");
@@ -214,7 +214,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // 3. Assert that the change is reflected in the original, unfiltered state
     const originalState = setter.get();
-    console.log("itemToSelect 1111111111111111", originalState);
+
     const originalGatsbyObject = originalState.products.find(
       (p) => p.id === "p3"
     );
@@ -222,7 +222,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
     expect(originalGatsbyObject).toBeDefined();
     expect(originalGatsbyObject?.inStock).toBe(true);
   });
-  return;
+
   it("should update an original item using the item setter from stateMap on a filtered array", () => {
     // 1. Filter for books. 'The Great Gatsby' (p3) is initially out of stock.
     const booksProxy = setter.products.stateFilter(
@@ -238,24 +238,20 @@ describe("CogsState - Advanced Chained Array Operations", () => {
     booksProxy.stateMap((item, itemSetter) => {
       // Find the specific book we want to modify and use its dedicated setter
       if (item.id === "p3") {
+        console.log("itemSetter", itemSetter.get());
         itemSetter.inStock.update(true);
       }
     });
 
-    // 3. Assert that the change is reflected in the original, unfiltered state store.
-    const updatedState =
-      getGlobalStore.getState().cogsStateStore.advancedTestState;
-    const updatedGatsby = updatedState.products.find((p) => p.id === "p3");
-    expect(updatedGatsby).toBeDefined();
-    expect(updatedGatsby?.inStock).toBe(true);
-
-    // 4. Also assert that the change is reflected through the original proxy
+    // 4 Also assert that the change is reflected through the original proxy
     const gatsbyViaProxy = setter.products.findWith("id", "p3");
+
     expect(gatsbyViaProxy.inStock.get()).toBe(true);
   });
-  return;
+
   it("should insert into the original array using the array setter from stateMap", () => {
     // 1. Filter for apparel
+
     const apparelProxy = setter.products.stateFilter(
       (p) => p.category === "apparel"
     );
@@ -278,6 +274,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // 3. Assert that the new item was added to the main, unfiltered products array.
     const updatedProducts = setter.products.get();
+
     expect(updatedProducts.length).toBe(initialFullLength + 1);
     const newScarf = updatedProducts.find((p) => p.id === "p8");
     expect(newScarf).toBeDefined();
@@ -294,8 +291,9 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
       // Assert
       expect(laptopProxy.price.get()).toBe(1337);
-      const updatedState =
-        getGlobalStore.getState().cogsStateStore.advancedTestState;
+      const updatedState = setter.get();
+
+      console.log("updatedState", updatedState);
       expect(updatedState.products.find((p) => p.id === "p1")?.price).toBe(
         1337
       );
@@ -339,6 +337,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
       expect(updatedShirt.id).toBe("p2");
     });
   });
+
   it("THE OMEGA KRAKEN: should handle a complex chain of filter, sort, map, update, insert, and select", () => {
     const initialProductCount = setter.products.get().length;
 
@@ -382,6 +381,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
         // ACTION C: Select the LAST item in this derived view (the Laptop, p1).
         if (index === localArray.length - 1) {
+          console.log("itemSetter", itemSetter.get());
           itemSetter.setSelected(true);
         }
       }
@@ -389,8 +389,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // --- Assertions: Verify every side-effect ---
 
-    const finalGlobalState =
-      getGlobalStore.getState().cogsStateStore.advancedTestState;
+    const finalGlobalState = setter.get();
 
     // ASSERTION 1: The item update is reflected in the original state.
     const updatedHeadphones = finalGlobalState.products.find(
@@ -406,6 +405,12 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // ASSERTION 3: The selection is correct in the DERIVED proxy's context.
     // The Laptop (p1) is at index 2 of the sorted electronics list.
+
+    console.log(
+      "sortedElectronicsProxy",
+      sortedElectronicsProxy.get(),
+      sortedElectronicsProxy.getSelectedIndex()
+    );
     expect(sortedElectronicsProxy.getSelectedIndex()).toBe(2);
     expect(sortedElectronicsProxy.getSelected()?.get().id).toBe("p1");
 
@@ -424,71 +429,293 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 });
 // Add this new describe block at the end of the file
 
-// describe("CogsState - Deeply Nested Array Operations", () => {
-//   let setter: StateObject<ComplexAppState>;
+describe("CogsState - Deeply Nested Array Operations", () => {
+  let setter: StateObject<ComplexAppState>;
 
-//   beforeEach(() => {
-//     vi.clearAllMocks();
-//     // Use the new 'complexApp' state key
-//     setter = useCogsState("complexApp");
-//     setter.revertToInitialState();
-//   });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Use the new 'complexApp' state key
+    setter = useCogsState("complexApp");
+    setter.revertToInitialState();
+  });
 
-//   it("should find and update a nested property via a chained .index().findWith() call", () => {
-//     const instanceIndex = 0;
-//     const propertyToFindId = "prop-b";
+  it("should find and update a nested property via a chained .index().findWith() call", () => {
+    const instanceIndex = 0;
+    const propertyToFindId = "prop-b";
+    console.log("instanceProxy", setter.itemInstances.get());
+    // --- STEP 1: Test `.index(instanceIndex)` ---
+    const instanceProxy = setter.itemInstances.index(instanceIndex);
 
-//     // --- STEP 1: Test `.index(instanceIndex)` ---
-//     const instanceProxy = setter.itemInstances.index(instanceIndex);
+    // Assert that we have a proxy and it points to the correct instance object.
+    expect(instanceProxy).toBeDefined();
+    expect(instanceProxy.id.get()).toBe("inst-1");
+    expect(instanceProxy.instance_name.get()).toBe("First Instance");
 
-//     // Assert that we have a proxy and it points to the correct instance object.
-//     expect(instanceProxy).toBeDefined();
-//     expect(instanceProxy.id.get()).toBe("inst-1");
-//     expect(instanceProxy.instance_name.get()).toBe("First Instance");
+    // --- STEP 2: Test accessing the `.properties` array from the instance proxy ---
+    const propertiesProxy = instanceProxy.properties;
+    const propertiesArray = propertiesProxy.get();
 
-//     // --- STEP 2: Test accessing the `.properties` array from the instance proxy ---
-//     const propertiesProxy = instanceProxy.properties;
-//     const propertiesArray = propertiesProxy.get();
+    // Assert that we have a proxy to the properties array and it has the correct length.
+    expect(propertiesProxy).toBeDefined();
+    expect(Array.isArray(propertiesArray)).toBe(true);
+    expect(propertiesArray.length).toBe(3);
+    expect(propertiesArray[0].itemcatprop_id).toBe("prop-a");
 
-//     // Assert that we have a proxy to the properties array and it has the correct length.
-//     expect(propertiesProxy).toBeDefined();
-//     expect(Array.isArray(propertiesArray)).toBe(true);
-//     expect(propertiesArray.length).toBe(3);
-//     expect(propertiesArray[0].itemcatprop_id).toBe("prop-a");
-//     console.log("propertyToFindId", propertyToFindId);
-//     // --- STEP 3: Test `.findWith()` on the properties proxy ---
-//     const propertyProxy = propertiesProxy.findWith(
-//       "itemcatprop_id",
-//       propertyToFindId
-//     );
+    // --- STEP 3: Test `.findWith()` on the properties proxy ---
+    const propertyProxy = propertiesProxy.findWith(
+      "itemcatprop_id",
+      propertyToFindId
+    );
 
-//     // Assert that we found the correct specific property.
-//     // This is where the original test was failing.
-//     expect(propertyProxy).toBeDefined();
-//     const initialProperty = propertyProxy.get();
+    // Assert that we found the correct specific property.
+    // This is where the original test was failing.
+    expect(propertyProxy).toBeDefined();
+    const initialProperty = propertyProxy.get();
 
-//     console.log("propertiesProxypropertiesProxy", propertiesProxy.get());
+    expect(initialProperty).toEqual({
+      itemcatprop_id: "prop-b",
+      name: "Size",
+      value: 10,
+    });
 
-//     expect(initialProperty).toEqual({
-//       itemcatprop_id: "prop-b",
-//       name: "Size",
-//       value: 10,
-//     });
+    // --- STEP 4: Test the update operation ---
+    propertyProxy.value.update(99);
 
-//     // --- STEP 4: Test the update operation ---
-//     propertyProxy.value.update(99);
+    // Assert that the update is reflected when GETTING the value again through the same proxy.
+    expect(propertyProxy.value.get()).toBe(99); // --- STEP 5: Verify the update in the global state ---
+    const finalState = setter.get();
+    const updatedProperty = finalState.itemInstances[0].properties.find(
+      (p) => p.itemcatprop_id === propertyToFindId
+    );
+    expect(updatedProperty?.value).toBe(99);
+  });
+});
+describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
+  let setter: StateObject<AdvancedTestState>;
 
-//     // Assert that the update is reflected when GETTING the value again through the same proxy.
-//     expect(propertyProxy.value.get()).toBe(99);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setter = useCogsState("advancedTestState");
+    setter.revertToInitialState();
+  });
 
-//     // --- STEP 5: Verify the update in the global state ---
-//     const finalState = getGlobalStore.getState().cogsStateStore.complexApp;
-//     const updatedInstanceData = finalState.itemInstances[instanceIndex];
-//     const updatedPropertyData = updatedInstanceData.properties.find(
-//       (p) => p.itemcatprop_id === propertyToFindId
-//     );
+  it("should handle multiple rapid inserts and maintain correct shadow store state", () => {
+    const initialCount = setter.products.get().length;
 
-//     expect(updatedPropertyData).toBeDefined();
-//     expect(updatedPropertyData?.value).toBe(99);
-//   });
-//});
+    // Rapid inserts
+    for (let i = 0; i < 10; i++) {
+      setter.products.insert({
+        id: `rapid-${i}`,
+        name: `Rapid Product ${i}`,
+        category: "electronics",
+        price: 100 + i,
+        inStock: true,
+      });
+    }
+
+    expect(setter.products.get().length).toBe(initialCount + 10);
+
+    // Verify all items are accessible
+    for (let i = 0; i < 10; i++) {
+      const item = setter.products.findWith("id", `rapid-${i}`);
+      expect(item.get().name).toBe(`Rapid Product ${i}`);
+    }
+  });
+
+  it("should handle alternating insert/cut operations", () => {
+    const initialCount = setter.products.get().length;
+
+    // Insert 5 items
+    for (let i = 0; i < 5; i++) {
+      setter.products.insert({
+        id: `alt-${i}`,
+        name: `Alt Product ${i}`,
+        category: "books",
+        price: 50 + i,
+        inStock: false,
+      });
+    }
+    console.log("setter.products.get()", setter.products.get());
+    // Remove every other item
+    setter.products.findWith("id", "alt-1").cut();
+    setter.products.findWith("id", "alt-3").cut();
+
+    expect(setter.products.get().length).toBe(initialCount + 3);
+    expect(setter.products.findWith("id", "alt-0")).toBeDefined();
+    expect(setter.products.findWith("id", "alt-2")).toBeDefined();
+    expect(setter.products.findWith("id", "alt-4")).toBeDefined();
+  });
+
+  it("should handle deep updates through multiple filtered layers", () => {
+    // Create a complex filter chain
+    const electronicsOnly = setter.products.stateFilter(
+      (p) => p.category === "electronics"
+    );
+    const expensiveElectronics = electronicsOnly.stateFilter(
+      (p) => p.price > 100
+    );
+    const inStockExpensive = expensiveElectronics.stateFilter((p) => p.inStock);
+
+    // Should only have Laptop and Headphones
+    expect(inStockExpensive.get().map((p) => p.id)).toEqual(["p1", "p4"]);
+
+    // Update through the deeply filtered proxy
+    inStockExpensive.index(0).price.update(999);
+
+    // Verify update propagated to original
+    expect(setter.products.findWith("id", "p1").price.get()).toBe(999);
+  });
+
+  it("should handle moving items between filtered sets", () => {
+    // --- SETUP ---
+    // Get initial state of the filters
+    const initialElectronics = setter.products.stateFilter(
+      (p) => p.category === "electronics"
+    );
+    const initialBooks = setter.products.stateFilter(
+      (p) => p.category === "books"
+    );
+
+    const initialElectronicsCount = initialElectronics.get().length;
+    const initialBooksCount = initialBooks.get().length;
+
+    // --- ACTION ---
+    // Change a book to an electronic
+    setter.products.findWith("id", "p3").category.update("electronics");
+
+    // --- ASSERTION ---
+    // **CRUCIAL STEP**: Re-run the filters to get the new, updated views
+    const currentElectronics = setter.products.stateFilter(
+      (p) => p.category === "electronics"
+    );
+    const currentBooks = setter.products.stateFilter(
+      (p) => p.category === "books"
+    );
+
+    // Now, test the results of the NEW filters
+    expect(currentElectronics.get().length).toBe(initialElectronicsCount + 1);
+    expect(currentBooks.get().length).toBe(initialBooksCount - 1);
+
+    // You can also verify the specific item is in the new set
+    expect(currentElectronics.get().some((p) => p.id === "p3")).toBe(true);
+    expect(currentBooks.get().some((p) => p.id === "p3")).toBe(false);
+  });
+
+  it("should maintain selection state across filter changes", () => {
+    // Select an item
+    setter.products.findWith("id", "p4").setSelected(true);
+
+    // Create filtered view that includes selected item
+    let electronics = setter.products.stateFilter(
+      (p) => p.category === "electronics"
+    );
+    expect(electronics.getSelected()?.get().id).toBe("p4");
+
+    // Change the selected item's category so it's filtered out
+    setter.products.findWith("id", "p4").category.update("books");
+    electronics = setter.products.stateFilter(
+      (p) => p.category === "electronics"
+    );
+    // Electronics filter should no longer have a selection
+    expect(electronics.getSelected()?.get()).toBeUndefined(); //this is erroring
+
+    // But the main array still knows what's selected
+    expect(setter.products.getSelected()?.get().id).toBe("p4");
+  });
+  return;
+  it("should handle empty arrays and null edge cases", () => {
+    // Clear all products
+    const allIds = setter.products.get().map((p) => p.id);
+    allIds.forEach((id) => setter.products.findWith("id", id).cut());
+
+    expect(setter.products.get()).toEqual([]);
+    expect(setter.products.getSelected()).toBeUndefined();
+    expect(setter.products.getSelectedIndex()).toBe(-1);
+
+    // Operations on empty array should not throw
+    const filtered = setter.products.stateFilter((p) => true);
+    expect(filtered.get()).toEqual([]);
+
+    // Insert into empty array
+    setter.products.insert({
+      id: "lonely",
+      name: "Lonely Product",
+      category: "books",
+      price: 10,
+      inStock: true,
+    });
+
+    expect(setter.products.get().length).toBe(1);
+    expect(setter.products.index(0).get().id).toBe("lonely");
+  });
+
+  it("should handle sorting with duplicate values", () => {
+    // Add items with duplicate prices
+    setter.products.insert({
+      id: "dup1",
+      name: "Dup 1",
+      category: "books",
+      price: 50,
+      inStock: true,
+    });
+    setter.products.insert({
+      id: "dup2",
+      name: "Dup 2",
+      category: "books",
+      price: 50,
+      inStock: true,
+    });
+    setter.products.insert({
+      id: "dup3",
+      name: "Dup 3",
+      category: "books",
+      price: 50,
+      inStock: true,
+    });
+
+    const sorted = setter.products.stateSort((a, b) => a.price - b.price);
+    const sortedPrices = sorted.get().map((p) => p.price);
+
+    // Should be sorted with all 50s together
+    expect(sortedPrices.filter((p) => p === 50).length).toBe(3);
+
+    // Updating one of the duplicates
+    sorted.findWith("id", "dup2").price.update(51);
+
+    // Re-sort and verify order changed
+    const reSorted = setter.products.stateSort((a, b) => a.price - b.price);
+    const dup2Index = reSorted.get().findIndex((p) => p.id === "dup2");
+    const dup1Index = reSorted.get().findIndex((p) => p.id === "dup1");
+    expect(dup2Index).toBeGreaterThan(dup1Index);
+  });
+
+  it("should handle complex array transformations", () => {
+    // Get all products, group by category, then flatten back
+    const byCategory = {
+      electronics: setter.products.stateFilter(
+        (p) => p.category === "electronics"
+      ),
+      books: setter.products.stateFilter((p) => p.category === "books"),
+      apparel: setter.products.stateFilter((p) => p.category === "apparel"),
+    };
+
+    // Modify each category differently
+    byCategory.electronics.stateMap((item, setter) => {
+      setter.price.update((p) => p * 0.9); // 10% discount
+    });
+
+    byCategory.books.stateMap((item, setter) => {
+      setter.inStock.update(true); // All books in stock
+    });
+
+    byCategory.apparel.stateMap((item, setter) => {
+      setter.name.update((n) => `Sale: ${n}`); // Add sale prefix
+    });
+
+    // Verify transformations
+    const final = setter.products.get();
+    expect(final.find((p) => p.id === "p1")?.price).toBe(1080); // 1200 * 0.9
+    expect(final.find((p) => p.id === "p3")?.inStock).toBe(true);
+    expect(final.find((p) => p.id === "p2")?.name).toBe("Sale: T-Shirt");
+  });
+});

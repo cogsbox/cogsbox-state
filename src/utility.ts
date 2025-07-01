@@ -182,7 +182,7 @@ export function getNestedValue<TStateObject extends unknown>(
         });
         return undefined;
       }
-
+      console.log("kssssssssssssssssssey", key, "value", value);
       // Get the shadow state to find the index
       const parentPath = pathArray.slice(0, i);
       const shadowKey = ["stateKey", ...parentPath].join("."); // Need stateKey here
@@ -215,108 +215,7 @@ export function getNestedValue<TStateObject extends unknown>(
   }
   return value;
 }
-export function updateNestedPropertyIds(
-  path: string[],
-  state: any,
-  newValue: any,
-  stateKey?: string // Add stateKey parameter
-) {
-  if (path.length === 0) {
-    return newValue;
-  }
 
-  const newState = Array.isArray(state) ? [...state] : { ...state };
-  let current: any = newState;
-
-  for (let i = 0; i < path.length - 1; i++) {
-    const key = path[i]!;
-
-    if (typeof key === "string" && key.startsWith("id:")) {
-      if (!Array.isArray(current)) {
-        throw new Error(
-          `Path segment "${key}" requires an array, but got a non-array.`
-        );
-      }
-
-      // Get the shadow state to find the index
-      const parentPath = path.slice(0, i);
-      const shadowKey = stateKey ? [stateKey, ...parentPath].join(".") : null;
-
-      if (shadowKey) {
-        const shadowMeta = getGlobalStore
-          .getState()
-          .shadowStateStore.get(shadowKey);
-        if (shadowMeta?.arrayKeys) {
-          const index = shadowMeta.arrayKeys.indexOf(key);
-          if (index !== -1) {
-            current[index] = { ...current[index] };
-            current = current[index];
-            continue;
-          }
-        }
-      }
-
-      // Fallback to finding by ID if shadow state lookup fails
-      const targetId = key.split(":")[1];
-      const index = current.findIndex(
-        (item: any) => String(item.id) === targetId
-      );
-
-      if (index === -1) {
-        throw new Error(`Item with id "${targetId}" not found in array.`);
-      }
-      current[index] = { ...current[index] };
-      current = current[index];
-    } else {
-      current[key] = Array.isArray(current[key])
-        ? [...current[key]]
-        : { ...current[key] };
-      current = current[key];
-    }
-  }
-
-  const lastKey = path[path.length - 1]!;
-  if (typeof lastKey === "string" && lastKey.startsWith("id:")) {
-    if (!Array.isArray(current)) {
-      throw new Error(
-        `Final path segment "${lastKey}" requires an array, but got a non-array.`
-      );
-    }
-
-    // Same logic for the last key
-    const parentPath = path.slice(0, -1);
-    const shadowKey = stateKey ? [stateKey, ...parentPath].join(".") : null;
-
-    if (shadowKey) {
-      const shadowMeta = getGlobalStore
-        .getState()
-        .shadowStateStore.get(shadowKey);
-      if (shadowMeta?.arrayKeys) {
-        const index = shadowMeta.arrayKeys.indexOf(lastKey);
-        if (index !== -1) {
-          current[index] = newValue;
-          return newState;
-        }
-      }
-    }
-
-    // Fallback
-    const targetId = lastKey.split(":")[1];
-    const index = current.findIndex(
-      (item: any) => String(item.id) === targetId
-    );
-    if (index === -1) {
-      throw new Error(
-        `Item with id "${targetId}" not found in array to update.`
-      );
-    }
-    current[index] = newValue;
-  } else {
-    current[lastKey] = newValue;
-  }
-
-  return newState;
-}
 type DifferencePaths = string[];
 
 export function getDifferences(

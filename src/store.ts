@@ -134,7 +134,7 @@ export type CogsGlobalState = {
   subscribeToShadowState: (key: string, callback: () => void) => () => void;
 
   selectedIndicesMap: Map<string, string>; // stateKey -> (parentPath -> selectedIndex)
-  getSelectedIndex: (stateKey: string) => number | undefined;
+  getSelectedIndex: (stateKey: string, validArrayIds?: string[]) => number;
   setSelectedIndex: (key: string, itemKey: string) => void;
   clearSelectedIndex: ({
     stateKey,
@@ -350,18 +350,18 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
   setShadowValue: (key: string, value: any, validArrayIds?: string[]) => {
     const shadowMeta = get().shadowStateStore.get(key);
-    console.log("setShadowValue", key, value, validArrayIds);
+    console.log("setShadowValue22222", key);
     // For primitive values, set directly
     if (shadowMeta?.value !== undefined || !shadowMeta) {
       get().shadowStateStore.set(key, { value });
-      console.log("setShadowValue22222", shadowMeta);
+
       return;
     }
 
     // For arrays
     if (shadowMeta.arrayKeys) {
       const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
-
+      console.log("arrayKeys", arrayKeys);
       // Update array metadata
       get().shadowStateStore.set(key, {
         ...shadowMeta,
@@ -437,60 +437,92 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     const arrayKey = [key, ...arrayPath].join(".");
     const parentMeta = newShadowStore.get(arrayKey);
-    const newArrayState = get().getNestedState(key, arrayPath) as any[];
-
+    console.log("insertShadowArrayElement", key, arrayPath, newItem);
     if (!parentMeta || !parentMeta.arrayKeys) return;
 
-    const newItemId = `id:${newItem.id}`;
-    const newIndex = newArrayState.findIndex((item) => item.id === newItem.id);
+    // Generate the ID if it doesn't have one
 
-    if (newIndex === -1) return;
+    const newItemId = `id:${ulid()}`;
+    const fullItemKey = arrayKey + "." + newItemId;
 
+    // Just add to the end (or at a specific index if provided)
     const newArrayKeys = [...parentMeta.arrayKeys];
-    newArrayKeys.splice(newIndex, 0, newItemId);
+    newArrayKeys.push(fullItemKey); // Or use splice if you have an index
     newShadowStore.set(arrayKey, { ...parentMeta, arrayKeys: newArrayKeys });
 
+    // Process the new item - but use the correct logic
     const processNewItem = (value: any, path: string[]) => {
       const nodeKey = [key, ...path].join(".");
-      if (typeof value === "object" && value !== null) {
-        newShadowStore.set(nodeKey, { id: ulid() });
-        Object.keys(value).forEach((k) => {
-          processNewItem(value[k], [...path, k]);
+
+      if (Array.isArray(value)) {
+        // Handle arrays...
+      } else if (typeof value === "object" && value !== null) {
+        // Create fields mapping
+        const fields = Object.fromEntries(
+          Object.keys(value).map((k) => [k, nodeKey + "." + k])
+        );
+        newShadowStore.set(nodeKey, { fields });
+
+        // Process each field
+        Object.entries(value).forEach(([k, v]) => {
+          processNewItem(v, [...path, k]);
         });
       } else {
-        newShadowStore.set(nodeKey, { id: ulid() });
+        // Primitive value
+        newShadowStore.set(nodeKey, { value });
       }
     };
 
     processNewItem(newItem, [...arrayPath, newItemId]);
-
     set({ shadowStateStore: newShadowStore });
   },
-
   removeShadowArrayElement: (key: string, itemPath: string[]) => {
     const newShadowStore = new Map(get().shadowStateStore);
-    const itemKey = [key, ...itemPath].join(".");
-    const itemIdToRemove = itemPath[itemPath.length - 1];
 
+    // Get the full item key (e.g., "stateKey.products.id:xxx")
+    const itemKey = [key, ...itemPath].join(".");
+
+    // Extract parent path and item ID
     const parentPath = itemPath.slice(0, -1);
     const parentKey = [key, ...parentPath].join(".");
+    const itemIdToRemove = itemPath[itemPath.length - 1];
+
+    // Get parent metadata
     const parentMeta = newShadowStore.get(parentKey);
 
     if (parentMeta && parentMeta.arrayKeys) {
-      const newArrayKeys = parentMeta.arrayKeys.filter(
-        (id) => id !== itemIdToRemove
+      // Find the index of the item to remove
+      const indexToRemove = parentMeta.arrayKeys.findIndex(
+        (arrayItemKey) => arrayItemKey === itemKey
       );
-      newShadowStore.set(parentKey, { ...parentMeta, arrayKeys: newArrayKeys });
-    }
 
-    const prefixToDelete = itemKey + ".";
-    for (const k of Array.from(newShadowStore.keys())) {
-      if (k === itemKey || k.startsWith(prefixToDelete)) {
-        newShadowStore.delete(k);
+      if (indexToRemove !== -1) {
+        // Create new array keys with the item removed
+        const newArrayKeys = parentMeta.arrayKeys.filter(
+          (arrayItemKey) => arrayItemKey !== itemKey
+        );
+
+        // Update parent with new array keys
+        newShadowStore.set(parentKey, {
+          ...parentMeta,
+          arrayKeys: newArrayKeys,
+        });
+
+        // Delete all data associated with the removed item
+        const prefixToDelete = itemKey + ".";
+        for (const k of Array.from(newShadowStore.keys())) {
+          if (k === itemKey || k.startsWith(prefixToDelete)) {
+            newShadowStore.delete(k);
+          }
+        }
       }
     }
 
     set({ shadowStateStore: newShadowStore });
+
+    // Notify subscribers of the change
+    const subscribers = get().shadowStateSubscribers.get(key);
+    subscribers?.forEach((cb) => cb());
   },
   updateShadowAtPath: (key: string, path: string[], newValue: any) => {
     const fullKey = [key, ...path].join(".");
@@ -501,15 +533,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   selectedIndicesMap: new Map<string, string>(),
-  getSelectedIndex: (arrayKey: string): number => {
+  getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {
     const itemKey = get().selectedIndicesMap.get(arrayKey);
 
-    console.log("getSelectedIndex", arrayKey, itemKey);
     if (!itemKey) return -1;
 
-    const arrayKeys = getGlobalStore
-      .getState()
-      .getShadowMetadata(arrayKey, [])?.arrayKeys;
+    // Use validIds if provided (for filtered views), otherwise use all arrayKeys
+    const arrayKeys =
+      validIds ||
+      getGlobalStore.getState().getShadowMetadata(arrayKey, [])?.arrayKeys;
+
     if (!arrayKeys) return -1;
 
     return arrayKeys.indexOf(itemKey);
@@ -524,7 +557,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       } else {
         newMap.set(arrayKey, itemKey);
       }
-
+      console.log("setSelectedIndex", newMap);
+      const shadowstate = getGlobalStore
+        .getState()
+        .shadowStateStore.get(arrayKey);
+      console.log("shadowstate", shadowstate);
       return {
         ...state,
         selectedIndicesMap: newMap,
@@ -831,7 +868,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         const results = obj.map((item) => resolvePath(item, remainingPath));
         return Array.isArray(results[0]) ? results.flat() : results;
       }
-
+      console.log("currentSegment", currentSegment, "obj", obj);
       // Handle standard object property access and numeric array indices
       const nextObj = obj[currentSegment as keyof typeof obj];
       return resolvePath(nextObj, remainingPath);
