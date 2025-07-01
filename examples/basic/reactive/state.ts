@@ -1,4 +1,4 @@
-import { createCogsState } from "../../src/CogsState";
+import { createCogsState } from "../../../src/CogsState";
 
 const fooBarObject = {
   foo: "bar" as const,

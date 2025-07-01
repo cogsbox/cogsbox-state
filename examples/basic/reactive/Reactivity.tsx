@@ -1,7 +1,7 @@
 "use client";
 
 import type { OptionsType, ReactivityType } from "@lib/CogsState";
-import { FlashWrapper } from "./FlashOnUpdate";
+import { FlashWrapper } from "../FlashOnUpdate";
 import { type StateExampleObject, useCogsState } from "./state";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -110,7 +110,7 @@ ${!isSignal ? "fooState.foo.get()" : "fooState.foo.$get()"}`;
 
 function ShowState() {
   const fooState = useCogsState("fooBarObject", { reactiveType: ["all"] });
-  console.log("fooState---", fooState.get(), fooState.getComponents());
+
   return (
     <div className="mt-4 p-4 bg-gray-100 rounded shadow">
       <pre>{JSON.stringify(fooState.get(), null, 2)}</pre>

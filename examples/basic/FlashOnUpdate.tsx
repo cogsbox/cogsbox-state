@@ -14,8 +14,8 @@ export const FlashWrapper = ({
 
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.style.outline = "8px solid red";
-    ref.current.style.backgroundColor = "red";
+    ref.current.style.outline = "2px solid red";
+
     renderCountRef.current++;
     const timer = setTimeout(() => {
       if (ref.current) {

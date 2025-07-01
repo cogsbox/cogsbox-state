@@ -1,10 +1,8 @@
 import {
-  notifyComponent,
   type EffectiveSetState,
   type FormElementParams,
   type FormOptsType,
   type UpdateArg,
-  type UpdateOpts,
 } from "./CogsState";
 
 import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
@@ -263,7 +261,8 @@ export const FormControlComponent = <TStateObject,>({
         clearTimeout(debounceTimeoutRef.current); // Clear pending timer
         debounceTimeoutRef.current = null;
       }
-      updateFn(setState, payload, path, validationKey); // Update global state NOW
+
+      setState(payload, path, { updateType: "update" });
       isCurrentlyDebouncing.current = false; // No longer debouncing
       return; // Don't proceed to set another timeout
     }
@@ -276,7 +275,7 @@ export const FormControlComponent = <TStateObject,>({
     debounceTimeoutRef.current = setTimeout(
       () => {
         isCurrentlyDebouncing.current = false;
-        updateFn(setState, payload, path, validationKey);
+        setState(payload, path, { updateType: "update" });
       },
       formOpts?.debounceTime ??
         (typeof globalStateValue == "boolean" ? 20 : 200)
@@ -297,7 +296,7 @@ export const FormControlComponent = <TStateObject,>({
       debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
       // Ensure the absolute latest local value is committed on blur
-      updateFn(setState, localValue, path, validationKey);
+      setState(localValue, path, { updateType: "update" });
     }
     // --- End modification ---
 

@@ -322,7 +322,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     };
 
     processValue(initialState, []);
-    console.log("Updated shadow store for key:", key, existingShadowStore);
+
     set({ shadowStateStore: existingShadowStore });
   },
 

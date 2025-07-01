@@ -22,13 +22,7 @@ import {
   isFunction,
   type GenericObject,
 } from "./utility.js";
-import {
-  cutFunc,
-  FormControlComponent,
-  pushFunc,
-  updateFn,
-  ValidationWrapper,
-} from "./Functions.js";
+import { FormControlComponent, ValidationWrapper } from "./Functions.js";
 import { isDeepEqual, transformStateFunc } from "./utility.js";
 import superjson from "superjson";
 import { v4 as uuidv4 } from "uuid";
@@ -568,7 +562,6 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
-
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
@@ -579,29 +572,62 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
 
-  // Apply global formElements as defaults to each state key's options
-  if (
-    Object.keys(initialOptionsPart).length > 0 ||
-    (opt && Object.keys(opt).length > 0)
-  ) {
-    Object.keys(initialOptionsPart).forEach((key) => {
-      // Get the existing options for this state key
-      initialOptionsPart[key] = initialOptionsPart[key] || {};
+  // Apply global options to each state key
+  Object.keys(statePart).forEach((key) => {
+    // Get existing options for this state key (from addStateOptions pattern)
+    let existingOptions = initialOptionsPart[key] || {};
 
-      initialOptionsPart[key].formElements = {
-        ...opt?.formElements, // Global defaults first
-        ...opt?.validation,
-        ...(initialOptionsPart[key].formElements || {}), // State-specific overrides
+    // Create the merged options object
+    const mergedOptions: any = {
+      // Start with existing options (from addStateOptions)
+      ...existingOptions,
+    };
+
+    // Apply global formElements
+    if (opt?.formElements) {
+      mergedOptions.formElements = {
+        ...opt.formElements, // Global defaults first
+        ...(existingOptions.formElements || {}), // State-specific overrides
       };
-      const existingOptions = getInitialOptions(key);
+    }
 
-      if (!existingOptions) {
-        getGlobalStore
-          .getState()
-          .setInitialStateOptions(key, initialOptionsPart[key]);
+    // Apply global validation - this is the key fix
+    if (opt?.validation) {
+      mergedOptions.validation = {
+        ...opt.validation, // Global validation first
+        ...(existingOptions.validation || {}), // State-specific overrides
+      };
+
+      // If global validation has a key and state doesn't have one, use the state key
+      if (opt.validation.key && !existingOptions.validation?.key) {
+        mergedOptions.validation.key = `${opt.validation.key}.${key}`;
       }
-    });
-  }
+    }
+
+    // Only set if we have options to set
+    if (Object.keys(mergedOptions).length > 0) {
+      const existingGlobalOptions = getInitialOptions(key);
+
+      if (!existingGlobalOptions) {
+        getGlobalStore.getState().setInitialStateOptions(key, mergedOptions);
+      } else {
+        // Merge with existing global options
+        getGlobalStore.getState().setInitialStateOptions(key, {
+          ...existingGlobalOptions,
+          ...mergedOptions,
+        });
+      }
+    }
+  });
+
+  console.log("opt", opt, "initialOptionsPart", initialOptionsPart);
+  console.log(
+    "Final options check:",
+    Object.keys(statePart).map((key) => ({
+      key,
+      options: getInitialOptions(key),
+    }))
+  );
 
   getGlobalStore.getState().setInitialStates(statePart);
   getGlobalStore.getState().setCreatedState(statePart);
@@ -1040,11 +1066,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
-      const nestedShadowVlaue = shadowMeta?.value;
+      const nestedShadowVlaue = store.getShadowValue(fullPath);
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(nestedShadowVlaue)
         : newStateOrFunction;
-      console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkk", payload, path);
+      console.log(
+        "kkkkkkkkkkkkkkkkkkkkkkkkkkkkk nestedShadowVlaue",
+        nestedShadowVlaue
+      );
 
       const timeStamp = Date.now();
 
@@ -1494,13 +1523,10 @@ function createProxyHandler<T>(
     const cacheKey = path.map(String).join(".");
     const stateKeyPathKey = [stateKey, ...path].join(".");
 
-    // Get the current state value from shadow store
-    const shadowValue = getGlobalStore
+    currentState = getGlobalStore
       .getState()
       .getShadowValue(stateKeyPathKey, meta?.validIds);
 
-    // Use shadow value if available, otherwise fall back to passed currentState
-    currentState = shadowValue !== undefined ? shadowValue : currentState;
     type CallableStateObject<T> = {
       (): T;
     } & {
@@ -2099,11 +2125,22 @@ function createProxyHandler<T>(
               if (!arrayKeys) {
                 throw new Error("No array keys found for mapping");
               }
-              const arraySetter = rebuildStateShape(currentState, path, meta);
-              console.log("arrayKeysarrayKeys", arrayKeys);
-              return currentState.map((item, index) => {
+              const shadowValue = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
+              const arraySetter = rebuildStateShape(
+                shadowValue as any,
+                path,
+                meta
+              );
+              console.log(
+                "arrayKeysarraycurrentStatecurrentStatecurrentStatecurrentStateKeys",
+                shadowValue
+              );
+
+              return shadowValue.map((item, index) => {
                 const itemPath = arrayKeys[index]?.split(".").slice(1);
-                console.log("itemPathitemPathitemPathitemPath", itemPath);
+                console.log("itemPathitemPathitemPathitemPath", item, itemPath);
                 const itemSetter = rebuildStateShape(
                   item,
                   itemPath as any,
@@ -2114,7 +2151,7 @@ function createProxyHandler<T>(
                   item,
                   itemSetter,
                   index,
-                  currentState,
+                  shadowValue,
                   arraySetter
                 );
               });
@@ -2227,23 +2264,20 @@ function createProxyHandler<T>(
                     !meta?.validIds ||
                     (meta?.validIds && meta?.validIds?.includes(key))
                 );
-              console.log(
-                `Accessing index ${index} of array at path ${path.join(".")}`,
-                arrayKeys
-              );
+              console.log("arrayKeys", arrayKeys);
               const itemId = arrayKeys?.[index];
               if (!itemId) return undefined;
-
+              console.log("itemId", itemId);
               const value = getGlobalStore
                 .getState()
                 .getShadowValue(itemId, meta?.validIds);
-              console.log(`itemIditemIditemIditemId`, meta?.validIds, value);
+              console.log("value22222", value);
               const state = rebuildStateShape(
                 value,
                 itemId.split(".").slice(1) as string[],
                 meta
               );
-
+              console.log("state2222", state.get());
               return state;
             };
           }
@@ -2298,14 +2332,16 @@ function createProxyHandler<T>(
 
               if (isUnique) {
                 invalidateCachePath(path);
-                pushFunc(effectiveSetState, newValue, path, stateKey);
+                effectiveSetState(newValue, path, { updateType: "insert" });
               } else if (onMatch && matchedItem) {
                 const updatedItem = onMatch(matchedItem);
                 const updatedArray = currentArray.map((item) =>
                   isDeepEqual(item, matchedItem) ? updatedItem : item
                 );
                 invalidateCachePath(path);
-                updateFn(effectiveSetState, updatedArray as any, path);
+                effectiveSetState(updatedArray as any, path, {
+                  updateType: "update",
+                });
               }
             };
           }
@@ -2327,16 +2363,17 @@ function createProxyHandler<T>(
           if (prop === "cutByValue") {
             return (value: string | number | boolean) => {
               const index = currentState.findIndex((item) => item === value);
-              if (index > -1) cutFunc(effectiveSetState, path, stateKey, index);
+              if (index > -1)
+                effectiveSetState(value as any, path, { updateType: "cut" });
             };
           }
           if (prop === "toggleByValue") {
             return (value: string | number | boolean) => {
               const index = currentState.findIndex((item) => item === value);
               if (index > -1) {
-                cutFunc(effectiveSetState, path, stateKey, index);
+                effectiveSetState(value as any, path, { updateType: "cut" });
               } else {
-                pushFunc(effectiveSetState, value as any, path, stateKey);
+                effectiveSetState(value as any, path, { updateType: "insert" });
               }
             };
           }
@@ -2396,16 +2433,17 @@ function createProxyHandler<T>(
               );
             };
           }
+
           if (prop === "findWith") {
             return (
               searchKey: keyof InferArrayElement<T>,
               searchValue: any
             ) => {
               // 1. Get the LATEST version of the array from the global store.
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
+              const arrayKeys = getGlobalStore
+                .getState()
+                .getShadowMetadata(stateKey, path)?.arrayKeys;
+              console.log("ssssssssssssssssssssssssss", arrayKeys);
               if (!arrayKeys) {
                 throw new Error("No array keys found for sorting");
               }
@@ -2421,7 +2459,8 @@ function createProxyHandler<T>(
                   .getShadowValue(fullPath, meta?.validIds);
                 console.log(
                   "shadocccccccccccccwValue",
-                  shadowValue,
+                  searchKey,
+                  shadowValue[searchKey],
                   searchValue
                 );
                 if (shadowValue && shadowValue[searchKey] === searchValue) {
@@ -2429,7 +2468,6 @@ function createProxyHandler<T>(
                   foundPath = fullPath.split(".").slice(1);
                 }
               });
-              console.log("shadowAssssssssssssrrayKEy", arrayKeys, value);
 
               return rebuildStateShape(value as any, foundPath, meta);
             };
@@ -2451,13 +2489,12 @@ function createProxyHandler<T>(
             );
           };
         }
-
+        console.log("sssssssssssssssssssssssss", prop, path, currentState);
         if (prop === "get") {
           return () => {
             const value = getGlobalStore
               .getState()
               .getShadowValue(stateKeyPathKey, meta?.validIds);
-            console.log("getValue", value);
 
             return value;
           };
@@ -2535,7 +2572,7 @@ function createProxyHandler<T>(
             const nested = getGlobalStore
               .getState()
               .getNestedState(stateKey, [...parentPath]);
-            updateFn(effectiveSetState, nested, parentPath);
+            effectiveSetState(nested, parentPath, { updateType: "update" });
             invalidateCachePath(parentPath);
           };
         }
@@ -2556,8 +2593,9 @@ function createProxyHandler<T>(
           }
           if (prop === "applyJsonPatch") {
             return (patches: any[]) => {
-              const currentState =
-                getGlobalStore.getState().cogsStateStore[stateKey];
+              const currentState = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey, meta?.validIds);
               const newState = applyPatch(currentState, patches).newDocument;
               updateGlobalState(
                 stateKey,

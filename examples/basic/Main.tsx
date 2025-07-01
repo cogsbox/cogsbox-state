@@ -2,7 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 
 import FormsMain from "./form/FormMain";
-import Reactivity from "./Reactivity";
+import Reactivity from "./reactive/Reactivity";
+import ArrayReactivity from "./array-reactivity/ArrayReactivity";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -10,6 +11,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       {/* <ReactiveMain />
       <FormsMain /> */}
       <Reactivity />
+      <ArrayReactivity />
     </div>
   </React.StrictMode>
 );
