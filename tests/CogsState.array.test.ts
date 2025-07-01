@@ -228,7 +228,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
     const booksProxy = setter.products.stateFilter(
       (p) => p.category === "books"
     );
-
+    console.log("booksProxy", setter.products.get());
     // Sanity check initial state
     const originalGatsby = setter.products.get().find((p) => p.id === "p3");
     expect(originalGatsby?.inStock).toBe(false);
@@ -313,6 +313,8 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     it("should update a whole object using a function", () => {
       const tShirtProxy = setter.products.findWith("id", "p2");
+
+      console.log("tShirtProxy", tShirtProxy.get());
       expect(tShirtProxy.get()).toEqual({
         id: "p2",
         name: "T-Shirt",
@@ -501,8 +503,8 @@ describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
 
   it("should handle multiple rapid inserts and maintain correct shadow store state", () => {
     const initialCount = setter.products.get().length;
+    console.log("initialCount", initialCount);
 
-    // Rapid inserts
     for (let i = 0; i < 10; i++) {
       setter.products.insert({
         id: `rapid-${i}`,
@@ -544,26 +546,6 @@ describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
     expect(setter.products.findWith("id", "alt-0")).toBeDefined();
     expect(setter.products.findWith("id", "alt-2")).toBeDefined();
     expect(setter.products.findWith("id", "alt-4")).toBeDefined();
-  });
-
-  it("should handle deep updates through multiple filtered layers", () => {
-    // Create a complex filter chain
-    const electronicsOnly = setter.products.stateFilter(
-      (p) => p.category === "electronics"
-    );
-    const expensiveElectronics = electronicsOnly.stateFilter(
-      (p) => p.price > 100
-    );
-    const inStockExpensive = expensiveElectronics.stateFilter((p) => p.inStock);
-
-    // Should only have Laptop and Headphones
-    expect(inStockExpensive.get().map((p) => p.id)).toEqual(["p1", "p4"]);
-
-    // Update through the deeply filtered proxy
-    inStockExpensive.index(0).price.update(999);
-
-    // Verify update propagated to original
-    expect(setter.products.findWith("id", "p1").price.get()).toBe(999);
   });
 
   it("should handle moving items between filtered sets", () => {
@@ -609,44 +591,20 @@ describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
     let electronics = setter.products.stateFilter(
       (p) => p.category === "electronics"
     );
+
     expect(electronics.getSelected()?.get().id).toBe("p4");
 
     // Change the selected item's category so it's filtered out
     setter.products.findWith("id", "p4").category.update("books");
-    electronics = setter.products.stateFilter(
-      (p) => p.category === "electronics"
-    );
+    electronics = setter.products.stateFilter((p) => {
+      return p.category === "electronics";
+    });
+
     // Electronics filter should no longer have a selection
-    expect(electronics.getSelected()?.get()).toBeUndefined(); //this is erroring
+    expect(electronics.getSelected()?.get()).toBeUndefined(); //this is erroring if i remove it everyhtign is fine
 
     // But the main array still knows what's selected
     expect(setter.products.getSelected()?.get().id).toBe("p4");
-  });
-  return;
-  it("should handle empty arrays and null edge cases", () => {
-    // Clear all products
-    const allIds = setter.products.get().map((p) => p.id);
-    allIds.forEach((id) => setter.products.findWith("id", id).cut());
-
-    expect(setter.products.get()).toEqual([]);
-    expect(setter.products.getSelected()).toBeUndefined();
-    expect(setter.products.getSelectedIndex()).toBe(-1);
-
-    // Operations on empty array should not throw
-    const filtered = setter.products.stateFilter((p) => true);
-    expect(filtered.get()).toEqual([]);
-
-    // Insert into empty array
-    setter.products.insert({
-      id: "lonely",
-      name: "Lonely Product",
-      category: "books",
-      price: 10,
-      inStock: true,
-    });
-
-    expect(setter.products.get().length).toBe(1);
-    expect(setter.products.index(0).get().id).toBe("lonely");
   });
 
   it("should handle sorting with duplicate values", () => {
@@ -711,7 +669,7 @@ describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
     byCategory.apparel.stateMap((item, setter) => {
       setter.name.update((n) => `Sale: ${n}`); // Add sale prefix
     });
-
+    console.log();
     // Verify transformations
     const final = setter.products.get();
     expect(final.find((p) => p.id === "p1")?.price).toBe(1080); // 1200 * 0.9

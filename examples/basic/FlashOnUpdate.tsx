@@ -2,14 +2,12 @@ import React, { useEffect, useRef, useState } from "react";
 
 export const FlashWrapper = ({
   children,
-  title,
-  color,
-  componentId,
+
+  color = "red",
 }: {
   children: React.ReactNode;
-  title: string | React.ReactNode;
-  color: string;
-  componentId: string;
+
+  color?: string;
 }) => {
   const ref = useRef<HTMLDivElement>(null);
   const renderCountRef = useRef(0);
@@ -28,26 +26,5 @@ export const FlashWrapper = ({
     return () => clearTimeout(timer);
   });
 
-  return (
-    <div
-      ref={ref}
-      className="transition-all duration-500 bg-white rounded font-bold shadow border-2 border-gray-500"
-    >
-      <div
-        className={`flex items-center ${
-          color ? color : "bg-white"
-        } text-white   px-4 w-full   py-0.5`}
-      >
-        <div className=" flex-1"> {title} </div>
-
-        <div className="flex h-full w-[110px]  items-center  justify-center px-2">
-          Render: <div className="w-2" />
-          <span className="text-2xl ">{renderCountRef.current}</span>
-        </div>
-      </div>
-      <div className="px-8 py-4 font-normal">
-        {children} <div className="text-xs text-gray-300 ">{componentId}</div>
-      </div>
-    </div>
-  );
+  return <div ref={ref}>{children}</div>;
 };

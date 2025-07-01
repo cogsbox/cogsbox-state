@@ -29,11 +29,11 @@ export function updateFn<U>(
             .getState()
             .getShadowValue(stateKey + "." + path.join("."))
         );
-        console.group("nestedValue", path, nestedValue);
+
         let value = getGlobalStore
           .getState()
           .setShadowValue(stateKey + "." + path.join("."), nestedValue);
-        console.group("updateFn", value);
+
         if (typeof value == "string") {
           value = value.trim();
         }
@@ -79,7 +79,8 @@ export function pushFunc<U>(
     (prevState) => {
       // The logic inside here is now much simpler.
       // We already have the final `newItem`.
-      const arrayToUpdate = getNestedValue(prevState, [...path]) || [];
+      const arrayToUpdate =
+        getNestedValue(prevState, [...path], stateKey!) || [];
       const newArray = [...arrayToUpdate];
       newArray.splice(index ?? newArray.length, 0, newItem);
       return getGlobalStore
@@ -109,7 +110,7 @@ export function cutFunc<U>(
 
   setState(
     (prevState) => {
-      const arrayToUpdate = getNestedValue(prevState, [...path]);
+      const arrayToUpdate = getNestedValue(prevState, [...path], stateKey!);
       if (index < 0 || index >= arrayToUpdate?.length) {
         throw new Error(`Index ${index} does not exist in the array.`);
       }

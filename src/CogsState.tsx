@@ -38,9 +38,8 @@ import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
 import useMeasure from "react-use-measure";
-import { ulid } from "ulid";
 
-type Prettify<T> = { [K in keyof T]: T[K] } & {};
+type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
 export type VirtualViewOptions = {
   itemHeight?: number;
@@ -368,7 +367,13 @@ type CookieType<T> = {
 export type CogsCookiesType<T extends string[] = string[]> = CookieType<
   ArrayToObject<T>
 >;
-export type ReactivityType = "none" | "component" | "deps" | "all";
+export type ReactivityUnion = "none" | "component" | "deps" | "all";
+export type ReactivityType =
+  | "none"
+  | "component"
+  | "deps"
+  | "all"
+  | Array<Prettify<"none" | "component" | "deps" | "all">>;
 
 type ValidationOptionsType = {
   key?: string;
@@ -416,7 +421,7 @@ export type OptionsType<T extends unknown = unknown> = {
   formElements?: FormsElementsType;
   enabledSync?: (state: T) => boolean;
   reactiveDeps?: (state: T) => any[] | true;
-  reactiveType?: ReactivityType[] | ReactivityType;
+  reactiveType?: ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
 
   initialState?: T;
@@ -569,7 +574,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
 ) => {
   let newInitialState = initialState;
-
+  console.log("initialState", initialState);
   // Extract state parts and options using transformStateFunc
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
@@ -601,14 +606,11 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   getGlobalStore.getState().setInitialStates(statePart);
   getGlobalStore.getState().setCreatedState(statePart);
 
-  Object.keys(initialOptionsPart).forEach((key) => {
+  Object.keys(statePart).forEach((key) => {
+    console.log("initializeShadowState", key, statePart[key]);
     getGlobalStore.getState().initializeShadowState(key, statePart[key]);
   });
 
-  console.log(
-    "getGlobalStore.getState()",
-    getGlobalStore.getState().cogsStateStore["advancedTestState"]
-  );
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
@@ -844,32 +846,7 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
     }
   }
 };
-const getUpdateValues = (
-  updateType: string,
-  prevValue: any,
-  payload: any,
-  path: string[]
-) => {
-  switch (updateType) {
-    case "update":
-      return {
-        oldValue: getNestedValue(prevValue, path),
-        newValue: getNestedValue(payload, path),
-      };
-    case "insert":
-      return {
-        oldValue: null, // or undefined
-        newValue: payload,
-      };
-    case "cut":
-      return {
-        oldValue: getNestedValue(prevValue, path),
-        newValue: null, // or undefined
-      };
-    default:
-      return { oldValue: null, newValue: null };
-  }
-};
+
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -1053,17 +1030,22 @@ export function useCogsStateFn<TStateObject extends unknown>(
     updateObj: { updateType: "insert" | "cut" | "update" },
     validationKey?: string
   ) => {
+    const fullPath = [thisKey, ...path].join(".");
     if (Array.isArray(path)) {
       const pathKey = `${thisKey}-${path.join(".")}`;
       componentUpdatesRef.current.add(pathKey);
     }
     const store = getGlobalStore.getState();
+    console.log("storestorestorestorestore", store.shadowStateStore);
 
     setState(thisKey, (prevValue: TStateObject) => {
+      const nestedShadowVlaue = getGlobalStore
+        .getState()
+        .getShadowValue(fullPath);
       const payload = isFunction<TStateObject>(newStateOrFunction)
-        ? newStateOrFunction(prevValue as TStateObject)
+        ? newStateOrFunction(nestedShadowVlaue)
         : newStateOrFunction;
-
+      console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkk", payload, path);
       const signalId = `${thisKey}-${path.join(".")}`;
       if (signalId) {
         let isArrayOperation = false;
@@ -1075,7 +1057,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         ) {
           // Remove last segment (index) from path
           const arrayPath = path.slice(0, -1);
-          const arrayValue = getNestedValue(payload, arrayPath);
+          const arrayValue = getNestedValue(payload, arrayPath, stateKey!);
           // If it's an array, use that path for signal
           if (Array.isArray(arrayValue)) {
             isArrayOperation = true;
@@ -1086,8 +1068,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
         if (elements) {
           const newValue = isArrayOperation
-            ? getNestedValue(payload, path.slice(0, -1))
-            : getNestedValue(payload, path);
+            ? getNestedValue(payload, path.slice(0, -1), stateKey!)
+            : getNestedValue(payload, path, stateKey!);
           elements.forEach(({ parentId, position, effect }) => {
             const parent = document.querySelector(
               `[data-parent-id="${parentId}"]`
@@ -1243,20 +1225,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       const timeStamp = Date.now();
 
-      let { oldValue, newValue } = getUpdateValues(
-        updateObj.updateType,
-        prevValue,
-        payload,
-        path
-      );
       const newUpdate = {
         timeStamp,
         stateKey: thisKey,
         path,
         updateType: updateObj.updateType,
         status: "new" as const,
-        oldValue,
-        newValue,
+        oldValue: nestedShadowVlaue,
+        newValue: payload,
       } satisfies UpdateTypeDetail;
 
       switch (updateObj.updateType) {
@@ -1276,6 +1252,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
 
         case "update": {
+          console.log("mmmmmmmmmmmmmmmmmmmmmmmm", newUpdate, path);
           store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
           break;
         }
@@ -1409,11 +1386,11 @@ function createProxyHandler<T>(
 
       const initialState =
         getGlobalStore.getState().initialStateGlobal[stateKey];
-      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
+
       getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
       shapeCache.clear();
       stateVersion++;
-
+      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
       const newProxy = rebuildStateShape(initialState, []);
       const initalOptionsGet = getInitialOptions(stateKey as string);
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
@@ -1506,17 +1483,21 @@ function createProxyHandler<T>(
     }
   ): any {
     const cacheKey = path.map(String).join(".");
-    const cachedEntry = shapeCache.get(cacheKey);
     const stateKeyPathKey = [stateKey, ...path].join(".");
-    currentState = getGlobalStore
+
+    // Get the current state value from shadow store
+    const shadowValue = getGlobalStore
       .getState()
       .getShadowValue(stateKeyPathKey, meta?.validIds);
+
+    // Use shadow value if available, otherwise fall back to passed currentState
+    currentState = shadowValue !== undefined ? shadowValue : currentState;
     type CallableStateObject<T> = {
       (): T;
     } & {
       [key: string]: any;
     };
-    console.log("rebuildStateShaperebuildStateShape", currentState, path);
+
     const baseFunction = function () {
       return getGlobalStore().getNestedState(stateKey, path);
     } as unknown as CallableStateObject<T>;
@@ -1554,9 +1535,10 @@ function createProxyHandler<T>(
           "_stateKey",
           "getComponents",
         ]);
-        console.log("get", prop, path, currentState);
+
         if (
           prop !== "then" &&
+          typeof prop === "string" &&
           !prop.startsWith("$") &&
           prop !== "stateMapNoRender" &&
           !mutationMethods.has(prop)
@@ -1647,7 +1629,11 @@ function createProxyHandler<T>(
             .getNestedState(stateKey, path);
           const initialState =
             getGlobalStore.getState().initialStateGlobal[stateKey];
-          const initialStateAtPath = getNestedValue(initialState, path);
+          const initialStateAtPath = getNestedValue(
+            initialState,
+            path,
+            stateKey!
+          );
           return isDeepEqual(thisReactiveState, initialStateAtPath)
             ? "fresh"
             : "stale";
@@ -1660,7 +1646,11 @@ function createProxyHandler<T>(
             );
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
-            const initialStateAtPath = getNestedValue(initialState, path);
+            const initialStateAtPath = getNestedValue(
+              initialState,
+              path,
+              stateKey!
+            );
             return isDeepEqual(thisReactiveState, initialStateAtPath)
               ? "fresh"
               : "stale";
@@ -1693,16 +1683,35 @@ function createProxyHandler<T>(
           if (prop === "getSelected") {
             return () => {
               const fullKey = stateKey + "." + path.join(".");
-              const selctedIndex = getGlobalStore.getState().selectedIndicesMap;
-              if (!selctedIndex || !selctedIndex.has(fullKey)) {
+              const selectedIndicesMap =
+                getGlobalStore.getState().selectedIndicesMap;
+              console.log("selectedIndicesMap", selectedIndicesMap);
+              if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
                 return undefined;
               }
-              const itemId = selctedIndex.get(fullKey)!;
-              const value = getGlobalStore.getState().getShadowValue(itemId!);
-              if (!value) return undefined;
+
+              const selectedItemKey = selectedIndicesMap.get(fullKey)!;
+              console.log("selectedItemKey", selectedItemKey);
+              // Check if we have validIds (filtered view)
+              if (meta?.validIds) {
+                // Check if the selected item is in the filtered view
+                if (!meta.validIds.includes(selectedItemKey)) {
+                  return undefined; // Selected item is not in the filtered view
+                }
+              }
+
+              // Get the value from shadow state
+              const value = getGlobalStore
+                .getState()
+                .getShadowValue(selectedItemKey);
+
+              if (!value) {
+                return undefined;
+              }
+
               return rebuildStateShape(
                 value,
-                itemId.split(".").slice(1) as string[],
+                selectedItemKey.split(".").slice(1) as string[],
                 meta
               );
             };
@@ -2058,6 +2067,7 @@ function createProxyHandler<T>(
               };
             };
           }
+
           if (prop === "stateMap") {
             return (
               callbackfn: (
@@ -2320,38 +2330,29 @@ function createProxyHandler<T>(
             return (callbackfn: (value: any, index: number) => boolean) => {
               const arrayKeys =
                 meta?.validIds ??
-                getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path)
-                  ?.arrayKeys?.filter(
-                    (key) =>
-                      !meta?.validIds ||
-                      (meta?.validIds && meta?.validIds?.includes(key))
-                  );
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+
               if (!arrayKeys) {
-                throw new Error("No array keys found for sorting");
+                throw new Error("No array keys found for filtering.");
               }
+
               const newValidIds: string[] = [];
               const filteredArray = currentState.filter(
                 (val: any, index: number) => {
-                  console.log("kkkkkkkk", val, index, callbackfn(val, index));
-                  const value = getGlobalStore
-                    .getState()
-                    .getShadowValue(arrayKeys[index]!, meta?.validIds);
-                  if (callbackfn(value, index)) {
+                  // Call the callback ONCE and store the result
+                  const didPass = callbackfn(val, index);
+
+                  // Now use the result
+                  if (didPass) {
                     newValidIds.push(arrayKeys[index]!);
                     return true;
                   }
                   return false;
                 }
               );
-              console.log(
-                "mmmmmmmmmmmmmmmmmmmmm",
-                filteredArray,
-                path,
-                newValidIds
-              );
-              return rebuildStateShape(filteredArray! as any, path, {
+
+              return rebuildStateShape(filteredArray as any, path, {
                 validIds: newValidIds,
               });
             };
@@ -2436,19 +2437,13 @@ function createProxyHandler<T>(
             );
           };
         }
-        console.log("prop", prop, path);
-        /*prop products []
-prop getSelected [ 'products' ]*/
+
         if (prop === "get") {
           return () => {
-            console.log(
-              `Getting value for ${stateKey} at path ${path.join(".")}`
-            );
             const value = getGlobalStore
               .getState()
               .getShadowValue(stateKeyPathKey, meta?.validIds);
-
-            console.log(`Value retrieved:`, value);
+            console.log("getValue", value);
 
             return value;
           };
@@ -2628,21 +2623,10 @@ prop getSelected [ 'products' ]*/
         if (prop === "_isServerSynced") return baseObj._isServerSynced;
         if (prop === "update") {
           return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
-            if (opts?.debounce) {
-              debounce(() => {
-                updateFn(effectiveSetState, payload, path, "", stateKey);
-                const newValue = getGlobalStore
-                  .getState()
-                  .getNestedState(stateKey, path);
-                if (opts?.afterUpdate) opts.afterUpdate(newValue);
-              }, opts.debounce);
-            } else {
-              updateFn(effectiveSetState, payload, path, "", stateKey);
-              const newValue = getGlobalStore
-                .getState()
-                .getNestedState(stateKey, path);
-              if (opts?.afterUpdate) opts.afterUpdate(newValue);
-            }
+            // currentState should now be the correct value
+
+            // Pass resolved value
+            effectiveSetState(payload as any, path, { updateType: "update" });
             invalidateCachePath(path);
           };
         }

@@ -276,7 +276,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     };
   },
   initializeShadowState: (key: string, initialState: any) => {
-    const newShadowStore = new Map<string, ShadowMetadata>();
+    // Get the existing shadow store
+    const existingShadowStore = new Map(get().shadowStateStore);
 
     const processValue = (value: any, path: string[]) => {
       const nodeKey = [key, ...path].join(".");
@@ -291,43 +292,48 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         });
 
         // Set the array metadata FIRST
-        newShadowStore.set(nodeKey, { arrayKeys: childIds });
+        existingShadowStore.set(nodeKey, { arrayKeys: childIds });
 
         // THEN process each item
         value.forEach((item, index) => {
           const itemId = childIds[index]!.split(".").pop(); // Extract just the id:xxx part
-
           processValue(item, [...path!, itemId!]);
         });
       } else if (typeof value === "object" && value !== null) {
         const fields = Object.fromEntries(
           Object.keys(value).map((k) => [k, nodeKey + "." + k])
         );
-        newShadowStore.set(nodeKey, { fields });
+        existingShadowStore.set(nodeKey, { fields });
 
         Object.keys(value).forEach((k) => {
           processValue(value[k], [...path, k]);
         });
       } else {
-        newShadowStore.set(nodeKey, { value });
+        // Primitive value - store with value property
+        existingShadowStore.set(nodeKey, { value });
       }
     };
 
     processValue(initialState, []);
-    console.log("newShadowStore", newShadowStore);
-    set({ shadowStateStore: newShadowStore });
+    console.log("Updated shadow store for key:", key, existingShadowStore);
+    set({ shadowStateStore: existingShadowStore });
   },
 
   getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
     const shadowMeta = get().shadowStateStore.get(fullKey);
 
-    // For primitive values, return as is
-    if (shadowMeta?.value !== undefined) {
+    // If no metadata found, return undefined
+    if (!shadowMeta) {
+      return undefined;
+    }
+
+    // For primitive values, return the value
+    if (shadowMeta.value !== undefined) {
       return shadowMeta.value;
     }
 
     // For arrays, reconstruct with possible validArrayIds
-    if (shadowMeta?.arrayKeys) {
+    if (shadowMeta.arrayKeys) {
       const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
       const items = arrayKeys.map((itemKey) => {
         // RECURSIVELY call getShadowValue for each item
@@ -337,7 +343,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
 
     // For objects with fields, reconstruct object
-    if (shadowMeta?.fields) {
+    if (shadowMeta.fields) {
       const reconstructedObject: any = {};
       Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
         // RECURSIVELY call getShadowValue for each field
@@ -346,11 +352,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return reconstructedObject;
     }
 
-    return shadowMeta;
+    return undefined;
   },
   setShadowValue: (key: string, value: any, validArrayIds?: string[]) => {
     const shadowMeta = get().shadowStateStore.get(key);
-    console.log("setShadowValue22222", key);
+
     // For primitive values, set directly
     if (shadowMeta?.value !== undefined || !shadowMeta) {
       get().shadowStateStore.set(key, { value });
@@ -361,7 +367,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // For arrays
     if (shadowMeta.arrayKeys) {
       const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
-      console.log("arrayKeys", arrayKeys);
+
       // Update array metadata
       get().shadowStateStore.set(key, {
         ...shadowMeta,
@@ -524,14 +530,56 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const subscribers = get().shadowStateSubscribers.get(key);
     subscribers?.forEach((cb) => cb());
   },
-  updateShadowAtPath: (key: string, path: string[], newValue: any) => {
-    const fullKey = [key, ...path].join(".");
+  updateShadowAtPath: (key, path, newValue) => {
     const newShadowStore = new Map(get().shadowStateStore);
-    const existing = newShadowStore.get(fullKey) || { id: ulid() };
-    newShadowStore.set(fullKey, { ...existing, lastUpdated: Date.now() });
-    set({ shadowStateStore: newShadowStore });
-  },
+    const fullKey = [key, ...path].join(".");
 
+    // This is the recursive function that does the real work.
+    const updateValue = (currentKey: any, valueToSet: any) => {
+      const meta = newShadowStore.get(currentKey);
+
+      // Case 1: The value to set is an object (but not an array)
+      if (
+        typeof valueToSet === "object" &&
+        valueToSet !== null &&
+        !Array.isArray(valueToSet)
+      ) {
+        // This is the logic that was missing.
+        // We must find the metadata for this object to know its children's paths.
+        if (meta && meta.fields) {
+          // For each key in the new object (e.g., 'name', 'price')...
+          for (const fieldKey in valueToSet) {
+            if (Object.prototype.hasOwnProperty.call(valueToSet, fieldKey)) {
+              const childPath = meta.fields[fieldKey];
+              const childValue = valueToSet[fieldKey];
+              // ...if a child path exists, recursively call updateValue on it.
+              if (childPath) {
+                updateValue(childPath, childValue);
+              }
+            }
+          }
+        } else {
+          console.warn(
+            `Attempted to update an object at ${currentKey}, but no 'fields' metadata was found.`
+          );
+        }
+      }
+      // Case 2: The value is a primitive (or an array, which we treat as a whole value here)
+      else {
+        const existing = newShadowStore.get(currentKey) || {};
+        newShadowStore.set(currentKey, { ...existing, value: valueToSet });
+      }
+    };
+
+    // Start the recursive update process from the top-level key for this update.
+    updateValue(fullKey, newValue);
+
+    // Set the new shadow store in state.
+    set({ shadowStateStore: newShadowStore });
+
+    // Important: After the shadow is updated, trigger a reconstruction and UI update.
+    // This is handled by the logic that calls `updateShadowAtPath`.
+  },
   selectedIndicesMap: new Map<string, string>(),
   getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {
     const itemKey = get().selectedIndicesMap.get(arrayKey);

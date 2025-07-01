@@ -164,7 +164,8 @@ export function deleteNestedProperty(path: string[], state: any): any {
 }
 export function getNestedValue<TStateObject extends unknown>(
   obj: TStateObject,
-  pathArray: string[]
+  pathArray: string[],
+  stateKey: string // <-- ADD THIS ARGUMENT
 ) {
   let value: any = obj;
 
@@ -182,31 +183,42 @@ export function getNestedValue<TStateObject extends unknown>(
         });
         return undefined;
       }
-      console.log("kssssssssssssssssssey", key, "value", value);
-      // Get the shadow state to find the index
-      const parentPath = pathArray.slice(0, i);
-      const shadowKey = ["stateKey", ...parentPath].join("."); // Need stateKey here
-      const shadowMeta = getGlobalStore
-        .getState()
-        .shadowStateStore.get(shadowKey);
 
-      if (!shadowMeta?.arrayKeys) {
+      // --- START OF THE SURGICAL FIX ---
+
+      // 1. Construct the FULL path of the item we are looking for.
+      const parentPath = pathArray.slice(0, i);
+      const fullItemPathToFind = [stateKey, ...parentPath, key].join(".");
+
+      // 2. Get the metadata for the PARENT array.
+      const parentShadowKey = [stateKey, ...parentPath].join(".");
+      const parentShadowMeta = getGlobalStore
+        .getState()
+        .shadowStateStore.get(parentShadowKey);
+
+      if (!parentShadowMeta?.arrayKeys) {
         console.error(
-          "No arrayKeys found in shadow state for path:",
-          parentPath
+          "No arrayKeys found in shadow state for parent path:",
+          parentShadowKey
         );
         return undefined;
       }
 
-      // Find the index of this ID in the arrayKeys
-      const itemIndex = shadowMeta.arrayKeys.indexOf(key);
+      // 3. Find the INDEX of the full item path in the parent's arrayKeys.
+      const itemIndex = parentShadowMeta.arrayKeys.indexOf(fullItemPathToFind);
+
       if (itemIndex === -1) {
-        console.error(`ID ${key} not found in arrayKeys`);
+        console.error(
+          `Item key ${fullItemPathToFind} not found in parent's arrayKeys:`,
+          parentShadowMeta.arrayKeys
+        );
         return undefined;
       }
 
-      // Get the item at that index
+      // 4. Use that index to get the item from the plain JS array.
       value = value[itemIndex];
+
+      // --- END OF THE SURGICAL FIX ---
     } else if (Array.isArray(value)) {
       value = value[parseInt(key)];
     } else {
