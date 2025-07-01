@@ -801,12 +801,12 @@ const updateGlobalState = (
 };
 
 const notifyComponents = (thisKey: string) => {
-  const stateEntry = getGlobalStore.getState().stateComponents.get(thisKey);
+  const stateEntry = getGlobalStore.getState().getShadowMetadata(thisKey, []);
   if (!stateEntry) return;
 
   // Batch component updates
   const updates = new Set<() => void>();
-  stateEntry.components.forEach((component) => {
+  stateEntry?.components?.forEach((component) => {
     const reactiveTypes = component
       ? Array.isArray(component.reactiveType)
         ? component.reactiveType
@@ -824,10 +824,10 @@ const notifyComponents = (thisKey: string) => {
 };
 
 export const notifyComponent = (stateKey: string, componentId: string) => {
-  const stateEntry = getGlobalStore.getState().stateComponents.get(stateKey);
+  const stateEntry = getGlobalStore.getState().getShadowMetadata(stateKey, []);
   if (stateEntry) {
     const fullComponentId = `${stateKey}////${componentId}`;
-    const component = stateEntry.components.get(fullComponentId);
+    const component = stateEntry?.components?.get(fullComponentId);
     const reactiveTypes = component
       ? Array.isArray(component.reactiveType)
         ? component.reactiveType
@@ -958,11 +958,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         componentIdRef.current,
         sessionId
       );
-      console.log(
-        "stateobecjt",
-        thisKey,
-        getGlobalStore.getState().cogsStateStore[thisKey]
-      );
+
       // Save to localStorage if we used server data
       if (isFromServer && localkey && sessionId) {
         saveToLocalStorage(newState, thisKey, options, sessionId, Date.now());
@@ -997,29 +993,34 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
 
     const componentKey = `${thisKey}////${componentIdRef.current}`;
-    const stateEntry = getGlobalStore
-      .getState()
-      .stateComponents.get(thisKey) || {
-      components: new Map(),
-    };
 
-    stateEntry.components.set(componentKey, {
+    // Register component in shadow metadata at root level
+    const rootMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+    const components = rootMeta?.components || new Map();
+
+    components.set(componentKey, {
       forceUpdate: () => forceUpdate({}),
-      paths: new Set(),
-      deps: [],
-      depsFunction: reactiveDeps || undefined,
       reactiveType: reactiveType ?? ["component", "deps"],
+      paths: new Set(),
+      depsFunction: reactiveDeps || undefined,
+      lastDeps: reactiveDeps
+        ? reactiveDeps(getGlobalStore.getState().cogsStateStore[thisKey])
+        : [],
     });
 
-    getGlobalStore.getState().stateComponents.set(thisKey, stateEntry);
-    //need to force update to create the stateUpdates references
+    getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+      ...rootMeta,
+      components,
+    });
+
     forceUpdate({});
+
     return () => {
-      if (stateEntry) {
-        stateEntry.components.delete(componentKey);
-        if (stateEntry.components.size === 0) {
-          getGlobalStore.getState().stateComponents.delete(thisKey);
-        }
+      // Cleanup: remove component from shadow metadata
+      const meta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+      if (meta?.components) {
+        meta.components.delete(componentKey);
+        getGlobalStore.getState().setShadowMetadata(thisKey, [], meta);
       }
     };
   }, []);
@@ -1036,55 +1037,79 @@ export function useCogsStateFn<TStateObject extends unknown>(
       componentUpdatesRef.current.add(pathKey);
     }
     const store = getGlobalStore.getState();
-    console.log("storestorestorestorestore", store.shadowStateStore);
 
     setState(thisKey, (prevValue: TStateObject) => {
-      const nestedShadowVlaue = getGlobalStore
-        .getState()
-        .getShadowValue(fullPath);
+      const shadowMeta = store.getShadowMetadata(thisKey, path);
+      const nestedShadowVlaue = shadowMeta?.value;
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(nestedShadowVlaue)
         : newStateOrFunction;
       console.log("kkkkkkkkkkkkkkkkkkkkkkkkkkkkk", payload, path);
-      const signalId = `${thisKey}-${path.join(".")}`;
-      if (signalId) {
-        let isArrayOperation = false;
-        let elements = store.signalDomElements.get(signalId);
 
-        if (
-          (!elements || elements.size === 0) &&
-          (updateObj.updateType === "insert" || updateObj.updateType === "cut")
-        ) {
-          // Remove last segment (index) from path
-          const arrayPath = path.slice(0, -1);
-          const arrayValue = getNestedValue(payload, arrayPath, stateKey!);
-          // If it's an array, use that path for signal
-          if (Array.isArray(arrayValue)) {
-            isArrayOperation = true;
-            const arraySignalId = `${thisKey}-${arrayPath.join(".")}`;
-            elements = store.signalDomElements.get(arraySignalId);
-          }
+      const timeStamp = Date.now();
+
+      const newUpdate = {
+        timeStamp,
+        stateKey: thisKey,
+        path,
+        updateType: updateObj.updateType,
+        status: "new" as const,
+        oldValue: nestedShadowVlaue,
+        newValue: payload,
+      } satisfies UpdateTypeDetail;
+
+      switch (updateObj.updateType) {
+        case "insert": {
+          store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
+          break;
         }
+        case "cut": {
+          store.removeShadowArrayElement(thisKey, path);
+          break;
+        }
+        case "update": {
+          store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
+          break;
+        }
+      }
 
-        if (elements) {
-          const newValue = isArrayOperation
-            ? getNestedValue(payload, path.slice(0, -1), stateKey!)
-            : getNestedValue(payload, path, stateKey!);
-          elements.forEach(({ parentId, position, effect }) => {
-            const parent = document.querySelector(
-              `[data-parent-id="${parentId}"]`
-            );
-            if (parent) {
-              const childNodes = Array.from(parent.childNodes);
-              if (childNodes[position]) {
-                const displayValue = effect
-                  ? new Function("state", `return (${effect})(state)`)(newValue)
-                  : newValue;
-                childNodes[position].textContent = String(displayValue);
+      // Only process signals if they exist
+      if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
+        // Get the updated value from shadow store
+        const updatedShadowValue = store.getShadowValue(fullPath);
+
+        shadowMeta.signals.forEach(({ parentId, position, effect }) => {
+          const parent = document.querySelector(
+            `[data-parent-id="${parentId}"]`
+          );
+          if (parent) {
+            const childNodes = Array.from(parent.childNodes);
+            if (childNodes[position]) {
+              let displayValue = updatedShadowValue;
+              if (effect) {
+                try {
+                  displayValue = new Function(
+                    "state",
+                    `return (${effect})(state)`
+                  )(updatedShadowValue);
+                } catch (err) {
+                  console.error("Error evaluating effect function:", err);
+                  displayValue = updatedShadowValue;
+                }
               }
+
+              if (
+                displayValue !== null &&
+                displayValue !== undefined &&
+                typeof displayValue === "object"
+              ) {
+                displayValue = JSON.stringify(displayValue);
+              }
+
+              childNodes[position].textContent = String(displayValue ?? "");
             }
-          });
-        }
+          }
+        });
       }
 
       if (
@@ -1133,9 +1158,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         });
       }
-
-      const stateEntry = store.stateComponents.get(thisKey);
-      if (stateEntry) {
+      // Get the root shadow metadata where components are stored
+      const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
+      if (shadowMetaRoort?.components) {
         const changedPaths = getDifferences(prevValue, payload);
         const changedPathsSet = new Set(changedPaths);
         const primaryPathToCheck =
@@ -1146,11 +1171,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
         for (const [
           componentKey,
           component,
-        ] of stateEntry.components.entries()) {
+        ] of shadowMetaRoort.components.entries()) {
           let shouldUpdate = false;
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
+
+          console.log("reactiveTypes", reactiveTypes, componentKey, thisKey);
 
           if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
@@ -1205,11 +1232,27 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           if (!shouldUpdate && reactiveTypes.includes("deps")) {
             if (component.depsFunction) {
-              const depsResult = component.depsFunction(payload);
+              const fullState = store.getNestedState(thisKey, []); //onyl works 2 times
+              const depsResult = component.depsFunction(fullState);
+              console.log(
+                "deps changed for",
+                componentKey,
+                component,
+                "reactiveTypesssssssssssssssssssssssss1111",
+                fullState,
+                depsResult
+              );
               let depsChanged = false;
               if (typeof depsResult === "boolean") {
                 if (depsResult) depsChanged = true;
               } else if (!isDeepEqual(component.deps, depsResult)) {
+                console.log(
+                  "deps changed for",
+                  componentKey,
+                  "reactiveTypesssssssssssssssssssssssss222",
+                  component.deps,
+                  isDeepEqual(component.deps, depsResult)
+                );
                 component.deps = depsResult;
                 depsChanged = true;
               }
@@ -1221,40 +1264,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (shouldUpdate) {
             component.forceUpdate();
           }
-        }
-      }
-      const timeStamp = Date.now();
-
-      const newUpdate = {
-        timeStamp,
-        stateKey: thisKey,
-        path,
-        updateType: updateObj.updateType,
-        status: "new" as const,
-        oldValue: nestedShadowVlaue,
-        newValue: payload,
-      } satisfies UpdateTypeDetail;
-
-      switch (updateObj.updateType) {
-        case "insert": {
-          console.log("parentPath", newUpdate, path);
-          // If the path is empty, we are inserting at the
-          // Ensure `newValue` is not undefined before inserting. It should be the new object.
-          if (newUpdate.newValue) {
-            store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
-          }
-          break;
-        }
-
-        case "cut": {
-          store.removeShadowArrayElement(thisKey, path);
-          break;
-        }
-
-        case "update": {
-          console.log("mmmmmmmmmmmmmmmmmmmmmmmm", newUpdate, path);
-          store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
-          break;
         }
       }
 
@@ -1306,7 +1315,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
-      return payload;
+      return store.getShadowValue(thisKey);
     });
   };
   if (!getGlobalStore.getState().updaterState[thisKey]) {
@@ -1341,7 +1350,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
     StateObject<TStateObject>,
   ];
 }
-
+type MetaData = {
+  validIds?: string[];
+};
 function createProxyHandler<T>(
   stateKey: string,
   effectiveSetState: EffectiveSetState<T>,
@@ -1354,7 +1365,7 @@ function createProxyHandler<T>(
   };
   const shapeCache = new Map<string, CacheEntry>();
   let stateVersion = 0;
-
+  console.log("componentId", componentId);
   const invalidateCachePath = (path: string[]) => {
     const pathKey = path.join(".");
     for (const [key] of shapeCache) {
@@ -1407,9 +1418,9 @@ function createProxyHandler<T>(
       setState(stateKey, initialState);
       const stateEntry = getGlobalStore
         .getState()
-        .stateComponents.get(stateKey);
+        .getShadowMetadata(stateKey, []);
       if (stateEntry) {
-        stateEntry.components.forEach((component) => {
+        stateEntry?.components?.forEach((component) => {
           component.forceUpdate();
         });
       }
@@ -1445,10 +1456,10 @@ function createProxyHandler<T>(
         setState(stateKey, newState);
         const stateEntry = getGlobalStore
           .getState()
-          .stateComponents.get(stateKey);
+          .getShadowMetadata(stateKey, []);
 
         if (stateEntry) {
-          stateEntry.components.forEach((component) => {
+          stateEntry?.components?.forEach((component) => {
             component.forceUpdate();
           });
         }
@@ -1478,9 +1489,7 @@ function createProxyHandler<T>(
   function rebuildStateShape(
     currentState: T,
     path: string[] = [],
-    meta?: {
-      validIds?: string[];
-    }
+    meta?: MetaData
   ): any {
     const cacheKey = path.map(String).join(".");
     const stateKeyPathKey = [stateKey, ...path].join(".");
@@ -1544,28 +1553,33 @@ function createProxyHandler<T>(
           !mutationMethods.has(prop)
         ) {
           const fullComponentId = `${stateKey}////${componentId}`;
-          const stateEntry = getGlobalStore
-            .getState()
-            .stateComponents.get(stateKey);
 
-          if (stateEntry) {
-            const component = stateEntry.components.get(fullComponentId);
-            if (component && !component.paths.has("")) {
-              const currentPath = path.join(".");
-              let needsAdd = true;
-              for (const existingPath of component.paths) {
-                if (
-                  currentPath.startsWith(existingPath) &&
-                  (currentPath === existingPath ||
-                    currentPath[existingPath.length] === ".")
-                ) {
-                  needsAdd = false;
-                  break;
-                }
+          // Get from shadow metadata instead of stateComponents
+          const rootMeta = getGlobalStore
+            .getState()
+            .getShadowMetadata(stateKey, []);
+          const component = rootMeta?.components?.get(fullComponentId);
+
+          if (component) {
+            const currentPath = [...path, prop].join(".");
+
+            let needsAdd = true;
+            for (const existingPath of component.paths) {
+              if (
+                currentPath.startsWith(existingPath) &&
+                (currentPath === existingPath ||
+                  currentPath[existingPath.length] === ".")
+              ) {
+                needsAdd = false;
+                break;
               }
-              if (needsAdd) {
-                component.paths.add(currentPath);
-              }
+            }
+            if (needsAdd && rootMeta) {
+              component.paths.add(currentPath);
+              // Update shadow metadata with the modified component
+              getGlobalStore
+                .getState()
+                .setShadowMetadata(stateKey, [], rootMeta);
             }
           }
         }
@@ -2454,10 +2468,12 @@ function createProxyHandler<T>(
               _stateKey: stateKey,
               _path: path,
               _effect: fn.toString(),
+              _meta: meta,
             });
         }
         if (prop === "$get") {
-          return () => $cogsSignal({ _stateKey: stateKey, _path: path });
+          return () =>
+            $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
         }
         if (prop === "lastSynced") {
           const syncKey = `${stateKey}:${path.join(".")}`;
@@ -2578,6 +2594,7 @@ function createProxyHandler<T>(
               return true;
             };
           }
+
           if (prop === "_componentId") return componentId;
           if (prop === "getComponents")
             return () => getGlobalStore().stateComponents.get(stateKey);
@@ -2667,6 +2684,8 @@ export function $cogsSignal(proxy: {
   _path: string[];
   _stateKey: string;
   _effect?: string;
+
+  _meta?: MetaData;
 }) {
   return createElement(SignalRenderer, { proxy });
 }
@@ -2678,6 +2697,7 @@ function SignalMapRenderer({
   proxy: {
     _stateKey: string;
     _path: string[];
+    _meta?: MetaData;
     _mapFn: (
       value: any,
       setter: any,
@@ -2686,13 +2706,14 @@ function SignalMapRenderer({
       arraySetter: any
     ) => ReactNode;
   };
-  rebuildStateShape: (
-    currentState: any,
-    path: string[],
-    meta?: { validIds?: string[] }
-  ) => any;
+  rebuildStateShape: (currentState: any, path: string[]) => any;
 }) {
-  const value = getGlobalStore().getNestedState(proxy._stateKey, proxy._path);
+  const value = getGlobalStore().getShadowValue(
+    [proxy._stateKey, proxy._path].join("."),
+    proxy._meta?.validIds
+  );
+
+  console.log("signal value", value, proxy._path, proxy._stateKey);
   if (!Array.isArray(value)) return null;
 
   const arraySetter = rebuildStateShape(
@@ -2713,86 +2734,107 @@ function SignalRenderer({
     _path: string[];
     _stateKey: string;
     _effect?: string;
+    _meta?: MetaData;
   };
 }) {
   const elementRef = useRef<HTMLSpanElement>(null);
+  const instanceIdRef = useRef<string | null>(null);
+  const isSetupRef = useRef(false);
   const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
+  const value = getGlobalStore().getShadowValue(
+    [proxy._stateKey, ...proxy._path].join("."),
+    proxy._meta?.validIds
+  );
 
+  // Setup effect - runs only once
   useEffect(() => {
     const element = elementRef.current;
-    if (!element || !element.parentElement) return;
+    if (!element || isSetupRef.current) return;
 
-    const parentElement = element.parentElement;
-    const childNodes = Array.from(parentElement.childNodes);
-    const position = childNodes.indexOf(element);
-
-    let parentId = parentElement.getAttribute("data-parent-id");
-    if (!parentId) {
-      parentId = `parent-${crypto.randomUUID()}`;
-      parentElement.setAttribute("data-parent-id", parentId);
-    }
-
-    const instanceId = `instance-${crypto.randomUUID()}`;
-    const elementInfo = {
-      instanceId,
-      parentId,
-      position,
-      effect: proxy._effect,
-    };
-
-    getGlobalStore.getState().addSignalElement(signalId, elementInfo);
-
-    const value = getGlobalStore
-      .getState()
-      .getNestedState(proxy._stateKey, proxy._path);
-    let displayValue = value;
-    if (proxy._effect) {
-      try {
-        displayValue = new Function(
-          "state",
-          `return (${proxy._effect})(state)`
-        )(value);
-      } catch (err) {
-        console.error("Error evaluating effect function:", err);
+    const timeoutId = setTimeout(() => {
+      if (!element.parentElement) {
+        console.warn("Parent element not found for signal", signalId);
+        return;
       }
-    }
 
-    if (displayValue !== null && typeof displayValue === "object") {
-      displayValue = JSON.stringify(displayValue);
-    }
+      const parentElement = element.parentElement;
+      const childNodes = Array.from(parentElement.childNodes);
+      const position = childNodes.indexOf(element);
 
-    const textNode = document.createTextNode(String(displayValue));
-    element.replaceWith(textNode);
-  }, [proxy._stateKey, proxy._path.join("."), proxy._effect]);
+      let parentId = parentElement.getAttribute("data-parent-id");
+      if (!parentId) {
+        parentId = `parent-${crypto.randomUUID()}`;
+        parentElement.setAttribute("data-parent-id", parentId);
+      }
+
+      instanceIdRef.current = `instance-${crypto.randomUUID()}`;
+
+      // Store signal info in shadow metadata
+      const currentMeta =
+        getGlobalStore
+          .getState()
+          .getShadowMetadata(proxy._stateKey, proxy._path) || {};
+      const signals = currentMeta.signals || [];
+      signals.push({
+        instanceId: instanceIdRef.current,
+        parentId,
+        position,
+        effect: proxy._effect,
+      });
+
+      getGlobalStore
+        .getState()
+        .setShadowMetadata(proxy._stateKey, proxy._path, {
+          ...currentMeta,
+          signals,
+        });
+
+      let displayValue = value;
+      if (proxy._effect) {
+        try {
+          displayValue = new Function(
+            "state",
+            `return (${proxy._effect})(state)`
+          )(value);
+        } catch (err) {
+          console.error("Error evaluating effect function:", err);
+        }
+      }
+
+      if (displayValue !== null && typeof displayValue === "object") {
+        displayValue = JSON.stringify(displayValue);
+      }
+
+      const textNode = document.createTextNode(String(displayValue));
+      element.replaceWith(textNode);
+      isSetupRef.current = true;
+    }, 0);
+
+    // Cleanup only on unmount
+    return () => {
+      clearTimeout(timeoutId);
+      if (instanceIdRef.current) {
+        const currentMeta =
+          getGlobalStore
+            .getState()
+            .getShadowMetadata(proxy._stateKey, proxy._path) || {};
+        if (currentMeta.signals) {
+          currentMeta.signals = currentMeta.signals.filter(
+            (s) => s.instanceId !== instanceIdRef.current
+          );
+          getGlobalStore
+            .getState()
+            .setShadowMetadata(proxy._stateKey, proxy._path, currentMeta);
+        }
+      }
+    };
+  }, []); // Empty deps - only run once
 
   return createElement("span", {
     ref: elementRef,
-    style: { display: "none" },
+    style: { display: "contents" },
     "data-signal-id": signalId,
   });
-}
-
-export function $cogsSignalStore(proxy: {
-  _path: string[];
-  _stateKey: string;
-}) {
-  const value = useSyncExternalStore(
-    (notify) => {
-      const stateEntry = getGlobalStore
-        .getState()
-        .stateComponents.get(proxy._stateKey) || { components: new Map() };
-      stateEntry.components.set(proxy._stateKey, {
-        forceUpdate: notify,
-        paths: new Set([proxy._path.join(".")]),
-      });
-      getGlobalStore
-        .getState()
-        .stateComponents.set(proxy._stateKey, stateEntry);
-      return () => stateEntry.components.delete(proxy._stateKey);
-    },
-    () => getGlobalStore.getState().getNestedState(proxy._stateKey, proxy._path)
-  );
-  return createElement("text", {}, String(value));
 }
 
 function CogsItemWrapper({
@@ -2833,17 +2875,18 @@ function CogsItemWrapper({
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore
       .getState()
-      .stateComponents.get(stateKey) || { components: new Map() };
-    stateEntry.components.set(fullComponentId, {
+      .getShadowMetadata(stateKey, []);
+    stateEntry?.components?.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set([itemPath.join(".")]),
+      reactiveType: ["component"],
     });
-    getGlobalStore.getState().stateComponents.set(stateKey, stateEntry);
+
     return () => {
-      const currentEntry = getGlobalStore
+      const stateEntry = getGlobalStore
         .getState()
-        .stateComponents.get(stateKey);
-      if (currentEntry) currentEntry.components.delete(fullComponentId);
+        .getShadowMetadata(stateKey, []);
+      if (stateEntry) stateEntry?.components?.delete(fullComponentId);
     };
   }, [stateKey, itemComponentId, itemPath.join(".")]);
 

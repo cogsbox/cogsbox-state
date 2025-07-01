@@ -30,18 +30,7 @@ export type TrieNode = {
   subscribers: Set<string>;
   children: Map<string, TrieNode>;
 };
-export type ComponentsType = {
-  components: Map<
-    string,
-    {
-      forceUpdate: () => void;
-      paths: Set<string>;
-      deps?: any[];
-      depsFunction?: (state: any) => any[] | true;
-      reactiveType: ReactivityType[] | ReactivityType;
-    }
-  >;
-};
+
 export type FormRefStoreState = {
   formRefs: Map<string, React.RefObject<any>>;
   registerFormRef: (id: string, ref: React.RefObject<any>) => void;
@@ -87,7 +76,18 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
     return filteredRefs;
   },
 }));
-
+export type ComponentsType = {
+  components?: Map<
+    string,
+    {
+      forceUpdate: () => void;
+      paths: Set<string>;
+      deps?: any[];
+      depsFunction?: (state: any) => any[] | true;
+      reactiveType: ReactivityType[] | ReactivityType;
+    }
+  >;
+};
 export type ShadowMetadata = {
   id?: string;
   arrayKeys?: string[];
@@ -100,7 +100,14 @@ export type ShadowMetadata = {
   syncInfo?: { status: string };
   lastUpdated?: number;
   value?: any;
-};
+  signals?: Array<{
+    instanceId: string;
+    parentId: string;
+    position: number;
+    effect?: string;
+  }>;
+} & ComponentsType;
+
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
   shadowStateStore: Map<string, ShadowMetadata>;
@@ -443,7 +450,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     const arrayKey = [key, ...arrayPath].join(".");
     const parentMeta = newShadowStore.get(arrayKey);
-    console.log("insertShadowArrayElement", key, arrayPath, newItem);
+
     if (!parentMeta || !parentMeta.arrayKeys) return;
 
     // Generate the ID if it doesn't have one
@@ -916,7 +923,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         const results = obj.map((item) => resolvePath(item, remainingPath));
         return Array.isArray(results[0]) ? results.flat() : results;
       }
-      console.log("currentSegment", currentSegment, "obj", obj);
+
       // Handle standard object property access and numeric array indices
       const nextObj = obj[currentSegment as keyof typeof obj];
       return resolvePath(nextObj, remainingPath);

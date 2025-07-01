@@ -8,8 +8,8 @@ const allState = {
   fooBarObject,
 };
 
-type StateObject = {
+export type StateExampleObject = {
   fooBarObject: { foo: "bar" | "baz" };
 };
 
-export const { useCogsState } = createCogsState<StateObject>(allState);
+export const { useCogsState } = createCogsState<StateExampleObject>(allState);
