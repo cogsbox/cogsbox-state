@@ -12,7 +12,7 @@ export const FlashWrapper = ({
 
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.style.outline = `1px solid ${color}`;
+    ref.current.style.outline = `2px solid ${color}`;
     ref.current.style.backgroundColor = `rgba(255, 0, 0, 0.05)`;
     renderCountRef.current++;
     const timer = setTimeout(() => {

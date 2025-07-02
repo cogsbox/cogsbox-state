@@ -217,7 +217,12 @@ export const FormControlComponent = <TStateObject,>({
     getInitialOptions,
     removeValidationError,
   } = getGlobalStore.getState();
-
+  const stateKeyPathKey = [stateKey, ...path].join(".");
+  const [, forceUpdate] = useState<any>();
+  getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+    forceUpdate({});
+  });
+  console.log("FormControlComponentFormControlComponent", stateKeyPathKey);
   const refKey = stateKey + "." + path.join(".");
   const localFormRef = useRef<HTMLInputElement>(null);
   const existingRef = getFormRef(refKey);
@@ -228,7 +233,9 @@ export const FormControlComponent = <TStateObject,>({
 
   // --- START CHANGES ---
 
-  const globalStateValue = useGetKeyState(stateKey, path);
+  const globalStateValue = getGlobalStore
+    .getState()
+    .getShadowValue(stateKeyPathKey);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -306,7 +313,7 @@ export const FormControlComponent = <TStateObject,>({
       // Use the potentially just flushed value
       const fieldValue = getGlobalStore
         .getState()
-        .getNestedState(stateKey, path);
+        .getShadowValue(stateKeyPathKey);
       await validateZodPathFunc(
         validationKey,
         initialOptions.validation.zodSchema,

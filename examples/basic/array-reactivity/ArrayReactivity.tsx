@@ -1,7 +1,5 @@
 "use client";
 
-import type { OptionsType } from "@lib/CogsState";
-
 import { createCogsState } from "../../../src/CogsState";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";

@@ -2,6 +2,7 @@
 
 import {
   createElement,
+  memo,
   startTransition,
   useCallback,
   useEffect,
@@ -1299,8 +1300,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ? component.reactiveType
             : [component.reactiveType || "component"];
 
-          console.log("reactiveTypes", reactiveTypes, componentKey, thisKey);
-
           if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
@@ -1488,7 +1487,7 @@ function createProxyHandler<T>(
   };
   const shapeCache = new Map<string, CacheEntry>();
   let stateVersion = 0;
-  console.log("componentId", componentId);
+
   const invalidateCachePath = (path: string[]) => {
     const pathKey = path.join(".");
     for (const [key] of shapeCache) {
@@ -1516,7 +1515,7 @@ function createProxyHandler<T>(
     } & {
       [key: string]: any;
     };
-    console.log(currentState, "currentState", stateKey, path);
+
     const baseFunction = function () {
       return getGlobalStore().getNestedState(stateKey, path);
     } as unknown as CallableStateObject<T>;
@@ -1526,7 +1525,7 @@ function createProxyHandler<T>(
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
-        return getGlobalStore().getNestedState(stateKey, path);
+        //return getGlobalStore().getNestedState(stateKey, path);
       },
 
       get(target: any, prop: string) {
@@ -1786,16 +1785,15 @@ function createProxyHandler<T>(
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
-                  .subscribeToShadowState(stateKey, () => {
+                  .subscribeToPath(stateKeyPathKey, () => {
                     setShadowUpdateTrigger((prev) => prev + 1);
                   });
                 return unsubscribe;
               }, [stateKey]);
 
-              const sourceArray = getGlobalStore().getNestedState(
-                stateKey,
-                path
-              ) as any[];
+              const sourceArray = getGlobalStore
+                .getState()
+                .getNestedState(stateKey, path) as any[];
               const totalCount = sourceArray.length;
 
               const { totalHeight, positions } = useMemo(() => {
@@ -2081,15 +2079,24 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => void
             ) => {
-              const arrayKeys =
+              const [arrayKeys, setArrayKeys] = useState<any>(
                 meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
+                  getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                    ?.arrayKeys
+              );
+              // getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+              //   console.log(
+              //     "stateKeyPathKeyccccccccccccccccc",
+              //     stateKeyPathKey
+              //   );
+              //   setArrayKeys(
+              //     getGlobalStore.getState().getShadowMetadata(stateKey, path)
+              //   );
+              // });
 
-              const shadowValue = getGlobalStore().getShadowValue(
-                stateKeyPathKey,
-                meta?.validIds
-              ) as any[];
+              const shadowValue = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
               if (!arrayKeys) {
                 throw new Error("No array keys found for mapping");
               }
@@ -2162,10 +2169,22 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
-              const arrayToMap = getGlobalStore().getShadowValue(
-                stateKeyPathKey,
-                meta?.validIds
-              ) as any[];
+              const [arrayToMap, setArrayKeys] = useState<any>(
+                getGlobalStore
+                  .getState()
+                  .getShadowValue(stateKeyPathKey, meta?.validIds)
+              );
+              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+                console.log(
+                  "stateKesssssssssssssssssssssssssyPathKey",
+                  stateKeyPathKey
+                );
+                setArrayKeys(
+                  getGlobalStore
+                    .getState()
+                    .getShadowValue(stateKeyPathKey, meta?.validIds)
+                );
+              });
               if (!Array.isArray(arrayToMap)) {
                 return null;
               }
@@ -2199,7 +2218,7 @@ function createProxyHandler<T>(
                 const originalIndex = sourceItemKeys.indexOf(itemKey);
                 const itemComponentId = `${componentId}-${itemKey}`;
 
-                return createElement(CogsItemWrapper, {
+                return createElement(MemoizedCogsItemWrapper, {
                   key: itemKey,
                   stateKey,
                   itemComponentId,
@@ -3040,7 +3059,17 @@ function SignalRenderer({
     "data-signal-id": signalId,
   });
 }
-
+const MemoizedCogsItemWrapper = memo(
+  CogsItemWrapper,
+  (prevProps, nextProps) => {
+    // Only re-render if the item path or key changed
+    return (
+      prevProps.itemPath.join(".") === nextProps.itemPath.join(".") &&
+      prevProps.stateKey === nextProps.stateKey &&
+      prevProps.itemComponentId === nextProps.itemComponentId
+    );
+  }
+);
 function CogsItemWrapper({
   stateKey,
   itemComponentId,

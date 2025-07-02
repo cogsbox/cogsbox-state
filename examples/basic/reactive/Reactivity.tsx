@@ -1,6 +1,6 @@
 "use client";
 
-import type { OptionsType, ReactivityType } from "@lib/CogsState";
+import type { OptionsType } from "../../../src/CogsState";
 import { FlashWrapper } from "../FlashOnUpdate";
 import { type StateExampleObject, useCogsState } from "./state";
 import SyntaxHighlighter from "react-syntax-highlighter";
@@ -9,10 +9,18 @@ import stringify from "stringify-object";
 
 export default function Reactivity() {
   return (
-    <div className="p-12">
-      <h1 className="text-2xl font-bold mb-6">Reactivity Example</h1>
-      <div className="flex gap-8 items-start">
-        <div className="flex-1 grid grid-cols-2 gap-4">
+    // Main container creating the two-column layout and setting the retro theme
+    <div className="flex gap-4 font-mono bg-gray-600 text-green-400 min-h-screen p-4">
+      {/* --- LEFT COLUMN --- */}
+      <div className="w-3/5 flex flex-col gap-3">
+        <h1 className="text-xl font-bold text-gray-300">Reactivity Types</h1>
+        <p className="text-sm text-gray-500 mb-2">
+          Explore different reactivity strategies and see when each component
+          re-renders.
+        </p>
+
+        {/* Grid for the interactive examples */}
+        <div className="grid grid-cols-2 gap-4">
           <ToggleState
             options={{ reactiveType: "component" }}
             title="Component Reactivity"
@@ -36,10 +44,13 @@ export default function Reactivity() {
             title="Signal-Based Reactivity"
           />
         </div>
-        <div className="flex-1">
-          <ReactivityExplanation />
-          <ShowState />
-        </div>
+      </div>
+
+      {/* --- RIGHT COLUMN --- */}
+      <div className="w-2/5 flex flex-col gap-4">
+        <div className="h-20" />
+        <ReactivityExplanation />
+        <ShowState />
       </div>
     </div>
   );
@@ -56,7 +67,6 @@ function ToggleState({
 }) {
   const fooState = useCogsState("fooBarObject", options);
 
-  // Create a cleaner display version
   const formatOptions = (opts: any) => {
     if (opts.reactiveType === "deps" && opts.reactiveDeps) {
       return `{
@@ -67,12 +77,6 @@ function ToggleState({
     return stringify(opts, {
       indent: "  ",
       singleQuotes: false,
-      transform: (obj: any, prop, originalResult) => {
-        if (typeof obj[prop] === "function") {
-          return originalResult.replace(/\n\s+/g, "\n    ");
-        }
-        return originalResult;
-      },
     });
   };
 
@@ -85,36 +89,39 @@ ${!isSignal ? "fooState.foo.get()" : "fooState.foo.$get()"}`;
 
   return (
     <FlashWrapper>
-      <div className="bg-white border rounded-lg p-4 flex flex-col gap-3 shadow-sm">
-        <span className="font-semibold text-lg">{title}</span>
+      <div className="bg-[#1a1a1a] border border-gray-700 rounded p-3 flex flex-col gap-3 h-full">
+        <h3 className="font-bold text-gray-200 text uppercase tracking-wider">
+          {title}
+        </h3>
         <span className="text-xs text-gray-500 -mt-2">
           ID: {fooState._componentId}
         </span>
-        <SyntaxHighlighter
-          language="javascript"
-          style={atomOneDark}
-          customStyle={{
-            margin: 0,
-            height: "200px",
-            fontSize: "13px",
-            borderRadius: "4px",
-          }}
-          showLineNumbers={false}
-          wrapLines={true}
-          wrapLongLines={true}
-        >
-          {displayString}
-        </SyntaxHighlighter>
-        <div className="flex gap-2 items-center w-full mt-2">
+        <div className="flex-grow overflow-auto bg-gray-900/50 rounded p-1">
+          <SyntaxHighlighter
+            language="javascript"
+            style={atomOneDark}
+            customStyle={{
+              backgroundColor: "transparent",
+              fontSize: "12px",
+              height: "100%",
+              padding: "0.5rem",
+            }}
+            codeTagProps={{ style: { fontFamily: "inherit" } }}
+          >
+            {displayString}
+          </SyntaxHighlighter>
+        </div>
+
+        <div className="flex gap-2 items-center w-full mt-1">
           <button
-            className="border rounded border-blue-500 hover:bg-blue-600 bg-blue-500 text-white px-4 py-1 text-sm font-medium cursor-pointer"
+            className="px-3 py-1 bg-green-900 text-green-200 rounded hover:bg-green-800 text-sm"
             onClick={() =>
               fooState.foo.update((s) => (s === "baz" ? "bar" : "baz"))
             }
           >
             Toggle Foo
           </button>
-          <div className="flex-1 text-lg font-mono bg-gray-100 p-1 rounded">
+          <div className="flex-1 text-base bg-gray-800 p-1 rounded border border-gray-700 text-center">
             {!isSignal ? fooState.foo.get() : fooState.foo.$get()}
           </div>
         </div>
@@ -123,63 +130,58 @@ ${!isSignal ? "fooState.foo.get()" : "fooState.foo.$get()"}`;
   );
 }
 
-// --- NEW COMPONENT ---
 function ReactivityExplanation() {
   const Type = ({ children }: { children: React.ReactNode }) => (
-    <code className="bg-gray-200 text-gray-800 font-semibold px-1.5 py-0.5 rounded text-sm">
+    <code className="bg-gray-700 text-green-300 font-semibold px-1 py-0.5 rounded text-xs">
       {children}
     </code>
   );
 
   return (
-    <div className="p-4 bg-white border rounded-lg shadow-sm mb-4 prose prose-sm max-w-none">
-      <h2 className="text-xl font-bold">Understanding Reactivity Types</h2>
-      <p>
-        Cogs offers several reactivity strategies to give you fine-grained
-        control over when your components re-render. This helps optimize
-        performance by avoiding unnecessary updates.
+    <div className="bg-[#1a1a1a] border border-gray-700 rounded p-3 text-gray-400">
+      <h2 className="text-gray-300 font-bold text-base mb-3">
+        Understanding Reactivity Types
+      </h2>
+      <p className=" mb-4">
+        Cogs offers several strategies to control when components re-render,
+        helping optimize performance.
       </p>
-      <dl className="mt-4 space-y-3">
+      <dl className="space-y-3 text-sm">
         <div>
           <dt>
             <Type>component</Type> (Default)
           </dt>
-          <dd className="ml-4">
-            The component will only re-render if a piece of state that is
-            explicitly used (via <Type>.get()</Type>) within its render function
-            is updated. This is the smartest and most common option.
+          <dd className="ml-4 mt-1 text-gray-500">
+            Re-renders only if state used via <Type>.get()</Type> in the
+            component is updated. Smartest and most common option.
           </dd>
         </div>
         <div>
           <dt>
             <Type>deps</Type>
           </dt>
-          <dd className="ml-4">
-            The component will only re-render if the values returned by the{" "}
-            <Type>reactiveDeps</Type> function change. This is similar to
-            React's `useEffect` dependency array and is useful for complex
-            conditions.
+          <dd className="ml-4 mt-1 text-gray-500">
+            Re-renders only if values from the <Type>reactiveDeps</Type>{" "}
+            function change. Useful for complex conditions.
           </dd>
         </div>
         <div>
           <dt>
             <Type>all</Type>
           </dt>
-          <dd className="ml-4">
-            The component will re-render whenever *any* part of the state slice
-            changes, even if the changed data is not used in the component. Use
-            this sparingly.
+          <dd className="ml-4 mt-1 text-gray-500">
+            Re-renders if *any* part of the state slice changes, even unused
+            parts. Use sparingly.
           </dd>
         </div>
         <div>
           <dt>
             <Type>none</Type>
           </dt>
-          <dd className="ml-4">
-            The component will **never** re-render in response to state changes.
-            This is ideal for components that only perform actions (like
-            buttons) or when using signals (<Type>$get()</Type>) for
-            hyper-granular, DOM-only updates.
+          <dd className="ml-4 mt-1 text-gray-500">
+            **Never** re-renders from state changes. Ideal for action-only
+            components or when using signals (<Type>$get()</Type>) for DOM-only
+            updates.
           </dd>
         </div>
       </dl>
@@ -188,14 +190,19 @@ function ReactivityExplanation() {
 }
 
 function ShowState() {
-  const fooState = useCogsState("fooBarObject", { reactiveType: ["all"] });
+  // Use 'all' to ensure this component always shows the latest state
+  const fooState = useCogsState("fooBarObject", { reactiveType: "all" });
 
   return (
-    <div className="p-4 bg-gray-800 text-gray-100 rounded-lg shadow-inner font-mono text-xs">
-      <h3 className="text-gray-400 font-semibold mb-2 text-sm">
-        Live Global State:
-      </h3>
-      <pre>{JSON.stringify(fooState.get(), null, 2)}</pre>
-    </div>
+    <FlashWrapper>
+      <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden">
+        <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
+          Live Global State
+        </h3>
+        <pre className="text-xs overflow-auto flex-grow">
+          {JSON.stringify(fooState.get(), null, 2)}
+        </pre>
+      </div>
+    </FlashWrapper>
   );
 }
