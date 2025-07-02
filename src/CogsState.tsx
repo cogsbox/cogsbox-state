@@ -1063,7 +1063,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       componentUpdatesRef.current.add(pathKey);
     }
     const store = getGlobalStore.getState();
-
+    console.log("888888888888888888888888", path);
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowVlaue = store.getShadowValue(fullPath);
@@ -1140,6 +1140,98 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         });
       }
+      if (updateObj.updateType === "insert") {
+        // Move this to AFTER the switch statement that inserts
+        const arrayMeta = store.getShadowMetadata(thisKey, path);
+
+        if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
+          const updatedArray = store.getShadowValue(
+            [thisKey, ...path].join(".")
+          );
+          const arrayKeys =
+            store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
+          console.log(
+            "arravvvvvvvvvvvvvvvvvvvssssssssssssssssssssvvvvyKeys",
+
+            arrayKeys,
+            updatedArray
+          );
+          // Find the new item (should be the last one after insert)
+          const newIndex = arrayKeys.length - 1;
+          const newItemKey = arrayKeys[newIndex]!;
+          const itemId = newItemKey.split(".").pop(); // FIX: Extract just id:xxx
+          const newItem = updatedArray[newIndex];
+
+          arrayMeta.mapWrappers.forEach((wrapper) => {
+            if (wrapper.containerRef && wrapper.containerRef.isConnected) {
+              // Create element for new item
+              const itemElement = document.createElement("div");
+              itemElement.setAttribute("data-item-path", newItemKey); // Keep full key for data attr
+              wrapper.containerRef.appendChild(itemElement);
+
+              // Render the new item
+              const root = createRoot(itemElement);
+              const tempProxy = createProxyHandler(
+                thisKey,
+                effectiveSetState,
+                componentId!,
+                sessionId
+              );
+              console.log(
+                "patddddddddddddddddddddddh",
+                path,
+                "rebuildStateShape",
+                tempProxy
+              );
+              const rebuildStateShape = (tempProxy as any)._rebuildStateShape; //why does thgis pass the path in ntot it as ["_rebuildStateShape"]
+
+              // Now use it
+              const itemPath = newItemKey.split(".").slice(1);
+              const itemSetter = rebuildStateShape(newItem, itemPath);
+
+              const arraySetter = rebuildStateShape(updatedArray, path);
+
+              const reactElement = wrapper.mapFn(
+                newItem,
+                itemSetter,
+                newIndex,
+                updatedArray,
+                arraySetter
+              );
+
+              root.render(reactElement);
+            }
+          });
+        }
+      }
+
+      if (updateObj.updateType === "cut") {
+        // For cut, path includes the item ID like ['todoArray', 'id:xxx']
+        const arrayPath = path.slice(0, -1); // Remove the item ID
+
+        const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
+        console.log(
+          store.shadowStateStore,
+          "999999999999999999999999999999999999999",
+          thisKey,
+          arrayPath
+        );
+        if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
+          arrayMeta.mapWrappers.forEach((wrapper) => {
+            if (wrapper.containerRef && wrapper.containerRef.isConnected) {
+              // Find and remove the element
+              const fullPath = [thisKey, ...path].join(".");
+
+              const elementToRemove = wrapper.containerRef.querySelector(
+                `[data-item-path="${fullPath}"]`
+              );
+              if (elementToRemove) {
+                elementToRemove.remove();
+              }
+            }
+          });
+        }
+      }
 
       if (
         updateObj.updateType === "update" &&
@@ -1187,6 +1279,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         });
       }
+
       // Get the root shadow metadata where components are stored
       const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
       if (shadowMetaRoort?.components) {
@@ -1379,6 +1472,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     StateObject<TStateObject>,
   ];
 }
+
 type MetaData = {
   validIds?: string[];
 };
@@ -1405,116 +1499,6 @@ function createProxyHandler<T>(
     stateVersion++;
   };
 
-  const baseObj = {
-    removeValidation: (obj?: { validationKey?: string }) => {
-      if (obj?.validationKey) {
-        removeValidationError(obj.validationKey);
-      }
-    },
-
-    revertToInitialState: (obj?: { validationKey?: string }) => {
-      const init = getGlobalStore
-        .getState()
-        .getInitialOptions(stateKey)?.validation;
-      if (init?.key) {
-        removeValidationError(init?.key);
-      }
-
-      if (obj?.validationKey) {
-        removeValidationError(obj.validationKey);
-      }
-
-      const initialState =
-        getGlobalStore.getState().initialStateGlobal[stateKey];
-
-      getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
-      shapeCache.clear();
-      stateVersion++;
-      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
-      const newProxy = rebuildStateShape(initialState, []);
-      const initalOptionsGet = getInitialOptions(stateKey as string);
-      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-        ? initalOptionsGet?.localStorage?.key(initialState)
-        : initalOptionsGet?.localStorage?.key;
-
-      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
-      if (storageKey) {
-        localStorage.removeItem(storageKey);
-      }
-
-      setUpdaterState(stateKey, newProxy);
-      setState(stateKey, initialState);
-      const stateEntry = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, []);
-      if (stateEntry) {
-        stateEntry?.components?.forEach((component) => {
-          component.forceUpdate();
-        });
-      }
-
-      return initialState;
-    },
-    updateInitialState: (newState: T) => {
-      shapeCache.clear();
-      stateVersion++;
-
-      const newUpdaterState = createProxyHandler(
-        stateKey,
-        effectiveSetState,
-        componentId,
-        sessionId
-      );
-      const initialState =
-        getGlobalStore.getState().initialStateGlobal[stateKey];
-      const initalOptionsGet = getInitialOptions(stateKey as string);
-      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-        ? initalOptionsGet?.localStorage?.key(initialState)
-        : initalOptionsGet?.localStorage?.key;
-
-      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
-      if (localStorage.getItem(storageKey)) {
-        localStorage.removeItem(storageKey);
-      }
-      startTransition(() => {
-        updateInitialStateGlobal(stateKey, newState);
-        getGlobalStore.getState().initializeShadowState(stateKey, newState);
-        setUpdaterState(stateKey, newUpdaterState);
-        setState(stateKey, newState);
-        const stateEntry = getGlobalStore
-          .getState()
-          .getShadowMetadata(stateKey, []);
-
-        if (stateEntry) {
-          stateEntry?.components?.forEach((component) => {
-            component.forceUpdate();
-          });
-        }
-      });
-
-      return {
-        fetchId: (field: keyof T) => newUpdaterState.get()[field],
-      };
-    },
-    _initialState: getGlobalStore.getState().initialStateGlobal[stateKey],
-    _serverState: getGlobalStore.getState().serverState[stateKey],
-    _isLoading: getGlobalStore.getState().isLoadingGlobal[stateKey],
-    _isServerSynced: () => {
-      const serverState = getGlobalStore.getState().serverState[stateKey];
-      return Boolean(
-        serverState && isDeepEqual(serverState, getKeyState(stateKey))
-      );
-    },
-  };
-
-  function getOrderedIds(arrayPath: string[]): string[] | null {
-    const arrayKey = [stateKey, ...arrayPath].join(".");
-    const arrayMeta = getGlobalStore.getState().shadowStateStore.get(arrayKey);
-    return arrayMeta?.arrayKeys || null;
-  }
-
   function rebuildStateShape(
     currentState: T,
     path: string[] = [],
@@ -1532,14 +1516,13 @@ function createProxyHandler<T>(
     } & {
       [key: string]: any;
     };
-
+    console.log(currentState, "currentState", stateKey, path);
     const baseFunction = function () {
       return getGlobalStore().getNestedState(stateKey, path);
     } as unknown as CallableStateObject<T>;
 
-    Object.keys(baseObj).forEach((key) => {
-      (baseFunction as any)[key] = (baseObj as any)[key];
-    });
+    // We attach baseObj properties *inside* the get trap now to avoid recursion
+    // This is a placeholder for the proxy.
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
@@ -1547,6 +1530,18 @@ function createProxyHandler<T>(
       },
 
       get(target: any, prop: string) {
+        // V--------- THE CRUCIAL FIX IS HERE ---------V
+        // This handles requests for internal functions on the proxy,
+        // returning the function itself instead of treating it as state.
+        if (prop === "_rebuildStateShape") {
+          return rebuildStateShape;
+        }
+        const baseObjProps = Object.getOwnPropertyNames(baseObj);
+        if (baseObjProps.includes(prop) && path.length === 0) {
+          return (baseObj as any)[prop];
+        }
+        // ^--------- END OF FIX ---------^
+
         const mutationMethods = new Set([
           "insert",
           "cut",
@@ -1580,7 +1575,6 @@ function createProxyHandler<T>(
         ) {
           const fullComponentId = `${stateKey}////${componentId}`;
 
-          // Get from shadow metadata instead of stateComponents
           const rootMeta = getGlobalStore
             .getState()
             .getShadowMetadata(stateKey, []);
@@ -1602,7 +1596,6 @@ function createProxyHandler<T>(
             }
             if (needsAdd && rootMeta) {
               component.paths.add(currentPath);
-              // Update shadow metadata with the modified component
               getGlobalStore
                 .getState()
                 .setShadowMetadata(stateKey, [], rootMeta);
@@ -1725,22 +1718,17 @@ function createProxyHandler<T>(
               const fullKey = stateKey + "." + path.join(".");
               const selectedIndicesMap =
                 getGlobalStore.getState().selectedIndicesMap;
-              console.log("selectedIndicesMap", selectedIndicesMap);
               if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
                 return undefined;
               }
 
               const selectedItemKey = selectedIndicesMap.get(fullKey)!;
-              console.log("selectedItemKey", selectedItemKey);
-              // Check if we have validIds (filtered view)
               if (meta?.validIds) {
-                // Check if the selected item is in the filtered view
                 if (!meta.validIds.includes(selectedItemKey)) {
-                  return undefined; // Selected item is not in the filtered view
+                  return undefined;
                 }
               }
 
-              // Get the value from shadow state
               const value = getGlobalStore
                 .getState()
                 .getShadowValue(selectedItemKey);
@@ -1773,7 +1761,6 @@ function createProxyHandler<T>(
               return selectedIndex;
             };
           }
-          // Replace the entire 'if (prop === "useVirtualView")' block with this
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -1795,8 +1782,7 @@ function createProxyHandler<T>(
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
               const lastRangeRef = useRef(range);
-              const orderedIds = getOrderedIds(path);
-              // Subscribe to shadow state updates
+
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1812,20 +1798,18 @@ function createProxyHandler<T>(
               ) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
                 const arrayMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, path);
-                const orderedIds = arrayMeta?.arrayKeys || []; // Get the ordered IDs
+                const orderedIds = arrayMeta?.arrayKeys || [];
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  const itemId = orderedIds[i]; // Get the ID for the item at this index
-                  let measuredHeight = itemHeight; // Default height
+                  const itemId = orderedIds[i];
+                  let measuredHeight = itemHeight;
                   if (itemId) {
-                    // Get metadata for the specific item using its full path
                     const itemMeta = getGlobalStore
                       .getState()
                       .getShadowMetadata(stateKey, [...path, itemId]);
@@ -1843,29 +1827,24 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              // Create virtual state
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
                 const end = Math.min(totalCount, range.endIndex);
 
-                // Get the ordered IDs from the parent array's metadata
                 const arrayMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, path);
                 const orderedIds = arrayMeta?.arrayKeys || [];
 
-                // Slice the array of data and the array of IDs to match the virtual range
                 const slicedArray = sourceArray.slice(start, end);
                 const slicedIds = orderedIds.slice(start, end);
 
-                // Create the new proxy, passing the sliced IDs as its `validIds` metadata.
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
                   validIds: slicedIds,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
-              // Helper to scroll to last item using stored ref
               const scrollToLastItem = useCallback(() => {
                 const shadowArray = getGlobalStore
                   .getState()
@@ -1897,7 +1876,6 @@ function createProxyHandler<T>(
                 return false;
               }, [stateKey, path, totalCount]);
 
-              // Handle new items when at bottom
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
 
@@ -1905,7 +1883,6 @@ function createProxyHandler<T>(
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
 
-                // Only auto-scroll if user hasn't scrolled away
                 if (
                   (hasNewItems || isInitialLoad) &&
                   wasAtBottomRef.current &&
@@ -1933,7 +1910,6 @@ function createProxyHandler<T>(
                 previousCountRef.current = totalCount;
               }, [totalCount, itemHeight, overscan]);
 
-              // Handle scroll events
               useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
@@ -1943,20 +1919,16 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
 
-                  // Track if we're at bottom
                   wasAtBottomRef.current = distanceFromBottom < 5;
 
-                  // If user scrolls away from bottom past threshold, set flag
                   if (distanceFromBottom > 100) {
                     userHasScrolledAwayRef.current = true;
                   }
 
-                  // If user scrolls back to bottom, cle
                   if (distanceFromBottom < 5) {
                     userHasScrolledAwayRef.current = false;
                   }
 
-                  // Update visible range based on scroll position
                   let startIndex = 0;
                   for (let i = 0; i < positions.length; i++) {
                     if (positions[i]! > scrollTop - itemHeight * overscan) {
@@ -1980,7 +1952,6 @@ function createProxyHandler<T>(
                     endIndex + 1 + overscan
                   );
 
-                  // THE FIX: Only update state if the visible range of items has changed.
                   if (
                     newStartIndex !== lastRangeRef.current.startIndex ||
                     newEndIndex !== lastRangeRef.current.endIndex
@@ -2000,14 +1971,12 @@ function createProxyHandler<T>(
                   passive: true,
                 });
 
-                // Only auto-scroll on initial load when user hasn't scrolled away
                 if (
                   stickToBottom &&
                   totalCount > 0 &&
                   !userHasScrolledAwayRef.current
                 ) {
                   const { scrollTop } = container;
-                  // Only if we're at the very top (initial load)
                   if (scrollTop === 0) {
                     container.scrollTop = container.scrollHeight;
                     wasAtBottomRef.current = true;
@@ -2030,6 +1999,7 @@ function createProxyHandler<T>(
                     containerRef.current.scrollHeight;
                 }
               }, [scrollToLastItem]);
+
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   const container = containerRef.current;
@@ -2037,19 +2007,14 @@ function createProxyHandler<T>(
 
                   const isLastItem = index === totalCount - 1;
 
-                  // --- Special Case: The Last Item ---
                   if (isLastItem) {
-                    // For the last item, scrollIntoView can fail. The most reliable method
-                    // is to scroll the parent container to its maximum scroll height.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: behavior,
                     });
-                    return; // We're done.
+                    return;
                   }
 
-                  // --- Standard Case: All Other Items ---
-                  // For all other items, we find the ref and use scrollIntoView.
                   const arrayMeta = getGlobalStore
                     .getState()
                     .getShadowMetadata(stateKey, path);
@@ -2065,20 +2030,18 @@ function createProxyHandler<T>(
                   }
 
                   if (element) {
-                    // 'center' gives a better user experience for items in the middle of the list.
                     element.scrollIntoView({
                       behavior: behavior,
                       block: "center",
                     });
                   } else if (positions[index] !== undefined) {
-                    // Fallback if the ref isn't available for some reason.
                     container.scrollTo({
                       top: positions[index],
                       behavior,
                     });
                   }
                 },
-                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
+                [positions, stateKey, path, totalCount]
               );
 
               const virtualizerProps = {
@@ -2122,25 +2085,22 @@ function createProxyHandler<T>(
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys;
+
+              const shadowValue = getGlobalStore().getShadowValue(
+                stateKeyPathKey,
+                meta?.validIds
+              ) as any[];
               if (!arrayKeys) {
                 throw new Error("No array keys found for mapping");
               }
-              const shadowValue = getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
               const arraySetter = rebuildStateShape(
                 shadowValue as any,
                 path,
                 meta
               );
-              console.log(
-                "arrayKeysarraycurrentStatecurrentStatecurrentStatecurrentStateKeys",
-                shadowValue
-              );
 
               return shadowValue.map((item, index) => {
                 const itemPath = arrayKeys[index]?.split(".").slice(1);
-                console.log("itemPathitemPathitemPathitemPath", item, itemPath);
                 const itemSetter = rebuildStateShape(
                   item,
                   itemPath as any,
@@ -2168,8 +2128,7 @@ function createProxyHandler<T>(
               ) => void
             ) => {
               const arrayToMap = currentState as any[];
-              const itemIdsForCurrentArray =
-                meta?.validIds || getOrderedIds(path) || [];
+              const itemIdsForCurrentArray = meta?.validIds || [];
               const arraySetter = rebuildStateShape(currentState, path, meta);
 
               return arrayToMap.map((item, index) => {
@@ -2203,12 +2162,24 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
-              const arrayToMap = currentState as any[];
-              if (!Array.isArray(arrayToMap)) return null;
+              const arrayToMap = getGlobalStore().getShadowValue(
+                stateKeyPathKey,
+                meta?.validIds
+              ) as any[];
+              if (!Array.isArray(arrayToMap)) {
+                return null;
+              }
 
-              const itemIdsForCurrentArray =
-                meta?.validIds || getOrderedIds(path) || [];
-              const sourceIds = getOrderedIds(path) || [];
+              const itemKeysForCurrentView =
+                meta?.validIds ||
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys ||
+                [];
+
+              const sourceItemKeys =
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys || [];
+
               const arraySetter = rebuildStateShape(
                 arrayToMap as any,
                 path,
@@ -2216,23 +2187,28 @@ function createProxyHandler<T>(
               );
 
               return arrayToMap.map((item, localIndex) => {
-                const itemId =
-                  itemIdsForCurrentArray[localIndex] || `id:${item.id}`;
-                const originalIndex = sourceIds.indexOf(itemId);
-                const finalPath = [...path, itemId];
-                const setter = rebuildStateShape(item, finalPath, meta);
-                const itemComponentId = `${componentId}-${path.join(".")}-${itemId}`;
+                const itemKey = itemKeysForCurrentView[localIndex];
+
+                if (!itemKey) {
+                  return null;
+                }
+
+                const itemPath = itemKey.split(".").slice(1);
+                const setter = rebuildStateShape(item, itemPath, meta);
+
+                const originalIndex = sourceItemKeys.indexOf(itemKey);
+                const itemComponentId = `${componentId}-${itemKey}`;
 
                 return createElement(CogsItemWrapper, {
-                  key: itemId,
+                  key: itemKey,
                   stateKey,
                   itemComponentId,
-                  itemPath: finalPath,
+                  itemPath: itemPath,
                   children: callbackfn(
                     item,
                     setter,
                     { localIndex, originalIndex },
-                    arrayToMap as any,
+                    arrayToMap,
                     arraySetter
                   ),
                 });
@@ -2264,20 +2240,16 @@ function createProxyHandler<T>(
                     !meta?.validIds ||
                     (meta?.validIds && meta?.validIds?.includes(key))
                 );
-              console.log("arrayKeys", arrayKeys);
               const itemId = arrayKeys?.[index];
               if (!itemId) return undefined;
-              console.log("itemId", itemId);
               const value = getGlobalStore
                 .getState()
                 .getShadowValue(itemId, meta?.validIds);
-              console.log("value22222", value);
               const state = rebuildStateShape(
                 value,
                 itemId.split(".").slice(1) as string[],
                 meta
               );
-              console.log("state2222", state.get());
               return state;
             };
           }
@@ -2296,10 +2268,7 @@ function createProxyHandler<T>(
           if (prop === "insert") {
             return (payload: UpdateArg<T>, index?: number) => {
               invalidateCachePath(path);
-
-              // Just call effectiveSetState directly
               effectiveSetState(payload, path, { updateType: "insert" });
-
               return rebuildStateShape(
                 getGlobalStore.getState().getNestedState(stateKey, path),
                 path
@@ -2346,30 +2315,33 @@ function createProxyHandler<T>(
             };
           }
           if (prop === "cut") {
-            // Check if this is an array item (has an ID in the path)
             const lastPathElement = path[path.length - 1];
             if (lastPathElement?.startsWith("id:")) {
               return () => {
                 const parentPath = path.slice(0, -1);
-                // The cutFunc needs the item's shadow ID, not an index
-                effectiveSetState(
-                  currentState, // or whatever indicates removal
-                  path, // The full path including the ID
-                  { updateType: "cut" }
-                );
+                invalidateCachePath(path);
+                effectiveSetState(currentState, parentPath, {
+                  updateType: "cut",
+                });
               };
             }
           }
           if (prop === "cutByValue") {
             return (value: string | number | boolean) => {
-              const index = currentState.findIndex((item) => item === value);
+              const index = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey)
+                .findIndex((item: any) => item === value);
               if (index > -1)
                 effectiveSetState(value as any, path, { updateType: "cut" });
             };
           }
           if (prop === "toggleByValue") {
             return (value: string | number | boolean) => {
-              const index = currentState.findIndex((item) => item === value);
+              const index = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey)
+                .findIndex((item: any) => item === value);
               if (index > -1) {
                 effectiveSetState(value as any, path, { updateType: "cut" });
               } else {
@@ -2391,10 +2363,7 @@ function createProxyHandler<T>(
               const newValidIds: string[] = [];
               const filteredArray = currentState.filter(
                 (val: any, index: number) => {
-                  // Call the callback ONCE and store the result
                   const didPass = callbackfn(val, index);
-
-                  // Now use the result
                   if (didPass) {
                     newValidIds.push(arrayKeys[index]!);
                     return true;
@@ -2439,35 +2408,27 @@ function createProxyHandler<T>(
               searchKey: keyof InferArrayElement<T>,
               searchValue: any
             ) => {
-              // 1. Get the LATEST version of the array from the global store.
               const arrayKeys = getGlobalStore
                 .getState()
                 .getShadowMetadata(stateKey, path)?.arrayKeys;
-              console.log("ssssssssssssssssssssssssss", arrayKeys);
+
               if (!arrayKeys) {
                 throw new Error("No array keys found for sorting");
               }
 
-              // 2. Perform the find operation on the FRESH array.
               let value = null;
               let foundPath: string[] = [];
-              console.log("sarrayKeysarrayKeyswValue", arrayKeys);
 
-              arrayKeys.forEach((fullPath: any, ind) => {
+              for (const fullPath of arrayKeys) {
                 let shadowValue = getGlobalStore
                   .getState()
                   .getShadowValue(fullPath, meta?.validIds);
-                console.log(
-                  "shadocccccccccccccwValue",
-                  searchKey,
-                  shadowValue[searchKey],
-                  searchValue
-                );
                 if (shadowValue && shadowValue[searchKey] === searchValue) {
                   value = shadowValue;
                   foundPath = fullPath.split(".").slice(1);
+                  break;
                 }
-              });
+              }
 
               return rebuildStateShape(value as any, foundPath, meta);
             };
@@ -2479,24 +2440,20 @@ function createProxyHandler<T>(
           typeof lastPathElement === "string" &&
           lastPathElement.startsWith("id:")
         ) {
+          let shadowValue = getGlobalStore
+            .getState()
+            .getShadowValue(path.join("."));
+
           return () => {
-            invalidateCachePath(path);
-            // Call effectiveSetState with the full path including the ID
-            effectiveSetState(
-              currentState, // payload doesn't matter for cut
-              path, // The full path including the ID
-              { updateType: "cut" }
-            );
+            effectiveSetState(shadowValue, path, { updateType: "cut" });
           };
         }
-        console.log("sssssssssssssssssssssssss", prop, path, currentState);
+
         if (prop === "get") {
           return () => {
-            const value = getGlobalStore
+            return getGlobalStore
               .getState()
               .getShadowValue(stateKeyPathKey, meta?.validIds);
-
-            return value;
           };
         }
         if (prop === "$derive") {
@@ -2522,58 +2479,59 @@ function createProxyHandler<T>(
         }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
-          const parentKey = parentPath.join(".");
           if (
             Array.isArray(
               getGlobalStore.getState().getNestedState(stateKey, parentPath)
             )
           ) {
             const itemId = path[path.length - 1];
-            const orderedIds = getOrderedIds(parentPath);
-            const thisIndex = orderedIds?.indexOf(itemId!);
-            return (
-              thisIndex ===
-              getGlobalStore
-                .getState()
-                .getSelectedIndex(stateKey + "." + path.join("."))
-            );
+            const fullParentKey = stateKey + "." + parentPath.join(".");
+            const selectedItemKey = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(fullParentKey);
+            const fullItemKey = stateKey + "." + path.join(".");
+            return selectedItemKey === fullItemKey;
           }
           return undefined;
         }
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
-
             const parentKey = parentPath.join(".");
+            const fullParentKey = stateKey + "." + parentKey;
+            const fullItemKey = stateKey + "." + path.join(".");
 
-            console.log("parentKey", parentKey);
-            console.log("path", stateKey + "." + path.join("."));
-            getGlobalStore
-              .getState()
-              .setSelectedIndex(
-                stateKey + "." + parentKey,
-                stateKey + "." + path.join(".")
-              );
+            if (value) {
+              getGlobalStore
+                .getState()
+                .setSelectedIndex(fullParentKey, fullItemKey);
+            } else {
+              getGlobalStore
+                .getState()
+                .clearSelectedIndex({ stateKey, path: parentPath });
+            }
           };
         }
         if (prop === "toggleSelected") {
           return () => {
             const parentPath = path.slice(0, -1);
-
             const parentKey = parentPath.join(".");
+            const fullParentKey = stateKey + "." + parentKey;
+            const fullItemKey = stateKey + "." + path.join(".");
 
-            getGlobalStore
+            const currentSelected = getGlobalStore
               .getState()
-              .setSelectedIndex(
-                stateKey + "." + parentKey,
-                stateKey + "." + path.join(".")
-              );
+              .selectedIndicesMap.get(fullParentKey);
 
-            const nested = getGlobalStore
-              .getState()
-              .getNestedState(stateKey, [...parentPath]);
-            effectiveSetState(nested, parentPath, { updateType: "update" });
-            invalidateCachePath(parentPath);
+            if (currentSelected === fullItemKey) {
+              getGlobalStore
+                .getState()
+                .clearSelectedIndex({ stateKey, path: parentPath });
+            } else {
+              getGlobalStore
+                .getState()
+                .setSelectedIndex(fullParentKey, fullItemKey);
+            }
           };
         }
         if (path.length == 0) {
@@ -2605,7 +2563,7 @@ function createProxyHandler<T>(
                 componentId,
                 sessionId
               );
-              notifyComponents(stateKey); // Simplified notification
+              notifyComponents(stateKey);
             };
           }
           if (prop === "validateZodSchema") {
@@ -2639,16 +2597,6 @@ function createProxyHandler<T>(
           if (prop === "getAllFormRefs")
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);
-          if (prop === "_initialState")
-            return getGlobalStore.getState().initialStateGlobal[stateKey];
-          if (prop === "_serverState")
-            return getGlobalStore.getState().serverState[stateKey];
-          if (prop === "_isLoading")
-            return getGlobalStore.getState().isLoadingGlobal[stateKey];
-          if (prop === "revertToInitialState")
-            return baseObj.revertToInitialState;
-          if (prop === "updateInitialState") return baseObj.updateInitialState;
-          if (prop === "removeValidation") return baseObj.removeValidation;
         }
         if (prop === "getFormRef") {
           return () =>
@@ -2675,12 +2623,8 @@ function createProxyHandler<T>(
         }
         if (prop === "_stateKey") return stateKey;
         if (prop === "_path") return path;
-        if (prop === "_isServerSynced") return baseObj._isServerSynced;
         if (prop === "update") {
           return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
-            // currentState should now be the correct value
-
-            // Pass resolved value
             effectiveSetState(payload as any, path, { updateType: "update" });
             invalidateCachePath(path);
           };
@@ -2713,6 +2657,109 @@ function createProxyHandler<T>(
     return proxyInstance;
   }
 
+  const baseObj = {
+    removeValidation: (obj?: { validationKey?: string }) => {
+      if (obj?.validationKey) {
+        removeValidationError(obj.validationKey);
+      }
+    },
+    revertToInitialState: (obj?: { validationKey?: string }) => {
+      const init = getGlobalStore
+        .getState()
+        .getInitialOptions(stateKey)?.validation;
+      if (init?.key) {
+        removeValidationError(init.key);
+      }
+
+      if (obj?.validationKey) {
+        removeValidationError(obj.validationKey);
+      }
+
+      const initialState =
+        getGlobalStore.getState().initialStateGlobal[stateKey];
+
+      getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
+      shapeCache.clear();
+      stateVersion++;
+      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
+      const newProxy = rebuildStateShape(initialState, []);
+      const initalOptionsGet = getInitialOptions(stateKey as string);
+      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+        ? initalOptionsGet?.localStorage?.key(initialState)
+        : initalOptionsGet?.localStorage?.key;
+
+      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+
+      if (storageKey) {
+        localStorage.removeItem(storageKey);
+      }
+
+      setUpdaterState(stateKey, newProxy);
+      setState(stateKey, initialState);
+      const stateEntry = getGlobalStore
+        .getState()
+        .getShadowMetadata(stateKey, []);
+      if (stateEntry) {
+        stateEntry?.components?.forEach((component) => {
+          component.forceUpdate();
+        });
+      }
+
+      return initialState;
+    },
+    updateInitialState: (newState: T) => {
+      shapeCache.clear();
+      stateVersion++;
+
+      const newUpdaterState = createProxyHandler(
+        stateKey,
+        effectiveSetState,
+        componentId,
+        sessionId
+      );
+      const initialState =
+        getGlobalStore.getState().initialStateGlobal[stateKey];
+      const initalOptionsGet = getInitialOptions(stateKey as string);
+      const localKey = isFunction(initalOptionsGet?.localStorage?.key)
+        ? initalOptionsGet?.localStorage?.key(initialState)
+        : initalOptionsGet?.localStorage?.key;
+
+      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
+
+      if (localStorage.getItem(storageKey)) {
+        localStorage.removeItem(storageKey);
+      }
+      startTransition(() => {
+        updateInitialStateGlobal(stateKey, newState);
+        getGlobalStore.getState().initializeShadowState(stateKey, newState);
+        setUpdaterState(stateKey, newUpdaterState);
+        setState(stateKey, newState);
+        const stateEntry = getGlobalStore
+          .getState()
+          .getShadowMetadata(stateKey, []);
+
+        if (stateEntry) {
+          stateEntry?.components?.forEach((component) => {
+            component.forceUpdate();
+          });
+        }
+      });
+
+      return {
+        fetchId: (field: keyof T) => (newUpdaterState.get() as any)[field],
+      };
+    },
+    _initialState: getGlobalStore.getState().initialStateGlobal[stateKey],
+    _serverState: getGlobalStore.getState().serverState[stateKey],
+    _isLoading: getGlobalStore.getState().isLoadingGlobal[stateKey],
+    _isServerSynced: () => {
+      const serverState = getGlobalStore.getState().serverState[stateKey];
+      return Boolean(
+        serverState && isDeepEqual(serverState, getKeyState(stateKey))
+      );
+    },
+  };
+
   return rebuildStateShape(
     getGlobalStore.getState().getNestedState(stateKey, [])
   );
@@ -2727,6 +2774,8 @@ export function $cogsSignal(proxy: {
 }) {
   return createElement(SignalRenderer, { proxy });
 }
+
+import { createRoot } from "react-dom/client";
 
 function SignalMapRenderer({
   proxy,
@@ -2744,25 +2793,140 @@ function SignalMapRenderer({
       arraySetter: any
     ) => ReactNode;
   };
-  rebuildStateShape: (currentState: any, path: string[]) => any;
-}) {
-  const value = getGlobalStore().getShadowValue(
-    [proxy._stateKey, proxy._path].join("."),
-    proxy._meta?.validIds
-  );
+  rebuildStateShape: (
+    currentState: any,
+    path: string[],
+    meta?: MetaData
+  ) => any;
+}): JSX.Element | null {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const instanceIdRef = useRef<string>(`map-${crypto.randomUUID()}`);
+  const isSetupRef = useRef(false);
+  const rootsMapRef = useRef<Map<string, any>>(new Map());
 
-  console.log("signal value", value, proxy._path, proxy._stateKey);
-  if (!Array.isArray(value)) return null;
+  // Setup effect - store the map function in shadow metadata
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container || isSetupRef.current) return;
 
-  const arraySetter = rebuildStateShape(
-    value,
-    proxy._path
-  ) as ArrayEndType<any>;
-  return arraySetter.stateMapNoRender(
-    (item, setter, index, array, arraySetter) => {
-      return proxy._mapFn(item, setter, index, array, arraySetter);
-    }
-  );
+    const timeoutId = setTimeout(() => {
+      // Store map wrapper in metadata
+      const currentMeta =
+        getGlobalStore
+          .getState()
+          .getShadowMetadata(proxy._stateKey, proxy._path) || {};
+
+      const mapWrappers = currentMeta.mapWrappers || [];
+      mapWrappers.push({
+        instanceId: instanceIdRef.current,
+        mapFn: proxy._mapFn,
+        containerRef: container,
+      });
+
+      getGlobalStore
+        .getState()
+        .setShadowMetadata(proxy._stateKey, proxy._path, {
+          ...currentMeta,
+          mapWrappers,
+        });
+
+      isSetupRef.current = true;
+
+      // Initial render
+      renderInitialItems();
+    }, 0);
+
+    // Cleanup
+    return () => {
+      clearTimeout(timeoutId);
+      if (instanceIdRef.current) {
+        const currentMeta =
+          getGlobalStore
+            .getState()
+            .getShadowMetadata(proxy._stateKey, proxy._path) || {};
+        if (currentMeta.mapWrappers) {
+          currentMeta.mapWrappers = currentMeta.mapWrappers.filter(
+            (w) => w.instanceId !== instanceIdRef.current
+          );
+          getGlobalStore
+            .getState()
+            .setShadowMetadata(proxy._stateKey, proxy._path, currentMeta);
+        }
+      }
+      rootsMapRef.current.forEach((root) => root.unmount());
+    };
+  }, []);
+
+  const renderInitialItems = () => {
+    const container = containerRef.current;
+    if (!container) return;
+
+    const value = getGlobalStore
+      .getState()
+      .getShadowValue(
+        [proxy._stateKey, ...proxy._path].join("."),
+        proxy._meta?.validIds
+      ) as any[];
+
+    if (!Array.isArray(value)) return;
+
+    const arrayMeta = getGlobalStore
+      .getState()
+      .getShadowMetadata(proxy._stateKey, proxy._path);
+    const arrayKeys = arrayMeta?.arrayKeys || [];
+
+    value.forEach((item, index) => {
+      const itemKey = arrayKeys[index]!;
+
+      const itemElement = document.createElement("div");
+
+      itemElement.setAttribute("data-item-path", itemKey);
+
+      container.appendChild(itemElement);
+
+      const root = createRoot(itemElement);
+      rootsMapRef.current.set(itemKey, root);
+
+      const itemSetter = rebuildStateShape(
+        item,
+        itemKey.split(".").slice(1) as string[],
+        proxy._meta
+      );
+      const arraySetter = rebuildStateShape(
+        value,
+        [proxy._stateKey, ...proxy._path],
+        proxy._meta
+      );
+      console.log(
+        "valuevaluevaluevaluevaluevaluevaluevaluevalue",
+        arraySetter.get(),
+        Array.isArray(value),
+        proxy._path,
+        [proxy._stateKey, ...proxy._path].join(".")
+      );
+      const reactElement = proxy._mapFn(
+        item,
+        itemSetter,
+        index,
+        value,
+        arraySetter
+      );
+
+      root.render(reactElement);
+    });
+  };
+
+  return <div ref={containerRef} data-map-container={instanceIdRef.current} />;
+}
+
+// Helper to render React element to actual DOM
+function renderReactElementToDOM(
+  reactElement: ReactNode,
+  targetElement: HTMLElement
+) {
+  // This is the tricky part - you need to convert JSX to actual DOM
+  // For now, use ReactDOM.render or a similar approach
+  // This is where the magic happens to bypass React's reconciliation
 }
 
 function SignalRenderer({
@@ -2779,10 +2943,12 @@ function SignalRenderer({
   const instanceIdRef = useRef<string | null>(null);
   const isSetupRef = useRef(false);
   const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
-  const value = getGlobalStore().getShadowValue(
-    [proxy._stateKey, ...proxy._path].join("."),
-    proxy._meta?.validIds
-  );
+  const value = getGlobalStore
+    .getState()
+    .getShadowValue(
+      [proxy._stateKey, ...proxy._path].join("."),
+      proxy._meta?.validIds
+    );
 
   // Setup effect - runs only once
   useEffect(() => {

@@ -33,20 +33,23 @@ export const { useCogsState } = createCogsState<ArrayStateObject>(allState, {
 
 export default function ArrayReactivity() {
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-6">
-        Array Reactivity with Nested Updates
-      </h1>
-      <p className="text-gray-600 mb-8">
-        This demonstrates granular reactivity within stateMap. Each form element
-        will only update the specific nested property, showing granular updates.
-      </p>
+    // Main container creating the two-column layout and setting the retro theme
+    <div className="flex gap-4 font-mono bg-gray-600 text-green-400 min-h-screen p-4">
+      {/* --- LEFT COLUMN --- */}
+      <div className="w-3/5 flex flex-col gap-3">
+        <h1 className="text-xl font-bold text-gray-300">Array Reactivity</h1>
+        <p className="text-sm text-gray-500 mb-2">
+          Each form element only updates its specific nested property.
+        </p>
 
-      <TodoListWithStateMap />
-      <AddTodoButton />
+        <TodoListWithStateMap />
+        <AddTodoButton />
+      </div>
 
-      <div className="mt-8">
-        <ShowArrayLength />
+      {/* --- RIGHT COLUMN --- */}
+      <div className="w-2/5">
+        {/* Pass a prop to ShowArray to control its layout */}
+        <ShowArray layout="vertical" />
       </div>
     </div>
   );
@@ -54,79 +57,117 @@ export default function ArrayReactivity() {
 
 function TodoListWithStateMap() {
   const todos = useCogsState("todoArray", {
-    reactiveType: "deps",
-    reactiveDeps: (state) => [state.length],
+    reactiveType: "none",
   });
 
   return (
     <FlashWrapper>
-      <div className="bg-white border rounded-lg p-4 shadow-sm">
-        <h3 className="font-medium mb-3">
-          Todo Items (stateMap with nested formElements)
+      {/* Panel with less spacious styling */}
+      <div className="bg-[#1a1a1a] border border-gray-700 rounded p-3">
+        <h3 className="font-bold text-gray-400 mb-2 text-sm uppercase tracking-wider">
+          Todo Items
         </h3>
-        {todos.stateMap((todo, todoSetter, index) => (
+        {/* Header Row */}
+        <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 p-1 border-b border-gray-700 text-xs text-gray-500 font-semibold">
+          <div>Done</div>
+          <div>Title</div>
+          <div>Priority</div>
+          <div>Action</div>
+        </div>
+        {/* List of Todos - compact styling */}
+        {todos.$stateMap((todo, todoSetter) => (
           <FlashWrapper key={todo.id}>
-            <div className="grid grid-cols-4 gap-4 p-4 border-b last:border-b-0 items-center">
-              {/* Completed Checkbox - only this should update when toggled */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 mb-1">Completed</label>
-                <FlashWrapper>
-                  {todoSetter.completed.formElement((obj) => (
-                    <input
-                      type="checkbox"
-                      className="w-5 h-5"
-                      checked={obj.get()}
-                      onChange={(e) => obj.set(e.target.checked)}
-                    />
-                  ))}
-                </FlashWrapper>
-              </div>
+            <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 py-2 px-1 border-b bg-gray-300 last:border-b-0 items-center">
+              {/* Checkbox */}
+              {todoSetter.completed.formElement((obj) => (
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 bg-gray-800 border-gray-600 accent-green-500"
+                  checked={obj.get()}
+                  onChange={(e) => obj.set(e.target.checked)}
+                />
+              ))}
 
-              {/* Title Input - only this should update when title changes */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 mb-1">Title</label>
-                <FlashWrapper>
-                  {todoSetter.title.formElement((obj) => (
-                    <input
-                      type="text"
-                      className="px-3 py-2 border rounded text-sm"
-                      value={obj.get()}
-                      onChange={(e) => obj.set(e.target.value)}
-                    />
-                  ))}
-                </FlashWrapper>
-              </div>
+              {/* Title Input */}
+              {todoSetter.title.formElement((obj) => (
+                <input
+                  type="text"
+                  className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
+                  value={obj.get()}
+                  onChange={(e) => obj.set(e.target.value)}
+                />
+              ))}
 
-              {/* Priority Select - only this should update when priority changes */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 mb-1">Priority</label>
-                <FlashWrapper>
-                  {todoSetter.priority.formElement((obj) => (
-                    <select
-                      className="px-3 py-2 border rounded text-sm"
-                      value={obj.get()}
-                      onChange={(e) =>
-                        obj.set(e.target.value as "high" | "medium" | "low")
-                      }
-                    >
-                      <option value="high">High</option>
-                      <option value="medium">Medium</option>
-                      <option value="low">Low</option>
-                    </select>
-                  ))}
-                </FlashWrapper>
-              </div>
+              {/* Priority Select */}
+              {todoSetter.priority.formElement((obj) => (
+                <select
+                  className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
+                  value={obj.get()}
+                  onChange={(e) =>
+                    obj.set(e.target.value as "high" | "medium" | "low")
+                  }
+                >
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              ))}
 
               {/* Actions */}
-              <div className="flex flex-col">
-                <label className="text-xs text-gray-500 mb-1">Actions</label>
-                <button
-                  onClick={() => todoSetter.cut()}
-                  className="px-3 py-2 bg-red-500 text-white text-sm rounded hover:bg-red-600"
+              <button
+                onClick={() => todoSetter.cut()}
+                className="px-2 py-0.5 bg-red-900 text-red-200 text-xs rounded hover:bg-red-800"
+              >
+                Del
+              </button>
+            </div>
+          </FlashWrapper>
+        ))}{" "}
+        {todos.stateList((todo, todoSetter) => (
+          <FlashWrapper key={todo.id}>
+            <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 py-1 px-1 border-b border-gray-800 bg-gray-300  last:border-b-0 items-center">
+              {/* Checkbox */}
+              {todoSetter.completed.formElement((obj) => (
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 bg-gray-800 border-gray-600 accent-green-500"
+                  checked={obj.get()}
+                  onChange={(e) => obj.set(e.target.checked)}
+                />
+              ))}
+
+              {/* Title Input */}
+              {todoSetter.title.formElement((obj) => (
+                <input
+                  type="text"
+                  className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
+                  value={obj.get()}
+                  onChange={(e) => obj.set(e.target.value)}
+                />
+              ))}
+
+              {/* Priority Select */}
+              {todoSetter.priority.formElement((obj) => (
+                <select
+                  className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
+                  value={obj.get()}
+                  onChange={(e) =>
+                    obj.set(e.target.value as "high" | "medium" | "low")
+                  }
                 >
-                  Delete
-                </button>
-              </div>
+                  <option value="high">High</option>
+                  <option value="medium">Medium</option>
+                  <option value="low">Low</option>
+                </select>
+              ))}
+
+              {/* Actions */}
+              <button
+                onClick={() => todoSetter.cut()}
+                className="px-2 py-0.5 bg-red-900 text-red-200 text-xs rounded hover:bg-red-800"
+              >
+                Del
+              </button>
             </div>
           </FlashWrapper>
         ))}
@@ -139,7 +180,8 @@ function AddTodoButton() {
   const todos = useCogsState("todoArray", { reactiveType: "none" });
 
   const addTodo = () => {
-    const newId = Math.max(...todos.get().map((t) => t.id)) + 1;
+    const ids = todos.get().map((t) => t.id);
+    const newId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
     todos.insert({
       id: newId,
       title: `New Todo ${newId}`,
@@ -149,10 +191,10 @@ function AddTodoButton() {
   };
 
   return (
-    <div className="mt-4">
+    <div className="mt-1">
       <button
         onClick={addTodo}
-        className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+        className="px-3 py-1 bg-green-900 text-green-200 rounded hover:bg-green-800 text-sm"
       >
         Add New Todo
       </button>
@@ -160,35 +202,52 @@ function AddTodoButton() {
   );
 }
 
-function ShowArrayLength() {
-  const todos = useCogsState("todoArray", {
-    reactiveType: "deps",
-    reactiveDeps: (state) => [state.length],
-  });
+// Modified ShowArray to accept a layout prop
+function ShowArray({
+  layout = "horizontal",
+}: {
+  layout?: "horizontal" | "vertical";
+}) {
+  const todos = useCogsState("todoArray");
+
+  // Determine flex direction based on prop
+  const containerClasses =
+    layout === "vertical"
+      ? "flex flex-col h-full gap-4"
+      : "flex gap-4 items-center";
 
   return (
     <FlashWrapper>
-      <div className="bg-blue-50 p-4 rounded border">
-        <div className="font-medium text-blue-800 mb-2">
-          Array Length (only updates when items added/removed):{" "}
-          {todos.get().length}
+      <div className={containerClasses}>
+        {/* Code Block - set to be a flex item that can grow/shrink */}
+        <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden">
+          <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
+            Code Snippet
+          </h3>
+          <div className="flex-grow overflow-auto">
+            <SyntaxHighlighter
+              language="javascript"
+              style={atomOneDark}
+              customStyle={{
+                backgroundColor: "transparent",
+                fontSize: "12px",
+              }}
+              codeTagProps={{ style: { fontFamily: "inherit" } }}
+            >
+              {`const todos = useCogsState("todoArray");`}
+            </SyntaxHighlighter>
+          </div>
         </div>
-        <SyntaxHighlighter
-          language="javascript"
-          style={atomOneDark}
-          customStyle={{
-            margin: 0,
-            height: "100px",
-            fontSize: "12px",
-            borderRadius: "4px",
-          }}
-        >
-          {`// Only updates on length change
-const todos = useCogsState("todoArray", {
-  reactiveType: "deps",
-  reactiveDeps: (state) => [state.length]
-});`}
-        </SyntaxHighlighter>
+
+        {/* JSON block - set to be a flex item that can grow/shrink */}
+        <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden">
+          <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
+            Live Global State
+          </h3>
+          <pre className="text-xs overflow-auto">
+            {JSON.stringify(todos.get(), null, 2)}
+          </pre>
+        </div>
       </div>
     </FlashWrapper>
   );

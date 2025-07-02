@@ -9,6 +9,7 @@ import type {
   UpdateTypeDetail,
 } from "./CogsState.js";
 import type { object } from "zod";
+import type { ReactNode } from "react";
 
 type StateUpdater<StateValue> =
   | StateValue
@@ -105,6 +106,17 @@ export type ShadowMetadata = {
     parentId: string;
     position: number;
     effect?: string;
+  }>;
+  mapWrappers?: Array<{
+    instanceId: string;
+    mapFn: (
+      value: any,
+      setter: any,
+      index: number,
+      array: any[],
+      arraySetter: any
+    ) => ReactNode;
+    containerRef: HTMLDivElement | null;
   }>;
 } & ComponentsType;
 
