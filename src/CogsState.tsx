@@ -1760,6 +1760,7 @@ function createProxyHandler<T>(
               const wasAtBottomRef = useRef(true);
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
+              const setInitialSCrollDone = useRef(false);
 
               // Subscribe to shadow state updates
               useEffect(() => {
@@ -1777,28 +1778,36 @@ function createProxyHandler<T>(
               const totalCount = sourceArray.length;
 
               // Calculate heights and positions
-              const { totalHeight, positions } = useMemo(() => {
+              const { totalHeight, positions, lastItem } = useMemo(() => {
                 const arrayMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, path);
                 const orderedIds = arrayMeta?.arrayKeys || []; // Get the ordered IDs
                 let height = 0;
                 const pos: number[] = [];
+                let lastItem = null;
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  const itemId = orderedIds[i]; // Get the ID for the item at this index
+                  const itemId = orderedIds[i]?.split(".").pop(); // Get the ID for the item at this index
                   let measuredHeight = itemHeight; // Default height
                   if (itemId) {
                     // Get metadata for the specific item using its full path
                     const itemMeta = getGlobalStore
                       .getState()
-                      .getShadowMetadata(stateKey, [...path, itemId]);
+                      .getShadowMetadata(stateKey, [itemId]);
+
                     measuredHeight =
                       itemMeta?.virtualizer?.itemHeight || itemHeight;
+                    lastItem = itemMeta;
                   }
                   height += measuredHeight;
                 }
-                return { totalHeight: height, positions: pos };
+                console.log(
+                  "uuuuuuuuuuuuuuuu",
+                  orderedIds[totalCount - 1],
+                  lastItem
+                );
+                return { totalHeight: height, positions: pos, lastItem };
               }, [
                 totalCount,
                 stateKey,
@@ -1854,9 +1863,36 @@ function createProxyHandler<T>(
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
                   wasAtBottomRef.current = distanceFromBottom < 5;
-                  if (!wasAtBottomRef.current) {
+                  if (
+                    !wasAtBottomRef.current &&
+                    !setInitialSCrollDone.current
+                  ) {
+                    // If the list is NOT at the bottom after scrolling
                     container.scrollTop = container.scrollHeight;
                     wasAtBottomRef.current = true;
+                    console.log("lastItem", lastItem);
+                    if (lastItem?.virtualizer?.domRef) {
+                      const element = lastItem.virtualizer.domRef as any;
+
+                      console.log("element", element);
+                      if (element) {
+                        const rect = element.getBoundingClientRect();
+                        const isInView =
+                          rect.top >= 0 &&
+                          rect.left >= 0 &&
+                          rect.bottom <=
+                            (window.innerHeight ||
+                              document.documentElement.clientHeight) &&
+                          rect.right <=
+                            (window.innerWidth ||
+                              document.documentElement.clientWidth);
+
+                        console.log("isInView", isInView);
+                        if (isInView) {
+                          setInitialSCrollDone.current = true;
+                        }
+                      }
+                    }
                   }
                 };
 
@@ -1906,7 +1942,14 @@ function createProxyHandler<T>(
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
                 };
-              }, [positions, totalCount, itemHeight, overscan, stickToBottom]);
+              }, [
+                positions,
+                totalCount,
+                itemHeight,
+                overscan,
+                stickToBottom,
+                lastItem,
+              ]);
 
               const scrollToBottom = useCallback(() => {
                 wasAtBottomRef.current = true;
@@ -3057,6 +3100,7 @@ function CogsItemWrapper({
       });
       const arrayPath = itemPath.slice(0, -1); // Remove the item ID
       const arrayPathKey = [stateKey, ...arrayPath].join(".");
+      console.log("arrayPathKey", itemPath, arrayPathKey);
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
     // --- END OF NEW CHECK ---
