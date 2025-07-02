@@ -1,0 +1,46 @@
+/*
+  This container holds all the cars. 
+  It's fixed to the viewport and doesn't interact with mouse events.
+  The z-index ensures it appears on top of the background but below any UI.
+*/
+.flying-cars-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0; /* Sits just above the background but below other content */
+}
+
+/*
+  This is the style for each individual car.
+  It's a very small white rectangle positioned absolutely.
+  The animation properties will be controlled by inline styles from React.
+*/
+.flying-car {
+  position: absolute;
+  width: 5px;
+  height: 3px;
+  background-color: rgb(29, 29, 29);
+  border-radius: 1px; /* Slightly rounded edges */
+
+  /* Set up the animation to be infinite and run at a constant speed */
+  animation-name: fly-across-screen;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+/*
+  This is the animation that moves the cars.
+  It starts from just off the left side of the screen and moves
+  to just off the right side, ensuring a smooth entrance and exit.
+*/
+@keyframes fly-across-screen {
+  0% {
+    /* Start just off-screen to the left */
+    transform: translateX(-20px);
+  }
+  100% {
+    /* End just off-screen to the right */
+    transform: translateX(100vw);
+  }
+}

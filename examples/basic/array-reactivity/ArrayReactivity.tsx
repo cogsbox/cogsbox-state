@@ -4,6 +4,7 @@ import { createCogsState } from "../../../src/CogsState";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { FlashWrapper } from "../FlashOnUpdate";
+import DotPattern from "../DotWrapper";
 
 // State definition with array of objects
 const todoArray = [
@@ -35,11 +36,16 @@ export default function ArrayReactivity() {
     <div className="flex gap-4 f text-green-400 min-h-screen p-4">
       {/* --- LEFT COLUMN --- */}
       <div className="w-3/5 flex flex-col gap-3">
-        <h1 className="text-xl font-bold text-gray-300">Array Reactivity</h1>
-        <p className="text-sm text-gray-500 mb-2">
-          Each form element only updates its specific nested property.
-        </p>
-
+        <DotPattern>
+          <div className="px-8 py-4">
+            <h1 className="text-2xl font-bold text-gray-200 ">
+              Array Reactivity
+            </h1>
+            <p className="text-sm text-gray-400 max-w-2xl">
+              Each form element only updates its specific nested property.
+            </p>
+          </div>
+        </DotPattern>
         <TodoListWithStateMap />
         <AddTodoButton />
       </div>
