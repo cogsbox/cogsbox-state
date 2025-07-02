@@ -1760,8 +1760,8 @@ function createProxyHandler<T>(
               const wasAtBottomRef = useRef(true);
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
-              const lastRangeRef = useRef(range);
 
+              // Subscribe to shadow state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1776,18 +1776,20 @@ function createProxyHandler<T>(
                 .getNestedState(stateKey, path) as any[];
               const totalCount = sourceArray.length;
 
+              // Calculate heights and positions
               const { totalHeight, positions } = useMemo(() => {
                 const arrayMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, path);
-                const orderedIds = arrayMeta?.arrayKeys || [];
+                const orderedIds = arrayMeta?.arrayKeys || []; // Get the ordered IDs
                 let height = 0;
                 const pos: number[] = [];
                 for (let i = 0; i < totalCount; i++) {
                   pos[i] = height;
-                  const itemId = orderedIds[i];
-                  let measuredHeight = itemHeight;
+                  const itemId = orderedIds[i]; // Get the ID for the item at this index
+                  let measuredHeight = itemHeight; // Default height
                   if (itemId) {
+                    // Get metadata for the specific item using its full path
                     const itemMeta = getGlobalStore
                       .getState()
                       .getShadowMetadata(stateKey, [...path, itemId]);
@@ -1805,24 +1807,7 @@ function createProxyHandler<T>(
                 shadowUpdateTrigger,
               ]);
 
-              const virtualState = useMemo(() => {
-                const start = Math.max(0, range.startIndex);
-                const end = Math.min(totalCount, range.endIndex);
-
-                const arrayMeta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                const orderedIds = arrayMeta?.arrayKeys || [];
-
-                const slicedArray = sourceArray.slice(start, end);
-                const slicedIds = orderedIds.slice(start, end);
-
-                return rebuildStateShape(slicedArray as any, path, {
-                  ...meta,
-                  validIds: slicedIds,
-                });
-              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
-
+              // Helper to scroll to last item using stored ref
               const scrollToLastItem = useCallback(() => {
                 const shadowArray = getGlobalStore
                   .getState()
@@ -1857,91 +1842,21 @@ function createProxyHandler<T>(
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
 
+                const container = containerRef.current;
+                if (!container) return;
+
                 const hasNewItems = totalCount > previousCountRef.current;
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
-
-                if (
-                  (hasNewItems || isInitialLoad) &&
-                  wasAtBottomRef.current &&
-                  !userHasScrolledAwayRef.current
-                ) {
-                  const visibleCount = Math.ceil(
-                    (containerRef.current?.clientHeight || 0) / itemHeight
-                  );
-                  const newRange = {
-                    startIndex: Math.max(
-                      0,
-                      totalCount - visibleCount - overscan
-                    ),
-                    endIndex: totalCount,
-                  };
-
-                  setRange(newRange);
-
-                  const timeoutId = setTimeout(() => {
-                    scrollToIndex(totalCount - 1, "smooth");
-                  }, 50);
-                  return () => clearTimeout(timeoutId);
-                }
-
-                previousCountRef.current = totalCount;
-              }, [totalCount, itemHeight, overscan]);
-
-              useEffect(() => {
-                const container = containerRef.current;
-                if (!container) return;
 
                 const handleScroll = () => {
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
-
                   wasAtBottomRef.current = distanceFromBottom < 5;
-
-                  if (distanceFromBottom > 100) {
-                    userHasScrolledAwayRef.current = true;
-                  }
-
-                  if (distanceFromBottom < 5) {
-                    userHasScrolledAwayRef.current = false;
-                  }
-
-                  let startIndex = 0;
-                  for (let i = 0; i < positions.length; i++) {
-                    if (positions[i]! > scrollTop - itemHeight * overscan) {
-                      startIndex = Math.max(0, i - 1);
-                      break;
-                    }
-                  }
-
-                  let endIndex = startIndex;
-                  const viewportEnd = scrollTop + clientHeight;
-                  for (let i = startIndex; i < positions.length; i++) {
-                    if (positions[i]! > viewportEnd + itemHeight * overscan) {
-                      break;
-                    }
-                    endIndex = i;
-                  }
-
-                  const newStartIndex = Math.max(0, startIndex);
-                  const newEndIndex = Math.min(
-                    totalCount,
-                    endIndex + 1 + overscan
-                  );
-
-                  if (
-                    newStartIndex !== lastRangeRef.current.startIndex ||
-                    newEndIndex !== lastRangeRef.current.endIndex
-                  ) {
-                    lastRangeRef.current = {
-                      startIndex: newStartIndex,
-                      endIndex: newEndIndex,
-                    };
-                    setRange({
-                      startIndex: newStartIndex,
-                      endIndex: newEndIndex,
-                    });
+                  if (!wasAtBottomRef.current) {
+                    container.scrollTop = container.scrollHeight;
+                    wasAtBottomRef.current = true;
                   }
                 };
 
@@ -1950,18 +1865,43 @@ function createProxyHandler<T>(
                 });
 
                 if (
-                  stickToBottom &&
-                  totalCount > 0 &&
+                  (hasNewItems || isInitialLoad) &&
+                  wasAtBottomRef.current &&
                   !userHasScrolledAwayRef.current
                 ) {
-                  const { scrollTop } = container;
-                  if (scrollTop === 0) {
-                    container.scrollTop = container.scrollHeight;
-                    wasAtBottomRef.current = true;
-                  }
+                  const visibleCount = Math.ceil(
+                    (container.clientHeight || 0) / itemHeight
+                  );
+                  const newRange = {
+                    startIndex: Math.max(
+                      0,
+                      totalCount - visibleCount - overscan
+                    ),
+                    endIndex: totalCount,
+                  };
+                  setRange(newRange);
+
+                  const timeoutId = setTimeout(() => {
+                    scrollToIndex(totalCount - 1, "smooth");
+                  }, 50);
+                  return () => {
+                    clearTimeout(timeoutId);
+                    container.removeEventListener("scroll", handleScroll);
+                  };
+                }
+
+                if (
+                  stickToBottom &&
+                  totalCount > 0 &&
+                  !userHasScrolledAwayRef.current &&
+                  container.scrollTop === 0
+                ) {
+                  container.scrollTop = container.scrollHeight;
+                  wasAtBottomRef.current = true;
                 }
 
                 handleScroll();
+                previousCountRef.current = totalCount;
 
                 return () => {
                   container.removeEventListener("scroll", handleScroll);
@@ -1976,8 +1916,7 @@ function createProxyHandler<T>(
                   containerRef.current.scrollTop =
                     containerRef.current.scrollHeight;
                 }
-              }, [scrollToLastItem]);
-
+              }, []);
               const scrollToIndex = useCallback(
                 (index: number, behavior: ScrollBehavior = "smooth") => {
                   const container = containerRef.current;
@@ -1985,14 +1924,19 @@ function createProxyHandler<T>(
 
                   const isLastItem = index === totalCount - 1;
 
+                  // --- Special Case: The Last Item ---
                   if (isLastItem) {
+                    // For the last item, scrollIntoView can fail. The most reliable method
+                    // is to scroll the parent container to its maximum scroll height.
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: behavior,
                     });
-                    return;
+                    return; // We're done.
                   }
 
+                  // --- Standard Case: All Other Items ---
+                  // For all other items, we find the ref and use scrollIntoView.
                   const arrayMeta = getGlobalStore
                     .getState()
                     .getShadowMetadata(stateKey, path);
@@ -2008,20 +1952,40 @@ function createProxyHandler<T>(
                   }
 
                   if (element) {
+                    // 'center' gives a better user experience for items in the middle of the list.
                     element.scrollIntoView({
                       behavior: behavior,
                       block: "center",
                     });
                   } else if (positions[index] !== undefined) {
+                    // Fallback if the ref isn't available for some reason.
                     container.scrollTo({
                       top: positions[index],
                       behavior,
                     });
                   }
                 },
-                [positions, stateKey, path, totalCount]
+                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
               );
+              // Create virtual state
+              const virtualState = useMemo(() => {
+                const start = Math.max(0, range.startIndex);
+                const end = Math.min(totalCount, range.endIndex);
+                // Get the ordered IDs from the parent array's metadata
+                const arrayMeta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                const orderedIds = arrayMeta?.arrayKeys || [];
+                // Slice the array of data and the array of IDs to match the virtual range
+                const slicedArray = sourceArray.slice(start, end);
+                const slicedIds = orderedIds.slice(start, end);
 
+                // Create the new proxy, passing the sliced IDs as its `validIds` metadata.
+                return rebuildStateShape(slicedArray as any, path, {
+                  ...meta,
+                  validIds: slicedIds,
+                });
+              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
@@ -2155,10 +2119,6 @@ function createProxyHandler<T>(
                   .getShadowValue(stateKeyPathKey, meta?.validIds)
               );
               getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                console.log(
-                  "stateKesssssssssssssssssssssssssyPathKey",
-                  stateKeyPathKey
-                );
                 setArrayKeys(
                   getGlobalStore
                     .getState()
@@ -3068,23 +3028,39 @@ function CogsItemWrapper({
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
 
+  // Proper way to merge refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
-      measureRef(element);
+      // Set your own ref
       elementRef.current = element;
+
+      // Call measureRef (it's a callback function from useMeasure)
+      measureRef(element);
     },
     [measureRef]
   );
 
   useEffect(() => {
-    if (bounds.height > 0 && bounds.height !== lastReportedHeight.current) {
+    const currentItemMetadata = getGlobalStore
+      .getState()
+      .getShadowMetadata(stateKey, itemPath);
+    const existingItemHeight = currentItemMetadata?.virtualizer?.itemHeight;
+
+    if (
+      bounds.height > 0 &&
+      bounds.height !== lastReportedHeight.current &&
+      bounds.height !== existingItemHeight
+    ) {
       lastReportedHeight.current = bounds.height;
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
         virtualizer: { itemHeight: bounds.height, domRef: elementRef.current },
       });
+      const arrayPath = itemPath.slice(0, -1); // Remove the item ID
+      const arrayPathKey = [stateKey, ...arrayPath].join(".");
+      getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
+    // --- END OF NEW CHECK ---
   }, [bounds.height, stateKey, itemPath]);
-
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore

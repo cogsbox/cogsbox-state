@@ -290,7 +290,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
   notifyPathSubscribers: (updatedPath) => {
     const subscribers = get().pathSubscribers;
-    console.log("notifyPathSubscribers", updatedPath);
+
     // Perform a direct, exact lookup. No loop.
     const subs = subscribers.get(updatedPath);
 

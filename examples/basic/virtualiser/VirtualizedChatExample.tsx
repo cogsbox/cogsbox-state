@@ -32,7 +32,7 @@ const generateMessages = (count: number): Message[] => {
 };
 
 const allState = {
-  messages: generateMessages(5000),
+  messages: generateMessages(300),
 };
 
 export type ChatState = {
@@ -81,23 +81,17 @@ function ChatWindow() {
 
   const { virtualState, virtualizerProps, scrollToBottom } =
     messages.useVirtualView({
-      itemHeight: 25, // Adjusted estimated height for better spacing
+      itemHeight: 65, // Adjusted estimated height for better spacing
       overscan: 10,
       stickToBottom: true,
     });
-
-  // Use useLayoutEffect to scroll to the bottom after the initial layout is calculated.
-  useLayoutEffect(() => {
-    scrollToBottom();
-  }, [scrollToBottom]);
-
+  // console.log("virtualizerProps", virtualState.get());
   return (
-    // THE KEY FIX: This new wrapper div is the flex item that grows.
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
       <div style={virtualizerProps.inner.style}>
         <div
           style={virtualizerProps.list.style}
-          className="px-4 pb-6 space-y-4"
+          className="px-4  space-y-4 pb-6"
         >
           {virtualState?.stateList((message, setter, index, array) => {
             return (
@@ -129,13 +123,11 @@ function MessageItem({ message }: { message: Message }) {
       )}
       <div className={bubbleClasses}>
         {!isFromYou && (
-          <p className="font-bold text-green-400 text-xs mb-1">
-            {message.author}
-          </p>
+          <p className="font-bold text-green-400 text-xs ">{message.author}</p>
         )}
         <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
         <p
-          className={`text-xs mt-1.5 ${
+          className={`text-xs  ${
             isFromYou ? "text-green-200/60" : "text-gray-400"
           } self-end`}
         >
