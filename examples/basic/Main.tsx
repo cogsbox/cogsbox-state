@@ -13,9 +13,10 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <div className="pointer-events-none">
         <PixelRain />
       </div>
-      <div className="px-12">
+      <div className="px-24 pt-12 flex flex-col gap-4">
         <Reactivity />
-        {/* <ArrayReactivity /> */}
+        <div className="h-20" />
+        <ArrayReactivity />
       </div>
     </div>
   </React.StrictMode>

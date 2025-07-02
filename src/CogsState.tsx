@@ -1030,8 +1030,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
       reactiveType: reactiveType ?? ["component", "deps"],
       paths: new Set(),
       depsFunction: reactiveDeps || undefined,
-      lastDeps: reactiveDeps
-        ? reactiveDeps(getGlobalStore.getState().cogsStateStore[thisKey])
+      deps: reactiveDeps
+        ? reactiveDeps(getGlobalStore.getState().getShadowValue(thisKey))
         : [],
     });
 
@@ -1281,10 +1281,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
+      const newState = store.getShadowValue(thisKey);
+      const changedPaths = getDifferences(prevValue, newState);
       // Get the root shadow metadata where components are stored
       const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
+
       if (shadowMetaRoort?.components) {
-        const changedPaths = getDifferences(prevValue, payload);
+        console.log(
+          "----------------------------------",
+          path,
+          shadowMetaRoort?.components
+        );
         const changedPathsSet = new Set(changedPaths);
         const primaryPathToCheck =
           updateObj.updateType === "update"
@@ -1307,79 +1314,48 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
 
           if (reactiveTypes.includes("component")) {
-            if (
-              component.paths.has(primaryPathToCheck) ||
-              component.paths.has("")
-            ) {
-              shouldUpdate = true;
-            }
-
-            if (!shouldUpdate) {
-              for (const changedPath of changedPathsSet) {
-                let currentPathToCheck = changedPath;
-                while (true) {
-                  if (component.paths.has(currentPathToCheck)) {
-                    shouldUpdate = true;
-                    break;
-                  }
-                  const lastDotIndex = currentPathToCheck.lastIndexOf(".");
-                  if (lastDotIndex !== -1) {
-                    const parentPath = currentPathToCheck.substring(
-                      0,
-                      lastDotIndex
-                    );
-                    if (
-                      !isNaN(
-                        Number(currentPathToCheck.substring(lastDotIndex + 1))
-                      )
-                    ) {
-                      if (component.paths.has(parentPath)) {
-                        shouldUpdate = true;
-                        break;
-                      }
-                    }
-                    currentPathToCheck = parentPath;
-                  } else {
-                    currentPathToCheck = "";
-                  }
-                  if (currentPathToCheck === "") {
-                    break;
-                  }
+            // A component should update if ANY of the changed paths
+            // are children of (or equal to) ANY of its subscribed paths.
+            for (const changedPath of changedPathsSet) {
+              for (const subscribedPath of component.paths) {
+                // Case 1: Exact match (e.g., changed 'a.b' and subscribed to 'a.b')
+                // Case 2: Changed is a child (e.g., changed 'a.b.c' and subscribed to 'a.b')
+                // Case 3: Subscribed to root (e.g., subscribedPath is '', matches everything)
+                if (
+                  changedPath === subscribedPath ||
+                  (subscribedPath !== "" &&
+                    changedPath.startsWith(subscribedPath + ".")) ||
+                  subscribedPath === ""
+                ) {
+                  shouldUpdate = true;
+                  break; // Exit inner loop once a match is found
                 }
-                if (shouldUpdate) break;
+              }
+              if (shouldUpdate) {
+                break; // Exit outer loop too
               }
             }
           }
 
           if (!shouldUpdate && reactiveTypes.includes("deps")) {
             if (component.depsFunction) {
-              const fullState = store.getNestedState(thisKey, []); //onyl works 2 times
-              const depsResult = component.depsFunction(fullState);
-              console.log(
-                "deps changed for",
-                componentKey,
-                component,
-                "reactiveTypesssssssssssssssssssssssss1111",
-                fullState,
-                depsResult
-              );
-              let depsChanged = false;
-              if (typeof depsResult === "boolean") {
-                if (depsResult) depsChanged = true;
-              } else if (!isDeepEqual(component.deps, depsResult)) {
-                console.log(
-                  "deps changed for",
-                  componentKey,
-                  "reactiveTypesssssssssssssssssssssssss222",
-                  component.deps,
-                  isDeepEqual(component.deps, depsResult)
-                );
-                component.deps = depsResult;
-                depsChanged = true;
-              }
-              if (depsChanged) {
+              const fullState = store.getShadowValue(thisKey);
+              const newDeps = component.depsFunction(fullState);
+
+              // Case 1: The deps function returned `true`. Always re-render.
+              if (newDeps === true) {
                 shouldUpdate = true;
               }
+              // Case 2: The deps function returned an array. Compare it.
+              else if (Array.isArray(newDeps)) {
+                if (!isDeepEqual(component.deps, newDeps)) {
+                  // The dependencies have changed.
+                  // Update the stored value for the next check and flag for re-render.
+                  component.deps = newDeps;
+                  shouldUpdate = true;
+                }
+              }
+              // Case 3: The function returned undefined, null, false, etc. Do nothing.
             }
           }
           if (shouldUpdate) {
@@ -1436,7 +1412,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
-      return store.getShadowValue(thisKey);
+      return newState;
     });
   };
   if (!getGlobalStore.getState().updaterState[thisKey]) {
@@ -1474,6 +1450,46 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
 type MetaData = {
   validIds?: string[];
+};
+const registerComponentDependency = (
+  stateKey: string,
+  componentId: string,
+  dependencyPath: string[]
+) => {
+  const fullComponentId = `${stateKey}////${componentId}`;
+  const component = getGlobalStore
+    .getState()
+    .getShadowMetadata(stateKey, [])
+    ?.components?.get(fullComponentId);
+
+  // Guard clause: Exit if no component or not the right reactivity type.
+  if (
+    !component ||
+    !(
+      Array.isArray(component.reactiveType)
+        ? component.reactiveType
+        : [component.reactiveType || "component"]
+    ).includes("component")
+  ) {
+    return;
+  }
+
+  const pathKey = dependencyPath.join(".");
+
+  // If a parent path already covers this dependency, do nothing.
+  if (
+    Array.from(component.paths).some((existing) => pathKey.startsWith(existing))
+  ) {
+    return;
+  }
+
+  // Add the new path and remove any now-redundant child paths.
+  component.paths.add(pathKey);
+  for (const p of Array.from(component.paths)) {
+    if (p !== pathKey && p.startsWith(pathKey + ".")) {
+      component.paths.delete(p);
+    }
+  }
 };
 function createProxyHandler<T>(
   stateKey: string,
@@ -1565,45 +1581,6 @@ function createProxyHandler<T>(
           "getComponents",
         ]);
 
-        if (
-          prop !== "then" &&
-          typeof prop === "string" &&
-          !prop.startsWith("$") &&
-          prop !== "stateMapNoRender" &&
-          !mutationMethods.has(prop)
-        ) {
-          const fullComponentId = `${stateKey}////${componentId}`;
-
-          const rootMeta = getGlobalStore
-            .getState()
-            .getShadowMetadata(stateKey, []);
-          const components = rootMeta?.components || new Map();
-          let component = components.get(fullComponentId);
-
-          // V--------- YOUR FIX, IMPLEMENTED DIRECTLY ---------V
-
-          if (component) {
-            const currentPath = path.join(".");
-            console.log("currentPath", currentPath);
-            let needsAdd = true;
-            for (const existingPath of component.paths) {
-              if (
-                currentPath.startsWith(existingPath) &&
-                (currentPath === existingPath ||
-                  currentPath[existingPath.length] === ".")
-              ) {
-                needsAdd = false;
-                break;
-              }
-            }
-            if (needsAdd && rootMeta) {
-              component.paths.add(currentPath);
-              getGlobalStore
-                .getState()
-                .setShadowMetadata(stateKey, [], rootMeta);
-            }
-          }
-        }
         if (prop === "getDifferences") {
           return () =>
             getDifferences(
@@ -2473,6 +2450,7 @@ function createProxyHandler<T>(
 
         if (prop === "get") {
           return () => {
+            registerComponentDependency(stateKey, componentId, path);
             return getGlobalStore
               .getState()
               .getShadowValue(stateKeyPathKey, meta?.validIds);
