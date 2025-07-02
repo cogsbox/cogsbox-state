@@ -2,6 +2,9 @@ import { createCogsState } from "../../../src/CogsState";
 
 const fooBarObject = {
   foo: "bar" as const,
+  nested: {
+    foo: "bar" as const,
+  },
 };
 
 const allState = {
@@ -9,7 +12,7 @@ const allState = {
 };
 
 export type StateExampleObject = {
-  fooBarObject: { foo: "bar" | "baz" };
+  fooBarObject: { foo: "bar" | "baz"; nested: { foo: "bar" | "baz" } };
 };
 
 export const { useCogsState } = createCogsState<StateExampleObject>(allState);

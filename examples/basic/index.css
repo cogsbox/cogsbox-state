@@ -1,5 +1,153 @@
 @import "tailwindcss";
 
 .input {
-    @apply rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+  @apply rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
+}
+
+@layer base {
+  /* Stepped gradient background for pixel aesthetic */
+  .pixel-gradient {
+    position: absolute;
+    inset: 0;
+    image-rendering: pixelated;
+  }
+
+  /* Lightning flash - must be behind content */
+  .lightning-flash {
+    position: fixed !important;
+    z-index: -1 !important;
+    pointer-events: none !important;
+  }
+
+  /*
+    The main container for the effect.
+    We'll send it behind other content with a negative z-index.
+  */
+  .pixel-rain-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  /*
+    The container for a single drop. It controls the main fall animation.
+  */
+  .pixel-drop {
+    position: absolute;
+    bottom: 100%; /* Start above the screen */
+
+    /* The main fall animation. It uses the random timing from the component. */
+    animation: pixel-fall var(--duration) linear var(--delay) infinite;
+  }
+
+  /*
+    The falling "stem" of the raindrop.
+    This is just a small, tall, pixelated line.
+  */
+  .pixel-stem {
+    width: 1px;
+    height: 60px;
+    background-color: #bdc5d1; /* The same bright pixel color */
+    image-rendering: pixelated;
+
+    /* A separate animation to make the stem disappear just before the splat. */
+    animation: pixel-stem-fade var(--duration) linear var(--delay) infinite;
+  }
+
+  /*
+    The "splat" effect that happens at the end of the fall.
+    It's an expanding, pixelated border.
+  */
+  .pixel-splat {
+    position: absolute;
+    bottom: 100%; /* Start above the screen like the drop */
+    width: 4px;
+    height: 1px;
+    margin-left: -4px; /* Center the initial small size */
+    margin-top: -1px;
+    border: 1px solid rgba(189, 197, 209, 0.3);
+    border-radius: 100%;
+    image-rendering: pixelated;
+
+    /* Start invisible and small. */
+    opacity: 0;
+
+    /* The splat animation is timed to happen at the end of the main fall. */
+    animation: pixel-splat-expand var(--splat-duration) linear var(--delay)
+      infinite;
+  }
+
+  /* --- KEYFRAMES --- */
+
+  /* The main falling animation for the entire drop */
+  @keyframes pixel-fall {
+    0% {
+      transform: translateY(0vh) translateX(0px);
+    }
+    75% {
+      /* --- THE CHANGE --- */
+      /* Instead of a fixed 90vh, use the random value from the component. */
+      transform: translateY(var(--end-height))
+        translateX(calc(var(--wind-strength) * var(--wind-sensitivity) * 0.75));
+    }
+    100% {
+      /* And make sure it stays there. */
+      transform: translateY(var(--end-height))
+        translateX(calc(var(--wind-strength) * var(--wind-sensitivity)));
+    }
+  }
+
+  /* The animation for the stem to fade out */
+  @keyframes pixel-stem-fade {
+    0%,
+    65% {
+      opacity: calc(0.6 * var(--drop-opacity));
+    }
+    75% {
+      opacity: calc(0.1 * var(--drop-opacity));
+    }
+
+    100% {
+      opacity: 0;
+    } /* Disappears as the drop hits the ground */
+  }
+
+  /* The animation for the splat to expand and fade */
+  @keyframes pixel-splat-expand {
+    0%,
+    30% {
+      opacity: 0;
+      transform: translateY(var(--end-height));
+      width: 4px;
+      height: 1px;
+      margin-left: -2px;
+      margin-top: -0.5px;
+      border-width: 1px;
+    } /* Invisible for most of the fall, but positioned at ground level */
+    50% {
+      opacity: calc(1 * var(--drop-opacity));
+      transform: translateY(var(--end-height));
+      width: 20px;
+      height: 5px;
+      margin-left: -20px;
+      margin-top: -5px;
+      border-width: 2px;
+    }
+    60% {
+      opacity: calc(0.7 * var(--drop-opacity));
+    }
+    100% {
+      opacity: 0;
+      transform: translateY(var(--end-height));
+      width: 80px;
+      height: 20px;
+      margin-left: -40px;
+      margin-top: -10px;
+      border-width: 3px;
+    } /* Fades out as it finishes expanding */
+  }
 }

@@ -32,7 +32,7 @@ export const { useCogsState } = createCogsState<ArrayStateObject>(allState, {
 export default function ArrayReactivity() {
   return (
     // Main container creating the two-column layout and setting the retro theme
-    <div className="flex gap-4 font-mono bg-gray-600 text-green-400 min-h-screen p-4">
+    <div className="flex gap-4 f text-green-400 min-h-screen p-4">
       {/* --- LEFT COLUMN --- */}
       <div className="w-3/5 flex flex-col gap-3">
         <h1 className="text-xl font-bold text-gray-300">Array Reactivity</h1>

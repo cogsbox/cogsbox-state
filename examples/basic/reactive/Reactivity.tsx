@@ -1,6 +1,6 @@
 "use client";
 
-import type { OptionsType } from "../../../src/CogsState";
+import type { OptionsType, StateObject } from "../../../src/CogsState";
 import { FlashWrapper } from "../FlashOnUpdate";
 import { type StateExampleObject, useCogsState } from "./state";
 import SyntaxHighlighter from "react-syntax-highlighter";
@@ -8,9 +8,10 @@ import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import stringify from "stringify-object";
 
 export default function Reactivity() {
+  const fooState = useCogsState("fooBarObject", { reactiveType: "none" });
   return (
     // Main container creating the two-column layout and setting the retro theme
-    <div className="flex gap-4 font-mono bg-gray-600 text-green-400 min-h-screen p-4">
+    <div className="flex gap-4  text-green-400 min-h-screen p-4">
       {/* --- LEFT COLUMN --- */}
       <div className="w-3/5 flex flex-col gap-3">
         <h1 className="text-xl font-bold text-gray-300">Reactivity Types</h1>
@@ -48,7 +49,23 @@ export default function Reactivity() {
 
       {/* --- RIGHT COLUMN --- */}
       <div className="w-2/5 flex flex-col gap-4">
-        <div className="h-20" />
+        <div className="h-20" />{" "}
+        <button
+          className="px-3 py-1 bg-green-900 text-green-200 rounded hover:bg-green-800 text-sm cursor-pointer"
+          onClick={() =>
+            fooState.foo.update((s) => (s === "baz" ? "bar" : "baz"))
+          }
+        >
+          Toggle Foo
+        </button>{" "}
+        <button
+          className="px-3 py-1 bg-green-900 text-green-200 rounded hover:bg-green-800 text-sm cursor-pointer"
+          onClick={() =>
+            fooState.nested.foo.update((s) => (s === "baz" ? "bar" : "baz"))
+          }
+        >
+          Toggle Nested Foo
+        </button>
         <ReactivityExplanation />
         <ShowState />
       </div>
@@ -86,7 +103,7 @@ function ToggleState({
 );
 // Getter:
 ${!isSignal ? "fooState.foo.get()" : "fooState.foo.$get()"}`;
-
+  console.log(fooState.nested.foo.get());
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700 rounded p-3 flex flex-col gap-3 h-full">
@@ -113,23 +130,43 @@ ${!isSignal ? "fooState.foo.get()" : "fooState.foo.$get()"}`;
         </div>
 
         <div className="flex gap-2 items-center w-full mt-1">
-          <button
-            className="px-3 py-1 bg-green-900 text-green-200 rounded hover:bg-green-800 text-sm"
-            onClick={() =>
-              fooState.foo.update((s) => (s === "baz" ? "bar" : "baz"))
-            }
-          >
-            Toggle Foo
-          </button>
           <div className="flex-1 text-base bg-gray-800 p-1 rounded border border-gray-700 text-center">
             {!isSignal ? fooState.foo.get() : fooState.foo.$get()}
+          </div>
+        </div>
+        <NestedFoo
+          nestedFoo={fooState.nested.foo}
+          isSignal={isSignal}
+          foo={fooState.nested.foo.get()}
+        />
+      </div>
+    </FlashWrapper>
+  );
+}
+
+function NestedFoo({
+  nestedFoo,
+  foo,
+  isSignal,
+}: {
+  nestedFoo: StateObject<StateExampleObject["fooBarObject"]["nested"]["foo"]>;
+  foo: String;
+
+  isSignal?: boolean;
+}) {
+  return (
+    <FlashWrapper>
+      <div className="flex gap-2 w-full">
+        <div className="flex w-full">
+          <div className="w-1/3 p-1 px-4  bg-gray-800 text-green-500 rounded">
+            Nested: {!isSignal ? nestedFoo.get() : nestedFoo.$get()}
+            {foo}
           </div>
         </div>
       </div>
     </FlashWrapper>
   );
 }
-
 function ReactivityExplanation() {
   const Type = ({ children }: { children: React.ReactNode }) => (
     <code className="bg-gray-700 text-green-300 font-semibold px-1 py-0.5 rounded text-xs">

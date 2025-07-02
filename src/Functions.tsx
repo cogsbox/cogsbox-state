@@ -222,7 +222,7 @@ export const FormControlComponent = <TStateObject,>({
   getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
     forceUpdate({});
   });
-  console.log("FormControlComponentFormControlComponent", stateKeyPathKey);
+
   const refKey = stateKey + "." + path.join(".");
   const localFormRef = useRef<HTMLInputElement>(null);
   const existingRef = getFormRef(refKey);

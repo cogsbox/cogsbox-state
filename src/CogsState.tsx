@@ -1577,11 +1577,14 @@ function createProxyHandler<T>(
           const rootMeta = getGlobalStore
             .getState()
             .getShadowMetadata(stateKey, []);
-          const component = rootMeta?.components?.get(fullComponentId);
+          const components = rootMeta?.components || new Map();
+          let component = components.get(fullComponentId);
+
+          // V--------- YOUR FIX, IMPLEMENTED DIRECTLY ---------V
 
           if (component) {
-            const currentPath = [...path, prop].join(".");
-
+            const currentPath = path.join(".");
+            console.log("currentPath", currentPath);
             let needsAdd = true;
             for (const existingPath of component.paths) {
               if (
