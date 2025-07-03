@@ -1,8 +1,10 @@
 "use client";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+
+// Assuming these are in separate files as in your original code
 import FlyingCars from "./FlyingCars";
 import BlimpWithSpotlights from "./Blimp";
-import { Clapperboard } from "lucide-react";
+import { svgBush } from "./assets/bush";
 
 interface PixelRainProps {
   numberOfDrops?: number;
@@ -27,42 +29,40 @@ function MoonGlow({
 
       const subtleX = 15;
       const subtleY = 120;
-      const baseIntensity = 1 + Math.random() * 0.2;
-      const steps = 40;
+      const baseIntensity = 2 + Math.random() * 0.1;
+      const steps = 20; // Clear distinct bands
       let gradientSteps = [];
-      const moonCurve = (t: number) => Math.pow(t, 9); // Really quick drop-off
 
-      // Update moon circle position
+      const glowStartRadius = 4;
+
       moonCircleRef.current.style.left = `${subtleX}%`;
       moonCircleRef.current.style.top = `${subtleY}px`;
 
       for (let i = 0; i < steps; i++) {
-        const distance = i / (steps - 1);
-        const easedDistance = moonCurve(distance);
+        const t = i / (steps - 1);
+        const radiusStart = glowStartRadius + Math.pow(t, 8) * 100;
+        const radiusEnd =
+          glowStartRadius + Math.pow((i + 1) / (steps - 1), 2) * 30;
 
-        // Start with moon intensity, drop off quickly
-        const opacity = i === 0 ? 0.9 : (1 - easedDistance) * baseIntensity;
-        const r = 215; // Match moon gray
-        const g = 211; // Match moon gray
-        const b = 215; // Match moon gray
+        const opacity = baseIntensity * (1 - t) * 0.4;
 
-        const positionStart = i === 0 ? 0 : moonCurve(i / steps) * 100;
-        const positionEnd =
-          i === steps - 1 ? 100 : moonCurve((i + 1) / steps) * 100;
+        const r = 200;
+        const g = 210;
+        const b = 220;
 
+        // Hard band: same color from start to end of this band
         gradientSteps.push(
-          `rgba(${r}, ${g}, ${b}, ${opacity}) ${positionStart}%`,
-          `rgba(${r}, ${g}, ${b}, ${opacity}) ${positionEnd}%`
+          `rgba(${r}, ${g}, ${b}, ${opacity}) ${radiusStart}vh`
         );
+        gradientSteps.push(`rgba(${r}, ${g}, ${b}, ${opacity}) ${radiusEnd}vh`);
       }
 
-      onMoonIntensityChange(baseIntensity * 0.4);
+      onMoonIntensityChange(baseIntensity * 0.3);
 
-      moonRef.current.style.background = `radial-gradient(circle ${
-        150 + baseIntensity * 40
-      }vh at ${subtleX}% ${subtleY}px, ${gradientSteps.join(", ")})`;
+      moonRef.current.style.background = `radial-gradient(circle 180vh at ${subtleX}% ${subtleY}px, transparent ${glowStartRadius}vh, ${gradientSteps.join(
+        ", "
+      )})`;
     };
-
     glowInterval = setInterval(updateMoonGlow, 400);
     updateMoonGlow();
 
@@ -84,7 +84,7 @@ function MoonGlow({
           zIndex: -4,
           pointerEvents: "none",
           background: "transparent",
-          mixBlendMode: "soft-light",
+          mixBlendMode: "screen",
           imageRendering: "pixelated",
         }}
       />
@@ -97,7 +97,7 @@ function MoonGlow({
           height: "120px",
           borderRadius: "50%",
           backgroundColor: "rgba(215, 215, 215, 0.9)",
-          zIndex: -3,
+          zIndex: -4,
           pointerEvents: "none",
           transform: "translate(-50%, -50%)",
           imageRendering: "pixelated",
@@ -129,12 +129,11 @@ function Lightning({ onBrightnessChange }: LightningProps) {
             lightningRef.current.style.background = "transparent";
           }
           onBrightnessChange(BASE_SKYLINE_BRIGHTNESS);
-          clearInterval(fadeInterval);
+          clearInterval(fadeInterval as NodeJS.Timeout);
           fadeInterval = undefined;
         } else {
           const intensity = isLit ? currentIntensity : currentIntensity * 0.3;
 
-          // Update DOM directly - no useState!
           if (lightningRef.current) {
             const randomX = 95 + Math.random() * 10;
             const randomY = -10 + Math.random() * 100;
@@ -178,10 +177,10 @@ function Lightning({ onBrightnessChange }: LightningProps) {
     };
 
     const scheduleLightning = () => {
-      const delay = 8000 + Math.random() * 12000; // Longer delays: 4-16 seconds
+      const delay = 8000 + Math.random() * 12000;
       schedulerTimeout = setTimeout(() => {
         triggerLightning();
-        scheduleLightning(); // This creates the loop - but now with longer delays
+        scheduleLightning();
       }, delay);
     };
 
@@ -214,12 +213,54 @@ function Lightning({ onBrightnessChange }: LightningProps) {
   );
 }
 
-export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
+export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
   const [skylineBrightness, setSkylineBrightness] = useState(0.5);
   const [moonIntensity, setMoonIntensity] = useState(0);
   const handleBrightnessChange = useCallback((brightness: number) => {
     setSkylineBrightness(brightness);
   }, []);
+
+  // --- START: Parallax Logic ---
+  const carsRef = useRef<HTMLDivElement>(null);
+  const cybermanRef = useRef<HTMLDivElement>(null);
+  const blimpRef = useRef<HTMLDivElement>(null);
+  const skylineRef = useRef<HTMLDivElement>(null);
+  const rainContainerRef = useRef<HTMLDivElement>(null);
+  const splatContainerRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const handleMouseMove = (event: MouseEvent) => {
+      if (!window) return;
+      const { clientX, clientY } = event;
+      const { innerWidth, innerHeight } = window;
+      const xOffset = (clientX - innerWidth / 2) / innerWidth;
+      const yOffset = (clientY - innerHeight / 2) / innerHeight;
+
+      const applyTransform = (
+        ref: React.RefObject<HTMLElement>,
+        strength: number,
+        preserveExistingTransform: string = ""
+      ) => {
+        if (ref.current) {
+          const x = xOffset * strength;
+          const y = yOffset * strength;
+          ref.current.style.transform = `${preserveExistingTransform} translate(${x}px, ${y}px) scale(1)`;
+        }
+      };
+
+      applyTransform(skylineRef, 0);
+      // The blimp needs to preserve its translateX animation
+      applyTransform(blimpRef, 15, "translateX(-100%)");
+
+      applyTransform(cybermanRef, 30);
+      applyTransform(rainContainerRef, 45);
+      applyTransform(splatContainerRef, 45);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    return () => window.removeEventListener("mousemove", handleMouseMove);
+  }, []);
+  // --- END: Parallax Logic ---
 
   const steppedGradient = useMemo(() => {
     const steps = 40;
@@ -227,26 +268,17 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
     const endColor = { r: 0, g: 0, b: 0 };
     let gradientSteps = [];
     const easeOutQuint = (t: number) => Math.pow(t, 8);
-
     for (let i = 0; i < steps; i++) {
-      const colorProgress = i / (steps - 1);
-      const r = Math.round(
-        startColor.r + (endColor.r - startColor.r) * colorProgress
-      );
-      const g = Math.round(
-        startColor.g + (endColor.g - startColor.g) * colorProgress
-      );
-      const b = Math.round(
-        startColor.b + (endColor.b - startColor.b) * colorProgress
-      );
-
-      const positionStart = i === 0 ? 0 : easeOutQuint(i / steps) * 100;
-      const positionEnd =
+      const p = i / (steps - 1);
+      const r = Math.round(startColor.r + (endColor.r - startColor.r) * p);
+      const g = Math.round(startColor.g + (endColor.g - startColor.g) * p);
+      const b = Math.round(startColor.b + (endColor.b - startColor.b) * p);
+      const posStart = i === 0 ? 0 : easeOutQuint(i / steps) * 100;
+      const posEnd =
         i === steps - 1 ? 100 : easeOutQuint((i + 1) / steps) * 100;
-
       gradientSteps.push(
-        `rgb(${r}, ${g}, ${b}) ${positionStart}%`,
-        `rgb(${r}, ${g}, ${b}) ${positionEnd}%`
+        `rgb(${r}, ${g}, ${b}) ${posStart}%`,
+        `rgb(${r}, ${g}, ${b}) ${posEnd}%`
       );
     }
     return `linear-gradient(180deg, ${gradientSteps.join(", ")})`;
@@ -255,52 +287,98 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
   const drops = useMemo(() => {
     let drops = [];
     for (let i = 0; i < numberOfDrops; i++) {
-      const randoHundo = Math.floor(Math.random() * 98) + 1;
-      const animationDuration = 0.5 + randoHundo / 100;
-      const endHeight = 40 + Math.random() * 90;
+      const rH = Math.floor(Math.random() * 98) + 1;
+      const aD = 0.5 + rH / 100;
+
+      // Use weighted random for 3D effect - bias toward shorter falls (higher density up top)
+      const densityWeight = Math.pow(Math.random(), 12); // Squares the random value, biasing toward 0
+      const eH = 40 + densityWeight * 100; // 40-140vh, but more clustered near 40
+
+      const sizeModifier = ((eH - 40) / 90) * 2;
       drops.push({
         id: `drop-${i}`,
         left: `${Math.random() * 100}%`,
-        animationDelay: `0.${randoHundo}s`,
-        animationDuration: `${animationDuration}s`,
-        endHeight: `${endHeight}vh`,
+        animationDelay: `0.${rH}s`,
+        animationDuration: `${aD}s`,
+        endHeight: `${eH}vh`,
         windSensitivity: 0.5 + Math.random() * 0.5,
-        opacity: 0.2 + ((endHeight - 40) / 90) * 0.7,
+        opacity: 0.4 + ((eH - 40) / 90) * 0.3,
+        sizeModifier: sizeModifier,
       });
     }
     return drops;
   }, [numberOfDrops]);
-
   return (
     <>
-      <div className="fixed inset-0 z-[-2]">
-        <FlyingCars numberOfCars={50} />
-      </div>{" "}
+      {/* Background elements - UNCHANGED */}
       <div className="fixed inset-0 z-[-4]">
         <div
           className="pixel-gradient"
-          style={{ background: steppedGradient, imageRendering: "pixelated" }}
+          style={{
+            background: steppedGradient,
+            imageRendering: "pixelated",
+            position: "absolute",
+            inset: -10,
+            zIndex: -50,
+          }}
         />
-      </div>
-      <div className="fixed bottom-[10vh] left-[20vh] z-[-1]  h-[500px]">
-        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />
       </div>
       <MoonGlow onMoonIntensityChange={setMoonIntensity} />
       <Lightning onBrightnessChange={handleBrightnessChange} />
+      {/* --- Parallax Layers (Just adding a ref to your existing elements) --- */}
+      {/* Cars Layer */}
+      <div ref={carsRef} className="fixed inset-0 z-[-4]">
+        <FlyingCars numberOfCars={50} />
+      </div>{" "}
+      <div
+        ref={cybermanRef}
+        className="fixed bottom-[10vh] left-[20vh] z-[-1]  h-[500px]"
+      >
+        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />
+      </div>
+      {/* Static Overlays - UNCHANGED */}
       <div
         style={{
           position: "fixed",
           inset: 0,
           height: "37%",
-          zIndex: -3,
+          zIndex: -4,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.3) 15%, transparent 37%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.2) 15%, transparent 37%)",
         }}
       />
-      <div className="fixed top-[45%] bg-black/40 w-full h-full z-[-2]" />
       <div
-        className="fixed top-[12vh] z-[-2] blur-[1px]"
+        style={{
+          position: "fixed",
+          inset: 0,
+          top: "22%",
+          height: "60%",
+          filter: "blur(20px)",
+          zIndex: -2,
+          pointerEvents: "none",
+          background:
+            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.24) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
+        }}
+      />
+      <div
+        style={{
+          position: "fixed",
+          inset: 0,
+
+          height: "5vh",
+
+          zIndex: -2,
+          pointerEvents: "none",
+        }}
+      >
+        {svgBush}
+      </div>
+      <div className="fixed top-[30vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[40vh] z-[-3]" />
+      {/* Blimp Layer */}
+      <div
+        ref={blimpRef}
+        className="fixed top-[21vh] z-[-4] "
         style={{
           animation: "moveAcross 240s linear infinite",
           transform: "translateX(-100%)",
@@ -308,56 +386,57 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
       >
         <BlimpWithSpotlights />
       </div>
-      <style>
-        {`
-                              @keyframes moveAcross {
-                                    from { transform: translateX(-100%); }
-                                    to { transform: translateX(100vw); }
-                              }
-                        `}
-      </style>
+      <style>{`@keyframes moveAcross { from { transform: translateX(-100%); } to { transform: translateX(100vw); }}`}</style>
+      {/* Skyline Layer */}
       <div
+        ref={skylineRef}
         style={{
           position: "fixed",
           top: 0,
           left: 0,
           width: "100%",
           height: "100vh",
-          zIndex: -2,
+          zIndex: -3,
           pointerEvents: "none",
-          filter: `brightness(${skylineBrightness + moonIntensity})`,
+          filter: `brightness(${
+            0.6 + (skylineBrightness + moonIntensity * 0.00002)
+          })`,
           background: steppedGradient,
           backgroundAttachment: "fixed",
           imageRendering: "pixelated",
           maskImage: "url(/skyline.svg)",
           maskSize: "100% 100vh",
-
+          maskPosition: "0 5vh",
           maskRepeat: "no-repeat",
         }}
       />{" "}
-      <div aria-hidden="true" className="pixel-rain-container">
+      {/* Rain Layers */}
+      <div
+        ref={rainContainerRef}
+        aria-hidden="true"
+        className="pixel-rain-container"
+      >
         {drops.map((drop) => (
-          <div key={drop.id}>
-            <div
-              className="pixel-drop"
-              style={
-                {
-                  left: drop.left,
-                  "--delay": drop.animationDelay,
-                  "--drop-opacity": drop.opacity,
-                  "--duration": drop.animationDuration,
-                  "--end-height": drop.endHeight,
-                  "--wind-sensitivity": drop.windSensitivity,
-                } as any
-              }
-            >
-              <div className="pixel-stem" />
-            </div>
-          </div>
+          <div
+            key={drop.id}
+            className="pixel-raindrop"
+            style={
+              {
+                left: drop.left,
+                "--delay": drop.animationDelay,
+                "--drop-opacity": drop.opacity,
+                "--duration": drop.animationDuration,
+                "--end-height": drop.endHeight,
+              } as any
+            }
+          />
         ))}
       </div>
-      {/* Splats outside wind container */}
-      <div aria-hidden="true" className="pixel-splat-container">
+      <div
+        ref={splatContainerRef}
+        aria-hidden="true"
+        className="pixel-splat-container"
+      >
         {drops.map((drop) => (
           <div
             key={`splat-${drop.id}`}
@@ -372,6 +451,7 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
                 "--splat-duration": `${
                   parseFloat(drop.animationDuration) * 2
                 }s`,
+                "--size-modifier": drop.sizeModifier, // ADD THIS LINE
               } as any
             }
           />

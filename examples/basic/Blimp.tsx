@@ -22,7 +22,10 @@ const BlimpWithSpotlights = () => {
           }
         `}
       </style>
-
+      <div className="h-10 w-[1px] bg-black/70 absolute left-[55px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/70 absolute left-[70px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/70 absolute right-[55px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/70 absolute right-[70px] top-[30px]" />
       {/* Blimp */}
       <div
         style={{
@@ -50,15 +53,14 @@ const BlimpWithSpotlights = () => {
             WebkitMaskRepeat: "no-repeat",
             WebkitMaskPosition: "center",
             background: `
-              linear-gradient(to top, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.06) 40%, transparent 70%),
-              radial-gradient(circle at 35% 82%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 5%, transparent 20%),
-              radial-gradient(circle at 65% 82%, rgba(255,255,255,0.5) 0%, rgba(255,255,255,0.2) 5%, transparent 20%)
+              linear-gradient(to top, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.04) 30%, transparent 70%),
+              radial-gradient(circle at 35% 82%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 5%, transparent 20%),
+              radial-gradient(circle at 65% 82%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 5%, transparent 20%)
             `,
             pointerEvents: "none",
           }}
         />
       </div>
-
       {/* Spotlight Container */}
       <div
         className="absolute  pointer-events-none"
@@ -74,7 +76,7 @@ const BlimpWithSpotlights = () => {
           style={{
             transformOrigin: "top center",
             // Adjust based on blimp positioning
-            animation: "swayLeft 20s ease-in-out infinite",
+            animation: "swayLeft 15s ease-in-out infinite",
           }}
         >
           <div
@@ -83,8 +85,8 @@ const BlimpWithSpotlights = () => {
               marginTop: "-7px",
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
-                "linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.3) 5%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
-              filter: "blur(2px)",
+                "linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.3) 7%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
+              filter: "blur(4px)",
             }}
           />
         </div>
@@ -95,7 +97,7 @@ const BlimpWithSpotlights = () => {
           style={{
             left: "50px", // Offset from left spotlight
             transformOrigin: "top center",
-            animation: "swayRight 30s ease-in-out infinite 1s", // Different timing and delay
+            animation: "swayRight 20s ease-in-out infinite 1s", // Different timing and delay
           }}
         >
           <div
@@ -104,8 +106,8 @@ const BlimpWithSpotlights = () => {
               marginTop: "-7px",
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
-                "linear-gradient(to bottom, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.3) 5%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
-              filter: "blur(2px)",
+                "linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.3) 7%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
+              filter: "blur(4px)",
             }}
           />
         </div>

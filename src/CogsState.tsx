@@ -41,6 +41,7 @@ export type VirtualViewOptions = {
   overscan?: number;
   stickToBottom?: boolean;
   dependencies?: any[];
+  scrollStickTolerance?: number;
 };
 
 // The result now returns a real StateObject
@@ -1740,6 +1741,7 @@ function createProxyHandler<T>(
                 overscan = 6,
                 stickToBottom = false,
                 dependencies = [],
+                scrollStickTolerance = 100,
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
@@ -1909,18 +1911,14 @@ function createProxyHandler<T>(
                 const hasNewItems = totalCount > previousCountRef.current;
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
-
-                if (hasNewItems) {
+                const nearBottom =
+                  container.scrollHeight - container.scrollTop <=
+                  container.clientHeight + scrollStickTolerance;
+                if (hasNewItems && stickToBottom && nearBottom) {
                   scrollToLastItem();
                   previousCountRef.current = totalCount;
                 }
 
-                console.log(
-                  "souhasNewItemshasNewItemshasNewItemsunt",
-                  totalCount,
-                  previousCountRef.current,
-                  hasNewItems
-                );
                 const initalScroll = () => {
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =

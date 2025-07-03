@@ -14,7 +14,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       <div className="pointer-events-none">
         <PixelRain />
       </div>
-      <div className="px-24 pt-40 flex flex-col gap-4">
+      <div className="px-24 pt-40 flex flex-col gap-4 z-[999]">
         <Reactivity />
         <div className="h-20" />
         <ArrayReactivity />
