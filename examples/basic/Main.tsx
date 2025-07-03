@@ -19,7 +19,7 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <div className="h-20" />
         <ArrayReactivity />
         <div className="h-20" />
-        <VirtualizedChatExample />
+        <VirtualizedChatExample /> <div className="h-40" />
       </div>
     </div>
   </React.StrictMode>

@@ -31,6 +31,27 @@
     height: 100%;
     pointer-events: none;
     z-index: -1;
+    /* CSS WIND ANIMATION - No more JavaScript needed! */
+    animation: wind-sway 12s ease-in-out infinite;
+  }
+
+  /* Pure CSS wind animation */
+  @keyframes wind-sway {
+    0% {
+      transform: translateX(0px);
+    }
+    25% {
+      transform: translateX(140px);
+    }
+    50% {
+      transform: translateX(-60px);
+    }
+    75% {
+      transform: translateX(80px);
+    }
+    100% {
+      transform: translateX(0px);
+    }
   }
 
   /*
@@ -59,45 +80,72 @@
   }
 
   /*
+    Splat container - separate from wind container
+  */
+  .pixel-splat-container {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: -1;
+    /* No wind animation here! */
+  }
+
+  /*
     The "splat" effect that happens at the end of the fall.
     It's an expanding, pixelated border.
   */
   .pixel-splat {
     position: absolute;
-    bottom: 100%; /* Start above the screen like the drop */
+    bottom: 100%;
     width: 4px;
     height: 1px;
-    margin-left: -4px; /* Center the initial small size */
+    margin-left: -4px;
     margin-top: -1px;
     border: 1px solid rgba(189, 197, 209, 0.3);
     border-radius: 100%;
     image-rendering: pixelated;
-
-    /* Start invisible and small. */
     opacity: 0;
-
-    /* The splat animation is timed to happen at the end of the main fall. */
+    transform: translateX(
+      calc(var(--wind-offset, 0px) * -1)
+    ); /* Counter the wind */
     animation: pixel-splat-expand var(--splat-duration) linear var(--delay)
       infinite;
   }
 
-  /* --- KEYFRAMES --- */
-
-  /* The main falling animation for the entire drop */
-  @keyframes pixel-fall {
+  /* Counter wind animation for splats to stay in place */
+  @keyframes wind-counter-sway {
     0% {
-      transform: translateY(0vh) translateX(0px);
+      transform: translateX(0px) translateY(var(--end-height));
+    }
+    25% {
+      transform: translateX(-140px) translateY(var(--end-height));
+    }
+    50% {
+      transform: translateX(60px) translateY(var(--end-height));
     }
     75% {
-      /* --- THE CHANGE --- */
-      /* Instead of a fixed 90vh, use the random value from the component. */
-      transform: translateY(var(--end-height))
-        translateX(calc(var(--wind-strength) * var(--wind-sensitivity) * 0.75));
+      transform: translateX(-80px) translateY(var(--end-height));
     }
     100% {
-      /* And make sure it stays there. */
-      transform: translateY(var(--end-height))
-        translateX(calc(var(--wind-strength) * var(--wind-sensitivity)));
+      transform: translateX(0px) translateY(var(--end-height));
+    }
+  }
+
+  /* --- KEYFRAMES --- */
+
+  /* The main falling animation for the entire drop - SIMPLIFIED WITHOUT WIND CALC */
+  @keyframes pixel-fall {
+    0% {
+      transform: translateY(0vh);
+    }
+    75% {
+      transform: translateY(var(--end-height));
+    }
+    100% {
+      transform: translateY(var(--end-height));
     }
   }
 
@@ -127,7 +175,7 @@
       margin-left: -2px;
       margin-top: -0.5px;
       border-width: 1px;
-    } /* Invisible for most of the fall, but positioned at ground level */
+    }
     50% {
       opacity: calc(1 * var(--drop-opacity));
       transform: translateY(var(--end-height));
@@ -148,6 +196,6 @@
       margin-left: -40px;
       margin-top: -10px;
       border-width: 3px;
-    } /* Fades out as it finishes expanding */
+    }
   }
 }

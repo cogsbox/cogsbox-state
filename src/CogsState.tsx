@@ -1064,17 +1064,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
       componentUpdatesRef.current.add(pathKey);
     }
     const store = getGlobalStore.getState();
-    console.log("888888888888888888888888", path);
+
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowVlaue = store.getShadowValue(fullPath);
       const payload = isFunction<TStateObject>(newStateOrFunction)
         ? newStateOrFunction(nestedShadowVlaue)
         : newStateOrFunction;
-      console.log(
-        "kkkkkkkkkkkkkkkkkkkkkkkkkkkkk nestedShadowVlaue",
-        nestedShadowVlaue
-      );
 
       const timeStamp = Date.now();
 
@@ -1287,11 +1283,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
 
       if (shadowMetaRoort?.components) {
-        console.log(
-          "----------------------------------",
-          path,
-          shadowMetaRoort?.components
-        );
         const changedPathsSet = new Set(changedPaths);
         const primaryPathToCheck =
           updateObj.updateType === "update"
@@ -1761,92 +1752,153 @@ function createProxyHandler<T>(
               const userHasScrolledAwayRef = useRef(false);
               const previousCountRef = useRef(0);
               const setInitialSCrollDone = useRef(false);
-
+              const lastItemId = useRef<any>(null);
               // Subscribe to shadow state updates
-              useEffect(() => {
-                const unsubscribe = getGlobalStore
-                  .getState()
-                  .subscribeToPath(stateKeyPathKey, () => {
-                    setShadowUpdateTrigger((prev) => prev + 1);
-                  });
-                return unsubscribe;
-              }, [stateKey]);
+              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+                setShadowUpdateTrigger((prev) => prev + 1);
+              });
 
               const sourceArray = getGlobalStore
                 .getState()
-                .getNestedState(stateKey, path) as any[];
+                .getShadowValue(stateKeyPathKey) as any[];
               const totalCount = sourceArray.length;
 
-              // Calculate heights and positions
-              const { totalHeight, positions, lastItem } = useMemo(() => {
-                const arrayMeta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                const orderedIds = arrayMeta?.arrayKeys || []; // Get the ordered IDs
-                let height = 0;
-                const pos: number[] = [];
-                let lastItem = null;
-                for (let i = 0; i < totalCount; i++) {
-                  pos[i] = height;
-                  const itemId = orderedIds[i]?.split(".").pop(); // Get the ID for the item at this index
-                  let measuredHeight = itemHeight; // Default height
-                  if (itemId) {
-                    // Get metadata for the specific item using its full path
-                    const itemMeta = getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, [itemId]);
+              const initialTotalHeight = totalCount * itemHeight;
+              const shadowArray = getGlobalStore
+                .getState()
+                .getShadowMetadata(stateKey, path);
+              const orderedIds = shadowArray?.arrayKeys || [];
 
-                    measuredHeight =
-                      itemMeta?.virtualizer?.itemHeight || itemHeight;
-                    lastItem = itemMeta;
-                  }
+              const { calcedTotalHeight, positions, lastItem } = useMemo(() => {
+                let height = 0;
+                let positions: number[] = [];
+                let lastItem = null;
+                for (let id of orderedIds) {
+                  const itemMeta = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, id.split(".").slice(1));
+
+                  let measuredHeight =
+                    itemMeta?.virtualizer?.itemHeight || itemHeight;
+                  lastItem = itemMeta;
+                  positions.push(height);
                   height += measuredHeight;
                 }
-                console.log(
-                  "uuuuuuuuuuuuuuuu",
-                  orderedIds[totalCount - 1],
-                  lastItem
-                );
-                return { totalHeight: height, positions: pos, lastItem };
-              }, [
-                totalCount,
-                stateKey,
-                path.join("."),
-                itemHeight,
-                shadowUpdateTrigger,
-              ]);
-
+                lastItemId.current = orderedIds[totalCount - 1];
+                return { calcedTotalHeight: height, positions, lastItem };
+              }, [shadowUpdateTrigger, itemHeight]);
+              const totalHeight = calcedTotalHeight ?? initialTotalHeight;
               // Helper to scroll to last item using stored ref
-              const scrollToLastItem = useCallback(() => {
-                const shadowArray = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
+              const scrollToLastItem = () => {
                 if (
                   !shadowArray ||
                   (shadowArray && shadowArray?.arrayKeys?.length === 0)
                 ) {
                   return false;
                 }
-                const lastIndex = totalCount - 1;
-                const lastKkey = [...path, shadowArray.arrayKeys![lastIndex]!];
-                if (lastIndex >= 0) {
-                  const lastItemData = getGlobalStore
+                const maxAttempts = 50; // 5 seconds total
+                let attempts = 0;
+                const findAndScroll = () => {
+                  const shadowStore = getGlobalStore
                     .getState()
-                    .getShadowMetadata(stateKey, lastKkey);
-                  if (lastItemData?.virtualizer?.domRef) {
-                    const element = lastItemData.virtualizer.domRef;
-                    if (element && element.scrollIntoView) {
-                      element.scrollIntoView({
-                        behavior: "auto",
-                        block: "end",
-                        inline: "nearest",
+                    .getShadowMetadata(
+                      stateKey,
+                      lastItemId.current.split(".").slice(1)
+                    );
+
+                  if (shadowStore?.virtualizer?.domRef) {
+                    const element = shadowStore.virtualizer.domRef;
+                    if (element) {
+                      console.log("element", element);
+                      const container = containerRef.current!;
+                      container.scrollTo({
+                        top: container.scrollHeight,
+                        behavior: "smooth",
                       });
+
                       return true;
                     }
                   }
-                }
+                  return false;
+                };
+
+                const intervalId = setInterval(() => {
+                  attempts++;
+                  if (findAndScroll() || attempts >= maxAttempts) {
+                    clearInterval(intervalId);
+                  }
+                }, 100);
                 return false;
-              }, [stateKey, path, totalCount]);
+              };
+
+              // Always handle scroll to update range
+              useEffect(() => {
+                const container = containerRef.current;
+                if (!container || positions.length === 0) return;
+                const handleScroll = () => {
+                  const { scrollTop, clientHeight, scrollHeight } = container;
+                  const scrollBottom = scrollTop + clientHeight;
+                  let endIndex = totalCount - 1;
+                  // If we're near the bottom, just show items to the end
+                  const nearBottom =
+                    scrollHeight - scrollBottom < itemHeight * 2;
+
+                  // Binary search for first visible item
+                  let startIndex = 0;
+                  let left = 0;
+                  let right = positions.length - 1;
+
+                  while (left <= right) {
+                    const mid = Math.floor((left + right) / 2);
+                    const itemTop = positions[mid]!;
+                    const itemBottom = positions[mid + 1] || totalHeight;
+
+                    if (itemBottom < scrollTop) {
+                      left = mid + 1;
+                    } else if (itemTop > scrollTop) {
+                      right = mid - 1;
+                    } else {
+                      startIndex = mid;
+                      break;
+                    }
+                  }
+
+                  if (nearBottom) {
+                    // If near bottom, include all remaining items
+                    endIndex = totalCount - 1;
+                  } else {
+                    // Binary search for last visible item
+                    left = startIndex;
+                    right = Math.min(positions.length - 1, totalCount - 1);
+
+                    while (left <= right) {
+                      const mid = Math.floor((left + right) / 2);
+                      const itemTop = positions[mid] || mid * itemHeight;
+
+                      if (itemTop <= scrollBottom) {
+                        endIndex = mid;
+                        left = mid + 1;
+                      } else {
+                        right = mid - 1;
+                      }
+                    }
+                  }
+
+                  // Apply overscan
+                  startIndex = Math.max(0, startIndex - overscan);
+                  endIndex = Math.min(totalCount - 1, endIndex + overscan);
+
+                  setRange({ startIndex, endIndex });
+                };
+                handleScroll();
+                container.addEventListener("scroll", handleScroll, {
+                  passive: true,
+                });
+
+                return () => {
+                  container.removeEventListener("scroll", handleScroll);
+                };
+              }, [positions, totalCount, shadowUpdateTrigger, totalHeight]);
 
               useEffect(() => {
                 if (!stickToBottom || totalCount === 0) return;
@@ -1858,11 +1910,23 @@ function createProxyHandler<T>(
                 const isInitialLoad =
                   previousCountRef.current === 0 && totalCount > 0;
 
-                const handleScroll = () => {
+                if (hasNewItems) {
+                  scrollToLastItem();
+                  previousCountRef.current = totalCount;
+                }
+
+                console.log(
+                  "souhasNewItemshasNewItemshasNewItemsunt",
+                  totalCount,
+                  previousCountRef.current,
+                  hasNewItems
+                );
+                const initalScroll = () => {
                   const { scrollTop, scrollHeight, clientHeight } = container;
                   const distanceFromBottom =
                     scrollHeight - scrollTop - clientHeight;
-                  wasAtBottomRef.current = distanceFromBottom < 5;
+                  wasAtBottomRef.current = distanceFromBottom < 8;
+
                   if (
                     !wasAtBottomRef.current &&
                     !setInitialSCrollDone.current
@@ -1870,6 +1934,7 @@ function createProxyHandler<T>(
                     // If the list is NOT at the bottom after scrolling
                     container.scrollTop = container.scrollHeight;
                     wasAtBottomRef.current = true;
+
                     console.log("lastItem", lastItem);
                     if (lastItem?.virtualizer?.domRef) {
                       const element = lastItem.virtualizer.domRef as any;
@@ -1890,58 +1955,13 @@ function createProxyHandler<T>(
                         console.log("isInView", isInView);
                         if (isInView) {
                           setInitialSCrollDone.current = true;
+                          //  previousCountRef.current = totalCount;
                         }
                       }
                     }
                   }
                 };
-
-                container.addEventListener("scroll", handleScroll, {
-                  passive: true,
-                });
-
-                if (
-                  (hasNewItems || isInitialLoad) &&
-                  wasAtBottomRef.current &&
-                  !userHasScrolledAwayRef.current
-                ) {
-                  const visibleCount = Math.ceil(
-                    (container.clientHeight || 0) / itemHeight
-                  );
-                  const newRange = {
-                    startIndex: Math.max(
-                      0,
-                      totalCount - visibleCount - overscan
-                    ),
-                    endIndex: totalCount,
-                  };
-                  setRange(newRange);
-
-                  const timeoutId = setTimeout(() => {
-                    scrollToIndex(totalCount - 1, "smooth");
-                  }, 50);
-                  return () => {
-                    clearTimeout(timeoutId);
-                    container.removeEventListener("scroll", handleScroll);
-                  };
-                }
-
-                if (
-                  stickToBottom &&
-                  totalCount > 0 &&
-                  !userHasScrolledAwayRef.current &&
-                  container.scrollTop === 0
-                ) {
-                  container.scrollTop = container.scrollHeight;
-                  wasAtBottomRef.current = true;
-                }
-
-                handleScroll();
-                previousCountRef.current = totalCount;
-
-                return () => {
-                  container.removeEventListener("scroll", handleScroll);
-                };
+                if (!setInitialSCrollDone.current) initalScroll();
               }, [
                 positions,
                 totalCount,
@@ -2013,22 +2033,22 @@ function createProxyHandler<T>(
               // Create virtual state
               const virtualState = useMemo(() => {
                 const start = Math.max(0, range.startIndex);
-                const end = Math.min(totalCount, range.endIndex);
-                // Get the ordered IDs from the parent array's metadata
-                const arrayMeta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                const orderedIds = arrayMeta?.arrayKeys || [];
-                // Slice the array of data and the array of IDs to match the virtual range
+
+                const end = Math.min(totalCount, range.endIndex + 1);
+                //
+                const orderedIds = shadowArray?.arrayKeys || [];
+
                 const slicedArray = sourceArray.slice(start, end);
                 const slicedIds = orderedIds.slice(start, end);
 
-                // Create the new proxy, passing the sliced IDs as its `validIds` metadata.
+                console.log(totalCount, range.endIndex, slicedArray);
+
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
                   validIds: slicedIds,
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
@@ -2156,18 +2176,18 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
-              const [arrayToMap, setArrayKeys] = useState<any>(
-                getGlobalStore
-                  .getState()
-                  .getShadowValue(stateKeyPathKey, meta?.validIds)
-              );
+              const [render, forceUpdate] = useState(0);
+              const arrayToMap = getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey, meta?.validIds);
               getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                setArrayKeys(
-                  getGlobalStore
-                    .getState()
-                    .getShadowValue(stateKeyPathKey, meta?.validIds)
-                );
+                const gotArray = getGlobalStore
+                  .getState()
+                  .getShadowValue(stateKeyPathKey, meta?.validIds);
+
+                forceUpdate((p) => p++);
               });
+
               if (!Array.isArray(arrayToMap)) {
                 return null;
               }
@@ -3100,7 +3120,7 @@ function CogsItemWrapper({
       });
       const arrayPath = itemPath.slice(0, -1); // Remove the item ID
       const arrayPathKey = [stateKey, ...arrayPath].join(".");
-      console.log("arrayPathKey", itemPath, arrayPathKey);
+
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
     // --- END OF NEW CHECK ---

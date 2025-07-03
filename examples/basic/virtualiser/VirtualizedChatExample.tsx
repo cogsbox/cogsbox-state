@@ -85,7 +85,7 @@ function ChatWindow() {
       overscan: 10,
       stickToBottom: true,
     });
-  // console.log("virtualizerProps", virtualState.get());
+  console.log("virtualizerProps", virtualState.get());
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
       <div style={virtualizerProps.inner.style}>

@@ -18,8 +18,8 @@
 */
 .flying-car {
   position: absolute;
-  width: 5px;
-  height: 3px;
+  width: 7px;
+  height: 4px;
   background-color: rgb(29, 29, 29);
   border-radius: 1px; /* Slightly rounded edges */
 
