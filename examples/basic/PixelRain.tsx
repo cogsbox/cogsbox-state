@@ -4,7 +4,8 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 // Assuming these are in separate files as in your original code
 import FlyingCars from "./FlyingCars";
 import BlimpWithSpotlights from "./Blimp";
-import { svgBush } from "./assets/bush";
+
+import { CloudTiles, CloudLayers } from "./CloudTiler";
 
 interface PixelRainProps {
   numberOfDrops?: number;
@@ -29,18 +30,18 @@ function MoonGlow({
 
       const subtleX = 15;
       const subtleY = 120;
-      const baseIntensity = 2 + Math.random() * 0.1;
+      const baseIntensity = 0.9 + Math.random() * 0.1;
       const steps = 20; // Clear distinct bands
       let gradientSteps = [];
 
-      const glowStartRadius = 4;
+      const glowStartRadius = 4.3;
 
       moonCircleRef.current.style.left = `${subtleX}%`;
       moonCircleRef.current.style.top = `${subtleY}px`;
 
       for (let i = 0; i < steps; i++) {
         const t = i / (steps - 1);
-        const radiusStart = glowStartRadius + Math.pow(t, 8) * 100;
+        const radiusStart = glowStartRadius + Math.pow(t, 6) * 100;
         const radiusEnd =
           glowStartRadius + Math.pow((i + 1) / (steps - 1), 2) * 30;
 
@@ -81,7 +82,7 @@ function MoonGlow({
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: -4,
+          zIndex: -3,
           pointerEvents: "none",
           background: "transparent",
           mixBlendMode: "screen",
@@ -96,8 +97,8 @@ function MoonGlow({
           width: "120px",
           height: "120px",
           borderRadius: "50%",
-          backgroundColor: "rgba(215, 215, 215, 0.9)",
-          zIndex: -4,
+          backgroundColor: "rgba(215, 215, 215, 0.8)",
+          zIndex: -3,
           pointerEvents: "none",
           transform: "translate(-50%, -50%)",
           imageRendering: "pixelated",
@@ -358,23 +359,11 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           zIndex: -2,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.24) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.2) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
         }}
       />
-      <div
-        style={{
-          position: "fixed",
-          inset: 0,
-
-          height: "5vh",
-
-          zIndex: -2,
-          pointerEvents: "none",
-        }}
-      >
-        {svgBush}
-      </div>
-      <div className="fixed top-[30vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[40vh] z-[-3]" />
+      <CloudLayers lightningBrightness={skylineBrightness} />
+      <div className="fixed top-[30vh] inset-0 text-gradient-to-b from-black/05 via-black to-black/05 w-full h-[40vh] z-[-3]" />
       {/* Blimp Layer */}
       <div
         ref={blimpRef}
