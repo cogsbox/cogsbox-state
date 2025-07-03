@@ -32,7 +32,7 @@ import { z } from "zod";
 import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
 import { useCogsConfig } from "./CogsStateClient.js";
 import { applyPatch } from "fast-json-patch";
-import useMeasure from "react-use-measure";
+import { useInView } from "react-intersection-observer";
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -2041,8 +2041,6 @@ function createProxyHandler<T>(
                 const slicedArray = sourceArray.slice(start, end);
                 const slicedIds = orderedIds.slice(start, end);
 
-                console.log(totalCount, range.endIndex, slicedArray);
-
                 return rebuildStateShape(slicedArray as any, path, {
                   ...meta,
                   validIds: slicedIds,
@@ -3087,7 +3085,7 @@ function CogsItemWrapper({
   children: React.ReactNode;
 }) {
   const [, forceUpdate] = useState({});
-  const [measureRef, bounds] = useMeasure();
+  const { ref, inView, entry } = useInView();
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
 
@@ -3098,9 +3096,9 @@ function CogsItemWrapper({
       elementRef.current = element;
 
       // Call measureRef (it's a callback function from useMeasure)
-      measureRef(element);
+      ref(element);
     },
-    [measureRef]
+    [ref]
   );
 
   useEffect(() => {
@@ -3110,21 +3108,24 @@ function CogsItemWrapper({
     const existingItemHeight = currentItemMetadata?.virtualizer?.itemHeight;
 
     if (
-      bounds.height > 0 &&
-      bounds.height !== lastReportedHeight.current &&
-      bounds.height !== existingItemHeight
+      entry?.target instanceof HTMLElement &&
+      entry.target.offsetHeight > 0 &&
+      entry.target.offsetHeight !== lastReportedHeight.current &&
+      entry.target.offsetHeight !== existingItemHeight
     ) {
-      lastReportedHeight.current = bounds.height;
+      lastReportedHeight.current = entry.target.offsetHeight;
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
-        virtualizer: { itemHeight: bounds.height, domRef: elementRef.current },
+        virtualizer: {
+          itemHeight: entry.target.offsetHeight,
+          domRef: elementRef.current,
+        },
       });
       const arrayPath = itemPath.slice(0, -1); // Remove the item ID
       const arrayPathKey = [stateKey, ...arrayPath].join(".");
 
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
-    // --- END OF NEW CHECK ---
-  }, [bounds.height, stateKey, itemPath]);
+  }, [entry, stateKey, itemPath]);
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore

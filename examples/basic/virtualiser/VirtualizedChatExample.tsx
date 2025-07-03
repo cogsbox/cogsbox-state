@@ -6,7 +6,8 @@ import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
 import { FlashWrapper } from "../FlashOnUpdate";
 import DotPattern from "../DotWrapper";
 import { faker } from "@faker-js/faker";
-import { useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
+import { useInView } from "react-intersection-observer";
 
 // --- Data Generation & State Definition (No Changes Here) ---
 
@@ -46,6 +47,24 @@ export const { useCogsState } = createCogsState<ChatState>(allState, {
 // --- Main Application Component (No Changes Here) ---
 
 export default function VirtualizedChatExample() {
+  const messages = useCogsState("messages", { reactiveType: "none" });
+  const { ref, inView, entry } = useInView();
+  useEffect(() => {
+    if (!inView) return;
+    const interval = setInterval(() => {
+      const allMessages = messages.get();
+      const newId = Math.max(...allMessages.map((m) => m.id)) + 1;
+
+      messages.insert({
+        id: newId,
+        author: faker.person.firstName(),
+        text: faker.lorem.sentence({ min: 3, max: 25 }),
+        timestamp: Date.now(),
+      });
+    }, 1000 + Math.random() * 2.5); // Send a new message every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [inView]);
   return (
     <div className="flex gap-4 text-green-400 h-screen p-4">
       <div className="w-3/5 flex flex-col gap-3">
@@ -60,10 +79,11 @@ export default function VirtualizedChatExample() {
             </p>
           </div>
         </DotPattern>
-
-        <div className="flex flex-col flex-grow bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
-          <ChatWindow />
-          <MessageInput />
+        <div ref={ref}>
+          <div className="flex flex-col  max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
+            <ChatWindow />
+            <MessageInput />
+          </div>{" "}
         </div>
       </div>
 
@@ -85,13 +105,13 @@ function ChatWindow() {
       overscan: 10,
       stickToBottom: true,
     });
-  console.log("virtualizerProps", virtualState.get());
+
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
       <div style={virtualizerProps.inner.style}>
         <div
           style={virtualizerProps.list.style}
-          className="px-4  space-y-4 pb-6"
+          className="px-4  space-y-4 pb-8"
         >
           {virtualState?.stateList((message, setter, index, array) => {
             return (
@@ -109,13 +129,22 @@ function MessageItem({ message }: { message: Message }) {
 
   const containerClasses = `w-full flex items-end gap-2 ${
     isFromYou ? "justify-end" : "justify-start"
-  }`;
+  } opacity-0 transition-opacity duration-500 ease-in`;
+
   const bubbleClasses = `flex flex-col max-w-[75%] px-3 py-2 rounded-lg shadow-md ${
     isFromYou ? "bg-green-800 rounded-br-none" : "bg-gray-700 rounded-bl-none"
   }`;
 
+  useEffect(() => {
+    const element = document.getElementById(`message-${message.id}`);
+    if (element) {
+      element.classList.remove("opacity-0");
+      element.classList.add("opacity-100");
+    }
+  }, []);
+
   return (
-    <div className={containerClasses}>
+    <div id={`message-${message.id}`} className={containerClasses}>
       {!isFromYou && (
         <div className="w-8 h-8 rounded-full bg-gray-600 text-gray-300 flex items-center justify-center font-bold text-sm flex-shrink-0">
           {message.author.charAt(0)}
@@ -125,22 +154,23 @@ function MessageItem({ message }: { message: Message }) {
         {!isFromYou && (
           <p className="font-bold text-green-400 text-xs ">{message.author}</p>
         )}
-        <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
-        <p
-          className={`text-xs  ${
-            isFromYou ? "text-green-200/60" : "text-gray-400"
-          } self-end`}
-        >
-          {new Date(message.timestamp).toLocaleTimeString([], {
-            hour: "2-digit",
-            minute: "2-digit",
-          })}
-        </p>
+        <div className="flex items-center gap-2">
+          <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
+          <p
+            className={`text-xs ${
+              isFromYou ? "text-green-200/60" : "text-gray-400"
+            } flex-shrink-0`}
+          >
+            {new Date(message.timestamp).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })}
+          </p>
+        </div>
       </div>
     </div>
   );
 }
-
 // MessageInput and ShowState components remain the same as the previous correct version.
 // No changes needed for them.
 

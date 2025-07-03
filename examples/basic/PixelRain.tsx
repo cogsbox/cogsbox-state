@@ -1,6 +1,8 @@
 "use client";
 import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import FlyingCars from "./FlyingCars";
+import BlimpWithSpotlights from "./Blimp";
+import { Clapperboard } from "lucide-react";
 
 interface PixelRainProps {
   numberOfDrops?: number;
@@ -28,7 +30,7 @@ function MoonGlow({
       const baseIntensity = 1 + Math.random() * 0.2;
       const steps = 40;
       let gradientSteps = [];
-      const moonCurve = (t: number) => Math.pow(t, 25); // Really quick drop-off
+      const moonCurve = (t: number) => Math.pow(t, 9); // Really quick drop-off
 
       // Update moon circle position
       moonCircleRef.current.style.left = `${subtleX}%`;
@@ -40,9 +42,9 @@ function MoonGlow({
 
         // Start with moon intensity, drop off quickly
         const opacity = i === 0 ? 0.9 : (1 - easedDistance) * baseIntensity;
-        const r = 195; // Match moon gray
-        const g = 195; // Match moon gray
-        const b = 195; // Match moon gray
+        const r = 215; // Match moon gray
+        const g = 211; // Match moon gray
+        const b = 215; // Match moon gray
 
         const positionStart = i === 0 ? 0 : moonCurve(i / steps) * 100;
         const positionEnd =
@@ -57,7 +59,7 @@ function MoonGlow({
       onMoonIntensityChange(baseIntensity * 0.4);
 
       moonRef.current.style.background = `radial-gradient(circle ${
-        150 + baseIntensity * 20
+        150 + baseIntensity * 40
       }vh at ${subtleX}% ${subtleY}px, ${gradientSteps.join(", ")})`;
     };
 
@@ -94,7 +96,7 @@ function MoonGlow({
           width: "120px",
           height: "120px",
           borderRadius: "50%",
-          backgroundColor: "rgba(195, 195, 195, 0.9)",
+          backgroundColor: "rgba(215, 215, 215, 0.9)",
           zIndex: -3,
           pointerEvents: "none",
           transform: "translate(-50%, -50%)",
@@ -110,12 +112,12 @@ function Lightning({ onBrightnessChange }: LightningProps) {
   useEffect(() => {
     let fadeInterval: NodeJS.Timeout | undefined;
     let schedulerTimeout: NodeJS.Timeout;
-    const BASE_SKYLINE_BRIGHTNESS = 0.5;
+    const BASE_SKYLINE_BRIGHTNESS = 0.1;
 
     const triggerLightning = () => {
       if (fadeInterval) return;
 
-      let currentIntensity = 0.4 + Math.random() * 0.3;
+      let currentIntensity = 0.2 + Math.random() * 0.2;
       let isLit = true;
 
       fadeInterval = setInterval(() => {
@@ -134,8 +136,8 @@ function Lightning({ onBrightnessChange }: LightningProps) {
 
           // Update DOM directly - no useState!
           if (lightningRef.current) {
-            const randomX = 85 + Math.random() * 10;
-            const randomY = -250 + Math.random() * 100;
+            const randomX = 95 + Math.random() * 10;
+            const randomY = -10 + Math.random() * 100;
             const randomWidth = 120 + Math.random() * 60;
             const randomHeight = 120 + Math.random() * 60;
 
@@ -159,7 +161,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
               );
             }
 
-            lightningRef.current.style.background = `radial-gradient(ellipse ${randomWidth}vh ${randomHeight}vh at ${randomX}% ${randomY}px, ${gradientSteps.join(
+            lightningRef.current.style.background = `radial-gradient(ellipse ${randomWidth}vh ${randomHeight}vh at ${randomX}% ${randomY}vh, ${gradientSteps.join(
               ", "
             )})`;
           }
@@ -172,7 +174,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
         }
 
         isLit = !isLit;
-      }, 40);
+      }, 60);
     };
 
     const scheduleLightning = () => {
@@ -295,7 +297,25 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
           background:
             "linear-gradient(to top, rgba(255, 120, 70, 0.3) 15%, transparent 37%)",
         }}
-      />{" "}
+      />
+      <div className="fixed top-[45%] bg-black/40 w-full h-full z-[-2]" />
+      <div
+        className="fixed top-[12vh] z-[-2] blur-[1px]"
+        style={{
+          animation: "moveAcross 240s linear infinite",
+          transform: "translateX(-100%)",
+        }}
+      >
+        <BlimpWithSpotlights />
+      </div>
+      <style>
+        {`
+                              @keyframes moveAcross {
+                                    from { transform: translateX(-100%); }
+                                    to { transform: translateX(100vw); }
+                              }
+                        `}
+      </style>
       <div
         style={{
           position: "fixed",
@@ -311,6 +331,7 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
           imageRendering: "pixelated",
           maskImage: "url(/skyline.svg)",
           maskSize: "100% 100vh",
+
           maskRepeat: "no-repeat",
         }}
       />{" "}

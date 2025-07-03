@@ -7,7 +7,7 @@ export default function DotPattern({
 }) {
   return (
     <div
-      className={`relative ${className}`}
+      className={`relative ${className} bg-black/20`}
       style={{
         backgroundImage:
           "radial-gradient(rgba(107, 114, 128, 0.2) 1px, transparent 1px)",

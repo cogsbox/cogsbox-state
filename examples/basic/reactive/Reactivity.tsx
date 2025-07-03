@@ -24,49 +24,33 @@ export default function ReactivityPage() {
   const [activeTab, setActiveTab] = useState<TabId>("component");
   const fooState = useCogsState("fooBarObject", { reactiveType: "none" });
 
-  const renderActiveTabContent = () => {
-    switch (activeTab) {
-      case "component":
-        return <ComponentReactivityExample />;
-      case "deps":
-        return <DepsReactivityExample />;
-      case "all":
-        return <AllReactivityExample />;
-      case "none":
-        return <SignalReactivityExample />;
-      default:
-        return null;
-    }
-  };
-
   return (
     <>
       <div className="flex gap-6 text-green-400  p-6 font-mono">
         {/* --- LEFT COLUMN (Interactive Examples) --- */}{" "}
-        <div className="w-3/5 flex flex-col gap-4">
-          {" "}
+        <div className="w-3/5 flex flex-col ">
           <DotPattern>
             <div className="px-8 py-4">
               <h1 className="text-2xl font-bold text-gray-200 ">
                 Reactivity Types
               </h1>
-              <p className="text-sm text-gray-400 max-w-2xl">
+              <p className="text-sm text-gray-200 max-w-2xl">
                 Cogs offers several strategies to control when components
                 re-render. Select a tab to see how each strategy works. Click
                 the "Toggle" buttons and watch which components flash,
                 indicating a re-render.
               </p>
               {/* Tab Navigation */}
-              <div className="flex border-b border-gray-700">
+              <div className="flex border-b border-gray-700 bg-gray-900/90 rounded-px-2 py-1">
                 {Object.values(TABS).map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as TabId)}
-                    className={`px-4 py-2 text-sm font-semibold transition-colors duration-200 -mb-px cursor-pointer
+                    className={`px-4 py-2 text-sm font-semibold transition-colors duration-200 -mb-px cursor-pointer bg-green-200/30
                   ${
                     activeTab === tab.id
                       ? "border-b-2 border-green-400 text-green-300"
-                      : "text-gray-500 hover:text-green-400 border-b-2 border-transparent"
+                      : "text-gray-300 hover:text-green-400 border-b-2 border-transparent"
                   }`}
                   >
                     {tab.title}
@@ -76,7 +60,17 @@ export default function ReactivityPage() {
             </div>
           </DotPattern>
           {/* Tab Content Area */}
-          <div className="">{renderActiveTabContent()}</div>{" "}
+          <div className="pl-6">
+            {activeTab === "component" ? (
+              <ComponentReactivityExample />
+            ) : activeTab === "deps" ? (
+              <DepsReactivityExample />
+            ) : activeTab === "all" ? (
+              <AllReactivityExample />
+            ) : activeTab === "none" ? (
+              <SignalReactivityExample />
+            ) : null}
+          </div>{" "}
         </div>
         {/* --- RIGHT COLUMN (Controls & Global State) --- */}
         <div className="w-2/5 flex flex-col gap-4 sticky top-6 ">
