@@ -7,8 +7,8 @@ const BlimpWithSpotlights = () => {
       <style>
         {`
           @keyframes swayLeft {
-            0%, 100% { transform: rotate(15deg); }
-            25% { transform: rotate(10deg); }
+            0%, 100% { transform: rotate(35deg); }
+            25% { transform: rotate(20deg); }
             50% { transform: rotate(25deg); }
             75% { transform: rotate(5deg); }
           }
@@ -22,23 +22,23 @@ const BlimpWithSpotlights = () => {
           }
         `}
       </style>
-      <div className="h-10 w-[1px] bg-black/70 absolute left-[55px] top-[30px]" />{" "}
-      <div className="h-10 w-[1px] bg-black/70 absolute left-[70px] top-[30px]" />{" "}
-      <div className="h-10 w-[1px] bg-black/70 absolute right-[55px] top-[30px]" />{" "}
-      <div className="h-10 w-[1px] bg-black/70 absolute right-[70px] top-[30px]" />
+      <div className="h-10 w-[1px] bg-black/50 absolute left-[55px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/50 absolute left-[70px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/50 absolute right-[55px] top-[30px]" />{" "}
+      <div className="h-10 w-[1px] bg-black/50 absolute right-[70px] top-[30px]" />
       {/* Blimp */}
       <div
         style={{
           position: "relative",
           top: "0",
           left: "0",
-          zIndex: -1,
+          zIndex: -5,
           pointerEvents: "none",
           backgroundAttachment: "fixed",
           imageRendering: "pixelated",
         }}
       >
-        <img src="./blimp.svg" alt="blimp" className="h-[88px] text-gray-200" />
+        <img src="./blimp.svg" alt="blimp" className="h-[88px] text-gray-700" />
 
         {/* Blimp illumination overlay */}
         <div
@@ -53,9 +53,9 @@ const BlimpWithSpotlights = () => {
             WebkitMaskRepeat: "no-repeat",
             WebkitMaskPosition: "center",
             background: `
-              linear-gradient(to top, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0.04) 30%, transparent 70%),
-              radial-gradient(circle at 35% 82%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 5%, transparent 20%),
-              radial-gradient(circle at 65% 82%, rgba(255,255,255,0.4) 0%, rgba(255,255,255,0.1) 5%, transparent 20%)
+      linear-gradient(to top, rgba(255,245,235,0.25) 0%, rgba(255,245,235,0.04) 30%, transparent 60%),
+              radial-gradient(circle at 35% 82%, rgba(255,245,235,0.5) 0%, rgba(255,245,235,0.1) 5%, transparent 20%),
+              radial-gradient(circle at 65% 82%, rgba(255,245,235,0.5) 0%, rgba(255,245,235,0.1) 5%, transparent 20%)
             `,
             pointerEvents: "none",
           }}
@@ -85,7 +85,7 @@ const BlimpWithSpotlights = () => {
               marginTop: "-7px",
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
-                "linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.3) 7%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
+                "    linear-gradient(to bottom, rgba(245,245,255,0.6) 0%, rgba(245,245,255,0.3) 7%,rgba(245,245,255,0.05)  25%, rgba(245,245,255,0) 100%)",
               filter: "blur(4px)",
             }}
           />
@@ -106,7 +106,7 @@ const BlimpWithSpotlights = () => {
               marginTop: "-7px",
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
-                "linear-gradient(to bottom, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.3) 7%,rgba(255,255,255,0.05)  25%, rgba(255,255,255,0) 100%)",
+                "    linear-gradient(to bottom, rgba(245,245,255,0.6) 0%, rgba(245,245,255,0.3) 7%,rgba(245,245,255,0.05)  25%, rgba(245,245,255,0) 100%)",
               filter: "blur(4px)",
             }}
           />

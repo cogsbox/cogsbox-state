@@ -1,5 +1,10 @@
 import { useMemo, useEffect, useRef } from "react";
 
+// The time in milliseconds of inactivity before the storm's energy recharges.
+const STORM_RECHARGE_TIME = 3000;
+// How much energy is depleted with each flash (e.g., 0.7 means it retains 70% of its energy).
+const ENERGY_DECAY_FACTOR = 0.75;
+
 interface CloudLayersProps {
   layers?: number;
   startOffset?: number;
@@ -9,7 +14,7 @@ interface CloudLayersProps {
 }
 
 export function CloudLayers({
-  layers = 7,
+  layers = 8,
   startOffset = 0,
   layerSpacing = 2,
   className = "",
@@ -17,6 +22,10 @@ export function CloudLayers({
 }: CloudLayersProps) {
   const layerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previousBrightness = useRef(0.1);
+
+  // --- NEW: Refs to manage the storm's state over time ---
+  const stormEnergyRef = useRef(1.0); // 1.0 = full power
+  const lastStrikeTimeRef = useRef(0);
 
   const layerData = useMemo(
     () =>
@@ -30,14 +39,29 @@ export function CloudLayers({
   );
 
   useEffect(() => {
-    // Detect when lightning strikes (brightness spikes)
-    if (
+    const isStrike =
       lightningBrightness < previousBrightness.current &&
-      previousBrightness.current > 0.15
-    ) {
+      previousBrightness.current > 0.15;
+
+    if (isStrike) {
+      const now = Date.now();
+      const timeSinceLastStrike = now - lastStrikeTimeRef.current;
+
+      // --- NEW: Recharge storm energy if there's been a long pause ---
+      if (timeSinceLastStrike > STORM_RECHARGE_TIME) {
+        // It's a new storm, reset to full power.
+        stormEnergyRef.current = 1.0;
+      }
+
+      // Calculate the potential intensity from the prop value.
+      const baseIntensity = (previousBrightness.current - 0.1) * 3;
+
+      // --- NEW: Scale the intensity by the current storm energy ---
+      const finalIntensity = baseIntensity * stormEnergyRef.current;
+
+      // Select layers to light up
       const layersToLight = Math.floor(Math.random() * 3) + 2;
       const selectedLayers = new Set<number>();
-
       while (selectedLayers.size < layersToLight) {
         selectedLayers.add(Math.floor(Math.random() * layers));
       }
@@ -50,16 +74,26 @@ export function CloudLayers({
         const y = 50 + (Math.random() - 0.5) * 40;
         const size = 40 + Math.random() * 40;
 
-        const intensity = (previousBrightness.current - 0.1) * 0.8;
-
-        layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${intensity}) 0%, transparent 50%)`;
+        // Use the new `finalIntensity` which decays over time
+        layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${finalIntensity}) 0%, transparent 50%)`;
         layer.style.transition = "none";
 
         setTimeout(() => {
+          if (!layer) return;
           layer.style.transition = "background 0.5s ease-out";
           layer.style.background = "transparent";
         }, 100);
       });
+
+      // --- NEW: Deplete the storm's energy for the next strike ---
+      stormEnergyRef.current *= ENERGY_DECAY_FACTOR;
+      // Prevent energy from becoming effectively zero
+      if (stormEnergyRef.current < 0.1) {
+        stormEnergyRef.current = 0.1;
+      }
+
+      // Record the time of this strike.
+      lastStrikeTimeRef.current = now;
     }
 
     previousBrightness.current = lightningBrightness;
@@ -67,91 +101,93 @@ export function CloudLayers({
 
   return (
     <div
-      className={`fixed inset-0 z-[-4] h-full w-[200vh] left-[-20vh] top-0 ${className}`}
+      className={`fixed inset-0 z-[-6] h-full w-[140vw] left-[-20vh] top-0 ${className}`}
     >
       <div className="relative w-full h-full overflow-hidden">
-        {layerData.map((layer, index) => (
-          <div
-            key={layer.id}
-            className="absolute w-full"
-            style={{
-              top: `${startOffset + layer.id * layerSpacing}vh`,
-              left: `${layer.horizontal}%`,
-              zIndex: layers - layer.id,
-            }}
-          >
-            {/* Base cloud layer */}
-            <CloudTiles tilt={layer.tilt} />
-
-            {/* Lightning mask overlay */}
+        {layerData.map((layer, index) => {
+          return (
             <div
-              ref={(el) => (layerRefs.current[index] = el)}
-              className="absolute inset-0 pointer-events-none"
+              key={layer.id}
+              className="absolute w-full"
               style={{
-                background: "transparent",
-                mixBlendMode: "screen",
-                maskImage: `url("data:image/svg+xml,${encodeURIComponent(
-                  `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
-                    ...Array(8),
-                  ]
-                    .map(
-                      (_, i) =>
-                        `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
-                          375 + i * 400
-                        },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
-                          315 + i * 400
-                        },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
-                          255 + i * 400
-                        },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
-                          195 + i * 400
-                        },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
-                          135 + i * 400
-                        },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
-                          75 + i * 400
-                        },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
-                          20 + i * 400
-                        },67.5 ${15 + i * 400},60 ${
-                          i * 400
-                        },60 Z" fill="white"/>`
-                    )
-                    .join("")}</svg>`
-                )}`,
-                WebkitMaskImage: `url("data:image/svg+xml,${encodeURIComponent(
-                  `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
-                    ...Array(8),
-                  ]
-                    .map(
-                      (_, i) =>
-                        `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
-                          375 + i * 400
-                        },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
-                          315 + i * 400
-                        },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
-                          255 + i * 400
-                        },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
-                          195 + i * 400
-                        },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
-                          135 + i * 400
-                        },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
-                          75 + i * 400
-                        },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
-                          20 + i * 400
-                        },67.5 ${15 + i * 400},60 ${
-                          i * 400
-                        },60 Z" fill="white"/>`
-                    )
-                    .join("")}</svg>`
-                )}`,
-                maskSize: "100% 100%",
-                WebkitMaskSize: "100% 100%",
-                maskRepeat: "no-repeat",
-                WebkitMaskRepeat: "no-repeat",
-                transform: `rotate(${layer.tilt}deg)`,
-                transformOrigin: "center",
+                top: `${startOffset + layer.id * layerSpacing + index / 2}vh`,
+                left: `${layer.horizontal}%`,
+                zIndex: layers - layer.id,
               }}
-            />
-          </div>
-        ))}
+            >
+              {/* Base cloud layer */}
+              <CloudTiles tilt={layer.tilt} />
+
+              {/* Lightning mask overlay */}
+              <div
+                ref={(el) => (layerRefs.current[index] = el)}
+                className="absolute inset-0 pointer-events-none"
+                style={{
+                  background: "transparent",
+                  mixBlendMode: "screen",
+                  maskImage: `url("data:image/svg+xml,${encodeURIComponent(
+                    `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
+                      ...Array(8),
+                    ]
+                      .map(
+                        (_, i) =>
+                          `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
+                            375 + i * 400
+                          },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
+                            315 + i * 400
+                          },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
+                            255 + i * 400
+                          },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
+                            195 + i * 400
+                          },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
+                            135 + i * 400
+                          },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
+                            75 + i * 400
+                          },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
+                            20 + i * 400
+                          },67.5 ${15 + i * 400},60 ${
+                            i * 400
+                          },60 Z" fill="white"/>`
+                      )
+                      .join("")}</svg>`
+                  )}`,
+                  WebkitMaskImage: `url("data:image/svg+xml,${encodeURIComponent(
+                    `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
+                      ...Array(8),
+                    ]
+                      .map(
+                        (_, i) =>
+                          `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
+                            375 + i * 400
+                          },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
+                            315 + i * 400
+                          },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
+                            255 + i * 400
+                          },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
+                            195 + i * 400
+                          },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
+                            135 + i * 400
+                          },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
+                            75 + i * 400
+                          },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
+                            20 + i * 400
+                          },67.5 ${15 + i * 400},60 ${
+                            i * 400
+                          },60 Z" fill="white"/>`
+                      )
+                      .join("")}</svg>`
+                  )}`,
+                  maskSize: "100% 100%",
+                  WebkitMaskSize: "100% 100%",
+                  maskRepeat: "no-repeat",
+                  WebkitMaskRepeat: "no-repeat",
+                  transform: `rotate(${layer.tilt}deg)`,
+                  transformOrigin: "center",
+                }}
+              />
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -191,16 +227,16 @@ export function CloudTiles({
               x1="0%"
               y1="0%"
               x2="0%"
-              y2="100%"
+              y2="50%"
             >
               <stop
                 offset="0%"
-                stopColor={lightColor || "#1a1a1a"}
+                stopColor={lightColor || "#0f0f0f"}
                 stopOpacity="1"
               />
               <stop
                 offset="100%"
-                stopColor={lightColor || "#1a1a1a"}
+                stopColor={lightColor || "#0f0f0f"}
                 stopOpacity="0.5"
               />
             </linearGradient>

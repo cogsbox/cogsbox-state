@@ -11,8 +11,8 @@ export default function FlyingCars({ numberOfCars = 40 }: FlyingCarsProps) {
     const carData = [];
 
     // Define the two vertical "lanes" for the cars
-    const topLaneY = 29; // 40vh from the top
-    const bottomLaneY = 23; // 45vh from the top
+    const topLaneY = 32; // 40vh from the top
+    const bottomLaneY = 30; // 45vh from the top
 
     for (let i = 0; i < numberOfCars; i++) {
       // Randomly decide the car's speed and starting time

@@ -10,7 +10,7 @@
   /* Lightning flash - must be behind content */
   .lightning-flash {
     position: fixed !important;
-    z-index: -2 !important;
+    z-index: -7 !important;
     pointer-events: none !important;
   }
 
@@ -72,7 +72,7 @@
     width: 100%;
     height: 100%;
     pointer-events: none;
-    z-index: -1;
+    z-index: -2;
     /* No wind animation here! */
   }
 
@@ -83,7 +83,7 @@
   .pixel-splat {
     position: absolute;
     bottom: 100%;
-
+    z-index: -2;
     margin-left: -6px;
     margin-top: -1px;
     border: 1px solid rgba(220, 225, 235, calc(1 * var(--drop-opacity)));

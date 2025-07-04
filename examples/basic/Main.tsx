@@ -10,11 +10,13 @@ import VirtualizedChatExample from "./virtualiser/VirtualizedChatExample";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <div className="relative min-h-screen bg-gradient-to-b from-gray-800 to-gray-900 z-0">
-      <div className="pointer-events-none">
+    <div className="relative min-h-screen bg-gradient-to-b from-black via-gray-900 to-black z-0">
+      <div className="fixed left-0 w-[8vw] h-[100vh] bg-gradient-to-r from-black/80 to-black/00" />
+      <div className="fixed right-0 w-[8vw] h-[100vh] bg-gradient-to-l from-black/80 to-black/00" />
+      <div className="pointer-events-none ">
         <PixelRain />
       </div>
-      <div className="px-24 pt-40 flex flex-col gap-4 z-[999]">
+      <div className="px-[10vw] pt-40 flex flex-col gap-4 z-[999]">
         <Reactivity />
         <div className="h-20" />
         <ArrayReactivity />
