@@ -86,7 +86,7 @@ const BlimpWithSpotlights = () => {
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
                 "    linear-gradient(to bottom, rgba(245,245,255,0.6) 0%, rgba(245,245,255,0.3) 7%,rgba(245,245,255,0.05)  25%, rgba(245,245,255,0) 100%)",
-              filter: "blur(4px)",
+              filter: "blur(6px)",
             }}
           />
         </div>
@@ -107,7 +107,7 @@ const BlimpWithSpotlights = () => {
               clipPath: "polygon(50% 0%, 0% 100%, 100% 100%)",
               background:
                 "    linear-gradient(to bottom, rgba(245,245,255,0.6) 0%, rgba(245,245,255,0.3) 7%,rgba(245,245,255,0.05)  25%, rgba(245,245,255,0) 100%)",
-              filter: "blur(4px)",
+              filter: "blur(6px)",
             }}
           />
         </div>

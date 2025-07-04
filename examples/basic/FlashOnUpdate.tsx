@@ -14,7 +14,7 @@ export const FlashWrapper = ({
     if (!ref.current) return;
     ref.current.style.outline = `2px solid ${color}`;
     ref.current.style.backgroundColor = `rgba(255, 0, 0, 0.05)`;
-    ref.current.style.backgroundImage = `radial-gradient(rgba(255, 255, 255, 0.3) 2px, transparent 2px)`;
+    ref.current.style.backgroundImage = `radial-gradient(rgba(255, 255, 255, 0.25) 2px, transparent 2px)`;
     ref.current.style.backgroundSize = "4px 4px";
     renderCountRef.current++;
     const timer = setTimeout(() => {

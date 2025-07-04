@@ -363,13 +363,13 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       </div>
 
       <div
-        className="fixed w-[50vw] left-0 h-[50%] bottom-0 contrast-150"
+        className="fixed w-[50vw] left-0 h-[50%] bottom-0 saturate-50 contrast-150"
         style={{ zIndex: Z_INDICES.GROUND }}
       >
         <img src="./backgroundSand.png" alt="" className="h-[100%]" />
       </div>
       <div
-        className="fixed w-[50vw] right-0 h-[50%] bottom-0  scale-x-[-1] contrast-150"
+        className="fixed w-[50vw] right-0 h-[50%] bottom-0 saturate-50  scale-x-[-1] contrast-150"
         style={{ zIndex: Z_INDICES.GROUND }}
       >
         <img src="./backgroundSand.png" alt="" className="h-[100%]" />

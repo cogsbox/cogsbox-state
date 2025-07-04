@@ -64,13 +64,14 @@ export default function ArrayMethodsPage() {
 
         <div className="grid grid-cols-2 gap-4">
           {/* We're back to the original, lean component structure */}
-          {/* <ItemList title="Red Team" arrayKey="redTeam" color="red" /> */}
+          <ItemList title="Red Team" arrayKey="redTeam" color="red" />
           <ItemList title="Blue Team" arrayKey="blueTeam" color="blue" />
         </div>
       </div>
 
       {/* --- RIGHT COLUMN (Detail Editor) --- */}
       <div className="w-2/5 sticky top-6">
+        <div className="h-26" />
         <ItemDetailForm />
       </div>
     </div>
@@ -151,10 +152,9 @@ function ItemList({
         <h3 className={`font-bold text-base ${teamColors[color].text}`}>
           {title}
         </h3>
-        <div className="flex-grow space-y-1 overflow-y-auto pr-1">
+        <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
           {teamState.stateList((_item, itemSetter) => (
             <FlashWrapper key={itemSetter.id.get()}>
-              <span className="bg-white">{itemSetter._componentId}</span>
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${

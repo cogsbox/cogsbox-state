@@ -1076,7 +1076,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     updateObj: { updateType: "insert" | "cut" | "update" },
     validationKey?: string
   ) => {
-    const fullPath = path.join(".");
+    const fullPath = [thisKey, ...path].join("."); // This is the full path to the state slice
     if (Array.isArray(path)) {
       const pathKey = `${thisKey}-${path.join(".")}`;
       componentUpdatesRef.current.add(pathKey);
@@ -1086,6 +1086,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
+      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@)", path, newStateOrFunction);
       const payload = (
         updateObj.updateType === "insert" && isFunction(newStateOrFunction)
           ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
@@ -1093,7 +1094,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ? newStateOrFunction(nestedShadowValue)
             : newStateOrFunction
       ) as TStateObject;
-
+      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@)", path, payload);
       const timeStamp = Date.now();
 
       const newUpdate = {
@@ -1244,7 +1245,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
           arrayMeta.mapWrappers.forEach((wrapper) => {
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
               // Find and remove the element
-              const fullPath = [thisKey, ...path].join(".");
 
               const elementToRemove = wrapper.containerRef.querySelector(
                 `[data-item-path="${fullPath}"]`
@@ -1309,7 +1309,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       // Get the root shadow metadata where components are stored
       const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
       console.log(
-        "reactiveTypesreactiveTypesreactiveTypes",
+        "reactiveTypesreactiveTypesreactiveTypes 123123",
         shadowMetaRoort,
         fullPath
       );
@@ -1333,11 +1333,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           if (reactiveTypes.includes("component")) {
             if (component.paths.has(fullPath)) {
-              console.log(
-                "reactiveTypesreactiveTypesreactiveTypes 22222222222222222",
-                component,
-                fullPath
-              );
               shouldUpdate = true;
             }
             for (const changedPath of changedPathsSet) {
@@ -1485,16 +1480,8 @@ const registerComponentDependency = (
     .getState()
     .getShadowMetadata(stateKey, [])?.components;
 
-  console.log(
-    "registerComponentDependency",
-    dependencyPath,
-    components,
-    fullComponentId
-  );
-
   let component = components?.get(fullComponentId);
 
-  console.log("dddddddddddddddddddddddddddddddddddcy", component);
   // Guard clause: Exit if no component or not the right reactivity type.
   if (
     !component ||
@@ -1507,8 +1494,7 @@ const registerComponentDependency = (
     return;
   }
 
-  const pathKey = dependencyPath.join(".");
-  console.log("pathKeypathKeysssssssspathKey", pathKey);
+  const pathKey = [stateKey, ...dependencyPath].join(".");
 
   // Add the new path and remove any now-redundant child paths.
   component.paths.add(pathKey);
@@ -1730,7 +1716,11 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === "getSelected") {
             return () => {
-              registerComponentDependency(stateKey, componentId, path);
+              console.log("9999999999999999999", path);
+              registerComponentDependency(stateKey, componentId, [
+                ...path,
+                "selected",
+              ]);
 
               const fullKey = stateKey + "." + path.join(".");
               const selectedIndicesMap =
@@ -2261,7 +2251,7 @@ function createProxyHandler<T>(
 
               return arrayToMap.map((item, localIndex) => {
                 const itemKey = itemKeysForCurrentView[localIndex];
-                console.log("item", item, stateKeyPathKey);
+
                 if (!itemKey) {
                   return null;
                 }
@@ -2554,21 +2544,11 @@ function createProxyHandler<T>(
             const stateEntry = JSON.stringify(
               getGlobalStore.getState().getShadowMetadata(stateKey, [])
             );
-            console.log(
-              "get jjjjjjjjjjjjjjjjjjjj",
-              stateKeyPathKey,
-              stateEntry,
-              getGlobalStore.getState().getShadowMetadata(stateKey, [])
-                ?.components
-            );
+
             registerComponentDependency(stateKey, componentId, path);
-            return (
-              stateKeyPathKey +
-              "---" +
-              getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey, meta?.validIds)
-            );
+            return getGlobalStore
+              .getState()
+              .getShadowValue(stateKeyPathKey, meta?.validIds);
           };
         }
         if (prop === "$derive") {
@@ -2594,7 +2574,7 @@ function createProxyHandler<T>(
         }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
-          registerComponentDependency(stateKey, componentId, parentPath);
+          registerComponentDependency(stateKey, componentId, path);
           if (
             Array.isArray(
               getGlobalStore.getState().getNestedState(stateKey, parentPath)
@@ -2615,7 +2595,11 @@ function createProxyHandler<T>(
             const parentPath = path.slice(0, -1);
             const fullParentKey = stateKey + "." + parentPath.join(".");
             const fullItemKey = stateKey + "." + path.join(".");
-
+            console.log(
+              "fullParentKeyfullParentKeyfullParentKeyfullParentKey",
+              fullParentKey,
+              fullItemKey
+            );
             // Update the selection
             if (value) {
               getGlobalStore
@@ -2630,7 +2614,10 @@ function createProxyHandler<T>(
             // Notify components that depend on the parent array
             const store = getGlobalStore.getState();
             const shadowMetaRoot = store.getShadowMetadata(stateKey, []);
-
+            console.log(
+              "shadowMetaRootshadowMetaRootshadowMetaRootshadowMetaRoot 22222222222222222",
+              shadowMetaRoot
+            );
             if (shadowMetaRoot?.components) {
               const changedPath = parentPath.join(".");
 
@@ -2648,7 +2635,19 @@ function createProxyHandler<T>(
                   component.forceUpdate();
                   continue;
                 }
-
+                console.log(
+                  "reactcomponentcomponentcomponentcomponentcomponentcomponentes 322",
+                  component.paths
+                );
+                if (component.paths.has(fullParentKey + ".selected")) {
+                  console.log(
+                    "reactiveTypesreactiveTypesreactiveTypes 322",
+                    componentKey,
+                    component,
+                    fullItemKey
+                  );
+                  shouldUpdate = true;
+                }
                 if (reactiveTypes.includes("component")) {
                   // Check if this component depends on the array that had its selection changed
                   for (const subscribedPath of component.paths) {
@@ -3272,7 +3271,7 @@ function CogsItemWrapper({
   const { ref, inView, entry } = useInView();
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
-  console.log("itemPath", itemPath, itemComponentId);
+
   const fullStateKey = [stateKey, ...itemPath].join(".");
   // Proper way to merge refs
   const setRefs = useCallback(
