@@ -1203,13 +1203,26 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 "rebuildStateShape",
                 tempProxy
               );
-              const rebuildStateShape = (tempProxy as any)._rebuildStateShape; //why does thgis pass the path in ntot it as ["_rebuildStateShape"]
+              const rebuildStateShape = (tempProxy as any)
+                ._rebuildStateShape as (sdsad: {
+                path: string[];
+                currentState: any;
+                componentId: string;
+              }) => void;
 
               // Now use it
               const itemPath = newItemKey.split(".").slice(1);
-              const itemSetter = rebuildStateShape(newItem, itemPath);
+              const itemSetter = rebuildStateShape({
+                path: itemPath,
+                currentState: newItem,
+                componentId: componentId!,
+              });
 
-              const arraySetter = rebuildStateShape(updatedArray, path);
+              const arraySetter = rebuildStateShape({
+                path,
+                currentState: updatedArray,
+                componentId: componentId!,
+              });
 
               const reactElement = wrapper.mapFn(
                 newItem,
@@ -1529,11 +1542,17 @@ function createProxyHandler<T>(
     stateVersion++;
   };
 
-  function rebuildStateShape(
-    currentState: T,
-    path: string[] = [],
-    meta?: MetaData
-  ): any {
+  function rebuildStateShape({
+    currentState,
+    path = [],
+    meta,
+    componentId,
+  }: {
+    currentState: T;
+    path: string[];
+    componentId: string;
+    meta?: MetaData;
+  }): any {
     const cacheKey = path.map(String).join(".");
     const stateKeyPathKey = [stateKey, ...path].join(".");
 
@@ -1733,11 +1752,11 @@ function createProxyHandler<T>(
                 return undefined;
               }
 
-              return rebuildStateShape(
-                value,
-                selectedItemKey.split(".").slice(1) as string[],
-                meta
-              );
+              return rebuildStateShape({
+                currentState: value,
+                path: selectedItemKey.split(".").slice(1) as string[],
+                componentId: componentId!,
+              });
             };
           }
           if (prop === "getSelectedIndex") {
@@ -2061,9 +2080,14 @@ function createProxyHandler<T>(
                 const slicedArray = sourceArray.slice(start, end);
                 const slicedIds = orderedIds.slice(start, end);
 
-                return rebuildStateShape(slicedArray as any, path, {
-                  ...meta,
-                  validIds: slicedIds,
+                return rebuildStateShape({
+                  currentState: slicedArray as any,
+                  path,
+                  componentId: componentId!,
+                  meta: {
+                    ...meta,
+                    validIds: slicedIds,
+                  },
                 });
               }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
 
@@ -2125,19 +2149,21 @@ function createProxyHandler<T>(
               if (!arrayKeys) {
                 throw new Error("No array keys found for mapping");
               }
-              const arraySetter = rebuildStateShape(
-                shadowValue as any,
+              const arraySetter = rebuildStateShape({
+                currentState: shadowValue as any,
                 path,
-                meta
-              );
+                componentId: componentId!,
+                meta,
+              });
 
               return shadowValue.map((item, index) => {
                 const itemPath = arrayKeys[index]?.split(".").slice(1);
-                const itemSetter = rebuildStateShape(
-                  item,
-                  itemPath as any,
-                  meta
-                );
+                const itemSetter = rebuildStateShape({
+                  currentState: item,
+                  path: itemPath as any,
+                  componentId: componentId!,
+                  meta,
+                });
 
                 return callbackfn(
                   item,
@@ -2161,12 +2187,23 @@ function createProxyHandler<T>(
             ) => {
               const arrayToMap = currentState as any[];
               const itemIdsForCurrentArray = meta?.validIds || [];
-              const arraySetter = rebuildStateShape(currentState, path, meta);
+              const arraySetter = rebuildStateShape({
+                currentState: currentState,
+                path,
+                componentId: componentId!,
+                meta,
+              });
 
               return arrayToMap.map((item, index) => {
                 const itemId = itemIdsForCurrentArray[index] || `id:${item.id}`;
                 const finalPath = [...path, itemId];
-                const setter = rebuildStateShape(item, finalPath, meta);
+                const setter = rebuildStateShape({
+                  currentState: item,
+                  path: finalPath,
+                  componentId: componentId!,
+                  meta,
+                });
+
                 return callbackfn(
                   item,
                   setter,
@@ -2216,11 +2253,12 @@ function createProxyHandler<T>(
                   ?.arrayKeys ||
                 [];
 
-              const arraySetter = rebuildStateShape(
-                arrayToMap as any,
+              const arraySetter = rebuildStateShape({
+                currentState: arrayToMap as any,
                 path,
-                meta
-              );
+                componentId: componentId!,
+                meta,
+              });
 
               return arrayToMap.map((item, localIndex) => {
                 const itemKey = itemKeysForCurrentView[localIndex];
@@ -2230,7 +2268,12 @@ function createProxyHandler<T>(
                 }
 
                 const itemPath = itemKey.split(".").slice(1);
-                const setter = rebuildStateShape(item, itemPath, meta);
+                const setter = rebuildStateShape({
+                  currentState: item,
+                  path: itemPath,
+                  componentId: componentId!,
+                  meta,
+                });
 
                 const itemComponentId = `${componentId}-${itemKey}`;
 
@@ -2258,11 +2301,12 @@ function createProxyHandler<T>(
               const flattenedResults = arrayToMap.flatMap(
                 (val: any) => val[fieldName] ?? []
               );
-              return rebuildStateShape(
-                flattenedResults as any,
-                [...path, "[*]", fieldName],
-                meta
-              );
+              return rebuildStateShape({
+                currentState: flattenedResults as any,
+                path: [...path, "[*]", fieldName],
+                componentId: componentId!,
+                meta,
+              });
             };
           }
           if (prop === "index") {
@@ -2280,11 +2324,12 @@ function createProxyHandler<T>(
               const value = getGlobalStore
                 .getState()
                 .getShadowValue(itemId, meta?.validIds);
-              const state = rebuildStateShape(
-                value,
-                itemId.split(".").slice(1) as string[],
-                meta
-              );
+              const state = rebuildStateShape({
+                currentState: value,
+                path: itemId.split(".").slice(1) as string[],
+                componentId: componentId!,
+                meta,
+              });
               return state;
             };
           }
@@ -2297,7 +2342,12 @@ function createProxyHandler<T>(
               const lastIndex = currentArray.length - 1;
               const lastValue = currentArray[lastIndex];
               const newPath = [...path, lastIndex.toString()];
-              return rebuildStateShape(lastValue, newPath);
+              return rebuildStateShape({
+                currentState: lastValue,
+                path: newPath,
+                componentId: componentId!,
+                meta,
+              });
             };
           }
           if (prop === "insert") {
@@ -2307,10 +2357,14 @@ function createProxyHandler<T>(
             ) => {
               invalidateCachePath(path);
               effectiveSetState(payload as any, path, { updateType: "insert" });
-              return rebuildStateShape(
-                getGlobalStore.getState().getNestedState(stateKey, path),
-                path
-              );
+              return rebuildStateShape({
+                currentState: getGlobalStore
+                  .getState()
+                  .getNestedState(stateKey, path),
+                path,
+                componentId: componentId!,
+                meta,
+              });
             };
           }
           if (prop === "uniqueInsert") {
@@ -2410,8 +2464,13 @@ function createProxyHandler<T>(
                 }
               );
 
-              return rebuildStateShape(filteredArray as any, path, {
-                validIds: newValidIds,
+              return rebuildStateShape({
+                currentState: filteredArray as any,
+                path,
+                componentId: componentId!,
+                meta: {
+                  validIds: newValidIds,
+                },
               });
             };
           }
@@ -2433,11 +2492,14 @@ function createProxyHandler<T>(
                 .sort((a, b) => compareFn(a.item, b.item))
                 .filter(Boolean);
 
-              return rebuildStateShape(
-                itemsWithIds.map((i) => i.item) as any,
+              return rebuildStateShape({
+                currentState: itemsWithIds.map((i) => i.item) as any,
                 path,
-                { validIds: itemsWithIds.map((i) => i.key) as string[] }
-              );
+                componentId: componentId!,
+                meta: {
+                  validIds: itemsWithIds.map((i) => i.key) as string[],
+                },
+              });
             };
           }
 
@@ -2468,7 +2530,12 @@ function createProxyHandler<T>(
                 }
               }
 
-              return rebuildStateShape(value as any, foundPath, meta);
+              return rebuildStateShape({
+                currentState: value as any,
+                path: foundPath,
+                componentId: componentId!,
+                meta,
+              });
             };
           }
         }
@@ -2751,7 +2818,12 @@ function createProxyHandler<T>(
         const nextValue = getGlobalStore
           .getState()
           .getNestedState(stateKey, nextPath);
-        return rebuildStateShape(nextValue, nextPath, meta);
+        return rebuildStateShape({
+          currentState: nextValue,
+          path: nextPath,
+          componentId: componentId!,
+          meta,
+        });
       },
     };
 
@@ -2788,7 +2860,11 @@ function createProxyHandler<T>(
       shapeCache.clear();
       stateVersion++;
       getGlobalStore.getState().initializeShadowState(stateKey, initialState);
-      const newProxy = rebuildStateShape(initialState, []);
+      const newProxy = rebuildStateShape({
+        currentState: initialState,
+        path: [],
+        componentId: componentId!,
+      });
       const initalOptionsGet = getInitialOptions(stateKey as string);
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
         ? initalOptionsGet?.localStorage?.key(initialState)
