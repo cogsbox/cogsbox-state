@@ -7,6 +7,7 @@ import ArrayReactivity from "./array-reactivity/ArrayReactivity";
 
 import { PixelRain } from "./PixelRain";
 import VirtualizedChatExample from "./virtualiser/VirtualizedChatExample";
+import ArrayMethodsPage from "./object-example/ObjectExmaple";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
@@ -24,7 +25,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <div className="h-20" />
         <ArrayReactivity />
         <div className="h-20" />
-        <VirtualizedChatExample /> <div className="h-40" />{" "}
+        <VirtualizedChatExample /> <div className="h-40" /> <ArrayMethodsPage />{" "}
+        <div className="h-40" />
       </div>{" "}
     </div>
   </React.StrictMode>
