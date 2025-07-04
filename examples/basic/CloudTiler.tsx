@@ -16,7 +16,7 @@ interface CloudLayersProps {
 
 export function CloudLayers({
   style,
-  layers = 8,
+  layers = 4,
   startOffset = 0,
   layerSpacing = 2,
   className = "",
@@ -56,7 +56,7 @@ export function CloudLayers({
       }
 
       // Calculate the potential intensity from the prop value.
-      const baseIntensity = (previousBrightness.current - 0.1) * 1;
+      const baseIntensity = (previousBrightness.current - 0.1) * 0.5;
 
       // --- NEW: Scale the intensity by the current storm energy ---
       const finalIntensity = baseIntensity * stormEnergyRef.current;

@@ -5,7 +5,7 @@ import { useMemo, useState, useCallback, useEffect, useRef } from "react";
 import FlyingCars from "./FlyingCars";
 import BlimpWithSpotlights from "./Blimp";
 
-import { CloudTiles, CloudLayers } from "./CloudTiler";
+import { CloudLayers } from "./CloudTiler";
 import { ShadowSilhouette } from "./ShadowSilhouette";
 import { cyberShadow } from "./assets/svgs";
 
@@ -13,17 +13,17 @@ import { cyberShadow } from "./assets/svgs";
 const Z_INDICES = {
   // Background layers (furthest back)
   BASE_BACKGROUND: -1000,
-  GRADIENT_BACKGROUND: -900,
+  GRADIENT_BACKGROUND: -950,
 
   // Atmospheric effects
 
-  LIGHTNING: -700,
-
   // Cloud layers
-  CLOUDS: -650,
+  CLOUDS: -900,
   MOON_GLOW: -600,
   ATMOSPHERIC_OVERLAY_1: -550,
   // Sky elements
+
+  LIGHTNING: -525,
   SKYLINE_BACKGROUND: -500,
   FLYING_CARS: -400,
   BLIMP: -350,
@@ -150,7 +150,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
   useEffect(() => {
     let fadeInterval: NodeJS.Timeout | undefined;
     let schedulerTimeout: NodeJS.Timeout;
-    const BASE_SKYLINE_BRIGHTNESS = 2.0;
+    const BASE_SKYLINE_BRIGHTNESS = 4.0;
 
     const triggerLightning = () => {
       if (fadeInterval) return;
@@ -395,7 +395,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_2,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.3) 10%, transparent 67%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.25) 10%, transparent 67%)",
         }}
       />
       <div
@@ -414,7 +414,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
 
       <CloudLayers
         lightningBrightness={skylineBrightness}
-        style={{ zIndex: Z_INDICES.CLOUDS }}
+        style={{ zIndex: Z_INDICES.CLOUDS, filter: "blur(5px)" }}
       />
 
       {/* Blimp Layer */}
@@ -452,9 +452,10 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             left: 0,
             width: "100%",
             height: "100%",
-            background: steppedGradient,
+            zIndex: Z_INDICES.SKYLINE_BACKGROUND,
+            backgroundColor: "rgba(255, 255, 255, 0.3)",
             filter: `brightness(${
-              0.6 * skylineBrightness + moonIntensity * 0.02
+              0.5 * skylineBrightness + moonIntensity * 0.02
             }) contrast(0.97) saturate(0.8)`,
             maskImage: "url(/skyline.svg)",
             maskSize: "100% 100vh",

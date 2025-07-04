@@ -653,7 +653,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   getGlobalStore.getState().setCreatedState(statePart);
 
   Object.keys(statePart).forEach((key) => {
-    console.log("initializeShadowState", key, statePart[key]);
     getGlobalStore.getState().initializeShadowState(key, statePart[key]);
   });
 
@@ -1077,7 +1076,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     updateObj: { updateType: "insert" | "cut" | "update" },
     validationKey?: string
   ) => {
-    const fullPath = [thisKey, ...path].join(".");
+    const fullPath = path.join(".");
     if (Array.isArray(path)) {
       const pathKey = `${thisKey}-${path.join(".")}`;
       componentUpdatesRef.current.add(pathKey);
@@ -1164,22 +1163,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
         // Move this to AFTER the switch statement that inserts
         const arrayMeta = store.getShadowMetadata(thisKey, path);
 
+        getGlobalStore.getState().notifyPathSubscribers(fullPath);
+        console.log(fullPath);
         if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
           const updatedArray = store.getShadowValue(
             [thisKey, ...path].join(".")
           );
           const arrayKeys =
             store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
-          console.log(
-            "arravvvvvvvvvvvvvvvvvvvssssssssssssssssssssvvvvyKeys",
 
-            arrayKeys,
-            updatedArray
-          );
           // Find the new item (should be the last one after insert)
           const newIndex = arrayKeys.length - 1;
           const newItemKey = arrayKeys[newIndex]!;
-          const itemId = newItemKey.split(".").pop(); // FIX: Extract just id:xxx
+
           const newItem = updatedArray[newIndex];
 
           arrayMeta.mapWrappers.forEach((wrapper) => {
@@ -1197,12 +1193,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 componentId!,
                 sessionId
               );
-              console.log(
-                "patddddddddddddddddddddddh",
-                path,
-                "rebuildStateShape",
-                tempProxy
-              );
+
               const rebuildStateShape = (tempProxy as any)
                 ._rebuildStateShape as (sdsad: {
                 path: string[];
@@ -1317,13 +1308,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const changedPaths = getDifferences(prevValue, newState);
       // Get the root shadow metadata where components are stored
       const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
-
+      console.log(
+        "reactiveTypesreactiveTypesreactiveTypes",
+        shadowMetaRoort,
+        fullPath
+      );
       if (shadowMetaRoort?.components) {
         const changedPathsSet = new Set(changedPaths);
-        const primaryPathToCheck =
-          updateObj.updateType === "update"
-            ? path.join(".")
-            : path.slice(0, -1).join(".") || "";
 
         for (const [
           componentKey,
@@ -1341,8 +1332,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
 
           if (reactiveTypes.includes("component")) {
-            // A component should update if ANY of the changed paths
-            // are children of (or equal to) ANY of its subscribed paths.
+            if (component.paths.has(fullPath)) {
+              console.log(
+                "reactiveTypesreactiveTypesreactiveTypes 22222222222222222",
+                component,
+                fullPath
+              );
+              shouldUpdate = true;
+            }
             for (const changedPath of changedPathsSet) {
               for (const subscribedPath of component.paths) {
                 // Case 1: Exact match (e.g., changed 'a.b' and subscribed to 'a.b')
@@ -1484,11 +1481,20 @@ const registerComponentDependency = (
   dependencyPath: string[]
 ) => {
   const fullComponentId = `${stateKey}////${componentId}`;
-  const component = getGlobalStore
+  let components = getGlobalStore
     .getState()
-    .getShadowMetadata(stateKey, [])
-    ?.components?.get(fullComponentId);
+    .getShadowMetadata(stateKey, [])?.components;
 
+  console.log(
+    "registerComponentDependency",
+    dependencyPath,
+    components,
+    fullComponentId
+  );
+
+  let component = components?.get(fullComponentId);
+
+  console.log("dddddddddddddddddddddddddddddddddddcy", component);
   // Guard clause: Exit if no component or not the right reactivity type.
   if (
     !component ||
@@ -1498,18 +1504,11 @@ const registerComponentDependency = (
         : [component.reactiveType || "component"]
     ).includes("component")
   ) {
-    console.log("nnnnnnot");
     return;
   }
 
   const pathKey = dependencyPath.join(".");
-
-  // If a parent path already covers this dependency, do nothing.
-  if (
-    Array.from(component.paths).some((existing) => pathKey.startsWith(existing))
-  ) {
-    return;
-  }
+  console.log("pathKeypathKeysssssssspathKey", pathKey);
 
   // Add the new path and remove any now-redundant child paths.
   component.paths.add(pathKey);
@@ -1529,6 +1528,7 @@ function createProxyHandler<T>(
     proxy: any;
     stateVersion: number;
   };
+
   const shapeCache = new Map<string, CacheEntry>();
   let stateVersion = 0;
 
@@ -1555,7 +1555,9 @@ function createProxyHandler<T>(
   }): any {
     const cacheKey = path.map(String).join(".");
     const stateKeyPathKey = [stateKey, ...path].join(".");
-
+    if (!componentId) {
+      console.error("dasdsadsadasd");
+    }
     currentState = getGlobalStore
       .getState()
       .getShadowValue(stateKeyPathKey, meta?.validIds);
@@ -1953,8 +1955,7 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 const hasNewItems = totalCount > previousCountRef.current;
-                const isInitialLoad =
-                  previousCountRef.current === 0 && totalCount > 0;
+
                 const nearBottom =
                   container.scrollHeight - container.scrollTop <=
                   container.clientHeight + scrollStickTolerance;
@@ -2232,15 +2233,13 @@ function createProxyHandler<T>(
               ) => ReactNode
             ) => {
               const [render, forceUpdate] = useState(0);
+
               const arrayToMap = getGlobalStore
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds);
-              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                const gotArray = getGlobalStore
-                  .getState()
-                  .getShadowValue(stateKeyPathKey, meta?.validIds);
 
-                forceUpdate((p) => p++);
+              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+                forceUpdate((p) => p + 1);
               });
 
               if (!Array.isArray(arrayToMap)) {
@@ -2262,33 +2261,29 @@ function createProxyHandler<T>(
 
               return arrayToMap.map((item, localIndex) => {
                 const itemKey = itemKeysForCurrentView[localIndex];
-
+                console.log("item", item, stateKeyPathKey);
                 if (!itemKey) {
                   return null;
                 }
+                const itemComponentId = uuidv4();
 
                 const itemPath = itemKey.split(".").slice(1);
                 const setter = rebuildStateShape({
                   currentState: item,
                   path: itemPath,
-                  componentId: componentId!,
+                  componentId: itemComponentId!,
                   meta,
                 });
-
-                const itemComponentId = `${componentId}-${itemKey}`;
 
                 return createElement(MemoizedCogsItemWrapper, {
                   key: itemKey,
                   stateKey,
                   itemComponentId,
-                  itemPath: itemPath,
-                  children: callbackfn(
-                    item,
-                    setter,
-                    localIndex,
-                    arrayToMap,
-                    arraySetter
-                  ),
+                  itemPath,
+                  localIndex,
+                  arraySetter, // Pass the array's setter
+                  rebuildStateShape, // Pass the function that creates new proxies
+                  renderFn: callbackfn, // Pass the render function itself, not its result
                 });
               });
             };
@@ -2556,10 +2551,24 @@ function createProxyHandler<T>(
 
         if (prop === "get") {
           return () => {
+            const stateEntry = JSON.stringify(
+              getGlobalStore.getState().getShadowMetadata(stateKey, [])
+            );
+            console.log(
+              "get jjjjjjjjjjjjjjjjjjjj",
+              stateKeyPathKey,
+              stateEntry,
+              getGlobalStore.getState().getShadowMetadata(stateKey, [])
+                ?.components
+            );
             registerComponentDependency(stateKey, componentId, path);
-            return getGlobalStore
-              .getState()
-              .getShadowValue(stateKeyPathKey, meta?.validIds);
+            return (
+              stateKeyPathKey +
+              "---" +
+              getGlobalStore
+                .getState()
+                .getShadowValue(stateKeyPathKey, meta?.validIds)
+            );
           };
         }
         if (prop === "$derive") {
@@ -2585,6 +2594,7 @@ function createProxyHandler<T>(
         }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
+          registerComponentDependency(stateKey, componentId, parentPath);
           if (
             Array.isArray(
               getGlobalStore.getState().getNestedState(stateKey, parentPath)
@@ -2699,12 +2709,6 @@ function createProxyHandler<T>(
           };
         }
         if (prop === "_componentId") {
-          console.log(
-            "get _componentId ---------------------------------",
-            componentId,
-            path,
-            stateKeyPathKey
-          );
           return componentId;
         }
         if (path.length == 0) {
@@ -2941,10 +2945,13 @@ function createProxyHandler<T>(
       );
     },
   };
+  const returnShape = rebuildStateShape({
+    currentState: getGlobalStore.getState().getNestedState(stateKey, []),
+    componentId,
+    path: [],
+  });
 
-  return rebuildStateShape(
-    getGlobalStore.getState().getNestedState(stateKey, [])
-  );
+  return returnShape;
 }
 
 export function $cogsSignal(proxy: {
@@ -3237,19 +3244,36 @@ function CogsItemWrapper({
   stateKey,
   itemComponentId,
   itemPath,
-  children,
+  localIndex,
+  arraySetter,
+  rebuildStateShape,
+  renderFn,
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
-  formOpts?: FormOptsType;
-  children: React.ReactNode;
+  localIndex: number;
+  arraySetter: any; // The proxy for the whole array
+  rebuildStateShape: (options: {
+    currentState: any;
+    path: string[];
+    componentId: string;
+    meta?: any;
+  }) => any;
+  renderFn: (
+    value: any,
+    setter: any,
+    index: number,
+    array: any,
+    arraySetter: any
+  ) => React.ReactNode;
 }) {
   const [, forceUpdate] = useState({});
   const { ref, inView, entry } = useInView();
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
-
+  console.log("itemPath", itemPath, itemComponentId);
+  const fullStateKey = [stateKey, ...itemPath].join(".");
   // Proper way to merge refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -3287,14 +3311,20 @@ function CogsItemWrapper({
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
   }, [entry, stateKey, itemPath]);
+
   useLayoutEffect(() => {
     const fullComponentId = `${stateKey}////${itemComponentId}`;
     const stateEntry = getGlobalStore
       .getState()
       .getShadowMetadata(stateKey, []);
+
+    // Register the component's existence for cleanup and other non-data-path triggers.
+    // Crucially, initialize with an EMPTY set of paths.
+    // The specific field dependencies will be added by `registerComponentDependency`
+    // when `.get()` is called on a field inside the rendered children.
     stateEntry?.components?.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
-      paths: new Set([itemPath.join(".")]),
+      paths: new Set(), // <--- THE FIX
       reactiveType: ["component"],
     });
 
@@ -3302,9 +3332,37 @@ function CogsItemWrapper({
       const stateEntry = getGlobalStore
         .getState()
         .getShadowMetadata(stateKey, []);
-      if (stateEntry) stateEntry?.components?.delete(fullComponentId);
+      stateEntry?.components?.delete(fullComponentId);
     };
-  }, [stateKey, itemComponentId, itemPath.join(".")]);
+    // The itemPath is no longer needed as a dependency for this effect
+  }, [stateKey, itemComponentId]);
+  const fullItemPath = [stateKey, ...itemPath].join(".");
+  const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
 
-  return <div ref={setRefs}>{children}</div>;
+  // If the item was deleted from the store, it might be null.
+  if (itemValue === undefined) {
+    return null;
+  }
+
+  const arrayValue = arraySetter.get();
+
+  // Re-create the specific proxy for this item with the latest data.
+  const itemSetter = rebuildStateShape({
+    currentState: itemValue,
+    path: itemPath,
+    componentId: itemComponentId,
+  });
+  const children = renderFn(
+    itemValue,
+    itemSetter,
+    localIndex,
+    arrayValue,
+    arraySetter
+  );
+
+  return (
+    <div ref={setRefs} onClick={() => forceUpdate({})}>
+      {children}
+    </div>
+  );
 }

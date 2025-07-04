@@ -64,7 +64,7 @@ export default function ArrayMethodsPage() {
 
         <div className="grid grid-cols-2 gap-4">
           {/* We're back to the original, lean component structure */}
-          <ItemList title="Red Team" arrayKey="redTeam" color="red" />
+          {/* <ItemList title="Red Team" arrayKey="redTeam" color="red" /> */}
           <ItemList title="Blue Team" arrayKey="blueTeam" color="blue" />
         </div>
       </div>
@@ -118,8 +118,7 @@ function ItemList({
   color: "red" | "blue";
 }) {
   const dashboardState = useCogsState("gameDashboard", {
-    reactiveType: "deps",
-    reactiveDeps: (state) => [state[arrayKey]],
+    reactiveType: "none",
   });
   const teamState = dashboardState[arrayKey];
 
@@ -155,7 +154,7 @@ function ItemList({
         <div className="flex-grow space-y-1 overflow-y-auto pr-1">
           {teamState.stateList((_item, itemSetter) => (
             <FlashWrapper key={itemSetter.id.get()}>
-              1 {itemSetter._componentId}2
+              <span className="bg-white">{itemSetter._componentId}</span>
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
@@ -231,6 +230,7 @@ function PlayerForm({ playerState }: { playerState: StateObject<Player> }) {
       {playerState.name.formElement((obj) => (
         <div>
           <label className={formLabelClass}>Name</label>
+          {obj.get()}
           <input {...obj.inputProps} className={formInputClass} />
         </div>
       ))}

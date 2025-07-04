@@ -558,38 +558,49 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const fullKey = [key, ...path].join(".");
 
     // This is the recursive function that does the real work.
-    const updateValue = (currentKey: any, valueToSet: any) => {
+    const updateValue = (currentKey: string, valueToSet: any) => {
       const meta = newShadowStore.get(currentKey);
 
-      // Case 1: The value to set is an object (but not an array)
+      // Case 1: The value to set is an object (but not an array).
+      // We must traverse its keys and update children, not replace the object itself.
       if (
         typeof valueToSet === "object" &&
         valueToSet !== null &&
         !Array.isArray(valueToSet)
       ) {
-        // This is the logic that was missing.
+        // This is the crucial fix.
         // We must find the metadata for this object to know its children's paths.
         if (meta && meta.fields) {
-          // For each key in the new object (e.g., 'name', 'price')...
+          // For each key in the new partial object (e.g., 'name', 'price')...
           for (const fieldKey in valueToSet) {
             if (Object.prototype.hasOwnProperty.call(valueToSet, fieldKey)) {
               const childPath = meta.fields[fieldKey];
               const childValue = valueToSet[fieldKey];
-              // ...if a child path exists, recursively call updateValue on it.
+
+              // ...if a child path exists in the metadata, recursively call updateValue on it.
               if (childPath) {
-                updateValue(childPath, childValue);
+                updateValue(childPath as string, childValue);
+              } else {
+                // NOTE: This logic ignores keys in the update object that don't exist in the state.
+                // A more advanced implementation might add new shadow nodes here.
               }
             }
           }
         } else {
+          // This is a recovery path. If told to update an object but it has no fields metadata,
+          // we fall back to the old (and potentially destructive) behavior, but with a warning.
           console.warn(
-            `Attempted to update an object at ${currentKey}, but no 'fields' metadata was found.`
+            `Attempted to update an object at ${currentKey}, but no 'fields' metadata was found. Replacing the value directly.`
           );
+          const existing = newShadowStore.get(currentKey) || {};
+          newShadowStore.set(currentKey, { ...existing, value: valueToSet });
         }
       }
-      // Case 2: The value is a primitive (or an array, which we treat as a whole value here)
+      // Case 2: The value is a primitive (or an array, which we treat as a single value).
+      // This is the base case for the recursion.
       else {
         const existing = newShadowStore.get(currentKey) || {};
+        // Only update the 'value' property, preserving other metadata like 'signals' or 'components'.
         newShadowStore.set(currentKey, { ...existing, value: valueToSet });
       }
     };
@@ -599,7 +610,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     // Set the new shadow store in state.
     set({ shadowStateStore: newShadowStore });
-    console.log("updateShadowAtPath", fullKey);
     get().notifyPathSubscribers(fullKey);
   },
   selectedIndicesMap: new Map<string, string>(),

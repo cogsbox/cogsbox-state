@@ -1,5 +1,4 @@
 import {
-  type EffectiveSetState,
   type FormElementParams,
   type FormOptsType,
   type UpdateArg,
@@ -11,123 +10,6 @@ import React from "react";
 import { getGlobalStore, formRefStore } from "./store";
 import { validateZodPathFunc } from "./useValidateZodPath";
 import { ulid } from "ulid";
-
-export function updateFn<U>(
-  setState: EffectiveSetState<U>,
-  payload: UpdateArg<U>,
-  path: string[],
-  validationKey?: string,
-  stateKey?: string
-): void {
-  setState(
-    (prevState) => {
-      if (isFunction<U>(payload)) {
-        const nestedValue = payload(
-          getGlobalStore
-            .getState()
-            .getShadowValue(stateKey + "." + path.join("."))
-        );
-
-        let value = getGlobalStore
-          .getState()
-          .setShadowValue(stateKey + "." + path.join("."), nestedValue);
-
-        if (typeof value == "string") {
-          value = value.trim();
-        }
-        return value;
-      } else {
-        let value =
-          !path || path.length == 0
-            ? payload
-            : getGlobalStore
-                .getState()
-                .setShadowValue(stateKey + "." + path.join("."), payload);
-        if (typeof value == "string") {
-          value = value.trim();
-        }
-        return value;
-      }
-    },
-    path,
-    { updateType: "update" },
-    validationKey
-  );
-}
-export function pushFunc<U>(
-  setState: EffectiveSetState<U>,
-  payload: UpdateArg<U>,
-  path: string[],
-  stateKey: string,
-  index?: number
-): void {
-  const arrayBeforeUpdate =
-    (getGlobalStore.getState().getNestedState(stateKey, path) as any[]) || [];
-
-  const newItem = isFunction<U>(payload)
-    ? payload(arrayBeforeUpdate as any)
-    : payload;
-
-  if (typeof newItem === "object" && newItem !== null && !(newItem as any).id) {
-    (newItem as any).id = ulid();
-  }
-  const finalId = (newItem as any).id;
-
-  setState(
-    (prevState) => {
-      // The logic inside here is now much simpler.
-      // We already have the final `newItem`.
-      const arrayToUpdate =
-        getNestedValue(prevState, [...path], stateKey!) || [];
-      const newArray = [...arrayToUpdate];
-      newArray.splice(index ?? newArray.length, 0, newItem);
-      return getGlobalStore
-        .getState()
-        .setShadowValue(stateKey + "." + path.join("."), payload);
-    },
-    [...path, `id:${finalId}`], // Now we use the ID that is guaranteed to be correct.
-    {
-      updateType: "insert",
-    }
-  );
-}
-export function cutFunc<U>(
-  setState: EffectiveSetState<U>,
-  path: string[],
-  stateKey: string,
-  index: number
-): void {
-  // Get the ordered IDs to find the ID for this index
-  const arrayKey = [stateKey, ...path].join(".");
-  const arrayMeta = getGlobalStore.getState().shadowStateStore.get(arrayKey);
-  const itemId = arrayMeta?.arrayKeys?.[index];
-
-  if (!itemId) {
-    throw new Error(`No ID found for index ${index} in array`);
-  }
-
-  setState(
-    (prevState) => {
-      const arrayToUpdate = getNestedValue(prevState, [...path], stateKey!);
-      if (index < 0 || index >= arrayToUpdate?.length) {
-        throw new Error(`Index ${index} does not exist in the array.`);
-      }
-
-      const updatedArray = [
-        ...arrayToUpdate.slice(0, index),
-        ...arrayToUpdate.slice(index + 1),
-      ] as U;
-
-      return path.length == 0
-        ? updatedArray
-        : getGlobalStore
-            .getState()
-            .setShadowValue(stateKey + "." + path.join("."), updatedArray);
-    },
-    [...path, itemId], // Use the ID here!
-    { updateType: "cut" }
-  );
-}
 
 export const useStoreSubscription = <T,>(
   fullPath: string,
@@ -194,7 +76,7 @@ export const useGetKeyState = (key: string, path: string[]) => {
   );
 };
 interface FormControlComponentProps<TStateObject> {
-  setState: EffectiveSetState<TStateObject>;
+  setState: any;
 
   path: string[];
   child: (obj: FormElementParams<TStateObject>) => JSX.Element;
