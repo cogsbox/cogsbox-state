@@ -56,7 +56,7 @@ export function CloudLayers({
       }
 
       // Calculate the potential intensity from the prop value.
-      const baseIntensity = (previousBrightness.current - 0.1) * 3;
+      const baseIntensity = (previousBrightness.current - 0.1) * 1;
 
       // --- NEW: Scale the intensity by the current storm energy ---
       const finalIntensity = baseIntensity * stormEnergyRef.current;

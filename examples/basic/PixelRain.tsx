@@ -7,7 +7,7 @@ import BlimpWithSpotlights from "./Blimp";
 
 import { CloudTiles, CloudLayers } from "./CloudTiler";
 import { ShadowSilhouette } from "./ShadowSilhouette";
-import { PerspectiveGround } from "./perspectiveGround";
+import { cyberShadow } from "./assets/svgs";
 
 // Centralized Z-Index Management System
 const Z_INDICES = {
@@ -29,8 +29,8 @@ const Z_INDICES = {
   BLIMP: -350,
   ATMOSPHERIC_OVERLAY_2: -330,
   SKYLINE_SILHOUETTE: -250,
-  ATMOSPHERIC_OVERLAY_3: -200,
-
+  ATMOSPHERIC_OVERLAY_3: -150,
+  GROUND: -200,
   // Foreground elements
   RAIN_CONTAINER: -100,
   SPLAT_CONTAINER: -50,
@@ -316,7 +316,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       <MoonGlow onMoonIntensityChange={setMoonIntensity} />
       <Lightning onBrightnessChange={handleBrightnessChange} />
 
-      {/* Cars Layer */}
       <div
         ref={carsRef}
         className="fixed inset-0"
@@ -325,19 +324,25 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         <FlyingCars numberOfCars={50} />
       </div>
 
-      {/* Cyberman */}
       <div
         ref={cybermanRef}
         className="fixed bottom-[20vh] left-[20vh] h-[500px]"
         style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
-        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />
-        <div className="mt-[-50px]">
+        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{" "}
+        <div
+          style={{ zIndex: Z_INDICES.CYBERMAN - 1 }}
+          className="h-[500px]  w-[200px] absolute top-[0px] left-[5px] text-sky-400"
+        >
+          {" "}
+          {cyberShadow}
+        </div>
+        <div className="mt-[-70px] relative">
           <ShadowSilhouette
             src="./cybermanSilh.svg"
             skewX={0}
             skewY={0}
-            intensity={0}
+            intensity={200}
           />
         </div>
       </div>
@@ -357,9 +362,19 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         <img src="./cat.png" alt="Hero background" className="h-[400px]" />
       </div>
 
-      <PerspectiveGround />
+      <div
+        className="fixed w-[50vw] left-0 h-[50%] bottom-0 contrast-150"
+        style={{ zIndex: Z_INDICES.GROUND }}
+      >
+        <img src="./backgroundSand.png" alt="" className="h-[100%]" />
+      </div>
+      <div
+        className="fixed w-[50vw] right-0 h-[50%] bottom-0  scale-x-[-1] contrast-150"
+        style={{ zIndex: Z_INDICES.GROUND }}
+      >
+        <img src="./backgroundSand.png" alt="" className="h-[100%]" />
+      </div>
 
-      {/* Atmospheric Overlays */}
       <div
         style={{
           position: "fixed",
@@ -417,7 +432,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       </div>
       <style>{`@keyframes moveAcross { from { transform: translateX(-100%); } to { transform: translateX(100vw); }}`}</style>
 
-      {/* Skyline Layers */}
       <div
         ref={skylineRef}
         style={{
@@ -494,7 +508,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}
       />
 
-      {/* Rain Layers */}
       <div
         ref={rainContainerRef}
         aria-hidden="true"

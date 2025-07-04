@@ -23,10 +23,9 @@ export const ShadowSilhouette = ({
   );
 
   const commonStyle: React.CSSProperties = {
-    transform: `scaleY(-1) skew(${skewX}deg, ${skewY}deg)`,
-    transformOrigin: "center",
-    opacity,
-    filter: "blur(4px)",
+    transform: `scaleY(-1.5) skew(${skewX}deg, ${skewY}deg) translateY(-100%)`,
+    transformOrigin: "center top",
+
     pointerEvents: "none",
     animation: `flicker ${flickerDuration} infinite ease-in-out alternate`,
     position: "absolute",
@@ -44,8 +43,6 @@ export const ShadowSilhouette = ({
             transform: `scaleY(-1) skew(${skewX + Math.random() * 4 - 2}deg, ${
               skewY + Math.random() * 2 - 1
             }deg) translateX(${Math.random() * 10 - 5}px)`,
-            opacity: opacity * 0.5,
-            filter: "blur(6px)",
           }}
         />
       )}

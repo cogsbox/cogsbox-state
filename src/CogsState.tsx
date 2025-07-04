@@ -1811,7 +1811,6 @@ function createProxyHandler<T>(
                   if (shadowStore?.virtualizer?.domRef) {
                     const element = shadowStore.virtualizer.domRef;
                     if (element) {
-                      console.log("element", element);
                       const container = containerRef.current!;
                       container.scrollTo({
                         top: container.scrollHeight,
@@ -1933,11 +1932,9 @@ function createProxyHandler<T>(
                     container.scrollTop = container.scrollHeight;
                     wasAtBottomRef.current = true;
 
-                    console.log("lastItem", lastItem);
                     if (lastItem?.virtualizer?.domRef) {
                       const element = lastItem.virtualizer.domRef as any;
 
-                      console.log("element", element);
                       if (element) {
                         const rect = element.getBoundingClientRect();
                         const isInView =
@@ -1950,7 +1947,6 @@ function createProxyHandler<T>(
                             (window.innerWidth ||
                               document.documentElement.clientWidth);
 
-                        console.log("isInView", isInView);
                         if (isInView) {
                           setInitialSCrollDone.current = true;
                           //  previousCountRef.current = totalCount;
