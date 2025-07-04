@@ -150,11 +150,11 @@ type ArraySpecificPrototypeKeys =
 export type ArrayEndType<TShape extends unknown> = {
   findWith: findWithFuncType<InferArrayElement<TShape>>;
   index: (index: number) => StateObject<InferArrayElement<TShape>> & {
-    insert: PushArgs<InferArrayElement<TShape>, TShape>;
+    insert: InsertType<InferArrayElement<TShape>>;
     cut: CutFunctionType<TShape>;
     _index: number;
   } & EndType<InferArrayElement<TShape>>;
-  insert: PushArgs<InferArrayElement<TShape>, TShape>;
+  insert: InsertType<InferArrayElement<TShape>>;
   cut: CutFunctionType<TShape>;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
@@ -181,7 +181,7 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (
       value: InferArrayElement<TShape>,
       setter: StateObject<InferArrayElement<TShape>>,
-      index: { localIndex: number; originalIndex: number },
+      index: number,
       array: TShape,
       arraySetter: StateObject<TShape>
     ) => void
@@ -208,7 +208,7 @@ export type ArrayEndType<TShape extends unknown> = {
     field: K
   ) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
   uniqueInsert: (
-    payload: UpdateArg<InferArrayElement<TShape>>,
+    payload: InsertParams<InferArrayElement<TShape>>,
     fields?: (keyof InferArrayElement<TShape>)[],
     onMatch?: (existingItem: any) => any
   ) => void;
@@ -239,9 +239,16 @@ export type FormOptsType = {
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 
 export type UpdateArg<S> = S | ((prevState: S) => S);
-
+export type InsertParams<S> =
+  | S
+  | ((prevState: { state: S; uuid: string }) => S);
 export type UpdateType<T> = (
   payload: UpdateArg<T>,
+  opts?: UpdateOpts<T>
+) => void;
+
+export type InsertType<T> = (
+  payload: InsertParams<T>,
   opts?: UpdateOpts<T>
 ) => void;
 
@@ -327,9 +334,20 @@ export type StateObject<T> = (T extends any[]
   };
 
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
+type EffectiveSetStateArg<
+  T,
+  UpdateType extends "update" | "insert" | "cut",
+> = UpdateType extends "insert"
+  ? T extends any[]
+    ? InsertParams<InferArrayElement<T>>
+    : never
+  : UpdateArg<T>;
 
-export type EffectiveSetState<TStateObject> = (
-  newStateOrFunction: UpdateArg<TStateObject>,
+// Then update your EffectiveSetState type
+type EffectiveSetState<TStateObject> = (
+  newStateOrFunction:
+    | EffectiveSetStateArg<TStateObject, "update">
+    | EffectiveSetStateArg<TStateObject, "insert">,
   path: string[],
   updateObj: { updateType: "update" | "insert" | "cut" },
   validationKey?: string,
@@ -1054,7 +1072,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, []);
 
   const effectiveSetState = (
-    newStateOrFunction: UpdateArg<TStateObject>,
+    newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
     updateObj: { updateType: "insert" | "cut" | "update" },
     validationKey?: string
@@ -1068,10 +1086,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
-      const nestedShadowVlaue = store.getShadowValue(fullPath);
-      const payload = isFunction<TStateObject>(newStateOrFunction)
-        ? newStateOrFunction(nestedShadowVlaue)
-        : newStateOrFunction;
+      const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
+      const payload = (
+        updateObj.updateType === "insert" && isFunction(newStateOrFunction)
+          ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
+          : isFunction(newStateOrFunction)
+            ? newStateOrFunction(nestedShadowValue)
+            : newStateOrFunction
+      ) as TStateObject;
 
       const timeStamp = Date.now();
 
@@ -1081,7 +1103,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         path,
         updateType: updateObj.updateType,
         status: "new" as const,
-        oldValue: nestedShadowVlaue,
+        oldValue: nestedShadowValue,
         newValue: payload,
       } satisfies UpdateTypeDetail;
 
@@ -1463,6 +1485,7 @@ const registerComponentDependency = (
         : [component.reactiveType || "component"]
     ).includes("component")
   ) {
+    console.log("nnnnnnot");
     return;
   }
 
@@ -1686,6 +1709,8 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === "getSelected") {
             return () => {
+              registerComponentDependency(stateKey, componentId, path);
+
               const fullKey = stateKey + "." + path.join(".");
               const selectedIndicesMap =
                 getGlobalStore.getState().selectedIndicesMap;
@@ -1715,11 +1740,6 @@ function createProxyHandler<T>(
               );
             };
           }
-          if (prop === "clearSelected") {
-            return () => {
-              getGlobalStore.getState().clearSelectedIndex({ stateKey, path });
-            };
-          }
           if (prop === "getSelectedIndex") {
             return () => {
               const selectedIndex = getGlobalStore
@@ -1732,6 +1752,12 @@ function createProxyHandler<T>(
               return selectedIndex;
             };
           }
+          if (prop === "clearSelected") {
+            return () => {
+              getGlobalStore.getState().clearSelectedIndex({ stateKey, path });
+            };
+          }
+
           if (prop === "useVirtualView") {
             return (
               options: VirtualViewOptions
@@ -2163,7 +2189,7 @@ function createProxyHandler<T>(
               callbackfn: (
                 value: any,
                 setter: any,
-                index: { localIndex: number; originalIndex: number },
+                index: number,
                 array: any,
                 arraySetter: any
               ) => ReactNode
@@ -2190,10 +2216,6 @@ function createProxyHandler<T>(
                   ?.arrayKeys ||
                 [];
 
-              const sourceItemKeys =
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys || [];
-
               const arraySetter = rebuildStateShape(
                 arrayToMap as any,
                 path,
@@ -2210,7 +2232,6 @@ function createProxyHandler<T>(
                 const itemPath = itemKey.split(".").slice(1);
                 const setter = rebuildStateShape(item, itemPath, meta);
 
-                const originalIndex = sourceItemKeys.indexOf(itemKey);
                 const itemComponentId = `${componentId}-${itemKey}`;
 
                 return createElement(MemoizedCogsItemWrapper, {
@@ -2221,7 +2242,7 @@ function createProxyHandler<T>(
                   children: callbackfn(
                     item,
                     setter,
-                    { localIndex, originalIndex },
+                    localIndex,
                     arrayToMap,
                     arraySetter
                   ),
@@ -2280,9 +2301,12 @@ function createProxyHandler<T>(
             };
           }
           if (prop === "insert") {
-            return (payload: UpdateArg<T>, index?: number) => {
+            return (
+              payload: InsertParams<InferArrayElement<T>>,
+              index?: number
+            ) => {
               invalidateCachePath(path);
-              effectiveSetState(payload, path, { updateType: "insert" });
+              effectiveSetState(payload as any, path, { updateType: "insert" });
               return rebuildStateShape(
                 getGlobalStore.getState().getNestedState(stateKey, path),
                 path
@@ -2512,10 +2536,10 @@ function createProxyHandler<T>(
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
-            const parentKey = parentPath.join(".");
-            const fullParentKey = stateKey + "." + parentKey;
+            const fullParentKey = stateKey + "." + parentPath.join(".");
             const fullItemKey = stateKey + "." + path.join(".");
 
+            // Update the selection
             if (value) {
               getGlobalStore
                 .getState()
@@ -2524,6 +2548,64 @@ function createProxyHandler<T>(
               getGlobalStore
                 .getState()
                 .clearSelectedIndex({ stateKey, path: parentPath });
+            }
+
+            // Notify components that depend on the parent array
+            const store = getGlobalStore.getState();
+            const shadowMetaRoot = store.getShadowMetadata(stateKey, []);
+
+            if (shadowMetaRoot?.components) {
+              const changedPath = parentPath.join(".");
+
+              for (const [
+                componentKey,
+                component,
+              ] of shadowMetaRoot.components.entries()) {
+                let shouldUpdate = false;
+                const reactiveTypes = Array.isArray(component.reactiveType)
+                  ? component.reactiveType
+                  : [component.reactiveType || "component"];
+
+                if (reactiveTypes.includes("none")) continue;
+                if (reactiveTypes.includes("all")) {
+                  component.forceUpdate();
+                  continue;
+                }
+
+                if (reactiveTypes.includes("component")) {
+                  // Check if this component depends on the array that had its selection changed
+                  for (const subscribedPath of component.paths) {
+                    if (
+                      changedPath === subscribedPath ||
+                      subscribedPath === "" ||
+                      changedPath.startsWith(subscribedPath + ".")
+                    ) {
+                      shouldUpdate = true;
+                      break;
+                    }
+                  }
+                }
+
+                if (!shouldUpdate && reactiveTypes.includes("deps")) {
+                  if (component.depsFunction) {
+                    const fullState = store.getShadowValue(stateKey);
+                    const newDeps = component.depsFunction(fullState);
+
+                    if (newDeps === true) {
+                      shouldUpdate = true;
+                    } else if (Array.isArray(newDeps)) {
+                      if (!isDeepEqual(component.deps, newDeps)) {
+                        component.deps = newDeps;
+                        shouldUpdate = true;
+                      }
+                    }
+                  }
+                }
+
+                if (shouldUpdate) {
+                  component.forceUpdate();
+                }
+              }
             }
           };
         }
@@ -2548,6 +2630,15 @@ function createProxyHandler<T>(
                 .setSelectedIndex(fullParentKey, fullItemKey);
             }
           };
+        }
+        if (prop === "_componentId") {
+          console.log(
+            "get _componentId ---------------------------------",
+            componentId,
+            path,
+            stateKeyPathKey
+          );
+          return componentId;
         }
         if (path.length == 0) {
           if (prop === "addValidation") {
@@ -2606,9 +2697,9 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === "_componentId") return componentId;
           if (prop === "getComponents")
-            return () => getGlobalStore().stateComponents.get(stateKey);
+            return () =>
+              getGlobalStore.getState().stateComponents.get(stateKey);
           if (prop === "getAllFormRefs")
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);

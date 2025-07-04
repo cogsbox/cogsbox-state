@@ -2,132 +2,76 @@
 
 import React from "react";
 import type { StateObject } from "../../../src/CogsState";
-
 import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
 import { FlashWrapper } from "../FlashOnUpdate";
 
-// Define the types for our state
-export type User = {
-  id: number;
+// --- NEW State Definition: Red & Blue Teams ---
+export type Player = {
+  id: string | number;
   name: string;
-  email: string;
-  role: "Admin" | "Member" | "Guest";
+  score: number;
+  specialty: "Offense" | "Defense" | "Support";
 };
 
-export type Task = {
-  id: string;
-  description: string;
-  status: "pending" | "in-progress" | "completed";
-  assigneeId: number | null;
+export type GameDashboardState = {
+  gameName: string;
+  isLive: boolean;
+  redTeam: Player[];
+  blueTeam: Player[];
 };
 
-// Define the full state object structure
-export type ProjectDashboardState = {
-  projectName: string;
-  isActive: boolean;
-  users: User[];
-  tasks: Task[];
-};
-
-// Create the initial state
-const initialState: ProjectDashboardState = {
-  projectName: "Cogs State Demo",
-  isActive: true,
-  users: [
-    { id: 1, name: "Alice", email: "alice@example.com", role: "Admin" },
-    { id: 2, name: "Bob", email: "bob@example.com", role: "Member" },
+const initialState: GameDashboardState = {
+  gameName: "Cogs Team Battle",
+  isLive: true,
+  redTeam: [
+    { id: 1, name: "Blaze", score: 1500, specialty: "Offense" },
+    { id: 2, name: "Rook", score: 900, specialty: "Defense" },
   ],
-  tasks: [
-    {
-      id: "t-1",
-      description: "Set up project structure",
-      status: "completed",
-      assigneeId: 1,
-    },
-    {
-      id: "t-2",
-      description: "Implement array methods",
-      status: "in-progress",
-      assigneeId: 2,
-    },
-    {
-      id: "t-3",
-      description: "Write documentation",
-      status: "pending",
-      assigneeId: null,
-    },
+  blueTeam: [
+    { id: 3, name: "Viper", score: 1250, specialty: "Offense" },
+    { id: 4, name: "Aegis", score: 1100, specialty: "Support" },
+    { id: 5, name: "Ghost", score: 850, specialty: "Defense" },
   ],
 };
 
-// Export the hook
 export const { useCogsState } = createCogsState(
   {
-    projectDashboard: initialState,
+    gameDashboard: initialState,
   },
-  { validation: { key: "projectDashboard" } }
+  { validation: { key: "gameDashboard" } }
 );
-// --- Main Page Component ---
-export default function ArrayMethodsPage() {
-  const dashboardState = useCogsState("projectDashboard");
-  const selectedUser = dashboardState.users.getSelected();
-  const selectedTask = dashboardState.tasks.getSelected();
 
+// --- Main Page Component (Using the original structure) ---
+export default function ArrayMethodsPage() {
   return (
-    <div className="flex gap-6 text-green-400 p-6 font-mono">
+    <div className="flex gap-6 p-6 font-mono">
       {/* --- LEFT COLUMN (Master Lists & Controls) --- */}
       <div className="w-3/5 flex flex-col gap-4">
         <DotPattern>
           <div className="px-8 py-4">
             <h1 className="text-2xl font-bold text-gray-200">
-              Advanced Array Methods
+              Team Roster Management
             </h1>
             <p className="text-sm text-gray-400 max-w-2xl">
-              Select items from the lists to edit them. Notice how updates are
-              granular, only re-rendering the necessary parts of the UI.
+              Select a player from either team to edit their stats. All updates
+              are granular.
             </p>
           </div>
         </DotPattern>
 
-        <ProjectDetails rootState={dashboardState} />
+        <GameDetails />
 
         <div className="grid grid-cols-2 gap-4">
-          <ItemList
-            title="Users"
-            arrayState={dashboardState.users}
-            onAddItem={() => {
-              const newId =
-                Math.max(0, ...dashboardState.users.get().map((u) => u.id)) + 1;
-              dashboardState.users.insert({
-                id: newId,
-                name: `New User ${newId}`,
-                email: `user${newId}@example.com`,
-                role: "Guest",
-              });
-            }}
-          />
-          <ItemList
-            title="Tasks"
-            arrayState={dashboardState.tasks}
-            onAddItem={() => {
-              const newId = `t-${Date.now()}`;
-              dashboardState.tasks.insert({
-                id: newId,
-                description: "A new unassigned task",
-                status: "pending",
-                assigneeId: null,
-              });
-            }}
-          />
+          {/* We're back to the original, lean component structure */}
+          <ItemList title="Red Team" arrayKey="redTeam" color="red" />
+          <ItemList title="Blue Team" arrayKey="blueTeam" color="blue" />
         </div>
       </div>
 
       {/* --- RIGHT COLUMN (Detail Editor) --- */}
       <div className="w-2/5 sticky top-6">
-        <ItemDetailForm
-          selectedUser={selectedUser}
-          selectedTask={selectedTask}
-        />
+        <ItemDetailForm />
       </div>
     </div>
   );
@@ -135,27 +79,22 @@ export default function ArrayMethodsPage() {
 
 // --- Left Column Components ---
 
-function ProjectDetails({
-  rootState,
-}: {
-  rootState: StateObject<ProjectDashboardState>;
-}) {
+function GameDetails() {
+  const rootState = useCogsState("gameDashboard");
+
   return (
     <FlashWrapper>
-      <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4">
-        <h3 className="font-bold text-gray-200 text-lg">Project Settings</h3>
+      <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 text-gray-200">
+        <h3 className="font-bold text-lg">Game Settings</h3>
         <div className="flex items-center gap-4">
-          <label className="text-gray-400 w-28">Project Name:</label>
-          {rootState.projectName.formElement((obj) => (
-            <input
-              {...obj.inputProps}
-              className="px-2 py-1 bg-gray-800 border border-gray-600 rounded text-sm w-full focus:outline-none focus:ring-1 focus:ring-green-500"
-            />
+          <label className="form-label w-28">Game Name:</label>
+          {rootState.gameName.formElement((obj) => (
+            <input {...obj.inputProps} className="form-input" />
           ))}
         </div>
         <div className="flex items-center gap-4">
-          <label className="text-gray-400 w-28">Is Active:</label>
-          {rootState.isActive.formElement((obj) => (
+          <label className="form-label w-28">Is Live:</label>
+          {rootState.isLive.formElement((obj) => (
             <input
               type="checkbox"
               className="w-5 h-5 bg-gray-800 border-gray-600 accent-green-500"
@@ -171,43 +110,76 @@ function ProjectDetails({
 
 function ItemList({
   title,
-  arrayState,
-  onAddItem,
+  arrayKey,
+  color,
 }: {
   title: string;
-  arrayState: StateObject<User[]> | StateObject<Task[]>;
-  onAddItem: () => void;
+  arrayKey: "redTeam" | "blueTeam";
+  color: "red" | "blue";
 }) {
+  const dashboardState = useCogsState("gameDashboard", {
+    reactiveType: "deps",
+    reactiveDeps: (state) => [state[arrayKey]],
+  });
+  const teamState = dashboardState[arrayKey];
+
+  const handleAddItem = () => {
+    teamState.insert(({ uuid }) => ({
+      id: uuid,
+      name: `New Recruit ${uuid.substring(0, 4)}`,
+      score: 0,
+      specialty: "Support",
+    }));
+  };
+
+  // Dynamic classes for team colors
+  const teamColors = {
+    red: {
+      selected: "bg-red-800/80 text-white font-semibold ring-2 ring-red-500",
+      button: "bg-red-900/80 text-red-200 hover:bg-red-800",
+      text: "text-red-400",
+    },
+    blue: {
+      selected: "bg-blue-800/80 text-white font-semibold ring-2 ring-blue-500",
+      button: "bg-blue-900/80 text-blue-200 hover:bg-blue-800",
+      text: "text-blue-400",
+    },
+  };
+
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
-        <h3 className="font-bold text-gray-300 text-base">{title}</h3>
+        <h3 className={`font-bold text-base ${teamColors[color].text}`}>
+          {title}
+        </h3>
         <div className="flex-grow space-y-1 overflow-y-auto pr-1">
-          {arrayState.stateList((item: any, itemSetter) => (
-            <FlashWrapper key={item.id}>
+          {teamState.stateList((_item, itemSetter) => (
+            <FlashWrapper key={itemSetter.id.get()}>
+              1 {itemSetter._componentId}2
               <button
                 onClick={() => itemSetter.setSelected(true)}
-                className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 ${
+                className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
                   itemSetter._selected
-                    ? "bg-green-800/80 text-white font-semibold ring-2 ring-green-500"
+                    ? teamColors[color].selected
                     : "bg-gray-800 hover:bg-gray-700/70"
                 }`}
               >
-                {item.name || item.description}
+                {/* Simplified: No conditional logic needed, all items are Players */}
+                {itemSetter.name.get()}
               </button>
             </FlashWrapper>
           ))}
         </div>
         <div className="pt-2 border-t border-gray-700 flex gap-2">
           <button
-            onClick={onAddItem}
-            className="px-2 py-1 text-xs bg-green-900/80 text-green-200 rounded hover:bg-green-800"
+            onClick={handleAddItem}
+            className={`px-2 py-1 text-xs rounded ${teamColors[color].button}`}
           >
-            Insert New
+            Add Player
           </button>
           <button
-            onClick={() => arrayState.cut()}
-            className="px-2 py-1 text-xs bg-red-900/80 text-red-200 rounded hover:bg-red-800"
+            onClick={() => teamState.cut()}
+            className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
           >
             Cut Last
           </button>
@@ -217,135 +189,87 @@ function ItemList({
   );
 }
 
-// --- Right Column Component ---
+// --- Right Column Component (Simplified) ---
 
-function ItemDetailForm({
-  selectedUser,
-  selectedTask,
-}: {
-  selectedUser?: StateObject<User>;
-  selectedTask?: StateObject<Task>;
-}) {
-  const itemState = selectedUser || selectedTask;
-  console.log("itemState", itemState);
+function ItemDetailForm() {
+  const dashboardState = useCogsState("gameDashboard");
+  // Check both teams for a selected player
+  const selectedPlayer =
+    dashboardState.redTeam.getSelected() ||
+    dashboardState.blueTeam.getSelected();
+
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 min-h-[300px]">
-        <h3 className="font-bold text-gray-200 text-lg mb-4">
-          Selected Item Editor
-        </h3>
-        {!itemState && (
+        <h3 className="font-bold text-gray-200 text-lg mb-4">Player Editor</h3>
+        {!selectedPlayer && (
           <div className="text-gray-500 text-center pt-10">
-            Select an item from the left to edit its details.
+            Select a player to edit.
           </div>
         )}
-
-        {selectedUser && <UserForm userState={selectedUser} />}
-        {selectedTask && <TaskForm taskState={selectedTask} />}
+        {/* Simplified: One form for any player */}
+        {selectedPlayer && <PlayerForm playerState={selectedPlayer} />}
       </div>
     </FlashWrapper>
   );
 }
 
-// --- Specific Forms for User and Task ---
+// --- Combined Player Form (With Improved Styling) ---
 
-function UserForm({ userState }: { userState: StateObject<User> }) {
+function PlayerForm({ playerState }: { playerState: StateObject<Player> }) {
+  const formInputClass =
+    "block w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-200 focus:ring-1 focus:ring-green-500 focus:outline-none";
+  const formLabelClass = "block text-sm font-medium text-gray-400 mb-1";
+
   return (
-    <div className="space-y-3 text-sm">
+    <div className="space-y-4 text-sm">
       <div className="font-semibold text-gray-500">
-        Editing User:{" "}
-        <span className="text-green-300">{userState.id.get()}</span>
+        Editing Player ID:{" "}
+        <span className="text-green-300">{playerState.id.get()}</span>
       </div>
-      {userState.name.formElement((obj) => (
-        <div className="flex flex-col gap-1">
-          <label>Name</label>
-          <input {...obj.inputProps} className="form-input" />
+
+      {playerState.name.formElement((obj) => (
+        <div>
+          <label className={formLabelClass}>Name</label>
+          <input {...obj.inputProps} className={formInputClass} />
         </div>
       ))}
-      {userState.email.formElement((obj) => (
-        <div className="flex flex-col gap-1">
-          <label>Email</label>
-          <input {...obj.inputProps} className="form-input" />
+
+      {playerState.score.formElement((obj) => (
+        <div>
+          <label className={formLabelClass}>Score</label>
+          <input type="number" {...obj.inputProps} className={formInputClass} />
         </div>
       ))}
-      {userState.role.formElement((obj) => (
-        <div className="flex flex-col gap-1">
-          <label>Role</label>
+
+      {playerState.specialty.formElement((obj) => (
+        <div>
+          <label className={formLabelClass}>Specialty</label>
           <select
             value={obj.get()}
-            onChange={(e) => obj.set(e.target.value as User["role"])}
-            className="form-input"
+            onChange={(e) => obj.set(e.target.value as Player["specialty"])}
+            className={formInputClass}
           >
-            <option>Admin</option>
-            <option>Member</option>
-            <option>Guest</option>
+            <option>Offense</option>
+            <option>Defense</option>
+            <option>Support</option>
           </select>
         </div>
       ))}
-      <FormActions
-        itemState={userState}
-        onClear={() => userState.setSelected(false)}
-      />
-    </div>
-  );
-}
-
-function TaskForm({ taskState }: { taskState: StateObject<Task> }) {
-  return (
-    <div className="space-y-3 text-sm">
-      <div className="font-semibold text-gray-500">
-        Editing Task:{" "}
-        <span className="text-green-300">{taskState.id.get()}</span>
+      <div className="pt-4 mt-4 border-t border-gray-700 flex justify-between items-center">
+        <button
+          onClick={() => playerState.cut()}
+          className="px-3 py-1 bg-red-900/80 text-red-200 rounded hover:bg-red-800 text-sm"
+        >
+          Cut This Player
+        </button>
+        <button
+          onClick={() => playerState.setSelected(false)}
+          className="px-3 py-1 bg-gray-600/80 text-gray-200 rounded hover:bg-gray-500 text-sm"
+        >
+          Deselect
+        </button>
       </div>
-      {taskState.description.formElement((obj) => (
-        <div className="flex flex-col gap-1">
-          <label>Description</label>
-          <input {...obj.inputProps} className="form-input" />
-        </div>
-      ))}
-      {taskState.status.formElement((obj) => (
-        <div className="flex flex-col gap-1">
-          <label>Status</label>
-          <select
-            value={obj.get()}
-            onChange={(e) => obj.set(e.target.value as Task["status"])}
-            className="form-input"
-          >
-            <option>pending</option>
-            <option>in-progress</option>
-            <option>completed</option>
-          </select>
-        </div>
-      ))}
-      <FormActions
-        itemState={taskState}
-        onClear={() => taskState.setSelected(false)}
-      />
-    </div>
-  );
-}
-
-function FormActions({
-  itemState,
-  onClear,
-}: {
-  itemState: StateObject<any>;
-  onClear: () => void;
-}) {
-  return (
-    <div className="pt-4 mt-4 border-t border-gray-700 flex justify-between items-center">
-      <button
-        onClick={() => itemState.cut()}
-        className="px-3 py-1 bg-red-900/80 text-red-200 rounded hover:bg-red-800 text-sm"
-      >
-        Cut This Item
-      </button>
-      <button
-        onClick={onClear}
-        className="px-3 py-1 bg-gray-600/80 text-gray-200 rounded hover:bg-gray-500 text-sm"
-      >
-        Deselect
-      </button>
     </div>
   );
 }
