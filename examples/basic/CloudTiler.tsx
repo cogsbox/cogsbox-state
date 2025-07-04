@@ -6,6 +6,7 @@ const STORM_RECHARGE_TIME = 3000;
 const ENERGY_DECAY_FACTOR = 0.75;
 
 interface CloudLayersProps {
+  style: React.CSSProperties;
   layers?: number;
   startOffset?: number;
   layerSpacing?: number;
@@ -14,6 +15,7 @@ interface CloudLayersProps {
 }
 
 export function CloudLayers({
+  style,
   layers = 8,
   startOffset = 0,
   layerSpacing = 2,
@@ -72,7 +74,7 @@ export function CloudLayers({
 
         const x = 66 + Math.random() * 34;
         const y = 50 + (Math.random() - 0.5) * 40;
-        const size = 40 + Math.random() * 40;
+        const size = 20 + Math.random() * 40;
 
         // Use the new `finalIntensity` which decays over time
         layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${finalIntensity}) 0%, transparent 50%)`;
@@ -102,6 +104,7 @@ export function CloudLayers({
   return (
     <div
       className={`fixed inset-0 z-[-6] h-full w-[140vw] left-[-20vh] top-0 ${className}`}
+      style={style}
     >
       <div className="relative w-full h-full overflow-hidden">
         {layerData.map((layer, index) => {

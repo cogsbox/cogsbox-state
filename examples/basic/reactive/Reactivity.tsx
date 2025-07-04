@@ -74,7 +74,7 @@ export default function ReactivityPage() {
         </div>
         {/* --- RIGHT COLUMN (Controls & Global State) --- */}
         <div className="w-2/5 flex flex-col gap-4 sticky top-6 ">
-          <div className="h-36" />{" "}
+          <div className="h-40" />{" "}
           <h2 className="text-lg font-bold text-gray-300">Controls</h2>
           <div className="flex flex-wrap gap-2">
             <button
@@ -204,7 +204,7 @@ function ExampleDisplay({
 
   return (
     <FlashWrapper>
-      <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 h-full">
+      <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 h-full min-h-[600px]">
         <div>
           <h3 className="font-bold text-gray-200 text-lg">{title}</h3>
           <p className="text-sm text-gray-400 mt-1">{description}</p>

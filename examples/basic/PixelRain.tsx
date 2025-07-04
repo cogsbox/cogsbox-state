@@ -6,6 +6,40 @@ import FlyingCars from "./FlyingCars";
 import BlimpWithSpotlights from "./Blimp";
 
 import { CloudTiles, CloudLayers } from "./CloudTiler";
+import { ShadowSilhouette } from "./ShadowSilhouette";
+import { PerspectiveGround } from "./perspectiveGround";
+
+// Centralized Z-Index Management System
+const Z_INDICES = {
+  // Background layers (furthest back)
+  BASE_BACKGROUND: -1000,
+  GRADIENT_BACKGROUND: -900,
+
+  // Atmospheric effects
+
+  LIGHTNING: -700,
+
+  // Cloud layers
+  CLOUDS: -650,
+  MOON_GLOW: -600,
+  ATMOSPHERIC_OVERLAY_1: -550,
+  // Sky elements
+  SKYLINE_BACKGROUND: -500,
+  FLYING_CARS: -400,
+  BLIMP: -350,
+  ATMOSPHERIC_OVERLAY_2: -330,
+  SKYLINE_SILHOUETTE: -250,
+  ATMOSPHERIC_OVERLAY_3: -200,
+
+  // Foreground elements
+  RAIN_CONTAINER: -100,
+  SPLAT_CONTAINER: -50,
+  CYBERMAN: -30,
+  CAT: -20,
+
+  // Main content (positive values)
+  SIDE_GRADIENTS: 10,
+};
 
 interface PixelRainProps {
   numberOfDrops?: number;
@@ -14,6 +48,7 @@ interface PixelRainProps {
 interface LightningProps {
   onBrightnessChange: (brightness: number) => void;
 }
+
 function MoonGlow({
   onMoonIntensityChange,
 }: {
@@ -30,8 +65,8 @@ function MoonGlow({
 
       const subtleX = 16;
       const subtleY = 8;
-      const baseIntensity = 0.5 + Math.random() * 0.02;
-      const steps = 16; // Clear distinct bands
+      const baseIntensity = 0.7 + Math.random() * 0.02;
+      const steps = 16;
       let gradientSteps = [];
 
       const glowStartRadius = 4.3;
@@ -52,7 +87,6 @@ function MoonGlow({
         const g = 210;
         const b = 220;
 
-        // Hard band: same color from start to end of this band
         gradientSteps.push(
           `rgba(${r}, ${g}, ${b}, ${opacity}) ${radiusStart}vh`
         );
@@ -71,7 +105,7 @@ function MoonGlow({
     return () => {
       clearInterval(glowInterval);
     };
-  }, []);
+  }, [onMoonIntensityChange]);
 
   return (
     <>
@@ -83,7 +117,7 @@ function MoonGlow({
           left: 0,
           right: 0,
           bottom: 0,
-          zIndex: -5,
+          zIndex: Z_INDICES.MOON_GLOW,
           pointerEvents: "none",
           background: "transparent",
           mixBlendMode: "screen",
@@ -98,8 +132,8 @@ function MoonGlow({
           width: "120px",
           height: "120px",
           borderRadius: "50%",
-          backgroundColor: "rgba(195, 195, 195, 0.9)",
-          zIndex: -5,
+          backgroundColor: "rgba(215, 215, 215, 0.9)",
+          zIndex: Z_INDICES.MOON_GLOW,
           pointerEvents: "none",
           filter: "blur(1px)",
           transform: "translate(-50%, -50%)",
@@ -109,13 +143,14 @@ function MoonGlow({
     </>
   );
 }
+
 function Lightning({ onBrightnessChange }: LightningProps) {
   const lightningRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let fadeInterval: NodeJS.Timeout | undefined;
     let schedulerTimeout: NodeJS.Timeout;
-    const BASE_SKYLINE_BRIGHTNESS = 1.0; // Normal brightness
+    const BASE_SKYLINE_BRIGHTNESS = 2.0;
 
     const triggerLightning = () => {
       if (fadeInterval) return;
@@ -124,19 +159,16 @@ function Lightning({ onBrightnessChange }: LightningProps) {
       let isLit = true;
 
       fadeInterval = setInterval(() => {
-        // Decay the overall intensity of the flash over time
         currentIntensity *= 0.96;
 
         if (currentIntensity < 0.01) {
-          // --- Reset after the lightning has faded ---
           if (lightningRef.current) {
             lightningRef.current.style.background = "transparent";
           }
-          onBrightnessChange(BASE_SKYLINE_BRIGHTNESS); // Reset to normal brightness
+          onBrightnessChange(BASE_SKYLINE_BRIGHTNESS);
           clearInterval(fadeInterval as NodeJS.Timeout);
           fadeInterval = undefined;
         } else {
-          // --- Render the current frame of the lightning ---
           const intensity = isLit ? currentIntensity : currentIntensity * 0.3;
 
           if (lightningRef.current) {
@@ -145,21 +177,14 @@ function Lightning({ onBrightnessChange }: LightningProps) {
             const randomWidth = 120 + Math.random() * 60;
             const randomHeight = 120 + Math.random() * 60;
 
-            // --- THIS IS THE EFFICIENT & SMOOTH GRADIENT ---
-            // We define only two points: the bright center and the transparent edge.
-            // The browser creates a perfectly smooth gradient between them.
-            const centerColor = `rgba(255, 255, 255, ${intensity})`; // Bright, slightly blue-white at the core
-            const edgeColor = `rgba(200, 220, 255, 0)`; // Fades to a transparent atmospheric blue
+            const centerColor = `rgba(255, 255, 255, ${intensity})`;
+            const edgeColor = `rgba(200, 220, 255, 0)`;
 
-            // The gradient stops at 70% to create a softer, more natural falloff
-            // instead of a hard edge at 100%.
             const gradient = `radial-gradient(ellipse ${randomWidth}vh ${randomHeight}vh at ${randomX}% ${randomY}vh, ${centerColor} 0%, ${edgeColor} 70%)`;
 
             lightningRef.current.style.background = gradient;
-            // --- END OF THE CHANGE ---
           }
 
-          // During lightning, adjust the main scene brightness based on intensity
           const brightness = isLit
             ? Math.max(0.3, BASE_SKYLINE_BRIGHTNESS - currentIntensity * 0.7)
             : BASE_SKYLINE_BRIGHTNESS - currentIntensity * 0.3;
@@ -167,7 +192,6 @@ function Lightning({ onBrightnessChange }: LightningProps) {
           onBrightnessChange(brightness);
         }
 
-        // Flicker between bright and dim states
         isLit = !isLit;
       }, 60);
     };
@@ -199,7 +223,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
         left: 0,
         right: 0,
         bottom: 0,
-        zIndex: -5, // Changed from -3 to -5 to be behind skylines
+        zIndex: Z_INDICES.LIGHTNING,
         pointerEvents: "none",
         background: "transparent",
         mixBlendMode: "screen",
@@ -210,53 +234,18 @@ function Lightning({ onBrightnessChange }: LightningProps) {
 }
 
 export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
-  const [skylineBrightness, setSkylineBrightness] = useState(1.0); // Start at normal brightness
+  const [skylineBrightness, setSkylineBrightness] = useState(1.0);
   const [moonIntensity, setMoonIntensity] = useState(0);
   const handleBrightnessChange = useCallback((brightness: number) => {
     setSkylineBrightness(brightness);
   }, []);
 
-  // --- START: Parallax Logic ---
   const carsRef = useRef<HTMLDivElement>(null);
   const cybermanRef = useRef<HTMLDivElement>(null);
   const blimpRef = useRef<HTMLDivElement>(null);
   const skylineRef = useRef<HTMLDivElement>(null);
   const rainContainerRef = useRef<HTMLDivElement>(null);
   const splatContainerRef = useRef<HTMLDivElement>(null);
-
-  // useEffect(() => {
-  //   const handleMouseMove = (event: MouseEvent) => {
-  //     if (!window) return;
-  //     const { clientX, clientY } = event;
-  //     const { innerWidth, innerHeight } = window;
-  //     const xOffset = (clientX - innerWidth / 2) / innerWidth;
-  //     const yOffset = (clientY - innerHeight / 2) / innerHeight;
-
-  //     const applyTransform = (
-  //       ref: React.RefObject<HTMLElement>,
-  //       strength: number,
-  //       preserveExistingTransform: string = ""
-  //     ) => {
-  //       if (ref.current) {
-  //         const x = xOffset * strength;
-  //         const y = yOffset * strength;
-  //         ref.current.style.transform = `${preserveExistingTransform} translate(${x}px, ${y}px) scale(1)`;
-  //       }
-  //     };
-
-  //     applyTransform(skylineRef, 0);
-  //     // The blimp needs to preserve its translateX animation
-  //     applyTransform(blimpRef, 15, "translateX(-100%)");
-
-  //     applyTransform(cybermanRef, 30);
-  //     applyTransform(rainContainerRef, 3);
-  //     applyTransform(splatContainerRef, 45);
-  //   };
-
-  //   window.addEventListener("mousemove", handleMouseMove);
-  //   return () => window.removeEventListener("mousemove", handleMouseMove);
-  // }, []);
-  // --- END: Parallax Logic ---
 
   const steppedGradient = useMemo(() => {
     const steps = 40;
@@ -287,9 +276,8 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       const rH = Math.floor(Math.random() * 98) + 1;
       const aD = 0.5 + rH / 100;
 
-      // Use weighted random for 3D effect - bias toward shorter falls (higher density up top)
-      const densityWeight = Math.pow(Math.random(), 4); // Squares the random value, biasing toward 0
-      const eH = 60 + densityWeight * 100; // 40-140vh, but more clustered near 40
+      const densityWeight = Math.pow(Math.random(), 4);
+      const eH = 60 + densityWeight * 100;
 
       const sizeModifier = ((eH - 40) / 90) * 2;
       drops.push({
@@ -305,14 +293,16 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
     }
     return drops;
   }, [numberOfDrops]);
+
   return (
     <>
-      {/* Background elements - UNCHANGED */}
-      <div className="fixed inset-0 z-[-5] background-gradient-masked">
-        {" "}
-        {/* <-- Class is moved here */}
+      {/* Background gradient */}
+      <div
+        className="fixed inset-0 background-gradient-masked"
+        style={{ zIndex: Z_INDICES.GRADIENT_BACKGROUND }}
+      >
         <div
-          className="pixel-gradient" // <-- Class is removed from here
+          className="pixel-gradient"
           style={{
             background: steppedGradient,
             imageRendering: "pixelated",
@@ -322,40 +312,63 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           }}
         />
       </div>
+
       <MoonGlow onMoonIntensityChange={setMoonIntensity} />
       <Lightning onBrightnessChange={handleBrightnessChange} />
-      {/* --- Parallax Layers (Just adding a ref to your existing elements) --- */}
+
       {/* Cars Layer */}
-      <div ref={carsRef} className="fixed inset-0 z-[-4]">
+      <div
+        ref={carsRef}
+        className="fixed inset-0"
+        style={{ zIndex: Z_INDICES.FLYING_CARS }}
+      >
         <FlyingCars numberOfCars={50} />
-      </div>{" "}
+      </div>
+
+      {/* Cyberman */}
       <div
         ref={cybermanRef}
-        className="fixed bottom-[20vh] left-[20vh] z-[-1]  h-[500px]"
+        className="fixed bottom-[20vh] left-[20vh] h-[500px]"
+        style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
         <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />
-      </div>{" "}
-      <div className="fixed bottom-[2vh] left-[50vw] z-[-1]  h-[25vh]">
-        {" "}
+        <div className="mt-[-50px]">
+          <ShadowSilhouette
+            src="./cybermanSilh.svg"
+            skewX={0}
+            skewY={0}
+            intensity={0}
+          />
+        </div>
+      </div>
+
+      {/* Cat */}
+      <div
+        className="fixed bottom-[2vh] left-[50vw] h-[25vh]"
+        style={{ zIndex: Z_INDICES.CAT }}
+      >
         <div
-          className="absolute bottom-[-100px] left-[-50px] w-[200px] h-[200px] "
+          className="absolute bottom-[-100px] left-[-50px] w-[200px] h-[200px]"
           style={{
             background:
               "radial-gradient(circle at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.01) 80%,  rgba(0,0,0,0.0) 100%)",
           }}
-        ></div>
-        <img src="./cat.png" alt="Hero background" className="h-[400px]" />{" "}
+        />
+        <img src="./cat.png" alt="Hero background" className="h-[400px]" />
       </div>
-      {/* Static Overlays - UNCHANGED */}
+
+      <PerspectiveGround />
+
+      {/* Atmospheric Overlays */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          height: "39%",
-          zIndex: -5,
+          height: "42%",
+          zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_1,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.15) 25%, transparent 67%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.3) 25%, transparent 67%)",
         }}
       />
       <div
@@ -364,10 +377,10 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           inset: 0,
           top: "9vh",
           height: "32%",
-          zIndex: -3,
+          zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_2,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.2) 10%, transparent 67%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.3) 10%, transparent 67%)",
         }}
       />
       <div
@@ -377,27 +390,34 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           top: "22%",
           height: "60%",
           filter: "blur(20px)",
-          zIndex: -2,
+          zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_3,
           pointerEvents: "none",
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.08) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
+            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.2) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
         }}
       />
-      <CloudLayers lightningBrightness={skylineBrightness} />
+
+      <CloudLayers
+        lightningBrightness={skylineBrightness}
+        style={{ zIndex: Z_INDICES.CLOUDS }}
+      />
+
       {/* Blimp Layer */}
       <div
         ref={blimpRef}
-        className="fixed top-[23vh] z-[-4] "
+        className="fixed top-[23vh]"
         style={{
+          zIndex: Z_INDICES.BLIMP,
           animation: "moveAcross 240s linear infinite",
           transform: "translateX(-100%)",
-          filter: " contrast(1.1)",
+          filter: "contrast(1.1)",
         }}
       >
         <BlimpWithSpotlights />
       </div>
       <style>{`@keyframes moveAcross { from { transform: translateX(-100%); } to { transform: translateX(100vw); }}`}</style>
-      {/* Skyline Layer */}
+
+      {/* Skyline Layers */}
       <div
         ref={skylineRef}
         style={{
@@ -406,13 +426,11 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           left: 0,
           width: "100%",
           height: "100vh",
-          zIndex: -5,
+          zIndex: Z_INDICES.SKYLINE_BACKGROUND,
           pointerEvents: "none",
-
           imageRendering: "pixelated",
         }}
       >
-        {/* Solid background for the skyline shape */}
         <div
           style={{
             position: "absolute",
@@ -431,7 +449,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           }}
         />
 
-        {/* Additional opaque layer to block clouds */}
         <div
           style={{
             position: "absolute",
@@ -439,8 +456,8 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             left: 0,
             width: "100%",
             height: "100%",
-            zIndex: -5,
-            background: "rgba(0, 0, 0, 0.85)", // Semi-opaque black
+            zIndex: Z_INDICES.SKYLINE_BACKGROUND,
+            background: "rgba(0, 0, 0, 0.85)",
             maskImage: "url(/skyline.svg)",
             maskSize: "100% 100vh",
             maskPosition: "0 -2vh",
@@ -448,6 +465,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           }}
         />
       </div>
+
       <div
         style={{
           position: "fixed",
@@ -455,27 +473,33 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           left: 0,
           width: "100%",
           height: "100vh",
-          zIndex: -3,
+          zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
           pointerEvents: "none",
           filter: `brightness(${
             1 + (1 - skylineBrightness + moonIntensity * 0.02)
-          }) contrast(0.93) saturate(0.88)`, // Darker: 0.6 instead of 0.8
+          }) contrast(0.93) saturate(0.88)`,
           background: "black",
           backgroundAttachment: "fixed",
           imageRendering: "pixelated",
-          transform: "scaleX(-1)", // Flips horizontally
+          transform: "scaleX(-1)",
           maskImage: "url(/skyline.svg)",
-          maskSize: "100% 60vh", // Less tall: 80vh instead of 100vh
-          maskPosition: "0 20vh", // Lower: 25vh instead of 5vh
+          maskSize: "100% 60vh",
+          maskPosition: "0 20vh",
           maskRepeat: "no-repeat",
         }}
-      />{" "}
-      <div className="fixed top-[26vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[50vh] z-[-3]" />
+      />
+
+      <div
+        className="fixed top-[26vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[50vh]"
+        style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}
+      />
+
       {/* Rain Layers */}
       <div
         ref={rainContainerRef}
         aria-hidden="true"
         className="pixel-rain-container"
+        style={{ zIndex: Z_INDICES.RAIN_CONTAINER }}
       >
         {drops.map((drop) => (
           <div
@@ -493,10 +517,12 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           />
         ))}
       </div>
+
       <div
         ref={splatContainerRef}
         aria-hidden="true"
         className="pixel-splat-container"
+        style={{ zIndex: Z_INDICES.SPLAT_CONTAINER }}
       >
         {drops.map((drop) => (
           <div
@@ -512,7 +538,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
                 "--splat-duration": `${
                   parseFloat(drop.animationDuration) * 2
                 }s`,
-                "--size-modifier": drop.sizeModifier, // ADD THIS LINE
+                "--size-modifier": drop.sizeModifier,
               } as any
             }
           />
