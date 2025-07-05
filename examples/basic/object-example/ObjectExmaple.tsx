@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import type { StateObject } from "../../../src/CogsState";
 import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
@@ -140,7 +141,6 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
     },
   };
 
-  // --- UPDATED: More concise insert example ---
   const addCode = `dashboardState.players.insert(({ uuid }) => ({
   ...newPlayer, id: uuid, team: "${color}",
 }));
@@ -148,10 +148,10 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
 
   const cutCode = `dashboardState.players
   .stateFilter((p) => p.team === "${color}")
-  .cut();
+  .cutSelected();
   `;
   const filterAndRenderCode = `dashboardState.players
-  .stateFilter(player => player.team === ${color})`;
+  .stateFilter(player => player.team === ${color}).stateList(player => player.name)`;
 
   return (
     <FlashWrapper>
@@ -339,14 +339,24 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
 
 function ShowFullState() {
   const dashboardState = useCogsState("gameDashboard", { reactiveType: "all" });
+  const preRef = useRef<HTMLPreElement>(null);
+
+  useEffect(() => {
+    if (preRef.current) {
+      preRef.current.scrollTop = preRef.current.scrollHeight;
+    }
+  }, [dashboardState.players.get()]);
 
   return (
     <FlashWrapper>
-      <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 overflow-hidden">
+      <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 overflow-y-auto max-h-[500px]">
         <h3 className="text-gray-300 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
           Live Player Array State
         </h3>
-        <pre className="text-xs overflow-auto flex-grow text-gray-300">
+        <pre
+          ref={preRef}
+          className="text-xs overflow-auto flex-grow text-gray-300"
+        >
           {JSON.stringify(dashboardState.players.get(), null, 2)}
         </pre>
       </div>

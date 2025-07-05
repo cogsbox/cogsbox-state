@@ -167,15 +167,6 @@ export type ArrayEndType<TShape extends unknown> = {
     options: VirtualViewOptions
   ) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
 
-  stateMapNoRender: (
-    callbackfn: (
-      value: InferArrayElement<TShape>,
-      setter: StateObject<InferArrayElement<TShape>>,
-      index: number,
-      array: TShape,
-      arraySetter: StateObject<TShape>
-    ) => void
-  ) => any;
   stateList: (
     callbackfn: (
       value: InferArrayElement<TShape>,
@@ -2183,45 +2174,7 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === "stateMapNoRender") {
-            return (
-              callbackfn: (
-                value: any,
-                setter: any,
-                index: number,
-                array: any,
-                arraySetter: any
-              ) => void
-            ) => {
-              const arrayToMap = currentState as any[];
-              const itemIdsForCurrentArray = meta?.validIds || [];
-              const arraySetter = rebuildStateShape({
-                currentState: currentState,
-                path,
-                componentId: componentId!,
-                meta,
-              });
 
-              return arrayToMap.map((item, index) => {
-                const itemId = itemIdsForCurrentArray[index] || `id:${item.id}`;
-                const finalPath = [...path, itemId];
-                const setter = rebuildStateShape({
-                  currentState: item,
-                  path: finalPath,
-                  componentId: componentId!,
-                  meta,
-                });
-
-                return callbackfn(
-                  item,
-                  setter,
-                  index,
-                  currentState,
-                  arraySetter
-                );
-              });
-            };
-          }
           if (prop === "$stateMap") {
             return (callbackfn: any) =>
               createElement(SignalMapRenderer, {
