@@ -112,9 +112,10 @@ function GameDetails() {
     </FlashWrapper>
   );
 }
+
 function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   const dashboardState = useCogsState("gameDashboard", {
-    reactiveType: "component", // Changed from "none" to make it reactive
+    reactiveType: "none",
   });
 
   const [sortBy, setSortBy] = useState<"score" | "name">("score");
@@ -124,13 +125,16 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   // --- THIS IS THE KEY SIMPLIFICATION ---
   const filteredAndSorted = dashboardState.players
     .stateFilter((player) => player.team === color)
-    .stateSort((a, b) => {
-      const direction = sortDirection === "asc" ? 1 : -1;
-      // Use a simple ternary to pick the comparison logic
-      return sortBy === "score"
-        ? (a.score - b.score) * direction
-        : a.name.localeCompare(b.name) * direction;
-    });
+    .stateSort(
+      (a, b) => {
+        const direction = sortDirection === "asc" ? 1 : -1;
+        // Use a simple ternary to pick the comparison logic
+        return sortBy === "score"
+          ? (a.score - b.score) * direction
+          : a.name.localeCompare(b.name) * direction;
+      },
+      [sortBy, sortDirection]
+    );
 
   const teamColors = {
     red: {
@@ -166,6 +170,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
         <div className="flex items-center justify-between">
+          <span className="text-white"> {dashboardState._componentId}</span>
           <h3 className={`font-bold text-base ${teamColors[color].text}`}>
             {title}
           </h3>
@@ -202,7 +207,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
         </div>
         <CodeSnippetDisplay title="" code={filterAndRenderCode} />
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {filteredAndSorted.$stateMap((itemSetter) => (
+          {filteredAndSorted.stateList((itemSetter) => (
             <FlashWrapper key={itemSetter.id.get()}>
               <button
                 onClick={() => itemSetter.setSelected(true)}
@@ -222,8 +227,8 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
           <div className="flex gap-2">
             <button
               onClick={() =>
-                dashboardState.players.insert(({ uuid }) => ({
-                  name: faker.person.firstName(),
+                filteredAndSorted.insert(({ uuid }) => ({
+                  name: faker.name.firstName(),
                   score: 0,
                   specialty: "Support" as const,
                   id: uuid,

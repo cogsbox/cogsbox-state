@@ -113,7 +113,7 @@ function ChatWindow() {
           style={virtualizerProps.list.style}
           className="px-4  space-y-4 pb-8"
         >
-          {virtualState?.stateList((setter, index, array) => {
+          {virtualState?.virtualList((setter, index, array) => {
             return (
               <MessageItem
                 key={setter._path.join(".")}

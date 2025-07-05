@@ -161,12 +161,20 @@ export type ArrayEndType<TShape extends unknown> = {
     compareFn: (
       a: InferArrayElement<TShape>,
       b: InferArrayElement<TShape>
-    ) => number
+    ) => number,
+    deps?: any[]
   ) => ArrayEndType<TShape>;
   useVirtualView: (
     options: VirtualViewOptions
   ) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
+  virtualList: (
+    callbackfn: (
+      setter: StateObject<InferArrayElement<TShape>>,
+      index: number,
 
+      arraySetter: StateObject<TShape>
+    ) => void
+  ) => any;
   stateList: (
     callbackfn: (
       setter: StateObject<InferArrayElement<TShape>>,
@@ -203,7 +211,8 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (value: InferArrayElement<TShape>, index: number) => boolean
   ) => StateObject<InferArrayElement<TShape>> | undefined;
   stateFilter: (
-    callbackfn: (value: InferArrayElement<TShape>, index: number) => void
+    callbackfn: (value: InferArrayElement<TShape>, index: number) => void,
+    deps?: any[]
   ) => ArrayEndType<TShape>;
   getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
   clearSelected: () => void;
@@ -1189,36 +1198,78 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (!newItemKey || newItemValue === undefined) return;
 
           arrayMeta.mapWrappers.forEach((wrapper) => {
-            let shouldRender = false;
-            let localIndex = -1;
+            let shouldRender = true;
+            let insertPosition = -1;
 
-            // --- THE FIX IS HERE ---
-            // Check if the wrapper has an array of filter functions.
+            // Check if wrapper has transforms
             if (
               wrapper.meta?.transforms &&
               wrapper.meta.transforms.length > 0
             ) {
-              // Test if the new item passes EVERY filter in the chain.
-              if (
-                wrapper.meta.transforms.every((fn: any) => fn(newItemValue, -1))
-              ) {
-                shouldRender = true;
-                localIndex = (wrapper.meta.validIds || []).length;
+              // Check if new item passes all filters
+              for (const transform of wrapper.meta.transforms) {
+                if (transform.type === "filter") {
+                  if (!transform.fn(newItemValue, -1)) {
+                    shouldRender = false;
+                    break;
+                  }
+                }
+              }
+
+              if (shouldRender) {
+                // Get current valid keys by applying transforms
+                const currentValidKeys = applyTransforms(
+                  thisKey,
+                  path,
+                  wrapper.meta.transforms
+                );
+
+                // Find where to insert based on sort
+                const sortTransform = wrapper.meta.transforms.find(
+                  (t: any) => t.type === "sort"
+                );
+                if (sortTransform) {
+                  // Add new item to the list and sort to find position
+                  const allItems = currentValidKeys.map((key) => ({
+                    key,
+                    value: store.getShadowValue(key),
+                  }));
+
+                  allItems.push({ key: newItemKey, value: newItemValue });
+                  allItems.sort((a, b) => sortTransform.fn(a.value, b.value));
+
+                  insertPosition = allItems.findIndex(
+                    (item) => item.key === newItemKey
+                  );
+                } else {
+                  // No sort, insert at end
+                  insertPosition = currentValidKeys.length;
+                }
               }
             } else {
-              // It's an unfiltered map, so it should always render the new item.
+              // No transforms, always render at end
               shouldRender = true;
-              localIndex = sourceArrayKeys.length - 1;
+              insertPosition = sourceArrayKeys.length - 1;
             }
 
             if (!shouldRender) {
-              return; // Skip this wrapper, the item doesn't belong.
+              return; // Skip this wrapper, item doesn't pass filters
             }
 
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
               const itemElement = document.createElement("div");
               itemElement.setAttribute("data-item-path", newItemKey);
-              wrapper.containerRef.appendChild(itemElement);
+
+              // Insert at correct position
+              const children = Array.from(wrapper.containerRef.children);
+              if (insertPosition >= 0 && insertPosition < children.length) {
+                wrapper.containerRef.insertBefore(
+                  itemElement,
+                  children[insertPosition]!
+                );
+              } else {
+                wrapper.containerRef.appendChild(itemElement);
+              }
 
               const root = createRoot(itemElement);
               const componentId = uuidv4();
@@ -1236,7 +1287,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
                   stateKey: thisKey,
                   itemComponentId: componentId,
                   itemPath: itemPath,
-                  localIndex: localIndex,
+                  localIndex: insertPosition,
                   arraySetter: arraySetter,
                   rebuildStateShape: wrapper.rebuildStateShape,
                   renderFn: wrapper.mapFn,
@@ -1246,7 +1297,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
           });
         }
       }
-
       if (updateObj.updateType === "cut") {
         // For cut, path includes the item ID like ['todoArray', 'id:xxx']
         const arrayPath = path.slice(0, -1); // Remove the item ID
@@ -1315,45 +1365,80 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         });
       }
+      // Assumes `isDeepEqual` is available in this scope.
 
       const newState = store.getShadowValue(thisKey);
-
       const rootMeta = store.getShadowMetadata(thisKey, []);
       const notifiedComponents = new Set<string>();
 
-      // Handle "all" reactive components first
-      if (rootMeta?.components) {
-        rootMeta.components.forEach((component, componentId) => {
-          const reactiveTypes = Array.isArray(component.reactiveType)
-            ? component.reactiveType
-            : [component.reactiveType || "component"];
-
-          if (reactiveTypes.includes("all")) {
-            component.forceUpdate();
-            notifiedComponents.add(componentId);
-          }
-        });
+      if (!rootMeta?.components) {
+        return; // No components to notify, exit early.
       }
 
-      // Direct lookup for components at THIS path
+      // --- PASS 1: High-Performance Path-Specific Updates ---
+      // This is the fastest check and handles the most common case. We do it first.
       const pathMeta = store.getShadowMetadata(thisKey, path);
       if (pathMeta?.pathComponents) {
         pathMeta.pathComponents.forEach((componentId) => {
-          if (!notifiedComponents.has(componentId)) {
-            const component = rootMeta?.components?.get(componentId);
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || "component"];
+          const component = rootMeta.components?.get(componentId);
+          if (component) {
+            const reactiveTypes = Array.isArray(component.reactiveType)
+              ? component.reactiveType
+              : [component.reactiveType || "component"];
 
-              if (component && !reactiveTypes.includes("none")) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
-              }
+            if (!reactiveTypes.includes("none")) {
+              component.forceUpdate();
+              notifiedComponents.add(componentId);
             }
           }
         });
       }
+
+      // --- PASS 2: Single Global Loop for 'all' and 'deps' ---
+      // Now iterate just ONCE over all components to handle the global cases.
+      rootMeta.components.forEach((component, componentId) => {
+        // CRITICAL: Skip any component that was already updated by the fast path.
+        if (notifiedComponents.has(componentId)) {
+          return; // equivalent to 'continue'
+        }
+
+        const reactiveTypes = Array.isArray(component.reactiveType)
+          ? component.reactiveType
+          : [component.reactiveType || "component"];
+
+        // Check for 'all' first, as it's the strongest condition and needs no further work.
+        if (reactiveTypes.includes("all")) {
+          component.forceUpdate();
+          notifiedComponents.add(componentId);
+          return; // We're done with this component, no need to check 'deps'.
+        }
+
+        // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
+        if (reactiveTypes.includes("deps")) {
+          if (component.depsFunction) {
+            const newDeps = component.depsFunction(newState);
+            let shouldUpdate = false;
+
+            // Case 1: The function returned `true` explicitly.
+            if (newDeps === true) {
+              shouldUpdate = true;
+            }
+            // Case 2: The function returned a dependency array.
+            else if (Array.isArray(newDeps)) {
+              if (!isDeepEqual(component.deps, newDeps)) {
+                // The dependencies have changed, update the stored value for the next check.
+                component.deps = newDeps;
+                shouldUpdate = true;
+              }
+            }
+
+            if (shouldUpdate) {
+              component.forceUpdate();
+              notifiedComponents.add(componentId);
+            }
+          }
+        }
+      });
       setStateLog(thisKey, (prevLogs) => {
         const logs = [...(prevLogs ?? []), newUpdate];
         const aggregatedLogs = new Map<string, typeof newUpdate>();
@@ -1459,7 +1544,56 @@ type MetaData = {
    * `$stateMap` renderer on a filtered view can use these functions to test if the
    * newly inserted item should be dynamically rendered in its view.
    */
-  transforms?: Array<Function>;
+  transforms?: Array<{
+    type: "filter" | "sort";
+    fn: Function;
+    dependencies?: any[];
+  }>;
+};
+
+function hashTransforms(transforms: any[]) {
+  if (!transforms || transforms.length === 0) {
+    return "";
+  }
+  // This creates a string representation of the transforms AND their dependencies.
+  // Example: "filter['red']sort['score','asc']"
+  return transforms
+    .map(
+      (transform) =>
+        // Safely stringify dependencies. An empty array becomes '[]'.
+        `${transform.type}${JSON.stringify(transform.dependencies || [])}`
+    )
+    .join("");
+}
+const applyTransforms = (
+  stateKey: string,
+  path: string[],
+  transforms?: Array<{ type: "filter" | "sort"; fn: Function }>
+): string[] => {
+  let arrayKeys =
+    getGlobalStore.getState().getShadowMetadata(stateKey, path)?.arrayKeys ||
+    [];
+
+  if (!transforms || transforms.length === 0) {
+    return arrayKeys;
+  }
+
+  let itemsWithKeys = arrayKeys.map((key) => ({
+    key,
+    value: getGlobalStore.getState().getShadowValue(key),
+  }));
+
+  for (const transform of transforms) {
+    if (transform.type === "filter") {
+      itemsWithKeys = itemsWithKeys.filter(({ value }, index) =>
+        transform.fn(value, index)
+      );
+    } else if (transform.type === "sort") {
+      itemsWithKeys.sort((a, b) => transform.fn(a.value, b.value));
+    }
+  }
+
+  return itemsWithKeys.map(({ key }) => key);
 };
 const registerComponentDependency = (
   stateKey: string,
@@ -1472,6 +1606,7 @@ const registerComponentDependency = (
 
   if (
     !component ||
+    component.reactiveType == "none" ||
     !(
       Array.isArray(component.reactiveType)
         ? component.reactiveType
@@ -2136,8 +2271,24 @@ function createProxyHandler<T>(
               });
             };
           }
+
+          if (prop === "$stateMap") {
+            return (callbackfn: any) =>
+              createElement(SignalMapRenderer, {
+                proxy: {
+                  _stateKey: stateKey,
+                  _path: path,
+                  _mapFn: callbackfn,
+                  _meta: meta,
+                },
+                rebuildStateShape,
+              });
+          }
           if (prop === "stateFilter") {
-            return (callbackfn: (value: any, index: number) => boolean) => {
+            return (
+              callbackfn: (value: any, index: number) => boolean,
+              deps?: any[]
+            ) => {
               const arrayKeys =
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2164,28 +2315,52 @@ function createProxyHandler<T>(
                 path,
                 componentId: componentId!,
                 meta: {
-                  ...meta,
                   validIds: newValidIds,
-
-                  transforms: [...(meta?.transforms || []), callbackfn],
+                  transforms: [
+                    ...(meta?.transforms || []),
+                    {
+                      type: "filter",
+                      fn: callbackfn,
+                      dependencies: deps || [],
+                    },
+                  ],
                 },
               });
             };
           }
+          if (prop === "stateSort") {
+            return (compareFn: (a: any, b: any) => number, deps?: any[]) => {
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+              if (!arrayKeys) {
+                throw new Error("No array keys found for sorting");
+              }
+              const itemsWithIds = currentState.map((item, index) => ({
+                item,
+                key: arrayKeys[index],
+              }));
 
-          if (prop === "$stateMap") {
-            return (callbackfn: any) =>
-              createElement(SignalMapRenderer, {
-                proxy: {
-                  _stateKey: stateKey,
-                  _path: path,
-                  _mapFn: callbackfn,
-                  _meta: meta,
+              itemsWithIds
+                .sort((a, b) => compareFn(a.item, b.item))
+                .filter(Boolean);
+
+              return rebuildStateShape({
+                currentState: itemsWithIds.map((i) => i.item) as any,
+                path,
+                componentId: componentId!,
+                meta: {
+                  validIds: itemsWithIds.map((i) => i.key) as string[],
+                  transforms: [
+                    ...(meta?.transforms || []),
+                    { type: "sort", fn: compareFn, dependencies: deps || [] },
+                  ],
                 },
-                rebuildStateShape,
               });
+            };
           }
-          if (prop === "stateList") {
+          if (prop === "virtualList") {
             return (
               callbackfn: (
                 setter: any,
@@ -2194,17 +2369,20 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
-              const [render, forceUpdate] = useState(1);
+              const [render, forceUpdate] = useState(0);
+
               const arrayToMap = getGlobalStore
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds);
 
-              if (!Array.isArray(arrayToMap)) {
-                return null;
-              }
               getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
                 forceUpdate((p) => p + 1);
               });
+
+              if (!Array.isArray(arrayToMap)) {
+                return null;
+              }
+
               const itemKeysForCurrentView =
                 meta?.validIds ||
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2227,6 +2405,12 @@ function createProxyHandler<T>(
                 const itemComponentId = uuidv4();
 
                 const itemPath = itemKey.split(".").slice(1);
+                const setter = rebuildStateShape({
+                  currentState: item,
+                  path: itemPath,
+                  componentId: itemComponentId!,
+                  meta,
+                });
 
                 return createElement(MemoizedCogsItemWrapper, {
                   key: itemKey,
@@ -2239,6 +2423,149 @@ function createProxyHandler<T>(
                   renderFn: callbackfn, // Pass the render function itself, not its result
                 });
               });
+            };
+          }
+          if (prop === "stateList") {
+            return (
+              callbackfn: (
+                setter: any,
+                index: number,
+                arraySetter: any
+              ) => ReactNode
+            ) => {
+              const StateListWrapper = () => {
+                const componentIdsRef = useRef<Map<string, string>>(new Map());
+
+                // Compute cache key dynamically for the CURRENT render. This is correct.
+                const cacheKey =
+                  meta?.transforms && meta.transforms.length > 0
+                    ? `${componentId}-${hashTransforms(meta.transforms)}`
+                    : `${componentId}-base`;
+                console.log("dsadasdasdasdasda");
+                // Force update mechanism. This is correct.
+                const [updateTrigger, forceUpdate] = useState({});
+
+                // This useMemo block is now correct because the useEffect below
+                // guarantees that on a data update, the cache will be empty.
+                const { validIds, arrayValues } = useMemo(() => {
+                  const cached = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, path)
+                    ?.transformCaches?.get(cacheKey);
+
+                  let freshValidIds: string[];
+
+                  if (cached && cached.validIds) {
+                    // Cache HIT: This only happens on re-renders NOT caused by a data update.
+                    freshValidIds = cached.validIds;
+                  } else {
+                    // Cache MISS: Guaranteed to happen after a data update.
+                    freshValidIds = applyTransforms(
+                      stateKey,
+                      path,
+                      meta?.transforms
+                    );
+
+                    getGlobalStore
+                      .getState()
+                      .setTransformCache(stateKey, path, cacheKey, {
+                        validIds: freshValidIds,
+                        computedAt: Date.now(),
+                        transforms: meta?.transforms || [],
+                      });
+                  }
+
+                  const freshValues = getGlobalStore
+                    .getState()
+                    .getShadowValue(stateKeyPathKey, freshValidIds);
+
+                  return {
+                    validIds: freshValidIds,
+                    arrayValues: freshValues || [],
+                  };
+                }, [cacheKey, updateTrigger]);
+
+                // --- THIS IS THE CORRECT FIX ---
+                // The subscription now purges ALL cache entries for this component.
+                useEffect(() => {
+                  const unsubscribe = getGlobalStore
+                    .getState()
+                    .subscribeToPath(stateKeyPathKey, () => {
+                      // A data change has occurred for the source array.
+
+                      const shadowMeta = getGlobalStore
+                        .getState()
+                        .getShadowMetadata(stateKey, path);
+
+                      const caches = shadowMeta?.transformCaches;
+                      if (caches) {
+                        // Iterate over ALL keys in the cache map.
+                        for (const key of caches.keys()) {
+                          // If the key belongs to this component instance, delete it.
+                          // This purges caches for 'sort by name', 'sort by score', etc.
+                          if (key.startsWith(componentId)) {
+                            caches.delete(key);
+                          }
+                        }
+                      }
+
+                      // Finally, force the re-render.
+                      forceUpdate({});
+                    });
+
+                  return unsubscribe;
+                  // This effect's logic now depends on the componentId to perform the purge.
+                }, [componentId, stateKeyPathKey]);
+
+                if (!Array.isArray(arrayValues)) {
+                  return null;
+                }
+
+                const arraySetter = rebuildStateShape({
+                  currentState: arrayValues as any,
+                  path,
+                  componentId: componentId!,
+                  meta: {
+                    ...meta,
+                    validIds: validIds,
+                  },
+                });
+
+                return (
+                  <>
+                    {arrayValues.map((item, localIndex) => {
+                      const itemKey = validIds[localIndex];
+
+                      if (!itemKey) {
+                        return null;
+                      }
+
+                      let itemComponentId =
+                        componentIdsRef.current.get(itemKey);
+                      if (!itemComponentId) {
+                        itemComponentId = uuidv4();
+                        componentIdsRef.current.set(itemKey, itemComponentId);
+                      }
+
+                      const itemPath = itemKey.split(".").slice(1);
+
+                      return createElement(MemoizedCogsItemWrapper, {
+                        key: itemKey,
+                        stateKey,
+                        itemComponentId,
+                        itemPath,
+                        localIndex,
+                        arraySetter,
+                        rebuildStateShape,
+                        renderFn: callbackfn,
+                        transformCacheKey: cacheKey,
+                      });
+                    })}
+                  </>
+                );
+              };
+
+              return <StateListWrapper />;
             };
           }
           if (prop === "stateFlattenOn") {
@@ -2382,11 +2709,15 @@ function createProxyHandler<T>(
           }
           if (prop === "cutSelected") {
             return () => {
-              const validKeys =
-                meta?.validIds ??
+              const baseArrayKeys =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-
+                  ?.arrayKeys || [];
+              const validKeys = applyTransforms(
+                stateKey,
+                path,
+                meta?.transforms
+              );
+              console.log("validKeys", validKeys);
               if (!validKeys || validKeys.length === 0) return;
 
               const indexKeyToCut = getGlobalStore
@@ -2396,13 +2727,13 @@ function createProxyHandler<T>(
               let indexToCut = validKeys.findIndex(
                 (key) => key === indexKeyToCut
               );
-
+              console.log("indexToCut", indexToCut);
               const pathForCut = validKeys[
                 indexToCut == -1 ? validKeys.length - 1 : indexToCut
               ]
                 ?.split(".")
                 .slice(1);
-
+              console.log("pathForCut", pathForCut);
               effectiveSetState(currentState, pathForCut!, {
                 updateType: "cut",
               });
@@ -2469,69 +2800,6 @@ function createProxyHandler<T>(
                 // Item doesn't exist, insert it
                 effectiveSetState(value as any, path, { updateType: "insert" });
               }
-            };
-          }
-
-          if (prop === "stateFilter") {
-            return (callbackfn: (value: any, index: number) => boolean) => {
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-
-              if (!arrayKeys) {
-                throw new Error("No array keys found for filtering.");
-              }
-
-              const newValidIds: string[] = [];
-              const filteredArray = currentState.filter(
-                (val: any, index: number) => {
-                  const didPass = callbackfn(val, index);
-                  if (didPass) {
-                    newValidIds.push(arrayKeys[index]!);
-                    return true;
-                  }
-                  return false;
-                }
-              );
-
-              return rebuildStateShape({
-                currentState: filteredArray as any,
-                path,
-                componentId: componentId!,
-                meta: {
-                  validIds: newValidIds,
-                },
-              });
-            };
-          }
-          if (prop === "stateSort") {
-            return (compareFn: (a: any, b: any) => number) => {
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-              if (!arrayKeys) {
-                throw new Error("No array keys found for sorting");
-              }
-              const itemsWithIds = currentState.map((item, index) => ({
-                item,
-                key: arrayKeys[index],
-              }));
-
-              itemsWithIds
-                .sort((a, b) => compareFn(a.item, b.item))
-                .filter(Boolean);
-
-              return rebuildStateShape({
-                currentState: itemsWithIds.map((i) => i.item) as any,
-                path,
-                componentId: componentId!,
-                meta: {
-                  validIds: itemsWithIds.map((i) => i.key) as string[],
-                  transforms: [...(meta?.transforms || []), compareFn],
-                },
-              });
             };
           }
 
@@ -3120,6 +3388,9 @@ function SignalMapRenderer({
           arraySetter: arraySetter,
           rebuildStateShape: rebuildStateShape,
           renderFn: proxy._mapFn,
+          transformCacheKey: proxy._meta
+            ? hashTransforms(proxy._meta.transforms || [])
+            : undefined, // Add this
         })
       );
     });
@@ -3242,11 +3513,13 @@ function SignalRenderer({
 const MemoizedCogsItemWrapper = memo(
   CogsItemWrapper,
   (prevProps, nextProps) => {
-    // Only re-render if the item path or key changed
+    // Re-render if any of these change:
     return (
       prevProps.itemPath.join(".") === nextProps.itemPath.join(".") &&
       prevProps.stateKey === nextProps.stateKey &&
-      prevProps.itemComponentId === nextProps.itemComponentId
+      prevProps.itemComponentId === nextProps.itemComponentId &&
+      prevProps.localIndex === nextProps.localIndex &&
+      prevProps.transformCacheKey === nextProps.transformCacheKey // NEW: Check cache key
     );
   }
 );
@@ -3258,12 +3531,14 @@ function CogsItemWrapper({
   arraySetter,
   rebuildStateShape,
   renderFn,
+  transformCacheKey,
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
   localIndex: number;
   arraySetter: any; // The proxy for the whole array
+  transformCacheKey?: string;
   rebuildStateShape: (options: {
     currentState: any;
     path: string[];
@@ -3398,3 +3673,89 @@ const cleanupComponentRegistration = (
     getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
   }
 };
+// Add this component at the top level of your file
+function CogsStateListRenderer({
+  stateKey,
+  path,
+  componentId,
+  meta,
+  rebuildStateShape,
+  renderFn,
+}: {
+  stateKey: string;
+  path: string[];
+  componentId: string;
+  meta?: MetaData;
+  rebuildStateShape: (options: {
+    currentState: any;
+    path: string[];
+    componentId: string;
+    meta?: any;
+  }) => any;
+  renderFn: (setter: any, index: number, arraySetter: any) => React.ReactNode;
+}) {
+  // This useRef is now stable because CogsStateListRenderer is a stable component.
+  const componentIdsRef = useRef<Map<string, string>>(new Map());
+
+  // Since this component re-renders when the parent does, we can get the latest
+  // state directly from the global store.
+  const stateKeyPathKey = [stateKey, ...path].join(".");
+
+  const itemKeysForCurrentView =
+    meta?.validIds ??
+    getGlobalStore.getState().getShadowMetadata(stateKey, path)?.arrayKeys ??
+    [];
+
+  const fullArrayValue = getGlobalStore
+    .getState()
+    .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
+
+  // If the data is not an array (e.g., during initialization), render nothing.
+  if (!Array.isArray(fullArrayValue)) {
+    return null;
+  }
+
+  // Create the proxy for the entire array. This is created fresh on each render.
+  const arraySetter = rebuildStateShape({
+    currentState: fullArrayValue as any,
+    path,
+    componentId, // The ID of the component that *called* stateList
+    meta,
+  });
+
+  // Map over the STABLE keys from the store and render a wrapper for each item.
+  return (
+    <>
+      {itemKeysForCurrentView.map((itemKey, localIndex) => {
+        if (!itemKey) {
+          // Safeguard against potential mismatches.
+          return null;
+        }
+
+        // Get or create a stable component ID for this specific item.
+        // This ID will persist across re-renders of the list.
+        let itemComponentId = componentIdsRef.current.get(itemKey);
+        if (!itemComponentId) {
+          itemComponentId = uuidv4();
+          componentIdsRef.current.set(itemKey, itemComponentId);
+        }
+
+        // The path for this specific item is derived from its unique key.
+        const itemPath = itemKey.split(".").slice(1);
+
+        // Render the MemoizedCogsItemWrapper. It will handle its own state
+        // and re-renders, preventing stale closures.
+        return createElement(MemoizedCogsItemWrapper, {
+          key: itemKey, // CRUCIAL: Use the unique item key from the store.
+          stateKey,
+          itemComponentId, // Pass the stable, unique ID for this wrapper instance.
+          itemPath,
+          localIndex,
+          arraySetter,
+          rebuildStateShape,
+          renderFn, // The user's render function.
+        });
+      })}
+    </>
+  );
+}

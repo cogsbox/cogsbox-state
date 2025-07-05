@@ -121,6 +121,14 @@ export type ShadowMetadata = {
     containerRef: HTMLDivElement | null;
     rebuildStateShape: any;
   }>;
+  transformCaches?: Map<
+    string,
+    {
+      validIds: string[];
+      computedAt: number;
+      transforms: Array<{ type: "filter" | "sort"; fn: Function }>;
+    }
+  >;
   pathComponents?: Set<string>;
 } & ComponentsType;
 
@@ -151,6 +159,12 @@ export type CogsGlobalState = {
     key: string,
     path: string[],
     metadata: Omit<ShadowMetadata, "id">
+  ) => void;
+  setTransformCache: (
+    key: string,
+    path: string[],
+    cacheKey: string,
+    cacheData: any
   ) => void;
 
   pathSubscribers: Map<string, Set<() => void>>;
@@ -462,7 +476,30 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       get().notifyPathSubscribers(fullKey);
     }
   },
+  setTransformCache: (
+    key: string,
+    path: string[],
+    cacheKey: string,
+    cacheData: any
+  ) => {
+    const fullKey = [key, ...path].join(".");
+    const newShadowStore = new Map(get().shadowStateStore);
+    const existing = newShadowStore.get(fullKey) || {};
 
+    // Initialize transformCaches if it doesn't exist
+    if (!existing.transformCaches) {
+      existing.transformCaches = new Map();
+    }
+
+    // Update just the specific cache entry
+    existing.transformCaches.set(cacheKey, cacheData);
+
+    // Update shadow store WITHOUT notifying path subscribers
+    newShadowStore.set(fullKey, existing);
+    set({ shadowStateStore: newShadowStore });
+
+    // Don't call notifyPathSubscribers here - cache updates shouldn't trigger renders
+  },
   insertShadowArrayElement: (
     key: string,
     arrayPath: string[],
