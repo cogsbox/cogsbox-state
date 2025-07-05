@@ -183,14 +183,13 @@ export type ArrayEndType<TShape extends unknown> = {
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
-  stateMap: (
+  stateMap: <U>(
     callbackfn: (
       setter: StateObject<InferArrayElement<TShape>>,
       index: number,
-
       arraySetter: StateObject<TShape>
-    ) => void
-  ) => any;
+    ) => U
+  ) => U[];
   $stateMap: (
     callbackfn: (
       setter: StateObject<InferArrayElement<TShape>>,

@@ -86,7 +86,14 @@ export default function ArrayMethodsPage() {
 
 function GameDetails() {
   const rootState = useCogsState("gameDashboard");
-
+  //const rootState2 = useCogsState("gameDashboard");
+  // rootState2.players.index(0).name.update("test");//fine
+  //   let testMap = rootState2.players.stateMap((setter) => {
+  //     return {
+  //       wierdshaep: setter.name,
+  //     };
+  //   });
+  //   testMap[0].wierdshaep.update("test");
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 text-gray-200">

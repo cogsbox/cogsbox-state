@@ -295,7 +295,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
   }, [numberOfDrops]);
 
   return (
-    <>
+    <div className="crt">
       {/* Background gradient */}
       <div
         className="fixed inset-0 background-gradient-masked"
@@ -558,6 +558,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           />
         ))}
       </div>
-    </>
+    </div>
   );
 }

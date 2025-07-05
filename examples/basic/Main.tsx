@@ -8,10 +8,12 @@ import ArrayReactivity from "./array-reactivity/ArrayReactivity";
 import { PixelRain } from "./PixelRain";
 import VirtualizedChatExample from "./virtualiser/VirtualizedChatExample";
 import ArrayMethodsPage from "./object-example/ObjectExmaple";
+import LCDCatScroller from "./LCDScreen";
+import { catSvg } from "./assets/svgs";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <div className="relative  z-0">
+    <div className="relative  z-0 crt">
       {" "}
       <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/70 to-black/00 pointer-events-none" />
       <div className="fixed right-0 w-[16vw] h-[100vh] bg-gradient-to-l from-black/70 to-black/00 pointer-events-none" />
@@ -26,6 +28,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         {/* <ArrayReactivity /> */}
         <div className="h-20" />
         <VirtualizedChatExample /> <div className="h-40" />
+        <LCDCatScroller svg={catSvg} speed={1} scale={16} />{" "}
+        <div className="h-40" />
         <ArrayMethodsPage /> <div className="h-40" />
       </div>{" "}
     </div>
