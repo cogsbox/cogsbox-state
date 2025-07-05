@@ -552,7 +552,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     set({ shadowStateStore: newShadowStore });
 
-    get().notifyPathSubscribers(itemKey);
+    get().notifyPathSubscribers(parentKey);
   },
   updateShadowAtPath: (key, path, newValue) => {
     const newShadowStore = new Map(get().shadowStateStore);

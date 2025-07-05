@@ -2191,15 +2191,9 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
-              const [render, forceUpdate] = useState(0);
-
               const arrayToMap = getGlobalStore
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds);
-
-              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                forceUpdate((p) => p + 1);
-              });
 
               if (!Array.isArray(arrayToMap)) {
                 return null;
@@ -2510,10 +2504,6 @@ function createProxyHandler<T>(
 
         if (prop === "get") {
           return () => {
-            const stateEntry = JSON.stringify(
-              getGlobalStore.getState().getShadowMetadata(stateKey, [])
-            );
-
             registerComponentDependency(stateKey, componentId, path);
             return getGlobalStore
               .getState()

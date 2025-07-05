@@ -22,9 +22,9 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
       </div>
       <div className="px-[10vw] pt-40 flex flex-col gap-4 z-[999]">
         {/* <Reactivity />
-        <div className="h-20" />
-        <ArrayReactivity />
         <div className="h-20" /> */}
+        <ArrayReactivity />
+        <div className="h-20" />
         {/* <VirtualizedChatExample /> <div className="h-40" />  */}
         <ArrayMethodsPage /> <div className="h-40" />
       </div>{" "}
