@@ -28,7 +28,7 @@ export const FlashWrapper = ({
   });
 
   return (
-    <div ref={ref} className="p-2">
+    <div ref={ref} className="p-1">
       {children}
     </div>
   );

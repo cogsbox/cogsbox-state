@@ -10,14 +10,12 @@ import {
   useMemo,
   useRef,
   useState,
-  useSyncExternalStore,
   type CSSProperties,
   type ReactNode,
   type RefObject,
 } from "react";
-
+import { createRoot } from "react-dom/client";
 import {
-  debounce,
   getDifferences,
   getNestedValue,
   isFunction,
@@ -1110,7 +1108,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     setState(thisKey, (prevValue: TStateObject) => {
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
-      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@)", path, newStateOrFunction);
+
       const payload = (
         updateObj.updateType === "insert" && isFunction(newStateOrFunction)
           ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
@@ -1118,7 +1116,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ? newStateOrFunction(nestedShadowValue)
             : newStateOrFunction
       ) as TStateObject;
-      console.log("@@@@@@@@@@@@@@@@@@@@@@@@@)", path, payload);
+
       const timeStamp = Date.now();
 
       const newUpdate = {
@@ -1186,42 +1184,57 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       // Update in effectiveSetState for insert handling:
-
-      // Update in effectiveSetState for insert handling:
       if (updateObj.updateType === "insert") {
-        // Move this to AFTER the switch statement that inserts
+        getGlobalStore.getState().notifyPathSubscribers(fullPath);
         const arrayMeta = store.getShadowMetadata(thisKey, path);
 
-        getGlobalStore.getState().notifyPathSubscribers(fullPath);
-        console.log(fullPath);
         if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
-          const updatedArray = store.getShadowValue(
+          const sourceArrayKeys =
+            store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
+          const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
+          const newItemValue = store.getShadowValue(newItemKey);
+          const fullSourceArray = store.getShadowValue(
             [thisKey, ...path].join(".")
           );
-          const arrayKeys =
-            store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
 
-          // Find the new item (should be the last one after insert)
-          const newIndex = arrayKeys.length - 1;
-          const newItemKey = arrayKeys[newIndex]!;
-
-          const newItem = updatedArray[newIndex];
+          if (!newItemKey || newItemValue === undefined) return;
 
           arrayMeta.mapWrappers.forEach((wrapper) => {
+            let shouldRender = false;
+            let localIndex = -1;
+
+            // --- THE FIX IS HERE ---
+            // Check if the wrapper has an array of filter functions.
+            if (wrapper.meta?.filterFns && wrapper.meta.filterFns.length > 0) {
+              // Test if the new item passes EVERY filter in the chain.
+              if (
+                wrapper.meta.filterFns.every((fn: any) => fn(newItemValue, -1))
+              ) {
+                shouldRender = true;
+                localIndex = (wrapper.meta.validIds || []).length;
+              }
+            } else {
+              // It's an unfiltered map, so it should always render the new item.
+              shouldRender = true;
+              localIndex = sourceArrayKeys.length - 1;
+            }
+
+            if (!shouldRender) {
+              return; // Skip this wrapper, the item doesn't belong.
+            }
+
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-              // Create element for new item
               const itemElement = document.createElement("div");
               itemElement.setAttribute("data-item-path", newItemKey);
               wrapper.containerRef.appendChild(itemElement);
 
-              // Render the new item using CogsItemWrapper
               const root = createRoot(itemElement);
               const componentId = uuidv4();
               const itemPath = newItemKey.split(".").slice(1);
 
               const arraySetter = wrapper.rebuildStateShape({
                 path: wrapper.path,
-                currentState: updatedArray,
+                currentState: fullSourceArray,
                 componentId: wrapper.componentId,
                 meta: wrapper.meta,
               });
@@ -1231,7 +1244,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
                   stateKey: thisKey,
                   itemComponentId: componentId,
                   itemPath: itemPath,
-                  localIndex: newIndex,
+                  localIndex: localIndex,
                   arraySetter: arraySetter,
                   rebuildStateShape: wrapper.rebuildStateShape,
                   renderFn: wrapper.mapFn,
@@ -1439,9 +1452,28 @@ export function useCogsStateFn<TStateObject extends unknown>(
 }
 
 type MetaData = {
+  /**
+   * An array of the full, unique string IDs (e.g., `"stateKey.arrayName.id:123"`)
+   * of the items that belong to the current derived "view" of an array.
+   * This is the primary mechanism for tracking the state of filtered or sorted lists.
+   *
+   * - `stateFilter` populates this with only the IDs of items that passed the filter.
+   * - `stateSort` reorders this list to match the new sort order.
+   * - All subsequent chained operations (like `.get()`, `.index()`, or `.cut()`)
+   *   MUST consult this list first to know which items they apply to and in what order.
+   */
   validIds?: string[];
-};
 
+  /**
+   * An array of the actual filter functions that have been applied in a chain.
+   * This is primarily used by reactive renderers like `$stateMap` to make predictions.
+   *
+   * For example, when a new item is inserted into the original source array, a
+   * `$stateMap` renderer on a filtered view can use these functions to test if the
+   * newly inserted item should be dynamically rendered in its view.
+   */
+  filterFns?: Array<(value: any, index: number) => boolean>;
+};
 const registerComponentDependency = (
   stateKey: string,
   componentId: string,
@@ -2065,7 +2097,6 @@ function createProxyHandler<T>(
               };
             };
           }
-
           if (prop === "stateMap") {
             return (
               callbackfn: (
@@ -2123,6 +2154,42 @@ function createProxyHandler<T>(
               });
             };
           }
+          if (prop === "stateFilter") {
+            return (callbackfn: (value: any, index: number) => boolean) => {
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+
+              if (!arrayKeys) {
+                throw new Error("No array keys found for filtering.");
+              }
+
+              const newValidIds: string[] = [];
+              const filteredArray = currentState.filter(
+                (val: any, index: number) => {
+                  const didPass = callbackfn(val, index);
+                  if (didPass) {
+                    newValidIds.push(arrayKeys[index]!);
+                    return true;
+                  }
+                  return false;
+                }
+              );
+
+              return rebuildStateShape({
+                currentState: filteredArray as any,
+                path,
+                componentId: componentId!,
+                meta: {
+                  ...meta,
+                  validIds: newValidIds,
+
+                  filterFns: [...(meta?.filterFns || []), callbackfn],
+                },
+              });
+            };
+          }
           if (prop === "stateMapNoRender") {
             return (
               callbackfn: (
@@ -2165,7 +2232,12 @@ function createProxyHandler<T>(
           if (prop === "$stateMap") {
             return (callbackfn: any) =>
               createElement(SignalMapRenderer, {
-                proxy: { _stateKey: stateKey, _path: path, _mapFn: callbackfn },
+                proxy: {
+                  _stateKey: stateKey,
+                  _path: path,
+                  _mapFn: callbackfn,
+                  _meta: meta,
+                },
                 rebuildStateShape,
               });
           }
@@ -2345,41 +2417,102 @@ function createProxyHandler<T>(
               }
             };
           }
+
           if (prop === "cut") {
-            const lastPathElement = path[path.length - 1];
-            if (lastPathElement?.startsWith("id:")) {
-              return () => {
-                const parentPath = path.slice(0, -1);
-                invalidateCachePath(path);
-                effectiveSetState(currentState, parentPath, {
-                  updateType: "cut",
-                });
-              };
-            }
+            return (index?: number, options?: { waitForSync?: boolean }) => {
+              // --- THE FIX ---
+              // 1. Prioritize the list of valid IDs from the current derived proxy's meta.
+              //    Fall back to the original array's keys only if we're on an unfiltered proxy.
+              const keysForThisView =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+
+              if (!keysForThisView || keysForThisView.length === 0) return; // Nothing to cut
+
+              // 2. Determine which item to cut based on the current view.
+              //    If no index is provided, cut the LAST item of the CURRENT view.
+              const indexToCut =
+                index !== undefined ? index : keysForThisView.length - 1;
+
+              // Get the full, unique ID of the item to cut.
+              const fullIdToCut = keysForThisView[indexToCut];
+
+              if (!fullIdToCut) return; // Index out of bounds
+
+              // 3. The path for effectiveSetState is just the item's path parts.
+              const pathForCut = fullIdToCut.split(".").slice(1);
+
+              // Call the effective setState to perform the deletion from the global store.
+              effectiveSetState(currentState, pathForCut, {
+                updateType: "cut",
+              });
+            };
           }
           if (prop === "cutByValue") {
             return (value: string | number | boolean) => {
-              const index = getGlobalStore
+              const arrayKeys = getGlobalStore
                 .getState()
-                .getShadowValue(stateKeyPathKey)
-                .findIndex((item: any) => item === value);
-              if (index > -1)
-                effectiveSetState(value as any, path, { updateType: "cut" });
+                .getShadowMetadata(stateKey, path)?.arrayKeys;
+
+              if (!arrayKeys) return;
+
+              // Find the item ID that matches the value
+              let targetItemId = null;
+              for (const itemId of arrayKeys) {
+                const itemValue = getGlobalStore
+                  .getState()
+                  .getShadowValue(itemId);
+                if (itemValue === value) {
+                  targetItemId = itemId;
+                  break;
+                }
+              }
+
+              if (targetItemId) {
+                effectiveSetState(
+                  value as any,
+                  targetItemId.split(".").slice(1),
+                  { updateType: "cut" }
+                );
+              }
             };
           }
+
           if (prop === "toggleByValue") {
             return (value: string | number | boolean) => {
-              const index = getGlobalStore
+              const arrayKeys = getGlobalStore
                 .getState()
-                .getShadowValue(stateKeyPathKey)
-                .findIndex((item: any) => item === value);
-              if (index > -1) {
-                effectiveSetState(value as any, path, { updateType: "cut" });
+                .getShadowMetadata(stateKey, path)?.arrayKeys;
+
+              if (!arrayKeys) return;
+
+              // Find if item exists
+              let existingItemId = null;
+              for (const itemId of arrayKeys) {
+                const itemValue = getGlobalStore
+                  .getState()
+                  .getShadowValue(itemId);
+                if (itemValue === value) {
+                  existingItemId = itemId;
+                  break;
+                }
+              }
+
+              if (existingItemId) {
+                // Item exists, cut it
+                effectiveSetState(
+                  value as any,
+                  existingItemId.split(".").slice(1),
+                  { updateType: "cut" }
+                );
               } else {
+                // Item doesn't exist, insert it
                 effectiveSetState(value as any, path, { updateType: "insert" });
               }
             };
           }
+
           if (prop === "stateFilter") {
             return (callbackfn: (value: any, index: number) => boolean) => {
               const arrayKeys =
@@ -2478,12 +2611,8 @@ function createProxyHandler<T>(
             };
           }
         }
-        const lastPathElement = path[path.length - 1];
-        if (
-          prop === "cut" &&
-          typeof lastPathElement === "string" &&
-          lastPathElement.startsWith("id:")
-        ) {
+
+        if (prop === "cut") {
           let shadowValue = getGlobalStore
             .getState()
             .getShadowValue(path.join("."));
@@ -2544,6 +2673,53 @@ function createProxyHandler<T>(
           }
           return undefined;
         }
+        const notifySelectionComponents = (
+          stateKey: string,
+          parentPath: string[],
+          currentSelected: string | undefined
+        ) => {
+          const store = getGlobalStore.getState();
+          const rootMeta = store.getShadowMetadata(stateKey, []);
+          const notifiedComponents = new Set<string>();
+
+          // Handle "all" reactive components first
+          if (rootMeta?.components) {
+            rootMeta.components.forEach((component, componentId) => {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || "component"];
+
+              if (reactiveTypes.includes("all")) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            });
+          }
+
+          store
+            .getShadowMetadata(stateKey, [...parentPath, "getSelected"])
+            ?.pathComponents?.forEach((componentId) => {
+              const thisComp = rootMeta?.components?.get(componentId);
+              thisComp?.forceUpdate();
+            });
+
+          const parentMeta = store.getShadowMetadata(stateKey, parentPath);
+          for (let arrayKey of parentMeta?.arrayKeys || []) {
+            const key = arrayKey + ".selected";
+            const selectedItem = store.getShadowMetadata(
+              stateKey,
+              key.split(".").slice(1)
+            );
+            if (arrayKey == currentSelected) {
+              selectedItem?.pathComponents?.forEach((componentId) => {
+                const thisComp = rootMeta?.components?.get(componentId);
+                thisComp?.forceUpdate();
+              });
+            }
+          }
+        };
+
+        // Then use it in both:
         if (prop === "setSelected") {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
@@ -2553,84 +2729,9 @@ function createProxyHandler<T>(
             const selectedIndex = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
-            // Notify components
-            const store = getGlobalStore.getState();
-            const rootMeta = store.getShadowMetadata(stateKey, []);
-            const notifiedComponents = new Set<string>();
 
-            // Handle "all" reactive components
-            if (rootMeta?.components) {
-              rootMeta.components.forEach((component, componentId) => {
-                const reactiveTypes = Array.isArray(component.reactiveType)
-                  ? component.reactiveType
-                  : [component.reactiveType || "component"];
+            notifySelectionComponents(stateKey, parentPath, selectedIndex);
 
-                if (reactiveTypes.includes("all")) {
-                  component.forceUpdate();
-                  notifiedComponents.add(componentId);
-                }
-              });
-            }
-            store
-              .getShadowMetadata(stateKey, [...parentPath, "getSelected"])
-              ?.pathComponents?.forEach((component, componentId) => {
-                const thisComp = rootMeta?.components?.get(componentId);
-                thisComp?.forceUpdate();
-              });
-
-            // Direct lookup for components that depend on the parent array path
-            const parentMeta = store.getShadowMetadata(stateKey, parentPath);
-
-            for (let arrayKey of parentMeta?.arrayKeys || []) {
-              const key = arrayKey + ".selected";
-
-              const selecetdItem = store.getShadowMetadata(
-                stateKey,
-                key.split(".").slice(1)
-              );
-              if (arrayKey == selectedIndex) {
-                selecetdItem?.pathComponents?.forEach(
-                  (component, componentId) => {
-                    const thisComp = rootMeta?.components?.get(componentId);
-                    thisComp?.forceUpdate();
-                  }
-                );
-              }
-            }
-            // for (let arrayKey of parentMeta?.arrayKeys || []) {
-            //   if (arrayKey !== fullItemKey && selectedIndex === arrayKey) {
-            //     const selectedPAth = [...parentPath, "getSelected"];
-            //     console.log(getGlobalStore.getState().shadowStateStore);
-
-            //     store
-            //       .getShadowMetadata(stateKey, selectedPAth)
-            //       ?.pathComponents?.forEach((componentget, componentId) => {
-            //         const component = rootMeta?.components?.get(componentId);
-            //         component?.forceUpdate();
-            //       });
-            //     const selectedIndex = getGlobalStore
-            //       .getState()
-            //       .selectedIndicesMap.get(fullParentKey);
-
-            //     store
-            //       .getShadowMetadata(stateKey, selectedPAth)
-            //       ?.pathComponents?.forEach((component, componentId) => {
-            //         if (!notifiedComponents.has(componentId)) {
-            //           const component = rootMeta?.components?.get(componentId);
-
-            //           if (component?.paths.has(selectedIndex + ".selected")) {
-            //             // console.log(
-            //             //   "!notifiedComponents.has(componentId) 123123",
-            //             //   component?.paths
-            //             // );
-            //             component?.forceUpdate();
-            //             notifiedComponents.add(componentId);
-            //           }
-            //         }
-            //       });
-            //   }
-            // }
-            // Update the selection
             if (value) {
               getGlobalStore
                 .getState()
@@ -2638,16 +2739,18 @@ function createProxyHandler<T>(
             }
           };
         }
+
         if (prop === "toggleSelected") {
           return () => {
             const parentPath = path.slice(0, -1);
-            const parentKey = parentPath.join(".");
-            const fullParentKey = stateKey + "." + parentKey;
+            const fullParentKey = stateKey + "." + parentPath.join(".");
             const fullItemKey = stateKey + "." + path.join(".");
 
             const currentSelected = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
+
+            notifySelectionComponents(stateKey, parentPath, currentSelected);
 
             if (currentSelected === fullItemKey) {
               getGlobalStore
@@ -2916,7 +3019,8 @@ export function $cogsSignal(proxy: {
   return createElement(SignalRenderer, { proxy });
 }
 
-import { createRoot } from "react-dom/client";
+// in your state manager file...
+
 function SignalMapRenderer({
   proxy,
   rebuildStateShape,
@@ -3015,10 +3119,15 @@ function SignalMapRenderer({
 
     if (!Array.isArray(value)) return;
 
-    const arrayMeta = getGlobalStore
-      .getState()
-      .getShadowMetadata(proxy._stateKey, proxy._path);
-    const arrayKeys = arrayMeta?.arrayKeys || [];
+    // --- BUG FIX IS HERE ---
+    // Prioritize the filtered IDs from the meta object, just like the regular `stateMap`.
+    // This ensures the keys match the filtered data.
+    const arrayKeys =
+      proxy._meta?.validIds ??
+      getGlobalStore.getState().getShadowMetadata(proxy._stateKey, proxy._path)
+        ?.arrayKeys ??
+      [];
+    // --- END OF FIX ---
 
     const arraySetter = rebuildStateShape({
       currentState: value,
@@ -3028,7 +3137,9 @@ function SignalMapRenderer({
     });
 
     value.forEach((item, index) => {
-      const itemKey = arrayKeys[index]!;
+      const itemKey = arrayKeys[index]!; // Now this will be the correct key for the filtered item
+      if (!itemKey) return; // Safeguard if there's a mismatch
+
       const itemComponentId = uuidv4();
       const itemElement = document.createElement("div");
 
@@ -3056,16 +3167,6 @@ function SignalMapRenderer({
   };
 
   return <div ref={containerRef} data-map-container={instanceIdRef.current} />;
-}
-
-// Helper to render React element to actual DOM
-function renderReactElementToDOM(
-  reactElement: ReactNode,
-  targetElement: HTMLElement
-) {
-  // This is the tricky part - you need to convert JSX to actual DOM
-  // For now, use ReactDOM.render or a similar approach
-  // This is where the magic happens to bypass React's reconciliation
 }
 
 function SignalRenderer({

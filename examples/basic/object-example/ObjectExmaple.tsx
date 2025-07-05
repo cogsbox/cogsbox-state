@@ -6,32 +6,31 @@ import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
 import { FlashWrapper } from "../FlashOnUpdate";
 
-// --- NEW State Definition: Red & Blue Teams ---
+// --- State Definition with a Flat Player List ---
 export type Player = {
   id: string | number;
   name: string;
   score: number;
   specialty: "Offense" | "Defense" | "Support";
+  team: "red" | "blue";
 };
 
 export type GameDashboardState = {
   gameName: string;
   isLive: boolean;
-  redTeam: Player[];
-  blueTeam: Player[];
+  players: Player[]; // A single, flat array for all players
 };
 
+// --- Initial state now uses the flat structure ---
 const initialState: GameDashboardState = {
   gameName: "Cogs Team Battle",
   isLive: true,
-  redTeam: [
-    { id: 1, name: "Blaze", score: 1500, specialty: "Offense" },
-    { id: 2, name: "Rook", score: 900, specialty: "Defense" },
-  ],
-  blueTeam: [
-    { id: 3, name: "Viper", score: 1250, specialty: "Offense" },
-    { id: 4, name: "Aegis", score: 1100, specialty: "Support" },
-    { id: 5, name: "Ghost", score: 850, specialty: "Defense" },
+  players: [
+    { id: 1, name: "Blaze", score: 1500, specialty: "Offense", team: "red" },
+    { id: 2, name: "Rook", score: 900, specialty: "Defense", team: "red" },
+    { id: 3, name: "Viper", score: 1250, specialty: "Offense", team: "blue" },
+    { id: 4, name: "Aegis", score: 1100, specialty: "Support", team: "blue" },
+    { id: 5, name: "Ghost", score: 850, specialty: "Defense", team: "blue" },
   ],
 };
 
@@ -42,7 +41,7 @@ export const { useCogsState } = createCogsState(
   { validation: { key: "gameDashboard" } }
 );
 
-// --- Main Page Component (Using the original structure) ---
+// --- Main Page Component ---
 export default function ArrayMethodsPage() {
   return (
     <div className="flex gap-6 p-6 font-mono">
@@ -63,9 +62,9 @@ export default function ArrayMethodsPage() {
         <GameDetails />
 
         <div className="grid grid-cols-2 gap-4">
-          {/* We're back to the original, lean component structure */}
-          <ItemList title="Red Team" arrayKey="redTeam" color="red" />
-          <ItemList title="Blue Team" arrayKey="blueTeam" color="blue" />
+          {/* ItemList now just needs a color to filter the main players list */}
+          <ItemList title="Red Team" color="red" />
+          <ItemList title="Blue Team" color="blue" />
         </div>
       </div>
 
@@ -109,30 +108,22 @@ function GameDetails() {
   );
 }
 
-function ItemList({
-  title,
-  arrayKey,
-  color,
-}: {
-  title: string;
-  arrayKey: "redTeam" | "blueTeam";
-  color: "red" | "blue";
-}) {
+function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   const dashboardState = useCogsState("gameDashboard", {
     reactiveType: "none",
   });
-  const teamState = dashboardState[arrayKey];
 
-  const handleAddItem = () => {
-    teamState.insert(({ uuid }) => ({
+  const handleAddItem = (color: "red" | "blue") => {
+    // Insert into the main `players` array, not the filtered `teamState`
+    dashboardState.players.insert(({ uuid }) => ({
       id: uuid,
       name: `New Recruit ${uuid.substring(0, 4)}`,
       score: 0,
       specialty: "Support",
+      team: color, // Set team color correctly
     }));
   };
 
-  // Dynamic classes for team colors
   const teamColors = {
     red: {
       selected: "bg-red-800/80 text-white font-semibold ring-2 ring-red-500",
@@ -153,31 +144,41 @@ function ItemList({
           {title}
         </h3>
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {teamState.$stateMap((_item, itemSetter) => (
-            <FlashWrapper key={itemSetter.id.get()}>
-              <button
-                onClick={() => itemSetter.setSelected(true)}
-                className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
-                  itemSetter._selected
-                    ? teamColors[color].selected
-                    : "bg-gray-800 hover:bg-gray-700/70"
-                }`}
-              >
-                {/* Simplified: No conditional logic needed, all items are Players */}
-                {itemSetter.name.get()}
-              </button>
-            </FlashWrapper>
-          ))}
+          {/* $stateMap works perfectly on the filtered `teamState` proxy */}
+          {dashboardState.players
+            .stateFilter((player) => player.team === color)
+            .$stateMap((_item, itemSetter) => (
+              <FlashWrapper key={itemSetter.id.get()}>
+                <button
+                  onClick={() => {
+                    itemSetter.setSelected(true);
+                  }}
+                  className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
+                    // `_selected` now checks against the master players list's selection state
+                    itemSetter._selected
+                      ? teamColors[color].selected
+                      : "bg-gray-800 hover:bg-gray-700/70"
+                  }`}
+                >
+                  {itemSetter.name.get()}
+                  {itemSetter.team.get()}
+                </button>
+              </FlashWrapper>
+            ))}
         </div>
         <div className="pt-2 border-t border-gray-700 flex gap-2">
           <button
-            onClick={handleAddItem}
+            onClick={() => handleAddItem(color)}
             className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
           >
             Add Player
           </button>
           <button
-            onClick={() => teamState.cut()}
+            onClick={() =>
+              dashboardState.players
+                .stateFilter((player) => player.team === color)
+                .cut()
+            }
             className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
           >
             Cut Last
@@ -192,22 +193,37 @@ function ItemList({
 
 function ItemDetailForm() {
   const dashboardState = useCogsState("gameDashboard");
-  // Check both teams for a selected player
-  const selectedPlayer =
-    dashboardState.redTeam.getSelected() ||
-    dashboardState.blueTeam.getSelected();
+
+  // Selection logic is now much simpler: just check the main players list.
+  const selectedPlayer = dashboardState.players.getSelected();
 
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 min-h-[300px]">
         <h3 className="font-bold text-gray-200 text-lg mb-4">Player Editor</h3>
+        {selectedPlayer && (
+          <div
+            className={`text-white text-center p-2 rounded-md mb-4 text-sm font-semibold ${
+              selectedPlayer.team.get() === "red"
+                ? "bg-red-500/50"
+                : "bg-blue-500/50"
+            }`}
+          >
+            {selectedPlayer.team.get()?.toUpperCase()} TEAM
+          </div>
+        )}
         {!selectedPlayer && (
           <div className="text-gray-500 text-center pt-10">
             Select a player to edit.
           </div>
         )}
-        {/* Simplified: One form for any player */}
-        {selectedPlayer && <PlayerForm playerState={selectedPlayer} />}
+        {/* Pass the selected player and the main players array to the form */}
+        {selectedPlayer && (
+          <PlayerForm
+            playerState={selectedPlayer}
+            playersArrayState={dashboardState.players}
+          />
+        )}
       </div>
     </FlashWrapper>
   );
@@ -215,7 +231,13 @@ function ItemDetailForm() {
 
 // --- Combined Player Form (With Improved Styling) ---
 
-function PlayerForm({ playerState }: { playerState: StateObject<Player> }) {
+function PlayerForm({
+  playerState,
+  playersArrayState,
+}: {
+  playerState: StateObject<Player>;
+  playersArrayState: StateObject<Player[]>;
+}) {
   const formInputClass =
     "block w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-200 focus:ring-1 focus:ring-green-500 focus:outline-none";
   const formLabelClass = "block text-sm font-medium text-gray-400 mb-1";
@@ -230,7 +252,6 @@ function PlayerForm({ playerState }: { playerState: StateObject<Player> }) {
       {playerState.name.formElement((obj) => (
         <div>
           <label className={formLabelClass}>Name</label>
-          {obj.get()}
           <input {...obj.inputProps} className={formInputClass} />
         </div>
       ))}
@@ -264,7 +285,7 @@ function PlayerForm({ playerState }: { playerState: StateObject<Player> }) {
           Cut This Player
         </button>
         <button
-          onClick={() => playerState.setSelected(false)}
+          onClick={() => playersArrayState.clearSelected()}
           className="px-3 py-1 bg-gray-600/80 text-gray-200 rounded hover:bg-gray-500 text-sm"
         >
           Deselect
