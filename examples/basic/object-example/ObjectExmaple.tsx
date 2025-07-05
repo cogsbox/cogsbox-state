@@ -153,9 +153,8 @@ function ItemList({
           {title}
         </h3>
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {teamState.stateList((_item, itemSetter) => (
+          {teamState.$stateMap((_item, itemSetter) => (
             <FlashWrapper key={itemSetter.id.get()}>
-              {itemSetter._componentId}
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
@@ -173,7 +172,7 @@ function ItemList({
         <div className="pt-2 border-t border-gray-700 flex gap-2">
           <button
             onClick={handleAddItem}
-            className={`px-2 py-1 text-xs rounded ${teamColors[color].button}`}
+            className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
           >
             Add Player
           </button>

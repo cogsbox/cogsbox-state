@@ -109,6 +109,9 @@ export type ShadowMetadata = {
   }>;
   mapWrappers?: Array<{
     instanceId: string;
+    path: string[];
+    componentId: string;
+    meta?: any;
     mapFn: (
       value: any,
       setter: any,
@@ -117,6 +120,7 @@ export type ShadowMetadata = {
       arraySetter: any
     ) => ReactNode;
     containerRef: HTMLDivElement | null;
+    rebuildStateShape: any;
   }>;
   pathComponents?: Set<string>;
 } & ComponentsType;

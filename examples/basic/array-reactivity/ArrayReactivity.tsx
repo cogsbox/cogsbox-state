@@ -60,9 +60,7 @@ export default function ArrayReactivity() {
 }
 
 function TodoListWithStateMap() {
-  const todos = useCogsState("todoArray", {
-    reactiveType: "none",
-  });
+  const todos = useCogsState("todoArray");
 
   return (
     <FlashWrapper>

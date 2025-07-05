@@ -1184,6 +1184,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         });
       }
+
+      // Update in effectiveSetState for insert handling:
+
+      // Update in effectiveSetState for insert handling:
       if (updateObj.updateType === "insert") {
         // Move this to AFTER the switch statement that inserts
         const arrayMeta = store.getShadowMetadata(thisKey, path);
@@ -1207,48 +1211,32 @@ export function useCogsStateFn<TStateObject extends unknown>(
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
               // Create element for new item
               const itemElement = document.createElement("div");
-              itemElement.setAttribute("data-item-path", newItemKey); // Keep full key for data attr
+              itemElement.setAttribute("data-item-path", newItemKey);
               wrapper.containerRef.appendChild(itemElement);
 
-              // Render the new item
+              // Render the new item using CogsItemWrapper
               const root = createRoot(itemElement);
-              const tempProxy = createProxyHandler(
-                thisKey,
-                effectiveSetState,
-                componentId!,
-                sessionId
-              );
-
-              const rebuildStateShape = (tempProxy as any)
-                ._rebuildStateShape as (sdsad: {
-                path: string[];
-                currentState: any;
-                componentId: string;
-              }) => void;
-
-              // Now use it
+              const componentId = uuidv4();
               const itemPath = newItemKey.split(".").slice(1);
-              const itemSetter = rebuildStateShape({
-                path: itemPath,
-                currentState: newItem,
-                componentId: componentId!,
-              });
 
-              const arraySetter = rebuildStateShape({
-                path,
+              const arraySetter = wrapper.rebuildStateShape({
+                path: wrapper.path,
                 currentState: updatedArray,
-                componentId: componentId!,
+                componentId: wrapper.componentId,
+                meta: wrapper.meta,
               });
 
-              const reactElement = wrapper.mapFn(
-                newItem,
-                itemSetter,
-                newIndex,
-                updatedArray,
-                arraySetter
+              root.render(
+                createElement(MemoizedCogsItemWrapper, {
+                  stateKey: thisKey,
+                  itemComponentId: componentId,
+                  itemPath: itemPath,
+                  localIndex: newIndex,
+                  arraySetter: arraySetter,
+                  rebuildStateShape: wrapper.rebuildStateShape,
+                  renderFn: wrapper.mapFn,
+                })
               );
-
-              root.render(reactElement);
             }
           });
         }
@@ -2191,6 +2179,7 @@ function createProxyHandler<T>(
                 arraySetter: any
               ) => ReactNode
             ) => {
+              const [render, forceUpdate] = useState(1);
               const arrayToMap = getGlobalStore
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds);
@@ -2198,7 +2187,9 @@ function createProxyHandler<T>(
               if (!Array.isArray(arrayToMap)) {
                 return null;
               }
-
+              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+                forceUpdate((p) => p + 1);
+              });
               const itemKeysForCurrentView =
                 meta?.validIds ||
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2926,7 +2917,6 @@ export function $cogsSignal(proxy: {
 }
 
 import { createRoot } from "react-dom/client";
-
 function SignalMapRenderer({
   proxy,
   rebuildStateShape,
@@ -2943,11 +2933,12 @@ function SignalMapRenderer({
       arraySetter: any
     ) => ReactNode;
   };
-  rebuildStateShape: (
-    currentState: any,
-    path: string[],
-    meta?: MetaData
-  ) => any;
+  rebuildStateShape: (stuff: {
+    currentState: any;
+    path: string[];
+    componentId: string;
+    meta?: MetaData;
+  }) => any;
 }): JSX.Element | null {
   const containerRef = useRef<HTMLDivElement>(null);
   const instanceIdRef = useRef<string>(`map-${crypto.randomUUID()}`);
@@ -2971,6 +2962,10 @@ function SignalMapRenderer({
         instanceId: instanceIdRef.current,
         mapFn: proxy._mapFn,
         containerRef: container,
+        rebuildStateShape: rebuildStateShape,
+        path: proxy._path,
+        componentId: instanceIdRef.current,
+        meta: proxy._meta,
       });
 
       getGlobalStore
@@ -3025,44 +3020,38 @@ function SignalMapRenderer({
       .getShadowMetadata(proxy._stateKey, proxy._path);
     const arrayKeys = arrayMeta?.arrayKeys || [];
 
+    const arraySetter = rebuildStateShape({
+      currentState: value,
+      path: proxy._path,
+      componentId: instanceIdRef.current,
+      meta: proxy._meta,
+    });
+
     value.forEach((item, index) => {
       const itemKey = arrayKeys[index]!;
-
+      const itemComponentId = uuidv4();
       const itemElement = document.createElement("div");
 
       itemElement.setAttribute("data-item-path", itemKey);
-
       container.appendChild(itemElement);
 
       const root = createRoot(itemElement);
       rootsMapRef.current.set(itemKey, root);
 
-      const itemSetter = rebuildStateShape(
-        item,
-        itemKey.split(".").slice(1) as string[],
-        proxy._meta
-      );
-      const arraySetter = rebuildStateShape(
-        value,
-        [proxy._stateKey, ...proxy._path],
-        proxy._meta
-      );
-      console.log(
-        "valuevaluevaluevaluevaluevaluevaluevaluevalue",
-        arraySetter.get(),
-        Array.isArray(value),
-        proxy._path,
-        [proxy._stateKey, ...proxy._path].join(".")
-      );
-      const reactElement = proxy._mapFn(
-        item,
-        itemSetter,
-        index,
-        value,
-        arraySetter
-      );
+      const itemPath = itemKey.split(".").slice(1) as string[];
 
-      root.render(reactElement);
+      // Render CogsItemWrapper instead of direct render
+      root.render(
+        createElement(MemoizedCogsItemWrapper, {
+          stateKey: proxy._stateKey,
+          itemComponentId: itemComponentId,
+          itemPath: itemPath,
+          localIndex: index,
+          arraySetter: arraySetter,
+          rebuildStateShape: rebuildStateShape,
+          renderFn: proxy._mapFn,
+        })
+      );
     });
   };
 
