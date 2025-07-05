@@ -642,11 +642,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       } else {
         newMap.set(arrayKey, itemKey);
       }
-      console.log("setSelectedIndex", newMap);
-      const shadowstate = getGlobalStore
-        .getState()
-        .shadowStateStore.get(arrayKey);
-      console.log("shadowstate", shadowstate);
+
       return {
         ...state,
         selectedIndicesMap: newMap,

@@ -154,6 +154,7 @@ export type ArrayEndType<TShape extends unknown> = {
   } & EndType<InferArrayElement<TShape>>;
   insert: InsertType<InferArrayElement<TShape>>;
   cut: CutFunctionType<TShape>;
+  cutSelected: () => void;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
   stateSort: (
@@ -1260,12 +1261,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         const arrayPath = path.slice(0, -1); // Remove the item ID
 
         const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
-        console.log(
-          store.shadowStateStore,
-          "999999999999999999999999999999999999999",
-          thisKey,
-          arrayPath
-        );
+
         if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
           arrayMeta.mapWrappers.forEach((wrapper) => {
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
@@ -1703,7 +1699,6 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === "getSelected") {
             return () => {
-              console.log("9999999999999999999", path);
               registerComponentDependency(stateKey, componentId, [
                 ...path,
                 "getSelected",
@@ -2418,31 +2413,53 @@ function createProxyHandler<T>(
 
           if (prop === "cut") {
             return (index?: number, options?: { waitForSync?: boolean }) => {
-              // --- THE FIX ---
-              // 1. Prioritize the list of valid IDs from the current derived proxy's meta.
-              //    Fall back to the original array's keys only if we're on an unfiltered proxy.
-              const keysForThisView =
+              const validKeys =
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys;
 
-              if (!keysForThisView || keysForThisView.length === 0) return; // Nothing to cut
+              if (!validKeys || validKeys.length === 0) return;
 
-              // 2. Determine which item to cut based on the current view.
-              //    If no index is provided, cut the LAST item of the CURRENT view.
               const indexToCut =
-                index !== undefined ? index : keysForThisView.length - 1;
+                index == -1
+                  ? validKeys.length - 1
+                  : index !== undefined
+                    ? index
+                    : validKeys.length - 1;
 
-              // Get the full, unique ID of the item to cut.
-              const fullIdToCut = keysForThisView[indexToCut];
-
+              const fullIdToCut = validKeys[indexToCut];
               if (!fullIdToCut) return; // Index out of bounds
 
-              // 3. The path for effectiveSetState is just the item's path parts.
               const pathForCut = fullIdToCut.split(".").slice(1);
-
-              // Call the effective setState to perform the deletion from the global store.
               effectiveSetState(currentState, pathForCut, {
+                updateType: "cut",
+              });
+            };
+          }
+          if (prop === "cutSelected") {
+            return () => {
+              const validKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+
+              if (!validKeys || validKeys.length === 0) return;
+
+              const indexKeyToCut = getGlobalStore
+                .getState()
+                .selectedIndicesMap.get(stateKeyPathKey);
+
+              let indexToCut = validKeys.findIndex(
+                (key) => key === indexKeyToCut
+              );
+
+              const pathForCut = validKeys[
+                indexToCut == -1 ? validKeys.length - 1 : indexToCut
+              ]
+                ?.split(".")
+                .slice(1);
+
+              effectiveSetState(currentState, pathForCut!, {
                 updateType: "cut",
               });
             };
@@ -2651,7 +2668,7 @@ function createProxyHandler<T>(
         }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
-          console.log("selected", componentId, [stateKey, ...path, "selected"]);
+
           registerComponentDependency(stateKey, componentId, [
             ...path,
             "selected",
@@ -3322,7 +3339,6 @@ function CogsItemWrapper({
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
 
-  const fullStateKey = [stateKey, ...itemPath].join(".");
   // Proper way to merge refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {

@@ -1,11 +1,10 @@
 "use client";
 
-import React from "react";
 import type { StateObject } from "../../../src/CogsState";
 import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
 import { FlashWrapper } from "../FlashOnUpdate";
-
+import { faker } from "@faker-js/faker";
 // --- IMPORTS for syntax highlighting in the main component ---
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
@@ -36,13 +35,6 @@ const initialState: GameDashboardState = {
     { id: 4, name: "Aegis", score: 1100, specialty: "Support", team: "blue" },
     { id: 5, name: "Ghost", score: 850, specialty: "Defense", team: "blue" },
   ],
-};
-
-const newPlayer = {
-  id: "...",
-  name: "New Recruit",
-  score: 0,
-  specialty: "Support" as const,
 };
 
 export const { useCogsState } = createCogsState(
@@ -127,7 +119,9 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
 
   const handleAddItem = (color: "red" | "blue") => {
     dashboardState.players.insert(({ uuid }) => ({
-      ...newPlayer,
+      name: faker.person.firstName(),
+      score: 0,
+      specialty: "Support" as const,
       id: uuid,
       team: color,
     }));
@@ -158,6 +152,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   `;
   const filterAndRenderCode = `dashboardState.players
   .stateFilter(player => player.team === ${color})`;
+
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
@@ -192,11 +187,11 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
               Add Player
             </button>
             <button
-              onClick={() =>
+              onClick={() => {
                 dashboardState.players
                   .stateFilter((player) => player.team === color)
-                  .cut()
-              }
+                  .cutSelected();
+              }}
               className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
             >
               Cut Team
