@@ -6,6 +6,10 @@ import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
 import { FlashWrapper } from "../FlashOnUpdate";
 
+// --- IMPORTS for syntax highlighting in the main component ---
+import SyntaxHighlighter from "react-syntax-highlighter";
+import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
+
 // --- State Definition with a Flat Player List ---
 export type Player = {
   id: string | number;
@@ -34,6 +38,13 @@ const initialState: GameDashboardState = {
   ],
 };
 
+const newPlayer = {
+  id: "...",
+  name: "New Recruit",
+  score: 0,
+  specialty: "Support" as const,
+};
+
 export const { useCogsState } = createCogsState(
   {
     gameDashboard: initialState,
@@ -50,11 +61,12 @@ export default function ArrayMethodsPage() {
         <DotPattern>
           <div className="px-8 py-4">
             <h1 className="text-2xl font-bold text-gray-200">
-              Team Roster Management
+              Array Method Examples
             </h1>
             <p className="text-sm text-gray-400 max-w-2xl">
-              Select a player from either team to edit their stats. All updates
-              are granular.
+              Use the buttons to perform granular array operations like insert,
+              filter, and cut. The syntax for each operation is shown below the
+              controls.
             </p>
           </div>
         </DotPattern>
@@ -62,16 +74,16 @@ export default function ArrayMethodsPage() {
         <GameDetails />
 
         <div className="grid grid-cols-2 gap-4">
-          {/* ItemList now just needs a color to filter the main players list */}
           <ItemList title="Red Team" color="red" />
           <ItemList title="Blue Team" color="blue" />
         </div>
       </div>
 
-      {/* --- RIGHT COLUMN (Detail Editor) --- */}
-      <div className="w-2/5 sticky top-6">
+      {/* --- RIGHT COLUMN (Detail Editor & Live State) --- */}
+      <div className="w-2/5 sticky top-6 flex flex-col gap-4">
         <div className="h-26" />
         <ItemDetailForm />
+        <ShowFullState />
       </div>
     </div>
   );
@@ -114,13 +126,10 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   });
 
   const handleAddItem = (color: "red" | "blue") => {
-    // Insert into the main `players` array, not the filtered `teamState`
     dashboardState.players.insert(({ uuid }) => ({
+      ...newPlayer,
       id: uuid,
-      name: `New Recruit ${uuid.substring(0, 4)}`,
-      score: 0,
-      specialty: "Support",
-      team: color, // Set team color correctly
+      team: color,
     }));
   };
 
@@ -137,64 +146,76 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
     },
   };
 
+  // --- UPDATED: More concise insert example ---
+  const addCode = `dashboardState.players.insert(({ uuid }) => ({
+  ...newPlayer, id: uuid, team: "${color}",
+}));
+  `;
+
+  const cutCode = `dashboardState.players
+  .stateFilter((p) => p.team === "${color}")
+  .cut();
+  `;
+  const filterAndRenderCode = `dashboardState.players
+  .stateFilter(player => player.team === ${color})`;
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
         <h3 className={`font-bold text-base ${teamColors[color].text}`}>
           {title}
-        </h3>
+        </h3>{" "}
+        <CodeSnippetDisplay title="" code={filterAndRenderCode} />
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {/* $stateMap works perfectly on the filtered `teamState` proxy */}
           {dashboardState.players
             .stateFilter((player) => player.team === color)
             .$stateMap((_item, itemSetter) => (
               <FlashWrapper key={itemSetter.id.get()}>
                 <button
-                  onClick={() => {
-                    itemSetter.setSelected(true);
-                  }}
-                  className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
-                    // `_selected` now checks against the master players list's selection state
+                  onClick={() => itemSetter.setSelected(true)}
+                  className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
                     itemSetter._selected
                       ? teamColors[color].selected
                       : "bg-gray-800 hover:bg-gray-700/70"
                   }`}
                 >
                   {itemSetter.name.get()}
-                  {itemSetter.team.get()}
                 </button>
               </FlashWrapper>
             ))}
         </div>
-        <div className="pt-2 border-t border-gray-700 flex gap-2">
-          <button
-            onClick={() => handleAddItem(color)}
-            className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
-          >
-            Add Player
-          </button>
-          <button
-            onClick={() =>
-              dashboardState.players
-                .stateFilter((player) => player.team === color)
-                .cut()
-            }
-            className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
-          >
-            Cut Last
-          </button>
+        <div className="pt-2 border-t border-gray-700">
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleAddItem(color)}
+              className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
+            >
+              Add Player
+            </button>
+            <button
+              onClick={() =>
+                dashboardState.players
+                  .stateFilter((player) => player.team === color)
+                  .cut()
+              }
+              className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
+            >
+              Cut Team
+            </button>
+          </div>
+          <div className="mt-4 space-y-3">
+            <CodeSnippetDisplay title="Add" code={addCode} />
+            <CodeSnippetDisplay title="Cut" code={cutCode} />
+          </div>
         </div>
       </div>
     </FlashWrapper>
   );
 }
 
-// --- Right Column Component (Simplified) ---
+// --- Right Column Components ---
 
 function ItemDetailForm() {
   const dashboardState = useCogsState("gameDashboard");
-
-  // Selection logic is now much simpler: just check the main players list.
   const selectedPlayer = dashboardState.players.getSelected();
 
   return (
@@ -217,7 +238,6 @@ function ItemDetailForm() {
             Select a player to edit.
           </div>
         )}
-        {/* Pass the selected player and the main players array to the form */}
         {selectedPlayer && (
           <PlayerForm
             playerState={selectedPlayer}
@@ -228,8 +248,6 @@ function ItemDetailForm() {
     </FlashWrapper>
   );
 }
-
-// --- Combined Player Form (With Improved Styling) ---
 
 function PlayerForm({
   playerState,
@@ -292,5 +310,51 @@ function PlayerForm({
         </button>
       </div>
     </div>
+  );
+}
+
+// --- Helper Components ---
+
+function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
+  return (
+    <div>
+      {title && (
+        <h4 className="text-gray-500 text-xs font-semibold mb-1 ml-1">
+          {title}
+        </h4>
+      )}
+      <div className="bg-gray-950 rounded overflow-hidden">
+        <SyntaxHighlighter
+          language="javascript"
+          style={atomOneDark}
+          customStyle={{
+            backgroundColor: "transparent",
+            fontSize: "11px",
+            padding: "0.5rem",
+            margin: 0,
+          }}
+          codeTagProps={{ style: { fontFamily: "inherit" } }}
+        >
+          {code.trim()}
+        </SyntaxHighlighter>
+      </div>
+    </div>
+  );
+}
+
+function ShowFullState() {
+  const dashboardState = useCogsState("gameDashboard", { reactiveType: "all" });
+
+  return (
+    <FlashWrapper>
+      <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 overflow-hidden">
+        <h3 className="text-gray-300 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
+          Live Player Array State
+        </h3>
+        <pre className="text-xs overflow-auto flex-grow text-gray-300">
+          {JSON.stringify(dashboardState.players.get(), null, 2)}
+        </pre>
+      </div>
+    </FlashWrapper>
   );
 }

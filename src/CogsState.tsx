@@ -1554,9 +1554,7 @@ function createProxyHandler<T>(
   }): any {
     const cacheKey = path.map(String).join(".");
     const stateKeyPathKey = [stateKey, ...path].join(".");
-    if (!componentId) {
-      console.error("dasdsadsadasd");
-    }
+
     currentState = getGlobalStore
       .getState()
       .getShadowValue(stateKeyPathKey, meta?.validIds);
