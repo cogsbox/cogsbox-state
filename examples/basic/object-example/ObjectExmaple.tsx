@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { StateObject } from "../../../src/CogsState";
 import { createCogsState } from "../../../src/CogsState";
 import DotPattern from "../DotWrapper";
@@ -112,21 +112,25 @@ function GameDetails() {
     </FlashWrapper>
   );
 }
-
 function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   const dashboardState = useCogsState("gameDashboard", {
-    reactiveType: "none",
+    reactiveType: "component", // Changed from "none" to make it reactive
   });
 
-  const handleAddItem = (color: "red" | "blue") => {
-    dashboardState.players.insert(({ uuid }) => ({
-      name: faker.person.firstName(),
-      score: 0,
-      specialty: "Support" as const,
-      id: uuid,
-      team: color,
-    }));
-  };
+  const [sortBy, setSortBy] = useState<"score" | "name">("score");
+  // Keep state for sort direction
+  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+
+  // --- THIS IS THE KEY SIMPLIFICATION ---
+  const filteredAndSorted = dashboardState.players
+    .stateFilter((player) => player.team === color)
+    .stateSort((a, b) => {
+      const direction = sortDirection === "asc" ? 1 : -1;
+      // Use a simple ternary to pick the comparison logic
+      return sortBy === "score"
+        ? (a.score - b.score) * direction
+        : a.name.localeCompare(b.name) * direction;
+    });
 
   const teamColors = {
     red: {
@@ -161,41 +165,78 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   return (
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
-        <h3 className={`font-bold text-base ${teamColors[color].text}`}>
-          {title}
-        </h3>{" "}
+        <div className="flex items-center justify-between">
+          <h3 className={`font-bold text-base ${teamColors[color].text}`}>
+            {title}
+          </h3>
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setSortBy("score");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                sortBy === "score"
+                  ? "bg-sky-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              Sort Score{" "}
+              {sortBy === "score" && (sortDirection === "asc" ? "↑" : "↓")}
+            </button>
+            <button
+              onClick={() => {
+                setSortBy("name");
+                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+              }}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                sortBy === "name"
+                  ? "bg-sky-700 text-gray-300 hover:bg-gray-600"
+                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+              }`}
+            >
+              Sort Name{" "}
+              {sortBy === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+            </button>
+          </div>
+        </div>
         <CodeSnippetDisplay title="" code={filterAndRenderCode} />
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {dashboardState.players
-            .stateFilter((player) => player.team === color)
-            .$stateMap((itemSetter) => (
-              <FlashWrapper key={itemSetter.id.get()}>
-                <button
-                  onClick={() => itemSetter.setSelected(true)}
-                  className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
-                    itemSetter._selected
-                      ? teamColors[color].selected
-                      : "bg-gray-800 hover:bg-gray-700/70"
-                  }`}
-                >
-                  {itemSetter.name.get()}
-                </button>
-              </FlashWrapper>
-            ))}
+          {filteredAndSorted.$stateMap((itemSetter) => (
+            <FlashWrapper key={itemSetter.id.get()}>
+              <button
+                onClick={() => itemSetter.setSelected(true)}
+                className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
+                  itemSetter._selected
+                    ? teamColors[color].selected
+                    : "bg-gray-800 hover:bg-gray-700/70"
+                }`}
+              >
+                <div>{itemSetter.name.get()}</div>{" "}
+                <div>{itemSetter.score.get()}</div>
+              </button>
+            </FlashWrapper>
+          ))}
         </div>
         <div className="pt-2 border-t border-gray-700">
           <div className="flex gap-2">
             <button
-              onClick={() => handleAddItem(color)}
+              onClick={() =>
+                dashboardState.players.insert(({ uuid }) => ({
+                  name: faker.person.firstName(),
+                  score: 0,
+                  specialty: "Support" as const,
+                  id: uuid,
+                  team: color,
+                }))
+              }
               className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
             >
               Add Player
             </button>
             <button
               onClick={() => {
-                dashboardState.players
-                  .stateFilter((player) => player.team === color)
-                  .cutSelected();
+                filteredAndSorted.cutSelected();
               }}
               className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
             >

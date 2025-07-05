@@ -1194,10 +1194,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
             // --- THE FIX IS HERE ---
             // Check if the wrapper has an array of filter functions.
-            if (wrapper.meta?.filterFns && wrapper.meta.filterFns.length > 0) {
+            if (
+              wrapper.meta?.transforms &&
+              wrapper.meta.transforms.length > 0
+            ) {
               // Test if the new item passes EVERY filter in the chain.
               if (
-                wrapper.meta.filterFns.every((fn: any) => fn(newItemValue, -1))
+                wrapper.meta.transforms.every((fn: any) => fn(newItemValue, -1))
               ) {
                 shouldRender = true;
                 localIndex = (wrapper.meta.validIds || []).length;
@@ -1456,7 +1459,7 @@ type MetaData = {
    * `$stateMap` renderer on a filtered view can use these functions to test if the
    * newly inserted item should be dynamically rendered in its view.
    */
-  filterFns?: Array<(value: any, index: number) => boolean>;
+  transforms?: Array<Function>;
 };
 const registerComponentDependency = (
   stateKey: string,
@@ -2164,7 +2167,7 @@ function createProxyHandler<T>(
                   ...meta,
                   validIds: newValidIds,
 
-                  filterFns: [...(meta?.filterFns || []), callbackfn],
+                  transforms: [...(meta?.transforms || []), callbackfn],
                 },
               });
             };
@@ -2526,6 +2529,7 @@ function createProxyHandler<T>(
                 componentId: componentId!,
                 meta: {
                   validIds: itemsWithIds.map((i) => i.key) as string[],
+                  transforms: [...(meta?.transforms || []), compareFn],
                 },
               });
             };

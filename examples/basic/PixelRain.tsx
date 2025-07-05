@@ -326,7 +326,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
 
       <div
         ref={cybermanRef}
-        className="fixed bottom-[20vh] left-[20vh] h-[500px]"
+        className="fixed bottom-[10vh] left-[10vh] h-[500px]"
         style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
         <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{" "}

@@ -13,8 +13,8 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
     <div className="relative  z-0">
       {" "}
-      <div className="fixed left-0 w-[8vw] h-[100vh] bg-gradient-to-r from-black/50 to-black/00" />
-      <div className="fixed right-0 w-[8vw] h-[100vh] bg-gradient-to-l from-black/50 to-black/00" />
+      <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/70 to-black/00 pointer-events-none" />
+      <div className="fixed right-0 w-[16vw] h-[100vh] bg-gradient-to-l from-black/70 to-black/00 pointer-events-none" />
       <div className="pointer-events-none ">
         {" "}
         <PixelRain />{" "}
