@@ -118,6 +118,7 @@ export type ShadowMetadata = {
     ) => ReactNode;
     containerRef: HTMLDivElement | null;
   }>;
+  pathComponents?: Set<string>;
 } & ComponentsType;
 
 export type CogsGlobalState = {
@@ -302,7 +303,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   initializeShadowState: (key: string, initialState: any) => {
     // Get the existing shadow store
     const existingShadowStore = new Map(get().shadowStateStore);
-
+    console.log("existingShadowStore", existingShadowStore);
     const processValue = (value: any, path: string[]) => {
       const nodeKey = [key, ...path].join(".");
 

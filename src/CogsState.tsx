@@ -1061,10 +1061,34 @@ export function useCogsStateFn<TStateObject extends unknown>(
     forceUpdate({});
 
     return () => {
-      // Cleanup: remove component from shadow metadata
       const meta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+      const component = meta?.components?.get(componentKey);
+
+      // Remove from each path we registered to
+      if (component?.paths) {
+        component.paths.forEach((fullPath) => {
+          // fullPath is like "todos.0.name", need to split and remove stateKey
+          const pathParts = fullPath.split(".");
+          const path = pathParts.slice(1); // Remove stateKey part
+
+          const pathMeta = getGlobalStore
+            .getState()
+            .getShadowMetadata(thisKey, path);
+          if (pathMeta?.pathComponents) {
+            // Optionally clean up empty Sets
+
+            if (pathMeta.pathComponents.size === 0) {
+              delete pathMeta.pathComponents;
+              getGlobalStore
+                .getState()
+                .setShadowMetadata(thisKey, path, pathMeta);
+            }
+          }
+        });
+      }
+
+      // Remove from root components
       if (meta?.components) {
-        meta.components.delete(componentKey);
         getGlobalStore.getState().setShadowMetadata(thisKey, [], meta);
       }
     };
@@ -1305,84 +1329,43 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       const newState = store.getShadowValue(thisKey);
-      const changedPaths = getDifferences(prevValue, newState);
-      // Get the root shadow metadata where components are stored
-      const shadowMetaRoort = store.getShadowMetadata(thisKey, []);
-      console.log(
-        "reactiveTypesreactiveTypesreactiveTypes 123123",
-        shadowMetaRoort,
-        fullPath
-      );
-      if (shadowMetaRoort?.components) {
-        const changedPathsSet = new Set(changedPaths);
 
-        for (const [
-          componentKey,
-          component,
-        ] of shadowMetaRoort.components.entries()) {
-          let shouldUpdate = false;
+      const rootMeta = store.getShadowMetadata(thisKey, []);
+      const notifiedComponents = new Set<string>();
+
+      // Handle "all" reactive components first
+      if (rootMeta?.components) {
+        rootMeta.components.forEach((component, componentId) => {
           const reactiveTypes = Array.isArray(component.reactiveType)
             ? component.reactiveType
             : [component.reactiveType || "component"];
 
-          if (reactiveTypes.includes("none")) continue;
           if (reactiveTypes.includes("all")) {
             component.forceUpdate();
-            continue;
+            notifiedComponents.add(componentId);
           }
-
-          if (reactiveTypes.includes("component")) {
-            if (component.paths.has(fullPath)) {
-              shouldUpdate = true;
-            }
-            for (const changedPath of changedPathsSet) {
-              for (const subscribedPath of component.paths) {
-                // Case 1: Exact match (e.g., changed 'a.b' and subscribed to 'a.b')
-                // Case 2: Changed is a child (e.g., changed 'a.b.c' and subscribed to 'a.b')
-                // Case 3: Subscribed to root (e.g., subscribedPath is '', matches everything)
-                if (
-                  changedPath === subscribedPath ||
-                  (subscribedPath !== "" &&
-                    changedPath.startsWith(subscribedPath + ".")) ||
-                  subscribedPath === ""
-                ) {
-                  shouldUpdate = true;
-                  break; // Exit inner loop once a match is found
-                }
-              }
-              if (shouldUpdate) {
-                break; // Exit outer loop too
-              }
-            }
-          }
-
-          if (!shouldUpdate && reactiveTypes.includes("deps")) {
-            if (component.depsFunction) {
-              const fullState = store.getShadowValue(thisKey);
-              const newDeps = component.depsFunction(fullState);
-
-              // Case 1: The deps function returned `true`. Always re-render.
-              if (newDeps === true) {
-                shouldUpdate = true;
-              }
-              // Case 2: The deps function returned an array. Compare it.
-              else if (Array.isArray(newDeps)) {
-                if (!isDeepEqual(component.deps, newDeps)) {
-                  // The dependencies have changed.
-                  // Update the stored value for the next check and flag for re-render.
-                  component.deps = newDeps;
-                  shouldUpdate = true;
-                }
-              }
-              // Case 3: The function returned undefined, null, false, etc. Do nothing.
-            }
-          }
-          if (shouldUpdate) {
-            component.forceUpdate();
-          }
-        }
+        });
       }
 
+      // Direct lookup for components at THIS path
+      const pathMeta = store.getShadowMetadata(thisKey, path);
+      if (pathMeta?.pathComponents) {
+        pathMeta.pathComponents.forEach((componentId) => {
+          if (!notifiedComponents.has(componentId)) {
+            const component = rootMeta?.components?.get(componentId);
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || "component"];
+
+              if (component && !reactiveTypes.includes("none")) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            }
+          }
+        });
+      }
       setStateLog(thisKey, (prevLogs) => {
         const logs = [...(prevLogs ?? []), newUpdate];
         const aggregatedLogs = new Map<string, typeof newUpdate>();
@@ -1470,25 +1453,22 @@ export function useCogsStateFn<TStateObject extends unknown>(
 type MetaData = {
   validIds?: string[];
 };
+
 const registerComponentDependency = (
   stateKey: string,
   componentId: string,
   dependencyPath: string[]
 ) => {
   const fullComponentId = `${stateKey}////${componentId}`;
-  let components = getGlobalStore
-    .getState()
-    .getShadowMetadata(stateKey, [])?.components;
+  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+  const component = rootMeta?.components?.get(fullComponentId);
 
-  let component = components?.get(fullComponentId);
-
-  // Guard clause: Exit if no component or not the right reactivity type.
   if (
     !component ||
     !(
       Array.isArray(component.reactiveType)
         ? component.reactiveType
-        : [component.reactiveType || "component"]
+        : [component.reactiveType]
     ).includes("component")
   ) {
     return;
@@ -1496,13 +1476,26 @@ const registerComponentDependency = (
 
   const pathKey = [stateKey, ...dependencyPath].join(".");
 
-  // Add the new path and remove any now-redundant child paths.
+  // Add to component's paths (existing logic)
   component.paths.add(pathKey);
-  for (const p of Array.from(component.paths)) {
-    if (p !== pathKey && p.startsWith(pathKey + ".")) {
-      component.paths.delete(p);
-    }
-  }
+
+  // NEW: Also store componentId at the path level
+  const pathMeta =
+    getGlobalStore.getState().getShadowMetadata(stateKey, dependencyPath) || {};
+  const pathComponents = pathMeta.pathComponents || new Set<string>();
+  pathComponents.add(fullComponentId);
+  // console.log(
+  //   "pathComponents",
+  //   pathMeta,
+  //   pathComponents,
+  //   stateKey,
+  //   componentId,
+  //   dependencyPath
+  // );
+  getGlobalStore.getState().setShadowMetadata(stateKey, dependencyPath, {
+    ...pathMeta,
+    pathComponents,
+  });
 };
 function createProxyHandler<T>(
   stateKey: string,
@@ -1578,30 +1571,6 @@ function createProxyHandler<T>(
           return (baseObj as any)[prop];
         }
         // ^--------- END OF FIX ---------^
-
-        const mutationMethods = new Set([
-          "insert",
-          "cut",
-          "cutByValue",
-          "toggleByValue",
-          "uniqueInsert",
-          "update",
-          "applyJsonPatch",
-          "setSelected",
-          "toggleSelected",
-          "clearSelected",
-          "sync",
-          "validateZodSchema",
-          "revertToInitialState",
-          "updateInitialState",
-          "removeValidation",
-          "setValidation",
-          "removeStorage",
-          "middleware",
-          "_componentId",
-          "_stateKey",
-          "getComponents",
-        ]);
 
         if (prop === "getDifferences") {
           return () =>
@@ -1719,7 +1688,7 @@ function createProxyHandler<T>(
               console.log("9999999999999999999", path);
               registerComponentDependency(stateKey, componentId, [
                 ...path,
-                "selected",
+                "getSelected",
               ]);
 
               const fullKey = stateKey + "." + path.join(".");
@@ -2574,7 +2543,11 @@ function createProxyHandler<T>(
         }
         if (prop === "_selected") {
           const parentPath = path.slice(0, -1);
-          registerComponentDependency(stateKey, componentId, path);
+          console.log("selected", componentId, [stateKey, ...path, "selected"]);
+          registerComponentDependency(stateKey, componentId, [
+            ...path,
+            "selected",
+          ]);
           if (
             Array.isArray(
               getGlobalStore.getState().getNestedState(stateKey, parentPath)
@@ -2595,93 +2568,92 @@ function createProxyHandler<T>(
             const parentPath = path.slice(0, -1);
             const fullParentKey = stateKey + "." + parentPath.join(".");
             const fullItemKey = stateKey + "." + path.join(".");
-            console.log(
-              "fullParentKeyfullParentKeyfullParentKeyfullParentKey",
-              fullParentKey,
-              fullItemKey
-            );
+
+            const selectedIndex = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(fullParentKey);
+            // Notify components
+            const store = getGlobalStore.getState();
+            const rootMeta = store.getShadowMetadata(stateKey, []);
+            const notifiedComponents = new Set<string>();
+
+            // Handle "all" reactive components
+            if (rootMeta?.components) {
+              rootMeta.components.forEach((component, componentId) => {
+                const reactiveTypes = Array.isArray(component.reactiveType)
+                  ? component.reactiveType
+                  : [component.reactiveType || "component"];
+
+                if (reactiveTypes.includes("all")) {
+                  component.forceUpdate();
+                  notifiedComponents.add(componentId);
+                }
+              });
+            }
+            store
+              .getShadowMetadata(stateKey, [...parentPath, "getSelected"])
+              ?.pathComponents?.forEach((component, componentId) => {
+                const thisComp = rootMeta?.components?.get(componentId);
+                thisComp?.forceUpdate();
+              });
+
+            // Direct lookup for components that depend on the parent array path
+            const parentMeta = store.getShadowMetadata(stateKey, parentPath);
+
+            for (let arrayKey of parentMeta?.arrayKeys || []) {
+              const key = arrayKey + ".selected";
+
+              const selecetdItem = store.getShadowMetadata(
+                stateKey,
+                key.split(".").slice(1)
+              );
+              if (arrayKey == selectedIndex) {
+                selecetdItem?.pathComponents?.forEach(
+                  (component, componentId) => {
+                    const thisComp = rootMeta?.components?.get(componentId);
+                    thisComp?.forceUpdate();
+                  }
+                );
+              }
+            }
+            // for (let arrayKey of parentMeta?.arrayKeys || []) {
+            //   if (arrayKey !== fullItemKey && selectedIndex === arrayKey) {
+            //     const selectedPAth = [...parentPath, "getSelected"];
+            //     console.log(getGlobalStore.getState().shadowStateStore);
+
+            //     store
+            //       .getShadowMetadata(stateKey, selectedPAth)
+            //       ?.pathComponents?.forEach((componentget, componentId) => {
+            //         const component = rootMeta?.components?.get(componentId);
+            //         component?.forceUpdate();
+            //       });
+            //     const selectedIndex = getGlobalStore
+            //       .getState()
+            //       .selectedIndicesMap.get(fullParentKey);
+
+            //     store
+            //       .getShadowMetadata(stateKey, selectedPAth)
+            //       ?.pathComponents?.forEach((component, componentId) => {
+            //         if (!notifiedComponents.has(componentId)) {
+            //           const component = rootMeta?.components?.get(componentId);
+
+            //           if (component?.paths.has(selectedIndex + ".selected")) {
+            //             // console.log(
+            //             //   "!notifiedComponents.has(componentId) 123123",
+            //             //   component?.paths
+            //             // );
+            //             component?.forceUpdate();
+            //             notifiedComponents.add(componentId);
+            //           }
+            //         }
+            //       });
+            //   }
+            // }
             // Update the selection
             if (value) {
               getGlobalStore
                 .getState()
                 .setSelectedIndex(fullParentKey, fullItemKey);
-            } else {
-              getGlobalStore
-                .getState()
-                .clearSelectedIndex({ stateKey, path: parentPath });
-            }
-
-            // Notify components that depend on the parent array
-            const store = getGlobalStore.getState();
-            const shadowMetaRoot = store.getShadowMetadata(stateKey, []);
-            console.log(
-              "shadowMetaRootshadowMetaRootshadowMetaRootshadowMetaRoot 22222222222222222",
-              shadowMetaRoot
-            );
-            if (shadowMetaRoot?.components) {
-              const changedPath = parentPath.join(".");
-
-              for (const [
-                componentKey,
-                component,
-              ] of shadowMetaRoot.components.entries()) {
-                let shouldUpdate = false;
-                const reactiveTypes = Array.isArray(component.reactiveType)
-                  ? component.reactiveType
-                  : [component.reactiveType || "component"];
-
-                if (reactiveTypes.includes("none")) continue;
-                if (reactiveTypes.includes("all")) {
-                  component.forceUpdate();
-                  continue;
-                }
-                console.log(
-                  "reactcomponentcomponentcomponentcomponentcomponentcomponentes 322",
-                  component.paths
-                );
-                if (component.paths.has(fullParentKey + ".selected")) {
-                  console.log(
-                    "reactiveTypesreactiveTypesreactiveTypes 322",
-                    componentKey,
-                    component,
-                    fullItemKey
-                  );
-                  shouldUpdate = true;
-                }
-                if (reactiveTypes.includes("component")) {
-                  // Check if this component depends on the array that had its selection changed
-                  for (const subscribedPath of component.paths) {
-                    if (
-                      changedPath === subscribedPath ||
-                      subscribedPath === "" ||
-                      changedPath.startsWith(subscribedPath + ".")
-                    ) {
-                      shouldUpdate = true;
-                      break;
-                    }
-                  }
-                }
-
-                if (!shouldUpdate && reactiveTypes.includes("deps")) {
-                  if (component.depsFunction) {
-                    const fullState = store.getShadowValue(stateKey);
-                    const newDeps = component.depsFunction(fullState);
-
-                    if (newDeps === true) {
-                      shouldUpdate = true;
-                    } else if (Array.isArray(newDeps)) {
-                      if (!isDeepEqual(component.deps, newDeps)) {
-                        component.deps = newDeps;
-                        shouldUpdate = true;
-                      }
-                    }
-                  }
-                }
-
-                if (shouldUpdate) {
-                  component.forceUpdate();
-                }
-              }
             }
           };
         }
@@ -3310,28 +3282,20 @@ function CogsItemWrapper({
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
   }, [entry, stateKey, itemPath]);
+  const fullComponentId = `${stateKey}////${itemComponentId}`;
+  const stateEntry = getGlobalStore.getState().getShadowMetadata(stateKey, []);
 
-  useLayoutEffect(() => {
-    const fullComponentId = `${stateKey}////${itemComponentId}`;
-    const stateEntry = getGlobalStore
-      .getState()
-      .getShadowMetadata(stateKey, []);
-
-    // Register the component's existence for cleanup and other non-data-path triggers.
-    // Crucially, initialize with an EMPTY set of paths.
-    // The specific field dependencies will be added by `registerComponentDependency`
-    // when `.get()` is called on a field inside the rendered children.
+  if (!stateEntry?.components?.has(fullComponentId)) {
     stateEntry?.components?.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(), // <--- THE FIX
       reactiveType: ["component"],
     });
+  }
 
+  useLayoutEffect(() => {
     return () => {
-      const stateEntry = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, []);
-      stateEntry?.components?.delete(fullComponentId);
+      cleanupComponentRegistration(stateKey, fullComponentId);
     };
     // The itemPath is no longer needed as a dependency for this effect
   }, [stateKey, itemComponentId]);
@@ -3365,3 +3329,36 @@ function CogsItemWrapper({
     </div>
   );
 }
+const cleanupComponentRegistration = (
+  stateKey: string,
+  componentId: string
+) => {
+  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+  const component = rootMeta?.components?.get(componentId);
+
+  // Remove from all registered paths
+  if (component?.paths) {
+    component.paths.forEach((fullPath) => {
+      const pathParts = fullPath.split(".");
+      const path = pathParts.slice(1);
+
+      const pathMeta = getGlobalStore
+        .getState()
+        .getShadowMetadata(stateKey, path);
+
+      if (pathMeta?.pathComponents) {
+        pathMeta.pathComponents.delete(componentId);
+        if (pathMeta.pathComponents.size === 0) {
+          delete pathMeta.pathComponents;
+          getGlobalStore.getState().setShadowMetadata(stateKey, path, pathMeta);
+        }
+      }
+    });
+  }
+
+  // Remove from root components
+  if (rootMeta?.components) {
+    rootMeta.components.delete(componentId);
+    getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
+  }
+};

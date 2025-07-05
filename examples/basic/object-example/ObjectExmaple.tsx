@@ -155,6 +155,7 @@ function ItemList({
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
           {teamState.stateList((_item, itemSetter) => (
             <FlashWrapper key={itemSetter.id.get()}>
+              {itemSetter._componentId}
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={`w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer hover:bg-gray-700/70 ${
