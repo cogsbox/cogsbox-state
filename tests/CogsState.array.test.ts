@@ -235,9 +235,9 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // 2. Use stateMap on the filtered proxy. Inside the map, we get a setter for each item.
     // This setter should point back to the item in the *original* array.
-    booksProxy.stateMap((item, itemSetter) => {
+    booksProxy.stateMap((itemSetter) => {
       // Find the specific book we want to modify and use its dedicated setter
-      if (item.id === "p3") {
+      if (itemSetter.id.get() === "p3") {
         console.log("itemSetter", itemSetter.get());
         itemSetter.inStock.update(true);
       }
@@ -259,7 +259,7 @@ describe("CogsState - Advanced Chained Array Operations", () => {
 
     // 2. Use stateMap. The last argument is a setter for the array being mapped over.
     // In this case of a derived (filtered) proxy, it should point to the ORIGINAL array.
-    apparelProxy.stateMap((_item, _itemSetter, index, _array, arraySetter) => {
+    apparelProxy.stateMap((_itemSetter, index, arraySetter) => {
       // To avoid inserting multiple times, we only do it on the first iteration.
       if (index === 0) {
         arraySetter.insert({
@@ -361,34 +361,32 @@ describe("CogsState - Advanced Chained Array Operations", () => {
     ]);
 
     // 4. Perform multiple, mixed operations within a stateMap on the derived proxy
-    sortedElectronicsProxy.stateMap(
-      (item, itemSetter, index, localArray, originalArraySetter) => {
-        // ACTION A: Update an existing item in the middle of the derived list.
-        // The 'Headphones' (p4) are initially inStock: true. Let's change it.
-        if (item.id === "p4") {
-          itemSetter.inStock.update(false);
-        }
-
-        // ACTION B: Insert a completely new item into the ORIGINAL array.
-        // We use the `originalArraySetter` and only do it once.
-        if (index === 0) {
-          originalArraySetter.insert({
-            id: "p-mouse",
-            name: "Gaming Mouse",
-            category: "electronics",
-            price: 65,
-            inStock: true,
-          });
-        }
-
-        // ACTION C: Select the LAST item in this derived view (the Laptop, p1).
-        if (index === localArray.length - 1) {
-          console.log("itemSetter", itemSetter.get());
-          itemSetter.setSelected(true);
-        }
+    sortedElectronicsProxy.stateMap((itemSetter, index, derivedArraySetter) => {
+      // ACTION A
+      if (itemSetter.get().id === "p4") {
+        itemSetter.inStock.update(false);
       }
-    );
 
+      // ACTION B - This needs to use the ORIGINAL array proxy to insert
+      // We can't use the derivedArraySetter for this.
+      if (index === 0) {
+        // To insert, we must use a proxy to the original array.
+        // The `arraySetter` from the map callback is derived and cannot be used for insertion.
+        // We use the top-level `setter.products` for this.
+        setter.products.insert({
+          id: "p-mouse",
+          name: "Gaming Mouse",
+          category: "electronics",
+          price: 65,
+          inStock: true,
+        });
+      }
+
+      // ACTION C: Select the LAST item in the DERIVED view.
+      if (index === derivedArraySetter.get().length - 1) {
+        itemSetter.setSelected(true);
+      }
+    });
     // --- Assertions: Verify every side-effect ---
 
     const finalGlobalState = setter.get();
@@ -663,15 +661,15 @@ describe("CogsState - Shadow Store Edge Cases and Stress Tests", () => {
     };
 
     // Modify each category differently
-    byCategory.electronics.stateMap((item, setter) => {
+    byCategory.electronics.stateMap((setter) => {
       setter.price.update((p) => p * 0.9); // 10% discount
     });
 
-    byCategory.books.stateMap((item, setter) => {
+    byCategory.books.stateMap((setter) => {
       setter.inStock.update(true); // All books in stock
     });
 
-    byCategory.apparel.stateMap((item, setter) => {
+    byCategory.apparel.stateMap((setter) => {
       setter.name.update((n) => `Sale: ${n}`); // Add sale prefix
     });
     console.log();

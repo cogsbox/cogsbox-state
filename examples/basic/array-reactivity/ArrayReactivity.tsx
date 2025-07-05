@@ -77,8 +77,8 @@ function TodoListWithStateMap() {
           <div>Action</div>
         </div>
         {/* List of Todos - compact styling */}
-        {todos.$stateMap((todo, todoSetter) => (
-          <FlashWrapper key={todo.id}>
+        {todos.$stateMap((todoSetter) => (
+          <FlashWrapper key={todoSetter.id.get()}>
             <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 py-2 px-1 border-b bg-gray-300 last:border-b-0 items-center">
               {/* Checkbox */}
               {todoSetter.completed.formElement((obj) => (
@@ -125,8 +125,8 @@ function TodoListWithStateMap() {
             </div>
           </FlashWrapper>
         ))}{" "}
-        {todos.stateList((todo, todoSetter) => (
-          <FlashWrapper key={todo.id}>
+        {todos.stateList((todoSetter) => (
+          <FlashWrapper key={todoSetter.id.get()}>
             <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 py-1 px-1 border-b border-gray-800 bg-gray-300  last:border-b-0 items-center">
               {/* Checkbox */}
               {todoSetter.completed.formElement((obj) => (

@@ -113,10 +113,9 @@ export type ShadowMetadata = {
     componentId: string;
     meta?: any;
     mapFn: (
-      value: any,
       setter: any,
       index: number,
-      array: any[],
+
       arraySetter: any
     ) => ReactNode;
     containerRef: HTMLDivElement | null;

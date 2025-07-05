@@ -151,7 +151,12 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
   .cutSelected();
   `;
   const filterAndRenderCode = `dashboardState.players
-  .stateFilter(player => player.team === ${color}).stateList(player => player.name)`;
+  .stateFilter(player => player.team === ${color})
+  .stateList(_item, itemSetter) => 
+    <Player onClick={() => itemSetter.setSelected(true)}>
+      {itemSetter.name.get()}
+    </Player>
+  )`;
 
   return (
     <FlashWrapper>
@@ -163,7 +168,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
           {dashboardState.players
             .stateFilter((player) => player.team === color)
-            .$stateMap((_item, itemSetter) => (
+            .$stateMap((itemSetter) => (
               <FlashWrapper key={itemSetter.id.get()}>
                 <button
                   onClick={() => itemSetter.setSelected(true)}

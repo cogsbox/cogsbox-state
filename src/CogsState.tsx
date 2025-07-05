@@ -169,28 +169,25 @@ export type ArrayEndType<TShape extends unknown> = {
 
   stateList: (
     callbackfn: (
-      value: InferArrayElement<TShape>,
       setter: StateObject<InferArrayElement<TShape>>,
       index: number,
-      array: TShape,
+
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
   stateMap: (
     callbackfn: (
-      value: InferArrayElement<TShape>,
       setter: StateObject<InferArrayElement<TShape>>,
       index: number,
-      array: TShape,
+
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
   $stateMap: (
     callbackfn: (
-      value: InferArrayElement<TShape>,
       setter: StateObject<InferArrayElement<TShape>>,
       index: number,
-      array: TShape,
+
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
@@ -2084,10 +2081,9 @@ function createProxyHandler<T>(
           if (prop === "stateMap") {
             return (
               callbackfn: (
-                value: any,
                 setter: any,
                 index: number,
-                array: any,
+
                 arraySetter: any
               ) => void
             ) => {
@@ -2129,10 +2125,9 @@ function createProxyHandler<T>(
                 });
 
                 return callbackfn(
-                  item,
                   itemSetter,
                   index,
-                  shadowValue,
+
                   arraySetter
                 );
               });
@@ -2190,10 +2185,9 @@ function createProxyHandler<T>(
           if (prop === "stateList") {
             return (
               callbackfn: (
-                value: any,
                 setter: any,
                 index: number,
-                array: any,
+
                 arraySetter: any
               ) => ReactNode
             ) => {
@@ -2230,12 +2224,6 @@ function createProxyHandler<T>(
                 const itemComponentId = uuidv4();
 
                 const itemPath = itemKey.split(".").slice(1);
-                const setter = rebuildStateShape({
-                  currentState: item,
-                  path: itemPath,
-                  componentId: itemComponentId!,
-                  meta,
-                });
 
                 return createElement(MemoizedCogsItemWrapper, {
                   key: itemKey,
@@ -2998,10 +2986,9 @@ function SignalMapRenderer({
     _path: string[];
     _meta?: MetaData;
     _mapFn: (
-      value: any,
       setter: any,
       index: number,
-      array: any[],
+
       arraySetter: any
     ) => ReactNode;
   };
@@ -3280,10 +3267,9 @@ function CogsItemWrapper({
     meta?: any;
   }) => any;
   renderFn: (
-    value: any,
     setter: any,
     index: number,
-    array: any,
+
     arraySetter: any
   ) => React.ReactNode;
 }) {
@@ -3363,10 +3349,9 @@ function CogsItemWrapper({
     componentId: itemComponentId,
   });
   const children = renderFn(
-    itemValue,
     itemSetter,
     localIndex,
-    arrayValue,
+
     arraySetter
   );
 
