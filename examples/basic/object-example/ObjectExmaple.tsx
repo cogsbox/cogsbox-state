@@ -111,7 +111,7 @@ function GameDetails() {
               type="checkbox"
               className="w-5 h-5 bg-gray-800 border-gray-600 accent-green-500"
               checked={obj.get()}
-              onChange={(e) => obj.set(e.target.checked)}
+              onChange={(e) => obj.update(e.target.checked)}
             />
           ))}
         </div>
@@ -338,7 +338,7 @@ function PlayerForm({
           <label className={formLabelClass}>Specialty</label>
           <select
             value={obj.get()}
-            onChange={(e) => obj.set(e.target.value as Player['specialty'])}
+            onChange={(e) => obj.update(e.target.value as Player['specialty'])}
             className={formInputClass}
           >
             <option>Offense</option>

@@ -106,12 +106,11 @@ export default function VirtualizedChatExample() {
 function ChatWindow() {
   const messages = useCogsState('messages', { reactiveType: 'none' });
 
-  const { virtualState, virtualizerProps, virtualList } =
-    messages.useVirtualView({
-      itemHeight: 65, // Adjusted estimated height for better spacing
-      overscan: 10,
-      stickToBottom: true,
-    });
+  const { virtualState, virtualizerProps } = messages.useVirtualView({
+    itemHeight: 65, // Adjusted estimated height for better spacing
+    overscan: 10,
+    stickToBottom: true,
+  });
 
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
@@ -120,7 +119,7 @@ function ChatWindow() {
           style={virtualizerProps.list.style}
           className="px-4  space-y-4 pb-8"
         >
-          {virtualList((setter, index, array) => {
+          {virtualState.virtualList((setter, index, array) => {
             return (
               <MessageItem
                 key={setter._path.join('.')}

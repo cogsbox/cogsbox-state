@@ -177,20 +177,22 @@ get state.simpleCounter.$get()}`}
               Toggle numbers in/out of array:
             </p>
             <div className="flex gap-2">
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                <button
-                  key={num}
-                  onClick={() => state.activeNumbers.toggleByValue(num)}
-                  className={`px-3 py-1.5 rounded text-sm transition-colors ${state.activeNumbers.$deriveClass(
-                    (s, deps) =>
-                      s.includes(deps[0])
-                        ? 'bg-green-600 text-white hover:bg-green-500'
-                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600',
-                    [num]
-                  )}`}
-                >
-                  {num}
-                </button>
+              {state.activeNumbers.formElement((obj) => (
+                <>
+                  {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                    <button
+                      key={num}
+                      onClick={() => obj.toggleByValue(num)}
+                      className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                        obj.get().includes(num)
+                          ? 'bg-green-600 text-white hover:bg-green-500'
+                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
+                </>
               ))}
             </div>
             <div className="text-sm text-gray-300">
@@ -276,7 +278,7 @@ function FormElementsExample() {
                   type="checkbox"
                   className="w-5 h-5 accent-green-500"
                   checked={obj.get()}
-                  onChange={(e) => obj.set(e.target.checked)}
+                  onChange={(e) => obj.toggle()}
                 />
               ))}
             </FlashWrapper>

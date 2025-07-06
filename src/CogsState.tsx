@@ -21,7 +21,7 @@ import {
   isFunction,
   type GenericObject,
 } from './utility.js';
-import { FormControlComponent, ValidationWrapper } from './Functions.js';
+import { ValidationWrapper } from './Functions.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
@@ -72,15 +72,7 @@ export type SyncInfo = {
   userId: number;
 };
 
-export type FormElementParams<T> = {
-  get: () => T;
-
-  set: UpdateType<T>;
-
-  path: string[];
-  validationErrors: () => string[];
-  addValidationError: (message?: string) => void;
-
+export type FormElementParams<T> = StateObject<T> & {
   inputProps: {
     ref?: React.RefObject<any>;
     value?: T extends boolean ? never : T;
@@ -1102,14 +1094,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
           break;
         }
       }
-      const updatedShadowMeta = store.getShadowMetadata(thisKey, path);
-      const updatedShadowValue = store.getShadowValue(
-        [thisKey, ...path].join('.')
+      const updatedShadowMeta = store.getShadowMetadata(
+        thisKey,
+        updateObj.updateType === 'insert' ? path : path.slice(0, -1)
       );
-      const valueChanged = !isDeepEqual(nestedShadowValue!, updatedShadowValue);
+      const updatedShadowValue = store.getShadowValue(
+        [
+          thisKey,
+          ...(updateObj.updateType === 'insert' ? path : path.slice(0, -1)),
+        ].join('.')
+      );
 
       // Only proceed if the underlying array has actually changed.
-      if (valueChanged && updatedShadowMeta?.classSignals) {
+      if (updatedShadowMeta?.classSignals) {
         // Use .map() to create a NEW array of signals. This is the immutable fix.
         const newClassSignals = updatedShadowMeta.classSignals.map(
           (signal: any) => {
@@ -1123,9 +1120,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 'deps',
                 `return (${signal.effect})(state, deps)`
               );
-              newClasses = effectFn(updatedShadowValue, signal.deps);
+              console.log(
+                'dsadasdasdasdasdasdasd',
+                signal.deps,
+                updatedShadowValue,
+                effectFn(updatedShadowValue, signal.deps)
+              );
+              newClasses = effectFn(updatedShadowValue, signal.deps); //updatedShadowValue
 
               // Only touch the DOM if the calculated classes have actually changed
+              // In effectiveSetState where you update classSignals
               if (newClasses !== oldClasses) {
                 const elements = document.querySelectorAll(`.${signal.id}`);
                 elements.forEach((element: Element) => {
@@ -1138,6 +1142,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
                       element.classList.remove(...oldClassesArray);
                     }
                   }
+
+                  // Force React to re-process this element
+                  const onClick = (element as any).onclick;
+                  if (onClick) {
+                    (element as any).onclick = null;
+                    queueMicrotask(() => {
+                      (element as any).onclick = onClick;
+                    });
+                  }
+
                   // Add new classes
                   const newClassesArray = newClasses.split(' ').filter(Boolean);
                   if (newClassesArray.length > 0) {
@@ -1586,7 +1600,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   ];
 }
 
-type MetaData = {
+export type MetaData = {
   /**
    * An array of the full, unique string IDs (e.g., `"stateKey.arrayName.id:123"`)
    * of the items that belong to the current derived "view" of an array.
@@ -1989,6 +2003,7 @@ function createProxyHandler<T>(
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToPath(stateKeyPathKey, (event: any) => {
+                    isProgrammaticScrollRef.current = true;
                     if (event.type === 'INSERT') {
                       // Get fresh array length
                       const store = getGlobalStore.getState();
@@ -2064,11 +2079,17 @@ function createProxyHandler<T>(
                 if (!container) return;
 
                 const handleScroll = () => {
-                  if (isProgrammaticScrollRef.current) {
-                    isProgrammaticScrollRef.current = false;
+                  const distanceFromBottom =
+                    container.scrollHeight -
+                    container.scrollTop -
+                    container.clientHeight;
+                  if (
+                    !isProgrammaticScrollRef.current &&
+                    distanceFromBottom < 20
+                  ) {
                     return;
                   }
-
+                  console.log('distanceFromBottom', distanceFromBottom);
                   const { scrollTop, clientHeight } = container;
                   const arrayKeys =
                     getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2077,14 +2098,14 @@ function createProxyHandler<T>(
                   // Calculate visible range
                   const startIndex = Math.floor(scrollTop / itemHeight);
                   const visibleCount = Math.ceil(clientHeight / itemHeight);
-
-                  setRange({
-                    startIndex: Math.max(0, startIndex - overscan),
-                    endIndex: Math.min(
-                      arrayKeys.length - 1,
-                      startIndex + visibleCount + overscan
-                    ),
-                  });
+                  console.log('visibleCount', startIndex, visibleCount);
+                  // setRange({
+                  //   startIndex: Math.max(0, startIndex - overscan),
+                  //   endIndex: Math.min(
+                  //     arrayKeys.length - 1,
+                  //     startIndex + visibleCount + overscan
+                  //   ),
+                  // }); //this cause scrazt rerenders the  isProgrammaticScrollRef.current logic is flawed na i dont know why
                 };
 
                 container.addEventListener('scroll', handleScroll);
@@ -2134,19 +2155,19 @@ function createProxyHandler<T>(
 
                     container.scrollTo({
                       top: container.scrollHeight,
-                      behavior: initialScroll ? 'instant' : 'smooth',
+                      behavior: initialScroll.current ? 'instant' : 'smooth',
                     });
                     const distanceFromBottom =
                       container.scrollHeight -
                       container.scrollTop -
                       container.clientHeight;
-                    if (distanceFromBottom < 10) {
+                    if (distanceFromBottom < 5) {
                       hasReachedBottomRef.current = true;
                       isProgrammaticScrollRef.current = false;
                       initialScroll.current = false;
                     }
                   }
-                }, 100); // Check every 100ms
+                }, 400); // Check every 100ms
 
                 return () => clearInterval(scrollInterval);
               }, [stickToBottom, trigger]);
@@ -2518,7 +2539,6 @@ function createProxyHandler<T>(
                         arraySetter,
                         rebuildStateShape,
                         renderFn: callbackfn,
-                        transformCacheKey: cacheKey,
                       });
                     })}
                   </>
@@ -2591,6 +2611,7 @@ function createProxyHandler<T>(
               index?: number
             ) => {
               invalidateCachePath(path);
+
               effectiveSetState(payload as any, path, { updateType: 'insert' });
               return rebuildStateShape({
                 currentState: getGlobalStore
@@ -2743,17 +2764,21 @@ function createProxyHandler<T>(
               // Step 2: Iterate through the KEYS to find the one matching the value. This is the robust way.
               for (const key of relevantKeys) {
                 const itemValue = getGlobalStore.getState().getShadowValue(key);
+                console.log('itemValue sdasdasdasd', itemValue);
                 if (itemValue === value) {
                   keyToCut = key;
                   break; // Found it!
                 }
               }
-
+              console.log('itemValue keyToCut', keyToCut);
               // Step 3: Act based on whether the key was found.
               if (keyToCut) {
                 // Item exists, so we CUT it using its *actual* key.
                 const itemPath = keyToCut.split('.').slice(1);
-                effectiveSetState(null as any, itemPath, { updateType: 'cut' });
+                console.log('itemValue keyToCut', keyToCut);
+                effectiveSetState(value as any, itemPath, {
+                  updateType: 'cut',
+                });
               } else {
                 // Item does not exist, so we INSERT it.
                 effectiveSetState(value as any, path, { updateType: 'insert' });
@@ -3121,17 +3146,25 @@ function createProxyHandler<T>(
           }
         }
         if (prop === 'formElement') {
-          return (child: FormControl<T>, formOpts?: FormOptsType) => (
-            <FormControlComponent<T>
-              setState={effectiveSetState}
-              stateKey={stateKey}
-              path={path}
-              child={child}
-              formOpts={formOpts}
-            />
-          );
+          return (child: FormControl<T>, formOpts?: FormOptsType) => {
+            return (
+              <ValidationWrapper
+                formOpts={formOpts}
+                path={path}
+                stateKey={stateKey}
+              >
+                <PrimitiveItemWrapper
+                  stateKey={stateKey}
+                  path={path}
+                  rebuildStateShape={rebuildStateShape}
+                  setState={effectiveSetState}
+                  formOpts={formOpts}
+                  renderFn={child}
+                />
+              </ValidationWrapper>
+            );
+          };
         }
-
         const nextPath = [...path, prop];
         const nextValue = getGlobalStore
           .getState()
@@ -3419,9 +3452,6 @@ function SignalMapRenderer({
           arraySetter: arraySetter,
           rebuildStateShape: rebuildStateShape,
           renderFn: proxy._mapFn,
-          transformCacheKey: proxy._meta
-            ? hashTransforms(proxy._meta.transforms || [])
-            : undefined, // Add this
         })
       );
     });
@@ -3541,15 +3571,14 @@ function SignalRenderer({
 }
 
 const MemoizedCogsItemWrapper = memo(
-  CogsItemWrapper,
+  ListItemWrapper,
   (prevProps, nextProps) => {
     // Re-render if any of these change:
     return (
       prevProps.itemPath.join('.') === nextProps.itemPath.join('.') &&
       prevProps.stateKey === nextProps.stateKey &&
       prevProps.itemComponentId === nextProps.itemComponentId &&
-      prevProps.localIndex === nextProps.localIndex &&
-      prevProps.transformCacheKey === nextProps.transformCacheKey // NEW: Check cache key
+      prevProps.localIndex === nextProps.localIndex
     );
   }
 );
@@ -3601,7 +3630,7 @@ const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
   return loaded;
 };
 
-function CogsItemWrapper({
+function ListItemWrapper({
   stateKey,
   itemComponentId,
   itemPath,
@@ -3609,14 +3638,13 @@ function CogsItemWrapper({
   arraySetter,
   rebuildStateShape,
   renderFn,
-  transformCacheKey,
 }: {
   stateKey: string;
   itemComponentId: string;
   itemPath: string[];
   localIndex: number;
   arraySetter: any; // The proxy for the whole array
-  transformCacheKey?: string;
+
   rebuildStateShape: (options: {
     currentState: any;
     path: string[];
@@ -3755,3 +3783,136 @@ const cleanupComponentRegistration = (
     getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
   }
 };
+function PrimitiveItemWrapper({
+  stateKey,
+  path,
+  rebuildStateShape,
+  renderFn,
+  formOpts,
+  setState,
+}: {
+  stateKey: string;
+  path: string[];
+  rebuildStateShape: (options: {
+    currentState: any;
+    path: string[];
+    componentId: string;
+    meta?: any;
+  }) => any;
+  renderFn: (params: FormElementParams<any>) => React.ReactNode;
+  formOpts?: FormOptsType;
+  setState: any;
+}) {
+  const [componentId] = useState(() => uuidv4());
+  const [, forceUpdate] = useState({});
+
+  const fullComponentId = `${stateKey}////${componentId}`;
+  const stateKeyPathKey = [stateKey, ...path].join('.');
+
+  // Register component
+  useLayoutEffect(() => {
+    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+    const components = rootMeta?.components || new Map();
+
+    components.set(fullComponentId, {
+      forceUpdate: () => forceUpdate({}),
+      paths: new Set(),
+      reactiveType: ['component'],
+    });
+
+    getGlobalStore.getState().setShadowMetadata(stateKey, [], {
+      ...rootMeta,
+      components,
+    });
+
+    return () => {
+      cleanupComponentRegistration(stateKey, fullComponentId);
+    };
+  }, [stateKey, componentId]);
+
+  // Form state management
+  const globalStateValue = getGlobalStore
+    .getState()
+    .getShadowValue(stateKeyPathKey);
+  const [localValue, setLocalValue] = useState<any>(globalStateValue);
+  const isCurrentlyDebouncing = useRef(false);
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    if (!isCurrentlyDebouncing.current && globalStateValue !== localValue) {
+      setLocalValue(globalStateValue);
+    }
+  }, [globalStateValue]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        isCurrentlyDebouncing.current = false;
+      }
+    };
+  }, []);
+
+  const debouncedUpdater = (payload: any) => {
+    setLocalValue(payload);
+    isCurrentlyDebouncing.current = true;
+
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+
+    const debounceTime =
+      formOpts?.debounceTime ??
+      (typeof globalStateValue === 'boolean' ? 20 : 200);
+
+    debounceTimeoutRef.current = setTimeout(() => {
+      isCurrentlyDebouncing.current = false;
+      setState(payload, path, { updateType: 'update' });
+    }, debounceTime);
+  };
+  const baseState = rebuildStateShape({
+    currentState: globalStateValue,
+    path: path,
+    componentId: componentId,
+  });
+
+  // Extend it with just inputProps
+  const stateWithInputProps = new Proxy(baseState, {
+    get(target, prop) {
+      if (prop === 'inputProps') {
+        return {
+          value: localValue ?? '',
+          onChange: (e: any) => {
+            const newValue = e.target.value;
+            setLocalValue(newValue);
+            isCurrentlyDebouncing.current = true;
+
+            if (debounceTimeoutRef.current) {
+              clearTimeout(debounceTimeoutRef.current);
+            }
+
+            debounceTimeoutRef.current = setTimeout(() => {
+              isCurrentlyDebouncing.current = false;
+              target.update(newValue); // Use the existing update method
+            }, formOpts?.debounceTime ?? 200);
+          },
+          onBlur: () => {
+            if (debounceTimeoutRef.current) {
+              clearTimeout(debounceTimeoutRef.current);
+              isCurrentlyDebouncing.current = false;
+              target.update(localValue);
+            }
+          },
+          ref: formRefStore
+            .getState()
+            .getFormRef(stateKey + '.' + path.join('.')),
+        };
+      }
+
+      // Pass through everything else
+      return target[prop];
+    },
+  });
+
+  return <>{renderFn(stateWithInputProps)}</>;
+}

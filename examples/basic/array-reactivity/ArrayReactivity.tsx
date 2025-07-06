@@ -1,16 +1,16 @@
-"use client";
+'use client';
 
-import { createCogsState } from "../../../src/CogsState";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { FlashWrapper } from "../FlashOnUpdate";
-import DotPattern from "../DotWrapper";
+import { createCogsState } from '../../../src/CogsState';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { FlashWrapper } from '../FlashOnUpdate';
+import DotPattern from '../DotWrapper';
 
 // State definition with array of objects
 const todoArray = [
-  { id: 1, title: "Learn React", completed: false, priority: "high" as const },
-  { id: 2, title: "Build App", completed: false, priority: "medium" as const },
-  { id: 3, title: "Deploy", completed: true, priority: "low" as const },
+  { id: 1, title: 'Learn React', completed: false, priority: 'high' as const },
+  { id: 2, title: 'Build App', completed: false, priority: 'medium' as const },
+  { id: 3, title: 'Deploy', completed: true, priority: 'low' as const },
 ];
 
 const allState = {
@@ -22,12 +22,12 @@ export type ArrayStateObject = {
     id: number;
     title: string;
     completed: boolean;
-    priority: "high" | "medium" | "low";
+    priority: 'high' | 'medium' | 'low';
   }>;
 };
 
 export const { useCogsState } = createCogsState<ArrayStateObject>(allState, {
-  validation: { key: "todoArray" },
+  validation: { key: 'todoArray' },
 });
 
 export default function ArrayReactivity() {
@@ -60,7 +60,7 @@ export default function ArrayReactivity() {
 }
 
 function TodoListWithStateMap() {
-  const todos = useCogsState("todoArray");
+  const todos = useCogsState('todoArray');
 
   return (
     <FlashWrapper>
@@ -86,7 +86,7 @@ function TodoListWithStateMap() {
                   type="checkbox"
                   className="w-4 h-4 bg-gray-800 border-gray-600 accent-green-500"
                   checked={obj.get()}
-                  onChange={(e) => obj.set(e.target.checked)}
+                  onChange={(e) => obj.toggle()}
                 />
               ))}
 
@@ -96,7 +96,7 @@ function TodoListWithStateMap() {
                   type="text"
                   className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
                   value={obj.get()}
-                  onChange={(e) => obj.set(e.target.value)}
+                  onChange={(e) => obj.update(e.target.value)}
                 />
               ))}
 
@@ -106,7 +106,7 @@ function TodoListWithStateMap() {
                   className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
                   value={obj.get()}
                   onChange={(e) =>
-                    obj.set(e.target.value as "high" | "medium" | "low")
+                    obj.update(e.target.value as 'high' | 'medium' | 'low')
                   }
                 >
                   <option value="high">High</option>
@@ -124,17 +124,17 @@ function TodoListWithStateMap() {
               </button>
             </div>
           </FlashWrapper>
-        ))}{" "}
+        ))}{' '}
         {todos.stateList((todoSetter) => (
           <FlashWrapper key={todoSetter.id.get()}>
             <div className="grid grid-cols-[auto_1fr_90px_60px] gap-2 py-1 px-1 border-b border-gray-800 bg-gray-300  last:border-b-0 items-center">
               {/* Checkbox */}
-              {todoSetter.completed.formElement((obj) => (
+              {todoSetter.completed.formElement((state) => (
                 <input
                   type="checkbox"
                   className="w-4 h-4 bg-gray-800 border-gray-600 accent-green-500"
-                  checked={obj.get()}
-                  onChange={(e) => obj.set(e.target.checked)}
+                  checked={state.get()}
+                  onChange={(e) => state.update(e.target.checked)}
                 />
               ))}
 
@@ -144,7 +144,7 @@ function TodoListWithStateMap() {
                   type="text"
                   className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
                   value={obj.get()}
-                  onChange={(e) => obj.set(e.target.value)}
+                  onChange={(e) => obj.update(e.target.value)}
                 />
               ))}
 
@@ -154,7 +154,7 @@ function TodoListWithStateMap() {
                   className="px-2 py-0.5 bg-gray-800 border border-gray-600 rounded text-xs w-full focus:outline-none focus:ring-1 focus:ring-green-500"
                   value={obj.get()}
                   onChange={(e) =>
-                    obj.set(e.target.value as "high" | "medium" | "low")
+                    obj.update(e.target.value as 'high' | 'medium' | 'low')
                   }
                 >
                   <option value="high">High</option>
@@ -179,7 +179,7 @@ function TodoListWithStateMap() {
 }
 
 function AddTodoButton() {
-  const todos = useCogsState("todoArray", { reactiveType: "none" });
+  const todos = useCogsState('todoArray', { reactiveType: 'none' });
 
   const addTodo = () => {
     const ids = todos.get().map((t) => t.id);
@@ -188,7 +188,7 @@ function AddTodoButton() {
       id: newId,
       title: `New Todo ${newId}`,
       completed: false,
-      priority: "medium",
+      priority: 'medium',
     });
   };
 
@@ -206,17 +206,17 @@ function AddTodoButton() {
 
 // Modified ShowArray to accept a layout prop
 function ShowArray({
-  layout = "horizontal",
+  layout = 'horizontal',
 }: {
-  layout?: "horizontal" | "vertical";
+  layout?: 'horizontal' | 'vertical';
 }) {
-  const todos = useCogsState("todoArray");
+  const todos = useCogsState('todoArray');
 
   // Determine flex direction based on prop
   const containerClasses =
-    layout === "vertical"
-      ? "flex flex-col h-full gap-4"
-      : "flex gap-4 items-center";
+    layout === 'vertical'
+      ? 'flex flex-col h-full gap-4'
+      : 'flex gap-4 items-center';
 
   return (
     <FlashWrapper>
@@ -231,10 +231,10 @@ function ShowArray({
               language="javascript"
               style={atomOneDark}
               customStyle={{
-                backgroundColor: "transparent",
-                fontSize: "12px",
+                backgroundColor: 'transparent',
+                fontSize: '12px',
               }}
-              codeTagProps={{ style: { fontFamily: "inherit" } }}
+              codeTagProps={{ style: { fontFamily: 'inherit' } }}
             >
               {`const todos = useCogsState("todoArray");`}
             </SyntaxHighlighter>
