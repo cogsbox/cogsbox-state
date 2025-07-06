@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import {
   createElement,
@@ -13,24 +13,24 @@ import {
   type CSSProperties,
   type ReactNode,
   type RefObject,
-} from "react";
-import { createRoot } from "react-dom/client";
+} from 'react';
+import { createRoot } from 'react-dom/client';
 import {
   getDifferences,
   getNestedValue,
   isFunction,
   type GenericObject,
-} from "./utility.js";
-import { FormControlComponent, ValidationWrapper } from "./Functions.js";
-import { isDeepEqual, transformStateFunc } from "./utility.js";
-import superjson from "superjson";
-import { v4 as uuidv4 } from "uuid";
-import { z } from "zod";
+} from './utility.js';
+import { FormControlComponent, ValidationWrapper } from './Functions.js';
+import { isDeepEqual, transformStateFunc } from './utility.js';
+import superjson from 'superjson';
+import { v4 as uuidv4 } from 'uuid';
+import { z } from 'zod';
 
-import { formRefStore, getGlobalStore, type ComponentsType } from "./store.js";
-import { useCogsConfig } from "./CogsStateClient.js";
-import { applyPatch } from "fast-json-patch";
-import { useInView } from "react-intersection-observer";
+import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
+import { useCogsConfig } from './CogsStateClient.js';
+import { applyPatch } from 'fast-json-patch';
+import { useInView } from 'react-intersection-observer';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -61,15 +61,6 @@ export type VirtualStateObjectResult<T extends any[]> = {
   scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
 };
 
-export type ServerSyncStatus = {
-  isFresh: boolean;
-  isFreshTime: number;
-  isStale: boolean;
-  isStaleTime: number;
-  isSyncing: boolean;
-  isSyncingTime: number;
-};
-
 export type SyncInfo = {
   timeStamp: number;
   userId: number;
@@ -79,7 +70,7 @@ export type FormElementParams<T> = {
   get: () => T;
 
   set: UpdateType<T>;
-  syncStatus: (SyncInfo & { date: Date }) | null;
+
   path: string[];
   validationErrors: () => string[];
   addValidationError: (message?: string) => void;
@@ -103,8 +94,7 @@ type findWithFuncType<U> = (
 export type PushArgs<U, T> = (
   update:
     | Prettify<U>
-    | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>),
-  opts?: UpdateOpts<U>
+    | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>)
 ) => StateObject<T>;
 
 type CutFunctionType<T> = (
@@ -114,36 +104,36 @@ type CutFunctionType<T> = (
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
 type ArraySpecificPrototypeKeys =
-  | "concat"
-  | "copyWithin"
-  | "fill"
-  | "find"
-  | "findIndex"
-  | "flat"
-  | "flatMap"
-  | "includes"
-  | "indexOf"
-  | "join"
-  | "keys"
-  | "lastIndexOf"
-  | "map"
-  | "pop"
-  | "push"
-  | "reduce"
-  | "reduceRight"
-  | "reverse"
-  | "shift"
-  | "slice"
-  | "some"
-  | "sort"
-  | "splice"
-  | "unshift"
-  | "values"
-  | "entries"
-  | "every"
-  | "filter"
-  | "forEach"
-  | "with";
+  | 'concat'
+  | 'copyWithin'
+  | 'fill'
+  | 'find'
+  | 'findIndex'
+  | 'flat'
+  | 'flatMap'
+  | 'includes'
+  | 'indexOf'
+  | 'join'
+  | 'keys'
+  | 'lastIndexOf'
+  | 'map'
+  | 'pop'
+  | 'push'
+  | 'reduce'
+  | 'reduceRight'
+  | 'reverse'
+  | 'shift'
+  | 'slice'
+  | 'some'
+  | 'sort'
+  | 'splice'
+  | 'unshift'
+  | 'values'
+  | 'entries'
+  | 'every'
+  | 'filter'
+  | 'forEach'
+  | 'with';
 
 export type ArrayEndType<TShape extends unknown> = {
   findWith: findWithFuncType<InferArrayElement<TShape>>;
@@ -237,20 +227,10 @@ export type UpdateArg<S> = S | ((prevState: S) => S);
 export type InsertParams<S> =
   | S
   | ((prevState: { state: S; uuid: string }) => S);
-export type UpdateType<T> = (
-  payload: UpdateArg<T>,
-  opts?: UpdateOpts<T>
-) => void;
+export type UpdateType<T> = (payload: UpdateArg<T>) => void;
 
-export type InsertType<T> = (
-  payload: InsertParams<T>,
-  opts?: UpdateOpts<T>
-) => void;
+export type InsertType<T> = (payload: InsertParams<T>) => void;
 
-export type UpdateOpts<T> = {
-  afterUpdate?: (state: T) => void;
-  debounce?: number;
-};
 export type ObjectEndType<T> = EndType<T> & {
   [K in keyof T]-?: ObjectEndType<T[K]>;
 } & {
@@ -272,8 +252,8 @@ export type EndType<T, IsArrayElement = false> = {
   get: () => T;
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
-  _status: "fresh" | "stale" | "synced";
-  getStatus: () => "fresh" | "stale";
+  _status: 'fresh' | 'stale' | 'synced';
+  getStatus: () => 'fresh' | 'stale';
 
   showValidationErrors: () => string[];
   setValidation: (ctx: string) => void;
@@ -331,8 +311,8 @@ export type StateObject<T> = (T extends any[]
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 type EffectiveSetStateArg<
   T,
-  UpdateType extends "update" | "insert" | "cut",
-> = UpdateType extends "insert"
+  UpdateType extends 'update' | 'insert' | 'cut',
+> = UpdateType extends 'insert'
   ? T extends any[]
     ? InsertParams<InferArrayElement<T>>
     : never
@@ -341,48 +321,31 @@ type EffectiveSetStateArg<
 // Then update your EffectiveSetState type
 type EffectiveSetState<TStateObject> = (
   newStateOrFunction:
-    | EffectiveSetStateArg<TStateObject, "update">
-    | EffectiveSetStateArg<TStateObject, "insert">,
+    | EffectiveSetStateArg<TStateObject, 'update'>
+    | EffectiveSetStateArg<TStateObject, 'insert'>,
   path: string[],
-  updateObj: { updateType: "update" | "insert" | "cut" },
-  validationKey?: string,
-  opts?: UpdateOpts<TStateObject>
+  updateObj: { updateType: 'update' | 'insert' | 'cut' },
+  validationKey?: string
 ) => void;
 
 export type UpdateTypeDetail = {
   timeStamp: number;
   stateKey: string;
-  updateType: "update" | "insert" | "cut";
+  updateType: 'update' | 'insert' | 'cut';
   path: string[];
-  status: "new" | "sent" | "synced";
+  status: 'new' | 'sent' | 'synced';
   oldValue: any;
   newValue: any;
   userId?: number;
 };
 
-export type ActionsType<T> = {
-  type: "onChange";
-  action: ({ state, actionType }: { state: T; actionType: string }) => void;
-  debounce?: number;
-}[];
-
-type ArrayToObject<T extends string[]> = Record<T[number], string>;
-type CookieType<T> = {
-  timeStamp: number;
-  value: T;
-  cookieName: string;
-  OnUnMountCookie?: Boolean;
-};
-export type CogsCookiesType<T extends string[] = string[]> = CookieType<
-  ArrayToObject<T>
->;
-export type ReactivityUnion = "none" | "component" | "deps" | "all";
+export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType =
-  | "none"
-  | "component"
-  | "deps"
-  | "all"
-  | Array<Prettify<"none" | "component" | "deps" | "all">>;
+  | 'none'
+  | 'component'
+  | 'deps'
+  | 'all'
+  | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
 
 type ValidationOptionsType = {
   key?: string;
@@ -395,11 +358,11 @@ export type OptionsType<T extends unknown = unknown> = {
   componentId?: string;
   serverSync?: ServerSyncType<T>;
   validation?: ValidationOptionsType;
-  enableServerState?: boolean;
+
   serverState?: {
     id?: string | number;
     data?: T;
-    status?: "pending" | "error" | "success";
+    status?: 'pending' | 'error' | 'success';
   };
   sync?: {
     action: (state: T) => Promise<{
@@ -428,7 +391,7 @@ export type OptionsType<T extends unknown = unknown> = {
     onChange?: (state: T) => void;
   };
   formElements?: FormsElementsType;
-  enabledSync?: (state: T) => boolean;
+
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
@@ -449,6 +412,7 @@ export type ServerSyncType<T> = {
     currentParams?: URLSearchParams;
   };
 };
+
 export type SyncActionsType<T> = {
   syncKey: string;
 
@@ -456,12 +420,12 @@ export type SyncActionsType<T> = {
   actionTimeStamp: number;
   retryCount?: number;
   status:
-    | "success"
-    | "waiting"
-    | "rolledBack"
-    | "error"
-    | "cancelled"
-    | "failed";
+    | 'success'
+    | 'waiting'
+    | 'rolledBack'
+    | 'error'
+    | 'cancelled'
+    | 'failed';
   snapshot?: {
     name: string;
     stateKeys: StateKeys[];
@@ -547,7 +511,7 @@ function setOptions<StateKey, Opt>({
         mergedOptions[key] = options[key as keyof typeof options];
       } else {
         if (
-          key == "localStorage" &&
+          key == 'localStorage' &&
           options[key] &&
           mergedOptions[key].key !== options[key]?.key
         ) {
@@ -555,7 +519,7 @@ function setOptions<StateKey, Opt>({
           mergedOptions[key] = options[key];
         }
         if (
-          key == "initialState" &&
+          key == 'initialState' &&
           options[key] &&
           mergedOptions[key] !== options[key] && // Different references
           !isDeepEqual(mergedOptions[key], options[key]) // And different values
@@ -582,7 +546,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
 ) => {
   let newInitialState = initialState;
-  console.log("initialState", initialState);
+  console.log('initialState', initialState);
   // Extract state parts and options using transformStateFunc
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
@@ -635,15 +599,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     }
   });
 
-  console.log("opt", opt, "initialOptionsPart", initialOptionsPart);
-  console.log(
-    "Final options check:",
-    Object.keys(statePart).map((key) => ({
-      key,
-      options: getInitialOptions(key),
-    }))
-  );
-
   getGlobalStore.getState().setInitialStates(statePart);
   getGlobalStore.getState().setCreatedState(statePart);
 
@@ -680,7 +635,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
         componentId,
         localStorage: options?.localStorage,
         middleware: options?.middleware,
-        enabledSync: options?.enabledSync,
+
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
         initialState: options?.initialState as any,
@@ -718,7 +673,6 @@ const {
   updateInitialStateGlobal,
   addValidationError,
   removeValidationError,
-  setServerSyncActions,
 } = getGlobalStore.getState();
 const saveToLocalStorage = <T,>(
   state: T,
@@ -729,7 +683,7 @@ const saveToLocalStorage = <T,>(
 ) => {
   if (currentInitialOptions?.log) {
     console.log(
-      "saving to localstorage",
+      'saving to localstorage',
       thisKey,
       currentInitialOptions.localStorage?.key,
       sessionId
@@ -779,7 +733,7 @@ const loadFromLocalStorage = (localStorageKey: string) => {
 
     return parsedData;
   } catch (error) {
-    console.error("Error loading from localStorage:", error);
+    console.error('Error loading from localStorage:', error);
     return null;
   }
 };
@@ -850,9 +804,9 @@ const notifyComponents = (thisKey: string) => {
     const reactiveTypes = component
       ? Array.isArray(component.reactiveType)
         ? component.reactiveType
-        : [component.reactiveType || "component"]
+        : [component.reactiveType || 'component']
       : null;
-    if (!reactiveTypes?.includes("none")) {
+    if (!reactiveTypes?.includes('none')) {
       updates.add(() => component.forceUpdate());
     }
   });
@@ -871,11 +825,11 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
     const reactiveTypes = component
       ? Array.isArray(component.reactiveType)
         ? component.reactiveType
-        : [component.reactiveType || "component"]
+        : [component.reactiveType || 'component']
       : null;
 
     // Skip if reactivity is disabled
-    if (reactiveTypes?.includes("none")) {
+    if (reactiveTypes?.includes('none')) {
       return;
     }
 
@@ -930,7 +884,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }));
 
       // Create combined key and update sync info
-      const syncKey = `${syncUpdate.stateKey}:${syncUpdate.path.join(".")}`;
+      const syncKey = `${syncUpdate.stateKey}:${syncUpdate.path.join('.')}`;
       getGlobalStore.getState().setSyncInfo(syncKey, {
         timeStamp: syncUpdate.timeStamp!,
         userId: syncUpdate.userId!,
@@ -948,7 +902,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const hasServerId = options?.serverState?.id !== undefined;
       const hasServerData =
         hasServerId &&
-        options?.serverState?.status === "success" &&
+        options?.serverState?.status === 'success' &&
         options?.serverState?.data;
 
       const currentGloballyStoredInitialState =
@@ -1009,9 +963,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       const reactiveTypes = Array.isArray(reactiveType)
         ? reactiveType
-        : [reactiveType || "component"];
+        : [reactiveType || 'component'];
 
-      if (!reactiveTypes.includes("none")) {
+      if (!reactiveTypes.includes('none')) {
         forceUpdate({});
       }
     }
@@ -1040,7 +994,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     components.set(componentKey, {
       forceUpdate: () => forceUpdate({}),
-      reactiveType: reactiveType ?? ["component", "deps"],
+      reactiveType: reactiveType ?? ['component', 'deps'],
       paths: new Set(),
       depsFunction: reactiveDeps || undefined,
       deps: reactiveDeps
@@ -1063,7 +1017,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       if (component?.paths) {
         component.paths.forEach((fullPath) => {
           // fullPath is like "todos.0.name", need to split and remove stateKey
-          const pathParts = fullPath.split(".");
+          const pathParts = fullPath.split('.');
           const path = pathParts.slice(1); // Remove stateKey part
 
           const pathMeta = getGlobalStore
@@ -1092,22 +1046,23 @@ export function useCogsStateFn<TStateObject extends unknown>(
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
-    updateObj: { updateType: "insert" | "cut" | "update" },
+    updateObj: { updateType: 'insert' | 'cut' | 'update' },
     validationKey?: string
   ) => {
-    const fullPath = [thisKey, ...path].join("."); // This is the full path to the state slice
+    const fullPath = [thisKey, ...path].join('.'); // This is the full path to the state slice
     if (Array.isArray(path)) {
-      const pathKey = `${thisKey}-${path.join(".")}`;
+      const pathKey = `${thisKey}-${path.join('.')}`;
       componentUpdatesRef.current.add(pathKey);
     }
     const store = getGlobalStore.getState();
 
     setState(thisKey, (prevValue: TStateObject) => {
+      console.log('prevValue', prevValue);
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
 
       const payload = (
-        updateObj.updateType === "insert" && isFunction(newStateOrFunction)
+        updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
           ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
           : isFunction(newStateOrFunction)
             ? newStateOrFunction(nestedShadowValue)
@@ -1121,21 +1076,21 @@ export function useCogsStateFn<TStateObject extends unknown>(
         stateKey: thisKey,
         path,
         updateType: updateObj.updateType,
-        status: "new" as const,
+        status: 'new' as const,
         oldValue: nestedShadowValue,
         newValue: payload,
       } satisfies UpdateTypeDetail;
 
       switch (updateObj.updateType) {
-        case "insert": {
+        case 'insert': {
           store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
           break;
         }
-        case "cut": {
+        case 'cut': {
           store.removeShadowArrayElement(thisKey, path);
           break;
         }
-        case "update": {
+        case 'update': {
           store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
           break;
         }
@@ -1157,11 +1112,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
               if (effect) {
                 try {
                   displayValue = new Function(
-                    "state",
+                    'state',
                     `return (${effect})(state)`
                   )(updatedShadowValue);
                 } catch (err) {
-                  console.error("Error evaluating effect function:", err);
+                  console.error('Error evaluating effect function:', err);
                   displayValue = updatedShadowValue;
                 }
               }
@@ -1169,19 +1124,19 @@ export function useCogsStateFn<TStateObject extends unknown>(
               if (
                 displayValue !== null &&
                 displayValue !== undefined &&
-                typeof displayValue === "object"
+                typeof displayValue === 'object'
               ) {
                 displayValue = JSON.stringify(displayValue);
               }
 
-              childNodes[position].textContent = String(displayValue ?? "");
+              childNodes[position].textContent = String(displayValue ?? '');
             }
           }
         });
       }
 
       // Update in effectiveSetState for insert handling:
-      if (updateObj.updateType === "insert") {
+      if (updateObj.updateType === 'insert') {
         getGlobalStore.getState().notifyPathSubscribers(fullPath);
         const arrayMeta = store.getShadowMetadata(thisKey, path);
 
@@ -1191,7 +1146,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
           const newItemValue = store.getShadowValue(newItemKey);
           const fullSourceArray = store.getShadowValue(
-            [thisKey, ...path].join(".")
+            [thisKey, ...path].join('.')
           );
 
           if (!newItemKey || newItemValue === undefined) return;
@@ -1207,7 +1162,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             ) {
               // Check if new item passes all filters
               for (const transform of wrapper.meta.transforms) {
-                if (transform.type === "filter") {
+                if (transform.type === 'filter') {
                   if (!transform.fn(newItemValue, -1)) {
                     shouldRender = false;
                     break;
@@ -1225,7 +1180,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
                 // Find where to insert based on sort
                 const sortTransform = wrapper.meta.transforms.find(
-                  (t: any) => t.type === "sort"
+                  (t: any) => t.type === 'sort'
                 );
                 if (sortTransform) {
                   // Add new item to the list and sort to find position
@@ -1256,8 +1211,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
             }
 
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-              const itemElement = document.createElement("div");
-              itemElement.setAttribute("data-item-path", newItemKey);
+              const itemElement = document.createElement('div');
+              itemElement.setAttribute('data-item-path', newItemKey);
 
               // Insert at correct position
               const children = Array.from(wrapper.containerRef.children);
@@ -1272,7 +1227,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
               const root = createRoot(itemElement);
               const componentId = uuidv4();
-              const itemPath = newItemKey.split(".").slice(1);
+              const itemPath = newItemKey.split('.').slice(1);
 
               const arraySetter = wrapper.rebuildStateShape({
                 path: wrapper.path,
@@ -1296,7 +1251,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           });
         }
       }
-      if (updateObj.updateType === "cut") {
+      if (updateObj.updateType === 'cut') {
         // For cut, path includes the item ID like ['todoArray', 'id:xxx']
         const arrayPath = path.slice(0, -1); // Remove the item ID
 
@@ -1319,46 +1274,46 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
 
       if (
-        updateObj.updateType === "update" &&
+        updateObj.updateType === 'update' &&
         (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
         path
       ) {
         removeValidationError(
           (validationKey || latestInitialOptionsRef.current?.validation?.key) +
-            "." +
-            path.join(".")
+            '.' +
+            path.join('.')
         );
       }
       const arrayWithoutIndex = path.slice(0, path.length - 1);
       if (
-        updateObj.updateType === "cut" &&
+        updateObj.updateType === 'cut' &&
         latestInitialOptionsRef.current?.validation?.key
       ) {
         removeValidationError(
           latestInitialOptionsRef.current?.validation?.key +
-            "." +
-            arrayWithoutIndex.join(".")
+            '.' +
+            arrayWithoutIndex.join('.')
         );
       }
       if (
-        updateObj.updateType === "insert" &&
+        updateObj.updateType === 'insert' &&
         latestInitialOptionsRef.current?.validation?.key
       ) {
         const getValidation = getValidationErrors(
           latestInitialOptionsRef.current?.validation?.key +
-            "." +
-            arrayWithoutIndex.join(".")
+            '.' +
+            arrayWithoutIndex.join('.')
         );
 
         getValidation.filter((k) => {
-          let length = k?.split(".").length;
-          const v = ""; // Placeholder as `v` is not used from getValidationErrors
+          let length = k?.split('.').length;
+          const v = ''; // Placeholder as `v` is not used from getValidationErrors
 
           if (
-            k == arrayWithoutIndex.join(".") &&
+            k == arrayWithoutIndex.join('.') &&
             length == arrayWithoutIndex.length - 1
           ) {
-            let newKey = k + "." + arrayWithoutIndex;
+            let newKey = k + '.' + arrayWithoutIndex;
             removeValidationError(k!);
             addValidationError(newKey, v!);
           }
@@ -1383,9 +1338,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (component) {
             const reactiveTypes = Array.isArray(component.reactiveType)
               ? component.reactiveType
-              : [component.reactiveType || "component"];
+              : [component.reactiveType || 'component'];
 
-            if (!reactiveTypes.includes("none")) {
+            if (!reactiveTypes.includes('none')) {
               component.forceUpdate();
               notifiedComponents.add(componentId);
             }
@@ -1403,17 +1358,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
         const reactiveTypes = Array.isArray(component.reactiveType)
           ? component.reactiveType
-          : [component.reactiveType || "component"];
+          : [component.reactiveType || 'component'];
 
         // Check for 'all' first, as it's the strongest condition and needs no further work.
-        if (reactiveTypes.includes("all")) {
+        if (reactiveTypes.includes('all')) {
           component.forceUpdate();
           notifiedComponents.add(componentId);
           return; // We're done with this component, no need to check 'deps'.
         }
 
         // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
-        if (reactiveTypes.includes("deps")) {
+        if (reactiveTypes.includes('deps')) {
           if (component.depsFunction) {
             const newDeps = component.depsFunction(newState);
             let shouldUpdate = false;
@@ -1470,19 +1425,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         latestInitialOptionsRef.current!.middleware({
           updateLog: stateLog,
           update: newUpdate,
-        });
-      }
-      if (latestInitialOptionsRef.current?.serverSync) {
-        const serverStateStore = store.serverState[thisKey];
-        const serverSync = latestInitialOptionsRef.current?.serverSync;
-        setServerSyncActions(thisKey, {
-          syncKey:
-            typeof serverSync.syncKey == "string"
-              ? serverSync.syncKey
-              : serverSync.syncKey({ state: payload }),
-          rollBackState: serverStateStore,
-          actionTimeStamp: Date.now() + (serverSync.debounce ?? 3000),
-          status: "waiting",
         });
       }
 
@@ -1544,7 +1486,7 @@ type MetaData = {
    * newly inserted item should be dynamically rendered in its view.
    */
   transforms?: Array<{
-    type: "filter" | "sort";
+    type: 'filter' | 'sort';
     fn: Function;
     dependencies?: any[];
   }>;
@@ -1552,7 +1494,7 @@ type MetaData = {
 
 function hashTransforms(transforms: any[]) {
   if (!transforms || transforms.length === 0) {
-    return "";
+    return '';
   }
   // This creates a string representation of the transforms AND their dependencies.
   // Example: "filter['red']sort['score','asc']"
@@ -1562,12 +1504,12 @@ function hashTransforms(transforms: any[]) {
         // Safely stringify dependencies. An empty array becomes '[]'.
         `${transform.type}${JSON.stringify(transform.dependencies || [])}`
     )
-    .join("");
+    .join('');
 }
 const applyTransforms = (
   stateKey: string,
   path: string[],
-  transforms?: Array<{ type: "filter" | "sort"; fn: Function }>
+  transforms?: Array<{ type: 'filter' | 'sort'; fn: Function }>
 ): string[] => {
   let arrayKeys =
     getGlobalStore.getState().getShadowMetadata(stateKey, path)?.arrayKeys ||
@@ -1583,11 +1525,11 @@ const applyTransforms = (
   }));
 
   for (const transform of transforms) {
-    if (transform.type === "filter") {
+    if (transform.type === 'filter') {
       itemsWithKeys = itemsWithKeys.filter(({ value }, index) =>
         transform.fn(value, index)
       );
-    } else if (transform.type === "sort") {
+    } else if (transform.type === 'sort') {
       itemsWithKeys.sort((a, b) => transform.fn(a.value, b.value));
     }
   }
@@ -1605,17 +1547,17 @@ const registerComponentDependency = (
 
   if (
     !component ||
-    component.reactiveType == "none" ||
+    component.reactiveType == 'none' ||
     !(
       Array.isArray(component.reactiveType)
         ? component.reactiveType
         : [component.reactiveType]
-    ).includes("component")
+    ).includes('component')
   ) {
     return;
   }
 
-  const pathKey = [stateKey, ...dependencyPath].join(".");
+  const pathKey = [stateKey, ...dependencyPath].join('.');
 
   // Add to component's paths (existing logic)
   component.paths.add(pathKey);
@@ -1653,9 +1595,9 @@ function createProxyHandler<T>(
   let stateVersion = 0;
 
   const invalidateCachePath = (path: string[]) => {
-    const pathKey = path.join(".");
+    const pathKey = path.join('.');
     for (const [key] of shapeCache) {
-      if (key === pathKey || key.startsWith(pathKey + ".")) {
+      if (key === pathKey || key.startsWith(pathKey + '.')) {
         shapeCache.delete(key);
       }
     }
@@ -1673,8 +1615,8 @@ function createProxyHandler<T>(
     componentId: string;
     meta?: MetaData;
   }): any {
-    const cacheKey = path.map(String).join(".");
-    const stateKeyPathKey = [stateKey, ...path].join(".");
+    const cacheKey = path.map(String).join('.');
+    const stateKeyPathKey = [stateKey, ...path].join('.');
 
     currentState = getGlobalStore
       .getState()
@@ -1702,7 +1644,7 @@ function createProxyHandler<T>(
         // V--------- THE CRUCIAL FIX IS HERE ---------V
         // This handles requests for internal functions on the proxy,
         // returning the function itself instead of treating it as state.
-        if (prop === "_rebuildStateShape") {
+        if (prop === '_rebuildStateShape') {
           return rebuildStateShape;
         }
         const baseObjProps = Object.getOwnPropertyNames(baseObj);
@@ -1711,14 +1653,14 @@ function createProxyHandler<T>(
         }
         // ^--------- END OF FIX ---------^
 
-        if (prop === "getDifferences") {
+        if (prop === 'getDifferences') {
           return () =>
             getDifferences(
               getGlobalStore.getState().cogsStateStore[stateKey],
               getGlobalStore.getState().initialStateGlobal[stateKey]
             );
         }
-        if (prop === "sync" && path.length === 0) {
+        if (prop === 'sync' && path.length === 0) {
           return async function () {
             const options = getGlobalStore
               .getState()
@@ -1745,7 +1687,7 @@ function createProxyHandler<T>(
               ) {
                 getGlobalStore.getState().removeValidationError(validationKey);
                 response.errors.forEach((error) => {
-                  const errorPath = [validationKey, ...error.path].join(".");
+                  const errorPath = [validationKey, ...error.path].join('.');
                   getGlobalStore
                     .getState()
                     .addValidationError(errorPath, error.message);
@@ -1765,7 +1707,7 @@ function createProxyHandler<T>(
             }
           };
         }
-        if (prop === "_status") {
+        if (prop === '_status') {
           const thisReactiveState = getGlobalStore
             .getState()
             .getNestedState(stateKey, path);
@@ -1777,10 +1719,10 @@ function createProxyHandler<T>(
             stateKey!
           );
           return isDeepEqual(thisReactiveState, initialStateAtPath)
-            ? "fresh"
-            : "stale";
+            ? 'fresh'
+            : 'stale';
         }
-        if (prop === "getStatus") {
+        if (prop === 'getStatus') {
           return function () {
             const thisReactiveState = getGlobalStore().getNestedState(
               stateKey,
@@ -1794,11 +1736,11 @@ function createProxyHandler<T>(
               stateKey!
             );
             return isDeepEqual(thisReactiveState, initialStateAtPath)
-              ? "fresh"
-              : "stale";
+              ? 'fresh'
+              : 'stale';
           };
         }
-        if (prop === "removeStorage") {
+        if (prop === 'removeStorage') {
           return () => {
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
@@ -1810,26 +1752,26 @@ function createProxyHandler<T>(
             if (storageKey) localStorage.removeItem(storageKey);
           };
         }
-        if (prop === "showValidationErrors") {
+        if (prop === 'showValidationErrors') {
           return () => {
             const init = getGlobalStore
               .getState()
               .getInitialOptions(stateKey)?.validation;
-            if (!init?.key) throw new Error("Validation key not found");
+            if (!init?.key) throw new Error('Validation key not found');
             return getGlobalStore
               .getState()
-              .getValidationErrors(init.key + "." + path.join("."));
+              .getValidationErrors(init.key + '.' + path.join('.'));
           };
         }
         if (Array.isArray(currentState)) {
-          if (prop === "getSelected") {
+          if (prop === 'getSelected') {
             return () => {
               registerComponentDependency(stateKey, componentId, [
                 ...path,
-                "getSelected",
+                'getSelected',
               ]);
 
-              const fullKey = stateKey + "." + path.join(".");
+              const fullKey = stateKey + '.' + path.join('.');
               const selectedIndicesMap =
                 getGlobalStore.getState().selectedIndicesMap;
               if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
@@ -1853,30 +1795,30 @@ function createProxyHandler<T>(
 
               return rebuildStateShape({
                 currentState: value,
-                path: selectedItemKey.split(".").slice(1) as string[],
+                path: selectedItemKey.split('.').slice(1) as string[],
                 componentId: componentId!,
               });
             };
           }
-          if (prop === "getSelectedIndex") {
+          if (prop === 'getSelectedIndex') {
             return () => {
               const selectedIndex = getGlobalStore
                 .getState()
                 .getSelectedIndex(
-                  stateKey + "." + path.join("."),
+                  stateKey + '.' + path.join('.'),
                   meta?.validIds
                 );
 
               return selectedIndex;
             };
           }
-          if (prop === "clearSelected") {
+          if (prop === 'clearSelected') {
             return () => {
               getGlobalStore.getState().clearSelectedIndex({ stateKey, path });
             };
           }
 
-          if (prop === "useVirtualView") {
+          if (prop === 'useVirtualView') {
             return (
               options: VirtualViewOptions
             ): VirtualStateObjectResult<any[]> => {
@@ -1922,7 +1864,7 @@ function createProxyHandler<T>(
                 for (let id of orderedIds) {
                   const itemMeta = getGlobalStore
                     .getState()
-                    .getShadowMetadata(stateKey, id.split(".").slice(1));
+                    .getShadowMetadata(stateKey, id.split('.').slice(1));
 
                   let measuredHeight =
                     itemMeta?.virtualizer?.itemHeight || itemHeight;
@@ -1949,7 +1891,7 @@ function createProxyHandler<T>(
                     .getState()
                     .getShadowMetadata(
                       stateKey,
-                      lastItemId.current.split(".").slice(1)
+                      lastItemId.current.split('.').slice(1)
                     );
 
                   if (shadowStore?.virtualizer?.domRef) {
@@ -1958,7 +1900,7 @@ function createProxyHandler<T>(
                       const container = containerRef.current!;
                       container.scrollTo({
                         top: container.scrollHeight,
-                        behavior: "smooth",
+                        behavior: 'smooth',
                       });
 
                       return true;
@@ -2036,12 +1978,12 @@ function createProxyHandler<T>(
                   setRange({ startIndex, endIndex });
                 };
                 handleScroll();
-                container.addEventListener("scroll", handleScroll, {
+                container.addEventListener('scroll', handleScroll, {
                   passive: true,
                 });
 
                 return () => {
-                  container.removeEventListener("scroll", handleScroll);
+                  container.removeEventListener('scroll', handleScroll);
                 };
               }, [positions, totalCount, shadowUpdateTrigger, totalHeight]);
 
@@ -2118,7 +2060,7 @@ function createProxyHandler<T>(
                 }
               }, []);
               const scrollToIndex = useCallback(
-                (index: number, behavior: ScrollBehavior = "smooth") => {
+                (index: number, behavior: ScrollBehavior = 'smooth') => {
                   const container = containerRef.current;
                   if (!container) return;
 
@@ -2155,7 +2097,7 @@ function createProxyHandler<T>(
                     // 'center' gives a better user experience for items in the middle of the list.
                     element.scrollIntoView({
                       behavior: behavior,
-                      block: "center",
+                      block: 'center',
                     });
                   } else if (positions[index] !== undefined) {
                     // Fallback if the ref isn't available for some reason.
@@ -2192,12 +2134,12 @@ function createProxyHandler<T>(
               const virtualizerProps = {
                 outer: {
                   ref: containerRef,
-                  style: { overflowY: "auto" as const, height: "100%" },
+                  style: { overflowY: 'auto' as const, height: '100%' },
                 },
                 inner: {
                   style: {
                     height: `${totalHeight}px`,
-                    position: "relative" as const,
+                    position: 'relative' as const,
                   },
                 },
                 list: {
@@ -2215,7 +2157,7 @@ function createProxyHandler<T>(
               };
             };
           }
-          if (prop === "stateMap") {
+          if (prop === 'stateMap') {
             return (
               callbackfn: (
                 setter: any,
@@ -2243,7 +2185,7 @@ function createProxyHandler<T>(
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
               if (!arrayKeys) {
-                throw new Error("No array keys found for mapping");
+                throw new Error('No array keys found for mapping');
               }
               const arraySetter = rebuildStateShape({
                 currentState: shadowValue as any,
@@ -2253,7 +2195,7 @@ function createProxyHandler<T>(
               });
 
               return shadowValue.map((item, index) => {
-                const itemPath = arrayKeys[index]?.split(".").slice(1);
+                const itemPath = arrayKeys[index]?.split('.').slice(1);
                 const itemSetter = rebuildStateShape({
                   currentState: item,
                   path: itemPath as any,
@@ -2271,7 +2213,7 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === "$stateMap") {
+          if (prop === '$stateMap') {
             return (callbackfn: any) =>
               createElement(SignalMapRenderer, {
                 proxy: {
@@ -2283,7 +2225,7 @@ function createProxyHandler<T>(
                 rebuildStateShape,
               });
           }
-          if (prop === "stateFilter") {
+          if (prop === 'stateFilter') {
             return (
               callbackfn: (value: any, index: number) => boolean,
               deps?: any[]
@@ -2294,7 +2236,7 @@ function createProxyHandler<T>(
                   ?.arrayKeys;
 
               if (!arrayKeys) {
-                throw new Error("No array keys found for filtering.");
+                throw new Error('No array keys found for filtering.');
               }
 
               const newValidIds: string[] = [];
@@ -2318,7 +2260,7 @@ function createProxyHandler<T>(
                   transforms: [
                     ...(meta?.transforms || []),
                     {
-                      type: "filter",
+                      type: 'filter',
                       fn: callbackfn,
                       dependencies: deps || [],
                     },
@@ -2327,14 +2269,14 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === "stateSort") {
+          if (prop === 'stateSort') {
             return (compareFn: (a: any, b: any) => number, deps?: any[]) => {
               const arrayKeys =
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys;
               if (!arrayKeys) {
-                throw new Error("No array keys found for sorting");
+                throw new Error('No array keys found for sorting');
               }
               const itemsWithIds = currentState.map((item, index) => ({
                 item,
@@ -2353,13 +2295,13 @@ function createProxyHandler<T>(
                   validIds: itemsWithIds.map((i) => i.key) as string[],
                   transforms: [
                     ...(meta?.transforms || []),
-                    { type: "sort", fn: compareFn, dependencies: deps || [] },
+                    { type: 'sort', fn: compareFn, dependencies: deps || [] },
                   ],
                 },
               });
             };
           }
-          if (prop === "virtualList") {
+          if (prop === 'virtualList') {
             return (
               callbackfn: (
                 setter: any,
@@ -2403,7 +2345,7 @@ function createProxyHandler<T>(
                 }
                 const itemComponentId = uuidv4();
 
-                const itemPath = itemKey.split(".").slice(1);
+                const itemPath = itemKey.split('.').slice(1);
                 const setter = rebuildStateShape({
                   currentState: item,
                   path: itemPath,
@@ -2424,7 +2366,7 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === "stateList") {
+          if (prop === 'stateList') {
             return (
               callbackfn: (
                 setter: any,
@@ -2546,7 +2488,7 @@ function createProxyHandler<T>(
                         componentIdsRef.current.set(itemKey, itemComponentId);
                       }
 
-                      const itemPath = itemKey.split(".").slice(1);
+                      const itemPath = itemKey.split('.').slice(1);
 
                       return createElement(MemoizedCogsItemWrapper, {
                         key: itemKey,
@@ -2567,7 +2509,7 @@ function createProxyHandler<T>(
               return <StateListWrapper />;
             };
           }
-          if (prop === "stateFlattenOn") {
+          if (prop === 'stateFlattenOn') {
             return (fieldName: string) => {
               const arrayToMap = currentState as any[];
               shapeCache.clear();
@@ -2577,13 +2519,13 @@ function createProxyHandler<T>(
               );
               return rebuildStateShape({
                 currentState: flattenedResults as any,
-                path: [...path, "[*]", fieldName],
+                path: [...path, '[*]', fieldName],
                 componentId: componentId!,
                 meta,
               });
             };
           }
-          if (prop === "index") {
+          if (prop === 'index') {
             return (index: number) => {
               const arrayKeys = getGlobalStore
                 .getState()
@@ -2600,14 +2542,14 @@ function createProxyHandler<T>(
                 .getShadowValue(itemId, meta?.validIds);
               const state = rebuildStateShape({
                 currentState: value,
-                path: itemId.split(".").slice(1) as string[],
+                path: itemId.split('.').slice(1) as string[],
                 componentId: componentId!,
                 meta,
               });
               return state;
             };
           }
-          if (prop === "last") {
+          if (prop === 'last') {
             return () => {
               const currentArray = getGlobalStore
                 .getState()
@@ -2624,13 +2566,13 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === "insert") {
+          if (prop === 'insert') {
             return (
               payload: InsertParams<InferArrayElement<T>>,
               index?: number
             ) => {
               invalidateCachePath(path);
-              effectiveSetState(payload as any, path, { updateType: "insert" });
+              effectiveSetState(payload as any, path, { updateType: 'insert' });
               return rebuildStateShape({
                 currentState: getGlobalStore
                   .getState()
@@ -2641,7 +2583,7 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === "uniqueInsert") {
+          if (prop === 'uniqueInsert') {
             return (
               payload: UpdateArg<T>,
               fields?: (keyof InferArrayElement<T>)[],
@@ -2667,7 +2609,7 @@ function createProxyHandler<T>(
 
               if (isUnique) {
                 invalidateCachePath(path);
-                effectiveSetState(newValue, path, { updateType: "insert" });
+                effectiveSetState(newValue, path, { updateType: 'insert' });
               } else if (onMatch && matchedItem) {
                 const updatedItem = onMatch(matchedItem);
                 const updatedArray = currentArray.map((item) =>
@@ -2675,13 +2617,13 @@ function createProxyHandler<T>(
                 );
                 invalidateCachePath(path);
                 effectiveSetState(updatedArray as any, path, {
-                  updateType: "update",
+                  updateType: 'update',
                 });
               }
             };
           }
 
-          if (prop === "cut") {
+          if (prop === 'cut') {
             return (index?: number, options?: { waitForSync?: boolean }) => {
               const validKeys =
                 meta?.validIds ??
@@ -2700,13 +2642,13 @@ function createProxyHandler<T>(
               const fullIdToCut = validKeys[indexToCut];
               if (!fullIdToCut) return; // Index out of bounds
 
-              const pathForCut = fullIdToCut.split(".").slice(1);
+              const pathForCut = fullIdToCut.split('.').slice(1);
               effectiveSetState(currentState, pathForCut, {
-                updateType: "cut",
+                updateType: 'cut',
               });
             };
           }
-          if (prop === "cutSelected") {
+          if (prop === 'cutSelected') {
             return () => {
               const baseArrayKeys =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2716,7 +2658,7 @@ function createProxyHandler<T>(
                 path,
                 meta?.transforms
               );
-              console.log("validKeys", validKeys);
+              console.log('validKeys', validKeys);
               if (!validKeys || validKeys.length === 0) return;
 
               const indexKeyToCut = getGlobalStore
@@ -2726,19 +2668,19 @@ function createProxyHandler<T>(
               let indexToCut = validKeys.findIndex(
                 (key) => key === indexKeyToCut
               );
-              console.log("indexToCut", indexToCut);
+              console.log('indexToCut', indexToCut);
               const pathForCut = validKeys[
                 indexToCut == -1 ? validKeys.length - 1 : indexToCut
               ]
-                ?.split(".")
+                ?.split('.')
                 .slice(1);
-              console.log("pathForCut", pathForCut);
+              console.log('pathForCut', pathForCut);
               effectiveSetState(currentState, pathForCut!, {
-                updateType: "cut",
+                updateType: 'cut',
               });
             };
           }
-          if (prop === "cutByValue") {
+          if (prop === 'cutByValue') {
             return (value: string | number | boolean) => {
               const arrayKeys = getGlobalStore
                 .getState()
@@ -2761,14 +2703,14 @@ function createProxyHandler<T>(
               if (targetItemId) {
                 effectiveSetState(
                   value as any,
-                  targetItemId.split(".").slice(1),
-                  { updateType: "cut" }
+                  targetItemId.split('.').slice(1),
+                  { updateType: 'cut' }
                 );
               }
             };
           }
 
-          if (prop === "toggleByValue") {
+          if (prop === 'toggleByValue') {
             return (value: string | number | boolean) => {
               const arrayKeys = getGlobalStore
                 .getState()
@@ -2792,17 +2734,17 @@ function createProxyHandler<T>(
                 // Item exists, cut it
                 effectiveSetState(
                   value as any,
-                  existingItemId.split(".").slice(1),
-                  { updateType: "cut" }
+                  existingItemId.split('.').slice(1),
+                  { updateType: 'cut' }
                 );
               } else {
                 // Item doesn't exist, insert it
-                effectiveSetState(value as any, path, { updateType: "insert" });
+                effectiveSetState(value as any, path, { updateType: 'insert' });
               }
             };
           }
 
-          if (prop === "findWith") {
+          if (prop === 'findWith') {
             return (
               searchKey: keyof InferArrayElement<T>,
               searchValue: any
@@ -2812,7 +2754,7 @@ function createProxyHandler<T>(
                 .getShadowMetadata(stateKey, path)?.arrayKeys;
 
               if (!arrayKeys) {
-                throw new Error("No array keys found for sorting");
+                throw new Error('No array keys found for sorting');
               }
 
               let value = null;
@@ -2824,7 +2766,7 @@ function createProxyHandler<T>(
                   .getShadowValue(fullPath, meta?.validIds);
                 if (shadowValue && shadowValue[searchKey] === searchValue) {
                   value = shadowValue;
-                  foundPath = fullPath.split(".").slice(1);
+                  foundPath = fullPath.split('.').slice(1);
                   break;
                 }
               }
@@ -2839,17 +2781,17 @@ function createProxyHandler<T>(
           }
         }
 
-        if (prop === "cut") {
+        if (prop === 'cut') {
           let shadowValue = getGlobalStore
             .getState()
-            .getShadowValue(path.join("."));
+            .getShadowValue(path.join('.'));
 
           return () => {
-            effectiveSetState(shadowValue, path, { updateType: "cut" });
+            effectiveSetState(shadowValue, path, { updateType: 'cut' });
           };
         }
 
-        if (prop === "get") {
+        if (prop === 'get') {
           return () => {
             registerComponentDependency(stateKey, componentId, path);
             return getGlobalStore
@@ -2857,7 +2799,7 @@ function createProxyHandler<T>(
               .getShadowValue(stateKeyPathKey, meta?.validIds);
           };
         }
-        if (prop === "$derive") {
+        if (prop === '$derive') {
           return (fn: any) =>
             $cogsSignal({
               _stateKey: stateKey,
@@ -2866,24 +2808,24 @@ function createProxyHandler<T>(
               _meta: meta,
             });
         }
-        if (prop === "$get") {
+        if (prop === '$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
         }
-        if (prop === "lastSynced") {
-          const syncKey = `${stateKey}:${path.join(".")}`;
+        if (prop === 'lastSynced') {
+          const syncKey = `${stateKey}:${path.join('.')}`;
           return getGlobalStore.getState().getSyncInfo(syncKey);
         }
-        if (prop == "getLocalStorage") {
+        if (prop == 'getLocalStorage') {
           return (key: string) =>
-            loadFromLocalStorage(sessionId + "-" + stateKey + "-" + key);
+            loadFromLocalStorage(sessionId + '-' + stateKey + '-' + key);
         }
-        if (prop === "_selected") {
+        if (prop === '_selected') {
           const parentPath = path.slice(0, -1);
 
           registerComponentDependency(stateKey, componentId, [
             ...path,
-            "selected",
+            'selected',
           ]);
           if (
             Array.isArray(
@@ -2891,11 +2833,11 @@ function createProxyHandler<T>(
             )
           ) {
             const itemId = path[path.length - 1];
-            const fullParentKey = stateKey + "." + parentPath.join(".");
+            const fullParentKey = stateKey + '.' + parentPath.join('.');
             const selectedItemKey = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
-            const fullItemKey = stateKey + "." + path.join(".");
+            const fullItemKey = stateKey + '.' + path.join('.');
             return selectedItemKey === fullItemKey;
           }
           return undefined;
@@ -2914,9 +2856,9 @@ function createProxyHandler<T>(
             rootMeta.components.forEach((component, componentId) => {
               const reactiveTypes = Array.isArray(component.reactiveType)
                 ? component.reactiveType
-                : [component.reactiveType || "component"];
+                : [component.reactiveType || 'component'];
 
-              if (reactiveTypes.includes("all")) {
+              if (reactiveTypes.includes('all')) {
                 component.forceUpdate();
                 notifiedComponents.add(componentId);
               }
@@ -2924,7 +2866,7 @@ function createProxyHandler<T>(
           }
 
           store
-            .getShadowMetadata(stateKey, [...parentPath, "getSelected"])
+            .getShadowMetadata(stateKey, [...parentPath, 'getSelected'])
             ?.pathComponents?.forEach((componentId) => {
               const thisComp = rootMeta?.components?.get(componentId);
               thisComp?.forceUpdate();
@@ -2932,10 +2874,10 @@ function createProxyHandler<T>(
 
           const parentMeta = store.getShadowMetadata(stateKey, parentPath);
           for (let arrayKey of parentMeta?.arrayKeys || []) {
-            const key = arrayKey + ".selected";
+            const key = arrayKey + '.selected';
             const selectedItem = store.getShadowMetadata(
               stateKey,
-              key.split(".").slice(1)
+              key.split('.').slice(1)
             );
             if (arrayKey == currentSelected) {
               selectedItem?.pathComponents?.forEach((componentId) => {
@@ -2947,11 +2889,11 @@ function createProxyHandler<T>(
         };
 
         // Then use it in both:
-        if (prop === "setSelected") {
+        if (prop === 'setSelected') {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
-            const fullParentKey = stateKey + "." + parentPath.join(".");
-            const fullItemKey = stateKey + "." + path.join(".");
+            const fullParentKey = stateKey + '.' + parentPath.join('.');
+            const fullItemKey = stateKey + '.' + path.join('.');
 
             const selectedIndex = getGlobalStore
               .getState()
@@ -2967,11 +2909,11 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === "toggleSelected") {
+        if (prop === 'toggleSelected') {
           return () => {
             const parentPath = path.slice(0, -1);
-            const fullParentKey = stateKey + "." + parentPath.join(".");
-            const fullItemKey = stateKey + "." + path.join(".");
+            const fullParentKey = stateKey + '.' + parentPath.join('.');
+            const fullItemKey = stateKey + '.' + path.join('.');
 
             const currentSelected = getGlobalStore
               .getState()
@@ -2990,25 +2932,25 @@ function createProxyHandler<T>(
             }
           };
         }
-        if (prop === "_componentId") {
+        if (prop === '_componentId') {
           return componentId;
         }
         if (path.length == 0) {
-          if (prop === "addValidation") {
+          if (prop === 'addValidation') {
             return (errors: ValidationError[]) => {
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
-              if (!init?.key) throw new Error("Validation key not found");
+              if (!init?.key) throw new Error('Validation key not found');
               removeValidationError(init.key);
               errors.forEach((error) => {
-                const fullErrorPath = [init.key, ...error.path].join(".");
+                const fullErrorPath = [init.key, ...error.path].join('.');
                 addValidationError(fullErrorPath, error.message);
               });
               notifyComponents(stateKey);
             };
           }
-          if (prop === "applyJsonPatch") {
+          if (prop === 'applyJsonPatch') {
             return (patches: any[]) => {
               const currentState = getGlobalStore
                 .getState()
@@ -3025,13 +2967,13 @@ function createProxyHandler<T>(
               notifyComponents(stateKey);
             };
           }
-          if (prop === "validateZodSchema") {
+          if (prop === 'validateZodSchema') {
             return () => {
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
               if (!init?.zodSchema || !init?.key)
-                throw new Error("Zod schema or validation key not found");
+                throw new Error('Zod schema or validation key not found');
 
               removeValidationError(init.key);
               const thisObject =
@@ -3040,7 +2982,7 @@ function createProxyHandler<T>(
 
               if (!result.success) {
                 result.error.errors.forEach((error) => {
-                  const fullErrorPath = [init.key, ...error.path].join(".");
+                  const fullErrorPath = [init.key, ...error.path].join('.');
                   addValidationError(fullErrorPath, error.message);
                 });
                 notifyComponents(stateKey);
@@ -3050,18 +2992,18 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === "getComponents")
+          if (prop === 'getComponents')
             return () =>
               getGlobalStore.getState().stateComponents.get(stateKey);
-          if (prop === "getAllFormRefs")
+          if (prop === 'getAllFormRefs')
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);
         }
-        if (prop === "getFormRef") {
+        if (prop === 'getFormRef') {
           return () =>
-            formRefStore.getState().getFormRef(stateKey + "." + path.join("."));
+            formRefStore.getState().getFormRef(stateKey + '.' + path.join('.'));
         }
-        if (prop === "validationWrapper") {
+        if (prop === 'validationWrapper') {
           return ({
             children,
             hideMessage,
@@ -3071,7 +3013,7 @@ function createProxyHandler<T>(
           }) => (
             <ValidationWrapper
               formOpts={
-                hideMessage ? { validation: { message: "" } } : undefined
+                hideMessage ? { validation: { message: '' } } : undefined
               }
               path={path}
               stateKey={stateKey}
@@ -3080,15 +3022,15 @@ function createProxyHandler<T>(
             </ValidationWrapper>
           );
         }
-        if (prop === "_stateKey") return stateKey;
-        if (prop === "_path") return path;
-        if (prop === "update") {
-          return (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => {
-            effectiveSetState(payload as any, path, { updateType: "update" });
+        if (prop === '_stateKey') return stateKey;
+        if (prop === '_path') return path;
+        if (prop === 'update') {
+          return (payload: UpdateArg<T>) => {
+            effectiveSetState(payload as any, path, { updateType: 'update' });
             invalidateCachePath(path);
           };
         }
-        if (prop === "formElement") {
+        if (prop === 'formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => (
             <FormControlComponent<T>
               setState={effectiveSetState}
@@ -3339,7 +3281,7 @@ function SignalMapRenderer({
     const value = getGlobalStore
       .getState()
       .getShadowValue(
-        [proxy._stateKey, ...proxy._path].join("."),
+        [proxy._stateKey, ...proxy._path].join('.'),
         proxy._meta?.validIds
       ) as any[];
 
@@ -3367,15 +3309,15 @@ function SignalMapRenderer({
       if (!itemKey) return; // Safeguard if there's a mismatch
 
       const itemComponentId = uuidv4();
-      const itemElement = document.createElement("div");
+      const itemElement = document.createElement('div');
 
-      itemElement.setAttribute("data-item-path", itemKey);
+      itemElement.setAttribute('data-item-path', itemKey);
       container.appendChild(itemElement);
 
       const root = createRoot(itemElement);
       rootsMapRef.current.set(itemKey, root);
 
-      const itemPath = itemKey.split(".").slice(1) as string[];
+      const itemPath = itemKey.split('.').slice(1) as string[];
 
       // Render CogsItemWrapper instead of direct render
       root.render(
@@ -3411,11 +3353,11 @@ function SignalRenderer({
   const elementRef = useRef<HTMLSpanElement>(null);
   const instanceIdRef = useRef<string | null>(null);
   const isSetupRef = useRef(false);
-  const signalId = `${proxy._stateKey}-${proxy._path.join(".")}`;
+  const signalId = `${proxy._stateKey}-${proxy._path.join('.')}`;
   const value = getGlobalStore
     .getState()
     .getShadowValue(
-      [proxy._stateKey, ...proxy._path].join("."),
+      [proxy._stateKey, ...proxy._path].join('.'),
       proxy._meta?.validIds
     );
 
@@ -3426,7 +3368,7 @@ function SignalRenderer({
 
     const timeoutId = setTimeout(() => {
       if (!element.parentElement) {
-        console.warn("Parent element not found for signal", signalId);
+        console.warn('Parent element not found for signal', signalId);
         return;
       }
 
@@ -3434,10 +3376,10 @@ function SignalRenderer({
       const childNodes = Array.from(parentElement.childNodes);
       const position = childNodes.indexOf(element);
 
-      let parentId = parentElement.getAttribute("data-parent-id");
+      let parentId = parentElement.getAttribute('data-parent-id');
       if (!parentId) {
         parentId = `parent-${crypto.randomUUID()}`;
-        parentElement.setAttribute("data-parent-id", parentId);
+        parentElement.setAttribute('data-parent-id', parentId);
       }
 
       instanceIdRef.current = `instance-${crypto.randomUUID()}`;
@@ -3466,15 +3408,15 @@ function SignalRenderer({
       if (proxy._effect) {
         try {
           displayValue = new Function(
-            "state",
+            'state',
             `return (${proxy._effect})(state)`
           )(value);
         } catch (err) {
-          console.error("Error evaluating effect function:", err);
+          console.error('Error evaluating effect function:', err);
         }
       }
 
-      if (displayValue !== null && typeof displayValue === "object") {
+      if (displayValue !== null && typeof displayValue === 'object') {
         displayValue = JSON.stringify(displayValue);
       }
 
@@ -3503,10 +3445,10 @@ function SignalRenderer({
     };
   }, []); // Empty deps - only run once
 
-  return createElement("span", {
+  return createElement('span', {
     ref: elementRef,
-    style: { display: "contents" },
-    "data-signal-id": signalId,
+    style: { display: 'contents' },
+    'data-signal-id': signalId,
   });
 }
 const MemoizedCogsItemWrapper = memo(
@@ -3514,7 +3456,7 @@ const MemoizedCogsItemWrapper = memo(
   (prevProps, nextProps) => {
     // Re-render if any of these change:
     return (
-      prevProps.itemPath.join(".") === nextProps.itemPath.join(".") &&
+      prevProps.itemPath.join('.') === nextProps.itemPath.join('.') &&
       prevProps.stateKey === nextProps.stateKey &&
       prevProps.itemComponentId === nextProps.itemComponentId &&
       prevProps.localIndex === nextProps.localIndex &&
@@ -3588,7 +3530,7 @@ function CogsItemWrapper({
         },
       });
       const arrayPath = itemPath.slice(0, -1); // Remove the item ID
-      const arrayPathKey = [stateKey, ...arrayPath].join(".");
+      const arrayPathKey = [stateKey, ...arrayPath].join('.');
 
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
     }
@@ -3600,7 +3542,7 @@ function CogsItemWrapper({
     stateEntry?.components?.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(), // <--- THE FIX
-      reactiveType: ["component"],
+      reactiveType: ['component'],
     });
   }
 
@@ -3610,7 +3552,7 @@ function CogsItemWrapper({
     };
     // The itemPath is no longer needed as a dependency for this effect
   }, [stateKey, itemComponentId]);
-  const fullItemPath = [stateKey, ...itemPath].join(".");
+  const fullItemPath = [stateKey, ...itemPath].join('.');
   const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
 
   // If the item was deleted from the store, it might be null.
@@ -3649,7 +3591,7 @@ const cleanupComponentRegistration = (
   // Remove from all registered paths
   if (component?.paths) {
     component.paths.forEach((fullPath) => {
-      const pathParts = fullPath.split(".");
+      const pathParts = fullPath.split('.');
       const path = pathParts.slice(1);
 
       const pathMeta = getGlobalStore
@@ -3672,89 +3614,3 @@ const cleanupComponentRegistration = (
     getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
   }
 };
-// Add this component at the top level of your file
-function CogsStateListRenderer({
-  stateKey,
-  path,
-  componentId,
-  meta,
-  rebuildStateShape,
-  renderFn,
-}: {
-  stateKey: string;
-  path: string[];
-  componentId: string;
-  meta?: MetaData;
-  rebuildStateShape: (options: {
-    currentState: any;
-    path: string[];
-    componentId: string;
-    meta?: any;
-  }) => any;
-  renderFn: (setter: any, index: number, arraySetter: any) => React.ReactNode;
-}) {
-  // This useRef is now stable because CogsStateListRenderer is a stable component.
-  const componentIdsRef = useRef<Map<string, string>>(new Map());
-
-  // Since this component re-renders when the parent does, we can get the latest
-  // state directly from the global store.
-  const stateKeyPathKey = [stateKey, ...path].join(".");
-
-  const itemKeysForCurrentView =
-    meta?.validIds ??
-    getGlobalStore.getState().getShadowMetadata(stateKey, path)?.arrayKeys ??
-    [];
-
-  const fullArrayValue = getGlobalStore
-    .getState()
-    .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
-
-  // If the data is not an array (e.g., during initialization), render nothing.
-  if (!Array.isArray(fullArrayValue)) {
-    return null;
-  }
-
-  // Create the proxy for the entire array. This is created fresh on each render.
-  const arraySetter = rebuildStateShape({
-    currentState: fullArrayValue as any,
-    path,
-    componentId, // The ID of the component that *called* stateList
-    meta,
-  });
-
-  // Map over the STABLE keys from the store and render a wrapper for each item.
-  return (
-    <>
-      {itemKeysForCurrentView.map((itemKey, localIndex) => {
-        if (!itemKey) {
-          // Safeguard against potential mismatches.
-          return null;
-        }
-
-        // Get or create a stable component ID for this specific item.
-        // This ID will persist across re-renders of the list.
-        let itemComponentId = componentIdsRef.current.get(itemKey);
-        if (!itemComponentId) {
-          itemComponentId = uuidv4();
-          componentIdsRef.current.set(itemKey, itemComponentId);
-        }
-
-        // The path for this specific item is derived from its unique key.
-        const itemPath = itemKey.split(".").slice(1);
-
-        // Render the MemoizedCogsItemWrapper. It will handle its own state
-        // and re-renders, preventing stale closures.
-        return createElement(MemoizedCogsItemWrapper, {
-          key: itemKey, // CRUCIAL: Use the unique item key from the store.
-          stateKey,
-          itemComponentId, // Pass the stable, unique ID for this wrapper instance.
-          itemPath,
-          localIndex,
-          arraySetter,
-          rebuildStateShape,
-          renderFn, // The user's render function.
-        });
-      })}
-    </>
-  );
-}

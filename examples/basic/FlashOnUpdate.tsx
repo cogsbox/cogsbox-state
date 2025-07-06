@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from 'react';
 
 export const FlashWrapper = ({
   children,
-  color = "red",
+  color = 'red',
 }: {
   children: React.ReactNode;
   color?: string;
@@ -15,13 +15,13 @@ export const FlashWrapper = ({
     ref.current.style.outline = `2px solid ${color}`;
     ref.current.style.backgroundColor = `rgba(255, 0, 0, 0.05)`;
     ref.current.style.backgroundImage = `radial-gradient(rgba(255, 255, 255, 0.25) 2px, transparent 2px)`;
-    ref.current.style.backgroundSize = "4px 4px";
+    ref.current.style.backgroundSize = '4px 4px';
     renderCountRef.current++;
     const timer = setTimeout(() => {
       if (ref.current) {
-        ref.current.style.outline = "none";
+        ref.current.style.outline = 'none';
 
-        ref.current.style.backgroundColor = "transparent";
+        ref.current.style.backgroundColor = 'transparent';
       }
     }, 200);
     return () => clearTimeout(timer);

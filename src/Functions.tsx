@@ -2,14 +2,12 @@ import {
   type FormElementParams,
   type FormOptsType,
   type UpdateArg,
-} from "./CogsState";
+} from './CogsState';
 
-import { getNestedValue, isFunction, updateNestedProperty } from "./utility";
-import { useEffect, useRef, useState } from "react";
-import React from "react";
-import { getGlobalStore, formRefStore } from "./store";
-import { validateZodPathFunc } from "./useValidateZodPath";
-import { ulid } from "ulid";
+import { useEffect, useRef, useState } from 'react';
+import React from 'react';
+import { getGlobalStore, formRefStore } from './store';
+import { validateZodPathFunc } from './useValidateZodPath';
 
 export const useStoreSubscription = <T,>(
   fullPath: string,
@@ -52,9 +50,9 @@ export const useGetValidationErrors = (
 ) => {
   const fullPath =
     validationKey +
-    "." +
-    (path.length > 0 ? [path.join(".")] : []) +
-    (validIndices && validIndices.length > 0 ? "." + validIndices : "");
+    '.' +
+    (path.length > 0 ? [path.join('.')] : []) +
+    (validIndices && validIndices.length > 0 ? '.' + validIndices : '');
 
   const returnresult = useStoreSubscription(
     fullPath,
@@ -65,13 +63,13 @@ export const useGetValidationErrors = (
 };
 
 export const useGetSyncInfo = (key: string, path: string[]) => {
-  const syncKey = `${key}:${path.join(".")}`;
+  const syncKey = `${key}:${path.join('.')}`;
   return useStoreSubscription(syncKey, (store, path) =>
     store.getSyncInfo(path)
   );
 };
 export const useGetKeyState = (key: string, path: string[]) => {
-  return useStoreSubscription(`${key}:${path.join(".")}`, (store, fullPath) =>
+  return useStoreSubscription(`${key}:${path.join('.')}`, (store, fullPath) =>
     store.getNestedState(key, path)
   );
 };
@@ -99,13 +97,13 @@ export const FormControlComponent = <TStateObject,>({
     getInitialOptions,
     removeValidationError,
   } = getGlobalStore.getState();
-  const stateKeyPathKey = [stateKey, ...path].join(".");
+  const stateKeyPathKey = [stateKey, ...path].join('.');
   const [, forceUpdate] = useState<any>();
   getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
     forceUpdate({});
   });
 
-  const refKey = stateKey + "." + path.join(".");
+  const refKey = stateKey + '.' + path.join('.');
   const localFormRef = useRef<HTMLInputElement>(null);
   const existingRef = getFormRef(refKey);
   if (!existingRef) {
@@ -145,13 +143,13 @@ export const FormControlComponent = <TStateObject,>({
     setLocalValue(payload); // Update local state immediately
     isCurrentlyDebouncing.current = true;
 
-    if (payload === "") {
+    if (payload === '') {
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current); // Clear pending timer
         debounceTimeoutRef.current = null;
       }
 
-      setState(payload, path, { updateType: "update" });
+      setState(payload, path, { updateType: 'update' });
       isCurrentlyDebouncing.current = false; // No longer debouncing
       return; // Don't proceed to set another timeout
     }
@@ -164,19 +162,18 @@ export const FormControlComponent = <TStateObject,>({
     debounceTimeoutRef.current = setTimeout(
       () => {
         isCurrentlyDebouncing.current = false;
-        setState(payload, path, { updateType: "update" });
+        console.log('debouncedUpdater', payload);
+        setState(payload, path, { updateType: 'update' });
       },
       formOpts?.debounceTime ??
-        (typeof globalStateValue == "boolean" ? 20 : 200)
+        (typeof globalStateValue == 'boolean' ? 20 : 200)
     );
   };
 
   const initialOptions = getInitialOptions(stateKey);
-  if (!initialOptions?.validation?.key) {
-    throw new Error("Validation key not found.");
-  }
-  const validationKey = initialOptions.validation.key;
-  const validateOnBlur = initialOptions.validation.onBlur === true;
+
+  const validationKey = initialOptions?.validation?.key;
+  const validateOnBlur = initialOptions?.validation?.onBlur === true;
 
   const handleBlur = async () => {
     // --- Ensure latest value is flushed if debouncing ---
@@ -185,14 +182,15 @@ export const FormControlComponent = <TStateObject,>({
       debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
       // Ensure the absolute latest local value is committed on blur
-      setState(localValue, path, { updateType: "update" });
+      setState(localValue, path, { updateType: 'update' });
     }
     // --- End modification ---
 
-    if (!initialOptions.validation?.zodSchema || !validateOnBlur) return;
-    removeValidationError(validationKey + "." + path.join("."));
+    if (!initialOptions?.validation?.zodSchema || !validateOnBlur) return;
+    removeValidationError(validationKey + '.' + path.join('.'));
     try {
       // Use the potentially just flushed value
+      if (!validationKey) return;
       const fieldValue = getGlobalStore
         .getState()
         .getShadowValue(stateKeyPathKey);
@@ -205,31 +203,28 @@ export const FormControlComponent = <TStateObject,>({
       // forceUpdate might be needed if validation state update doesn't trigger render
       // Consider using useGetValidationErrors hook result directly for validation display
     } catch (error) {
-      console.error("Validation error on blur:", error);
+      console.error('Validation error on blur:', error);
     }
   };
 
   const rawSyncStatus = useGetSyncInfo(stateKey, path);
-  const syncStatus = rawSyncStatus
-    ? { ...rawSyncStatus, date: new Date(rawSyncStatus.timeStamp) }
-    : null;
 
   const childElement = child({
     // --- START CHANGES ---
     get: () => localValue, // Get should return the immediate local value
     set: debouncedUpdater, // Use the new debounced updater
     // --- END CHANGES ---
-    syncStatus,
+
     path: path,
     validationErrors: () =>
-      getValidationErrors(validationKey + "." + path.join(".")),
+      getValidationErrors(validationKey + '.' + path.join('.')),
     addValidationError: (message?: string) => {
-      removeValidationError(validationKey + "." + path.join("."));
-      addValidationError(validationKey + "." + path.join("."), message ?? "");
+      removeValidationError(validationKey + '.' + path.join('.'));
+      addValidationError(validationKey + '.' + path.join('.'), message ?? '');
     },
     inputProps: {
       // --- START CHANGES ---
-      value: localValue ?? "", // Input value is always the local state
+      value: localValue ?? '', // Input value is always the local state
       onChange: (e: any) => debouncedUpdater(e.target.value), // Use debounced updater
       // --- END CHANGES ---
       onBlur: handleBlur,
@@ -278,7 +273,7 @@ export function ValidationWrapper({
   const thesMessages: string[] = [];
 
   if (validationErrors) {
-    const newMessage = validationErrors!.join(", ");
+    const newMessage = validationErrors!.join(', ');
     if (!thesMessages.includes(newMessage)) {
       thesMessages.push(newMessage);
     }
@@ -294,10 +289,10 @@ export function ValidationWrapper({
           ),
           active: validationErrors.length > 0 ? true : false,
           message: formOpts?.validation?.hideMessage
-            ? ""
+            ? ''
             : formOpts?.validation?.message
               ? formOpts?.validation?.message
-              : thesMessages.map((m) => m).join(", "),
+              : thesMessages.map((m) => m).join(', '),
           path: path,
         })
       ) : (

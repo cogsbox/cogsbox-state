@@ -1,33 +1,33 @@
-"use client";
+'use client';
 
-import type { OptionsType, StateObject } from "../../../src/CogsState";
-import { type StateExampleObject, useCogsState } from "./state";
+import type { OptionsType, StateObject } from '../../../src/CogsState';
+import { type StateExampleObject, useCogsState } from './state';
 
-import React, { useState } from "react";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import stringify from "stringify-object";
-import DotPattern from "../DotWrapper";
-import { FlashWrapper } from "../FlashOnUpdate";
+import React, { useState } from 'react';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import stringify from 'stringify-object';
+import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../FlashOnUpdate';
 
 // Define the structure for our tabs
 const TABS = {
-  component: { id: "component", title: "Component Reactivity (Default)" },
-  deps: { id: "deps", title: "Dependency-Based" },
-  all: { id: "all", title: "Entire State" },
-  none: { id: "none", title: "Signal-Based (None)" },
+  component: { id: 'component', title: 'Component Reactivity (Default)' },
+  deps: { id: 'deps', title: 'Dependency-Based' },
+  all: { id: 'all', title: 'Entire State' },
+  none: { id: 'none', title: 'Signal-Based (None)' },
 };
 type TabId = keyof typeof TABS;
 
 // --- Main Page Component ---
 export default function ReactivityPage() {
-  const [activeTab, setActiveTab] = useState<TabId>("component");
-  const fooState = useCogsState("fooBarObject", { reactiveType: "none" });
+  const [activeTab, setActiveTab] = useState<TabId>('component');
+  const fooState = useCogsState('fooBarObject', { reactiveType: 'none' });
 
   return (
     <>
       <div className="flex gap-6 text-green-400  p-6 font-mono">
-        {/* --- LEFT COLUMN (Interactive Examples) --- */}{" "}
+        {/* --- LEFT COLUMN (Interactive Examples) --- */}{' '}
         <div className="w-3/5 flex flex-col ">
           <DotPattern>
             <div className="px-8 py-4">
@@ -38,7 +38,9 @@ export default function ReactivityPage() {
                 Cogs offers several strategies to control when components
                 re-render. Select a tab to see how each strategy works. Click
                 the "Toggle" buttons and watch which components flash,
-                indicating a re-render.
+                indicating a re-render. The seperateNested is in a diffferent
+                component using the same global state but with a different
+                useCogsState call.
               </p>
               {/* Tab Navigation */}
               <div className="flex border-b border-gray-700 bg-gray-900/90 rounded-px-2 py-1">
@@ -49,38 +51,38 @@ export default function ReactivityPage() {
                     className={`px-4 py-2 text-sm font-semibold transition-colors duration-200 -mb-px cursor-pointer bg-green-200/30
                   ${
                     activeTab === tab.id
-                      ? "border-b-2 border-green-400 text-green-300"
-                      : "text-gray-300 hover:text-green-400 border-b-2 border-transparent"
+                      ? 'border-b-2 border-green-400 text-green-300'
+                      : 'text-gray-300 hover:text-green-400 border-b-2 border-transparent'
                   }`}
                   >
                     {tab.title}
                   </button>
-                ))}{" "}
+                ))}{' '}
               </div>
             </div>
           </DotPattern>
           {/* Tab Content Area */}
           <div className="pl-6">
-            {activeTab === "component" ? (
+            {activeTab === 'component' ? (
               <ComponentReactivityExample />
-            ) : activeTab === "deps" ? (
+            ) : activeTab === 'deps' ? (
               <DepsReactivityExample />
-            ) : activeTab === "all" ? (
+            ) : activeTab === 'all' ? (
               <AllReactivityExample />
-            ) : activeTab === "none" ? (
+            ) : activeTab === 'none' ? (
               <SignalReactivityExample />
             ) : null}
-          </div>{" "}
+          </div>{' '}
         </div>
         {/* --- RIGHT COLUMN (Controls & Global State) --- */}
         <div className="w-2/5 flex flex-col gap-4 sticky top-6 ">
-          <div className="h-40" />{" "}
+          <div className="h-40" />{' '}
           <h2 className="text-lg font-bold text-gray-300">Controls</h2>
           <div className="flex flex-wrap gap-2">
             <button
               className="px-3 py-1 bg-green-900/80 border border-green-300/70 text-green-200 rounded hover:bg-green-800 text-sm cursor-pointer"
               onClick={() =>
-                fooState.foo.update((s) => (s === "baz" ? "bar" : "baz"))
+                fooState.foo.update((s) => (s === 'baz' ? 'bar' : 'baz'))
               }
             >
               Toggle root 'foo'
@@ -88,7 +90,7 @@ export default function ReactivityPage() {
             <button
               className="px-3 py-1 bg-green-900/80 border border-green-300/70 text-green-200 rounded hover:bg-green-800 text-sm cursor-pointer"
               onClick={() =>
-                fooState.nested.foo.update((s) => (s === "baz" ? "bar" : "baz"))
+                fooState.nested.foo.update((s) => (s === 'baz' ? 'bar' : 'baz'))
               }
             >
               Toggle 'nested.foo'
@@ -97,7 +99,7 @@ export default function ReactivityPage() {
               className="px-3 py-1 bg-green-900/80 border border-green-300/70 text-green-200 rounded hover:bg-green-800 text-sm cursor-pointer"
               onClick={() =>
                 fooState.seperateNested.foo.update((s) =>
-                  s === "baz" ? "bar" : "baz"
+                  s === 'baz' ? 'bar' : 'baz'
                 )
               }
             >
@@ -119,7 +121,7 @@ function ComponentReactivityExample() {
     <ExampleDisplay
       title="Component Reactivity (Default)"
       description="This is the default. The component re-renders only if the specific state values it calls with .get() are updated."
-      options={{ reactiveType: "component" }}
+      options={{ reactiveType: 'component' }}
     />
   );
 }
@@ -130,15 +132,15 @@ function DepsReactivityExample() {
       title="Dependency-Based Reactivity"
       description="The component re-renders only when the specific values returned by the reactiveDeps function change."
       options={{
-        reactiveType: "deps",
-        reactiveDeps: (state: StateExampleObject["fooBarObject"]) => [
+        reactiveType: 'deps',
+        reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
           state.foo,
           state.nested.foo,
         ],
       }}
       nestedOptions={{
-        reactiveType: "deps",
-        reactiveDeps: (state: StateExampleObject["fooBarObject"]) => [
+        reactiveType: 'deps',
+        reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
           state.seperateNested.foo,
         ],
       }}
@@ -151,7 +153,7 @@ function AllReactivityExample() {
     <ExampleDisplay
       title="Entire State Reactive"
       description="This component re-renders if *any* part of the 'fooBarObject' state slice changes, even properties it doesn't use."
-      options={{ reactiveType: "all" }}
+      options={{ reactiveType: 'all' }}
     />
   );
 }
@@ -161,7 +163,7 @@ function SignalReactivityExample() {
     <ExampleDisplay
       title="Signal-Based Reactivity"
       description="With reactiveType: 'none', the React component *never* re-renders from state changes. Use signals (.$get()) for fine-grained, direct-to-DOM updates."
-      options={{ reactiveType: "none" }}
+      options={{ reactiveType: 'none' }}
       isSignal={true}
     />
   );
@@ -178,28 +180,28 @@ function ExampleDisplay({
 }: {
   title: string;
   description: string;
-  options: OptionsType<StateExampleObject["fooBarObject"]>;
-  nestedOptions?: OptionsType<StateExampleObject["fooBarObject"]>;
+  options: OptionsType<StateExampleObject['fooBarObject']>;
+  nestedOptions?: OptionsType<StateExampleObject['fooBarObject']>;
   isSignal?: boolean;
 }) {
-  const fooState = useCogsState("fooBarObject", options);
+  const fooState = useCogsState('fooBarObject', options);
   const finalNestedOptions = nestedOptions || options;
 
   const formatOptions = (opts: any) => {
-    if (opts.reactiveType === "deps") {
-      if (opts.reactiveDeps.toString().includes("seperateNested.foo")) {
+    if (opts.reactiveType === 'deps') {
+      if (opts.reactiveDeps.toString().includes('seperateNested.foo')) {
         return `{ reactiveType: "deps", reactiveDeps: (s) => [s.seperateNested.foo] }`;
       }
       return `{ reactiveType: "deps", reactiveDeps: (s) => [s.foo, s.nested.foo] }`;
     }
-    return stringify(opts, { indent: "  ", singleQuotes: false });
+    return stringify(opts, { indent: '  ', singleQuotes: false });
   };
 
   const displayString = `const state = useCogsState( "fooBarObject", ${formatOptions(
     options
   )} );`;
   const getterString = `// Renders: ${
-    isSignal ? "state.foo.$get()" : "state.foo.get()"
+    isSignal ? 'state.foo.$get()' : 'state.foo.get()'
   }`;
 
   return (
@@ -214,11 +216,11 @@ function ExampleDisplay({
             language="javascript"
             style={atomOneDark}
             customStyle={{
-              backgroundColor: "transparent",
-              fontSize: "12px",
-              padding: "0.5rem",
+              backgroundColor: 'transparent',
+              fontSize: '12px',
+              padding: '0.5rem',
             }}
-            codeTagProps={{ style: { fontFamily: "inherit" } }}
+            codeTagProps={{ style: { fontFamily: 'inherit' } }}
           >
             {`${displayString}\n${getterString}`}
           </SyntaxHighlighter>
@@ -242,7 +244,7 @@ function NestedFoo({
   nestedFoo,
   isSignal,
 }: {
-  nestedFoo: StateObject<StateExampleObject["fooBarObject"]["nested"]["foo"]>;
+  nestedFoo: StateObject<StateExampleObject['fooBarObject']['nested']['foo']>;
   isSignal?: boolean;
 }) {
   return (
@@ -265,19 +267,19 @@ function NestedFooInstance({
   options,
   isSignal,
 }: {
-  options: OptionsType<StateExampleObject["fooBarObject"]>;
+  options: OptionsType<StateExampleObject['fooBarObject']>;
   isSignal?: boolean;
 }) {
-  const nestedFooState = useCogsState("fooBarObject", options);
+  const nestedFooState = useCogsState('fooBarObject', options);
 
   const formatOptions2 = (opts: any) => {
     if (
-      opts.reactiveType === "deps" &&
-      opts.reactiveDeps?.toString().includes("state.seperateNested.foo")
+      opts.reactiveType === 'deps' &&
+      opts.reactiveDeps?.toString().includes('state.seperateNested.foo')
     ) {
       return `{ reactiveType: "deps", reactiveDeps: (s) => [s.seperateNested.foo] }`;
     }
-    return stringify(opts, { indent: "  ", singleQuotes: false });
+    return stringify(opts, { indent: '  ', singleQuotes: false });
   };
 
   const displayString = `// In a separate component...\nconst nestedState = useCogsState(\n  "fooBarObject",\n  ${formatOptions2(
@@ -293,11 +295,11 @@ function NestedFooInstance({
             language="javascript"
             style={atomOneDark}
             customStyle={{
-              backgroundColor: "transparent",
-              fontSize: "11px",
-              padding: "0.5rem",
+              backgroundColor: 'transparent',
+              fontSize: '11px',
+              padding: '0.5rem',
             }}
-            codeTagProps={{ style: { fontFamily: "inherit" } }}
+            codeTagProps={{ style: { fontFamily: 'inherit' } }}
           >
             {displayString}
           </SyntaxHighlighter>
@@ -371,7 +373,7 @@ function ReactivityExplanation() {
 }
 
 function ShowState() {
-  const fooState = useCogsState("fooBarObject", { reactiveType: "all" });
+  const fooState = useCogsState('fooBarObject', { reactiveType: 'all' });
   return (
     <FlashWrapper>
       <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 overflow-hidden">

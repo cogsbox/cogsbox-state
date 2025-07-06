@@ -1,5 +1,5 @@
-import { create } from "zustand";
-import { ulid } from "ulid";
+import { create } from 'zustand';
+import { ulid } from 'ulid';
 import type {
   OptionsType,
   ReactivityType,
@@ -7,9 +7,9 @@ import type {
   SyncActionsType,
   SyncInfo,
   UpdateTypeDetail,
-} from "./CogsState.js";
+} from './CogsState.js';
 
-import type { ReactNode } from "react";
+import type { ReactNode } from 'react';
 
 type StateUpdater<StateValue> =
   | StateValue
@@ -65,7 +65,7 @@ export const formRefStore = create<FormRefStoreState>((set, get) => ({
   // Get all refs that start with the stateKey prefix
   getFormRefsByStateKey: (stateKey) => {
     const allRefs = get().formRefs;
-    const stateKeyPrefix = stateKey + ".";
+    const stateKeyPrefix = stateKey + '.';
     const filteredRefs = new Map();
 
     allRefs.forEach((ref, id) => {
@@ -126,7 +126,7 @@ export type ShadowMetadata = {
     {
       validIds: string[];
       computedAt: number;
-      transforms: Array<{ type: "filter" | "sort"; fn: Function }>;
+      transforms: Array<{ type: 'filter' | 'sort'; fn: Function }>;
     }
   >;
   pathComponents?: Set<string>;
@@ -158,7 +158,7 @@ export type CogsGlobalState = {
   setShadowMetadata: (
     key: string,
     path: string[],
-    metadata: Omit<ShadowMetadata, "id">
+    metadata: Omit<ShadowMetadata, 'id'>
   ) => void;
   setTransformCache: (
     key: string,
@@ -222,7 +222,7 @@ export type CogsGlobalState = {
   removeValidationError: (path: string) => void;
 
   // --- Server Sync and Logging ---
-  serverSyncActions: { [key: string]: SyncActionsType<any> };
+
   serverSyncLog: { [key: string]: SyncLogType[] };
   stateLog: { [key: string]: UpdateTypeDetail[] };
   syncInfoStore: Map<string, SyncInfo>;
@@ -231,7 +231,7 @@ export type CogsGlobalState = {
   setServerSideOrNot: (key: string, value: boolean) => void;
   getServerSideOrNot: (key: string) => boolean | undefined;
   getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
-  setServerSyncActions: (key: string, value: SyncActionsType<any>) => void;
+
   setStateLog: (
     key: string,
     updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]
@@ -285,7 +285,7 @@ export type CogsGlobalState = {
   subscribe: (listener: () => void) => () => void;
 };
 const isSimpleObject = (value: any): boolean => {
-  if (value === null || typeof value !== "object") return false;
+  if (value === null || typeof value !== 'object') return false;
 
   // Handle special cases that should be treated as primitives
   if (
@@ -345,7 +345,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const existingShadowStore = new Map(get().shadowStateStore);
 
     const processValue = (value: any, path: string[]) => {
-      const nodeKey = [key, ...path].join(".");
+      const nodeKey = [key, ...path].join('.');
 
       if (Array.isArray(value)) {
         // Handle arrays as before
@@ -353,19 +353,19 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
         value.forEach((item) => {
           const itemId = `id:${ulid()}`;
-          childIds.push(nodeKey + "." + itemId);
+          childIds.push(nodeKey + '.' + itemId);
         });
 
         existingShadowStore.set(nodeKey, { arrayKeys: childIds });
 
         value.forEach((item, index) => {
-          const itemId = childIds[index]!.split(".").pop();
+          const itemId = childIds[index]!.split('.').pop();
           processValue(item, [...path!, itemId!]);
         });
       } else if (isSimpleObject(value)) {
         // Only create field mappings for simple objects
         const fields = Object.fromEntries(
-          Object.keys(value).map((k) => [k, nodeKey + "." + k])
+          Object.keys(value).map((k) => [k, nodeKey + '.' + k])
         );
         existingShadowStore.set(nodeKey, { fields });
 
@@ -440,7 +440,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       // Update each array item
       value.forEach((item: any, index: number) => {
         const itemKey = arrayKeys[index]!;
-        if (typeof item === "object") {
+        if (typeof item === 'object') {
           // For object items, update their fields
           const itemMeta = get().shadowStateStore.get(itemKey);
           if (itemMeta?.fields) {
@@ -480,14 +480,14 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     path: string[],
     validArrayIds?: string[]
   ) => {
-    const fullKey = [key, ...path].join(".");
+    const fullKey = [key, ...path].join('.');
     let data = get().shadowStateStore.get(fullKey);
 
     return get().shadowStateStore.get(fullKey);
   },
 
   setShadowMetadata: (key: string, path: string[], metadata: any) => {
-    const fullKey = [key, ...path].join(".");
+    const fullKey = [key, ...path].join('.');
     const newShadowStore = new Map(get().shadowStateStore);
     const existing = newShadowStore.get(fullKey) || { id: ulid() };
     newShadowStore.set(fullKey, { ...existing, ...metadata });
@@ -503,7 +503,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     cacheKey: string,
     cacheData: any
   ) => {
-    const fullKey = [key, ...path].join(".");
+    const fullKey = [key, ...path].join('.');
     const newShadowStore = new Map(get().shadowStateStore);
     const existing = newShadowStore.get(fullKey) || {};
 
@@ -527,7 +527,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     newItem: any
   ) => {
     const newShadowStore = new Map(get().shadowStateStore);
-    const arrayKey = [key, ...arrayPath].join(".");
+    const arrayKey = [key, ...arrayPath].join('.');
     const parentMeta = newShadowStore.get(arrayKey);
 
     if (!parentMeta || !parentMeta.arrayKeys) return;
@@ -535,7 +535,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // Generate the ID if it doesn't have one
 
     const newItemId = `id:${ulid()}`;
-    const fullItemKey = arrayKey + "." + newItemId;
+    const fullItemKey = arrayKey + '.' + newItemId;
 
     // Just add to the end (or at a specific index if provided)
     const newArrayKeys = [...parentMeta.arrayKeys];
@@ -544,14 +544,14 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     // Process the new item - but use the correct logic
     const processNewItem = (value: any, path: string[]) => {
-      const nodeKey = [key, ...path].join(".");
+      const nodeKey = [key, ...path].join('.');
 
       if (Array.isArray(value)) {
         // Handle arrays...
-      } else if (typeof value === "object" && value !== null) {
+      } else if (typeof value === 'object' && value !== null) {
         // Create fields mapping
         const fields = Object.fromEntries(
-          Object.keys(value).map((k) => [k, nodeKey + "." + k])
+          Object.keys(value).map((k) => [k, nodeKey + '.' + k])
         );
         newShadowStore.set(nodeKey, { fields });
 
@@ -573,11 +573,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
 
     // Get the full item key (e.g., "stateKey.products.id:xxx")
-    const itemKey = [key, ...itemPath].join(".");
+    const itemKey = [key, ...itemPath].join('.');
 
     // Extract parent path and item ID
     const parentPath = itemPath.slice(0, -1);
-    const parentKey = [key, ...parentPath].join(".");
+    const parentKey = [key, ...parentPath].join('.');
     const itemIdToRemove = itemPath[itemPath.length - 1];
 
     // Get parent metadata
@@ -602,7 +602,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         });
 
         // Delete all data associated with the removed item
-        const prefixToDelete = itemKey + ".";
+        const prefixToDelete = itemKey + '.';
         for (const k of Array.from(newShadowStore.keys())) {
           if (k === itemKey || k.startsWith(prefixToDelete)) {
             newShadowStore.delete(k);
@@ -617,7 +617,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
   updateShadowAtPath: (key, path, newValue) => {
     const newShadowStore = new Map(get().shadowStateStore);
-    const fullKey = [key, ...path].join(".");
+    const fullKey = [key, ...path].join('.');
 
     const updateValue = (currentKey: string, valueToSet: any) => {
       const meta = newShadowStore.get(currentKey);
@@ -687,7 +687,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   }): void => {
     set((state) => {
       const newMap = new Map(state.selectedIndicesMap);
-      const fullPath = [stateKey, ...path].join(".");
+      const fullPath = [stateKey, ...path].join('.');
       newMap.delete(fullPath);
       return {
         ...state,
@@ -781,8 +781,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
   serverState: {},
 
-  serverSyncActions: {},
-
   serverSyncLog: {},
   serverSideOrNot: {},
   setServerSyncLog: (key, newValue) => {
@@ -843,20 +841,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       },
     }));
   },
-  setServerSyncActions: (key: string, value: SyncActionsType<any>) => {
-    set((prev) => ({
-      serverSyncActions: {
-        ...prev.serverSyncActions,
-        [key]: value,
-      },
-    }));
-  },
+
   addValidationError: (path, message) => {
-    console.log("addValidationError---");
+    console.log('addValidationError---');
     set((prev) => {
       const updatedErrors = new Map(prev.validationErrors);
       const existingMessages = updatedErrors.get(path) || [];
-      console.log("addValidationError", path, message, existingMessages);
+      console.log('addValidationError', path, message, existingMessages);
       // Append the new message instead of replacing
       updatedErrors.set(path, [...existingMessages, message]);
       return { validationErrors: updatedErrors };
@@ -867,9 +858,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       const updatedErrors = new Map(prev.validationErrors);
 
       let doSomething = false;
-      const pathArray = path.split(".");
+      const pathArray = path.split('.');
       Array.from(updatedErrors.keys()).forEach((key) => {
-        const keyArray = key.split(".");
+        const keyArray = key.split('.');
         if (keyArray.length >= pathArray.length) {
           let match = true;
           for (let i = 0; i < pathArray.length; i++) {
@@ -892,11 +883,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   getValidationErrors: (path: string) => {
     const errors: string[] = [];
     const valErrors = get().validationErrors;
-    const pathArray = path.split(".");
+    const pathArray = path.split('.');
 
     // Helper to check if an index matches either a wildcard or is in an array of indices
     const isIndexMatch = (pathSegment: string, keySegment: string) => {
-      if (pathSegment === "[*]") return true;
+      if (pathSegment === '[*]') return true;
       if (Array.isArray(pathSegment)) {
         return pathSegment.includes(parseInt(keySegment));
       }
@@ -904,7 +895,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     };
 
     Array.from(valErrors.keys()).forEach((key) => {
-      const keyArray = key.split(".");
+      const keyArray = key.split('.');
       if (keyArray.length >= pathArray.length) {
         let match = true;
         for (let i = 0; i < pathArray.length; i++) {
@@ -912,7 +903,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
           const keySegment = keyArray[i]!;
 
           // If current path segment is a number or [*], we need special handling
-          if (pathSegment === "[*]" || Array.isArray(pathSegment)) {
+          if (pathSegment === '[*]' || Array.isArray(pathSegment)) {
             // Key segment should be a number if we're using [*] or array indices
             const keyIndex = parseInt(keySegment);
             if (isNaN(keyIndex)) {
@@ -958,10 +949,10 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       // FIX: Handle ID-based array access like 'id:xyz'
       if (
         Array.isArray(obj) &&
-        typeof currentSegment === "string" &&
-        currentSegment.startsWith("id:")
+        typeof currentSegment === 'string' &&
+        currentSegment.startsWith('id:')
       ) {
-        const targetId = currentSegment.split(":")[1];
+        const targetId = currentSegment.split(':')[1];
         const foundItem = obj.find(
           (item) => item && String(item.id) === targetId
         );
@@ -969,9 +960,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       }
 
       // Handle wildcard array access: '[*]'
-      if (currentSegment === "[*]") {
+      if (currentSegment === '[*]') {
         if (!Array.isArray(obj)) {
-          console.warn("Asterisk notation used on non-array value");
+          console.warn('Asterisk notation used on non-array value');
           return undefined;
         }
         if (remainingPath.length === 0) return obj;
@@ -1022,7 +1013,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         cogsStateStore: {
           ...prev.cogsStateStore,
           [key]:
-            typeof value === "function"
+            typeof value === 'function'
               ? value(prev.cogsStateStore[key])
               : value,
         },

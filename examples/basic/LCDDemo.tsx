@@ -22,12 +22,12 @@ const initialState = {
   lcd: {
     pixels: Array.from(new Uint8Array(TOTAL)),
     controls: {
-      speed: 1,
+      speed: 2,
       fade: 0.85,
       startX: 0,
       endX: null as number | null,
-      initialDelay: 2,
-      finalDelay: 3,
+      initialDelay: 1,
+      finalDelay: 0.5,
       repeat: true,
       stressTest: false,
       randomPixels: 100,
@@ -153,37 +153,10 @@ function LCDCatScrollerStateful({
     // n > log(threshold / initial_brightness) / log(fade)
     // Since we want the *minimum* integer frames, we take the ceiling.
     const calculateFadeOutFrames = (fadeFactor: number): number => {
-      // If fade is 0, it's instant. If 1, it never fades significantly.
-      // Set a practical limit for fade = 1 or values very close to 1
-      const MAX_FADE_TIME_SECONDS = 5; // Cap the fade time to 5 seconds for very high fade values
-      const MAX_FADE_TIME_FRAMES = Math.round(MAX_FADE_TIME_SECONDS * 60);
-
-      if (fadeFactor >= 1) {
-        return MAX_FADE_TIME_FRAMES; // Assume max fade time if fade is 1 or more
-      }
-      if (fadeFactor <= 0) {
-        return 1; // Instant fade (1 frame)
-      }
-
-      // Choose a threshold for "effectively black"
-      // A common practice is to fade until the value is less than 1 (or a small epsilon)
-      const initialBrightness = 255;
-      const threshold = 0.5; // Brightness below which it's considered faded
-
-      // Ensure threshold is less than initialBrightness to avoid log(<=0)
-      if (threshold >= initialBrightness) {
-        return 1; // If threshold is higher or equal, it's effectively faded instantly
-      }
-
-      // Calculate frames using logarithms
-      const frames = Math.ceil(
-        Math.log(threshold / initialBrightness) / Math.log(fadeFactor)
-      );
-
-      // Ensure a minimum number of fade frames to be visually apparent, and respect the max cap
-      return Math.min(Math.max(frames, 1), MAX_FADE_TIME_FRAMES);
+      // For fade values close to 1 (like 0.99), we need more frames to fade out
+      // For lower fade values (like 0.5), we need fewer frames
+      return Math.ceil(1 / (1 - fadeFactor));
     };
-
     let fadeOutDurationFrames = 0; // Will be calculated when entering FADING_OUT state
 
     const loop = () => {

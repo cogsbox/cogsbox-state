@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 .input {
   @apply rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500;
@@ -102,12 +102,12 @@
     --crt-blue: rgb(40, 129, 206);
   }
   .crt {
-    text-shadow: 0 0 0.1em currentColor, 0.5px 0.5px rgba(255, 0, 255, 0.1),
-      -0.5px -0.5px rgba(0, 255, 255, 0.1);
+    text-shadow: 0 0 0.1em currentColor, 0.5px 0.5px rgba(255, 0, 255, 0.05),
+      -0.5px -0.5px rgba(0, 255, 255, 0.05);
     position: relative;
     &:before,
     &:after {
-      content: "";
+      content: '';
       transform: translateZ(0);
       pointer-events: none;
       opacity: 0.5;
