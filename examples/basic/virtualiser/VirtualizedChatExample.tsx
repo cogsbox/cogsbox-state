@@ -1,13 +1,13 @@
-"use client";
+'use client';
 
-import { createCogsState } from "../../../src/CogsState";
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
-import { FlashWrapper } from "../FlashOnUpdate";
-import DotPattern from "../DotWrapper";
-import { faker } from "@faker-js/faker";
-import { useEffect, useLayoutEffect, useState } from "react";
-import { useInView } from "react-intersection-observer";
+import { createCogsState } from '../../../src/CogsState';
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { FlashWrapper } from '../FlashOnUpdate';
+import DotPattern from '../DotWrapper';
+import { faker } from '@faker-js/faker';
+import { useEffect, useLayoutEffect, useState } from 'react';
+import { useInView } from 'react-intersection-observer';
 
 // --- Data Generation & State Definition (No Changes Here) ---
 
@@ -16,6 +16,7 @@ type Message = {
   author: string;
   text: string;
   timestamp: number;
+  photo: string | null;
 };
 
 const generateMessages = (count: number): Message[] => {
@@ -26,6 +27,8 @@ const generateMessages = (count: number): Message[] => {
       id: i + 1,
       author: faker.helpers.arrayElement(authors),
       text: faker.lorem.sentence({ min: 3, max: 25 }),
+      photo: Math.random() > 0.3 ? faker.image.urlLoremFlickr() : null,
+
       timestamp: Date.now() - (count - i) * 60000,
     });
   }
@@ -33,7 +36,7 @@ const generateMessages = (count: number): Message[] => {
 };
 
 const allState = {
-  messages: generateMessages(300),
+  messages: generateMessages(50),
 };
 
 export type ChatState = {
@@ -41,13 +44,13 @@ export type ChatState = {
 };
 
 export const { useCogsState } = createCogsState<ChatState>(allState, {
-  validation: { key: "chatApp" },
+  validation: { key: 'chatApp' },
 });
 
 // --- Main Application Component (No Changes Here) ---
 
 export default function VirtualizedChatExample() {
-  const messages = useCogsState("messages", { reactiveType: "none" });
+  const messages = useCogsState('messages', { reactiveType: 'none' });
   const { ref, inView, entry } = useInView();
   useEffect(() => {
     if (!inView) return;
@@ -60,8 +63,12 @@ export default function VirtualizedChatExample() {
         author: faker.person.firstName(),
         text: faker.lorem.sentence({ min: 3, max: 25 }),
         timestamp: Date.now(),
+        photo:
+          Math.random() > 0.3
+            ? faker.image.urlLoremFlickr({ category: 'cat' })
+            : null,
       });
-    }, 1000 + Math.random() * 2.5); // Send a new message every 3 seconds
+    }, 2000 + Math.random() * 2.5); // Send a new message every 3 seconds
 
     return () => clearInterval(interval);
   }, [inView]);
@@ -83,7 +90,7 @@ export default function VirtualizedChatExample() {
           <div className="flex flex-col  max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
             <ChatWindow />
             <MessageInput />
-          </div>{" "}
+          </div>{' '}
         </div>
       </div>
 
@@ -97,9 +104,9 @@ export default function VirtualizedChatExample() {
 // --- Child Components ---
 
 function ChatWindow() {
-  const messages = useCogsState("messages", { reactiveType: "none" });
+  const messages = useCogsState('messages', { reactiveType: 'none' });
 
-  const { virtualState, virtualizerProps, scrollToBottom } =
+  const { virtualState, virtualizerProps, virtualList } =
     messages.useVirtualView({
       itemHeight: 65, // Adjusted estimated height for better spacing
       overscan: 10,
@@ -113,10 +120,10 @@ function ChatWindow() {
           style={virtualizerProps.list.style}
           className="px-4  space-y-4 pb-8"
         >
-          {virtualState?.virtualList((setter, index, array) => {
+          {virtualList((setter, index, array) => {
             return (
               <MessageItem
-                key={setter._path.join(".")}
+                key={setter._path.join('.')}
                 message={setter.get()}
               />
             );
@@ -128,21 +135,21 @@ function ChatWindow() {
 }
 
 function MessageItem({ message }: { message: Message }) {
-  const isFromYou = message.author === "You";
+  const isFromYou = message.author === 'You';
 
   const containerClasses = `w-full flex items-end gap-2 ${
-    isFromYou ? "justify-end" : "justify-start"
+    isFromYou ? 'justify-end' : 'justify-start'
   } opacity-0 transition-opacity duration-500 ease-in`;
 
   const bubbleClasses = `flex flex-col max-w-[75%] px-3 py-2 rounded-lg shadow-md ${
-    isFromYou ? "bg-green-800 rounded-br-none" : "bg-gray-700 rounded-bl-none"
+    isFromYou ? 'bg-green-800 rounded-br-none' : 'bg-gray-700 rounded-bl-none'
   }`;
 
   useEffect(() => {
     const element = document.getElementById(`message-${message.id}`);
     if (element) {
-      element.classList.remove("opacity-0");
-      element.classList.add("opacity-100");
+      element.classList.remove('opacity-0');
+      element.classList.add('opacity-100');
     }
   }, []);
 
@@ -159,17 +166,24 @@ function MessageItem({ message }: { message: Message }) {
         )}
         <div className="flex items-center gap-2">
           <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
+
           <p
             className={`text-xs ${
-              isFromYou ? "text-green-200/60" : "text-gray-400"
+              isFromYou ? 'text-green-200/60' : 'text-gray-400'
             } flex-shrink-0`}
           >
             {new Date(message.timestamp).toLocaleTimeString([], {
-              hour: "2-digit",
-              minute: "2-digit",
+              hour: '2-digit',
+              minute: '2-digit',
             })}
           </p>
         </div>
+        {message.photo && (
+          <img
+            src={message.photo}
+            className="w-full  rounded-lg max-h-[300px] object-cover"
+          />
+        )}
       </div>
     </div>
   );
@@ -178,8 +192,8 @@ function MessageItem({ message }: { message: Message }) {
 // No changes needed for them.
 
 function MessageInput() {
-  const [text, setText] = useState("");
-  const messages = useCogsState("messages", { reactiveType: "none" });
+  const [text, setText] = useState('');
+  const messages = useCogsState('messages', { reactiveType: 'none' });
 
   const handleSend = () => {
     if (!text.trim()) return;
@@ -192,12 +206,13 @@ function MessageInput() {
 
     messages.insert({
       id: newId,
-      author: "You",
+      author: 'You',
       text: text,
       timestamp: Date.now(),
+      photo: null,
     });
 
-    setText("");
+    setText('');
   };
 
   return (
@@ -228,16 +243,16 @@ function MessageInput() {
 }
 
 function ShowState({
-  layout = "horizontal",
+  layout = 'horizontal',
 }: {
-  layout?: "horizontal" | "vertical";
+  layout?: 'horizontal' | 'vertical';
 }) {
-  const messages = useCogsState("messages");
+  const messages = useCogsState('messages');
 
   const containerClasses =
-    layout === "vertical"
-      ? "flex flex-col h-full gap-4"
-      : "flex gap-4 items-center";
+    layout === 'vertical'
+      ? 'flex flex-col h-full gap-4'
+      : 'flex gap-4 items-center';
 
   return (
     <FlashWrapper>
@@ -250,7 +265,7 @@ function ShowState({
             <SyntaxHighlighter
               language="javascript"
               style={atomOneDark}
-              customStyle={{ backgroundColor: "transparent", fontSize: "12px" }}
+              customStyle={{ backgroundColor: 'transparent', fontSize: '12px' }}
             >
               {`// THE FIX: A wrapper div that handles the flexbox layout
 <div className="flex-1 min-h-0">

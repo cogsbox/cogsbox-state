@@ -19,22 +19,22 @@ export type TodoItem = {
 export type AppState = {
   simpleCounter: number;
   inputMessage: string;
-  isFeatureEnabled: boolean;
+  isBooleanValue: boolean;
   todoList: TodoItem[];
-  statusMessage: string;
+  activeNumbers: number[]; // Changed from statusMessage to activeNumbers
 };
 
 // --- Initial state ---
 const initialAppState: AppState = {
   simpleCounter: 0,
   inputMessage: 'Hello Cogs State!',
-  isFeatureEnabled: true,
+  isBooleanValue: false,
   todoList: [
     { id: uuidv4(), text: 'Initial Todo 1', done: false },
     { id: uuidv4(), text: 'Initial Todo 2 (Done)', done: true },
     { id: uuidv4(), text: 'Initial Todo 3', done: false },
   ],
-  statusMessage: 'Initial Status',
+  activeNumbers: [1, 3, 5], // List of active numbers
 };
 
 // --- Create Cogs State Instance ---
@@ -52,7 +52,7 @@ function SectionWrapper({
 }) {
   return (
     <FlashWrapper>
-      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-5">
+      <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg p-5">
         <h3 className="font-bold text-lg text-gray-100 mb-4">{title}</h3>
         {children}
       </div>
@@ -86,6 +86,32 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
   );
 }
 
+// Separate component for .get() display to show it causes re-renders
+function GetCounterDisplay() {
+  const state = useCogsState('appData');
+  return (
+    <div className="text-gray-200 font-medium">
+      Value (reactive):{' '}
+      <FlashWrapper>
+        <span className="text-blue-400">{state.simpleCounter.get()}</span>
+      </FlashWrapper>
+    </div>
+  );
+}
+
+// Separate component for .$get() display to show it doesn't cause re-renders
+function SignalCounterDisplay() {
+  const state = useCogsState('appData', { reactiveType: 'none' });
+  return (
+    <div className="text-gray-200 font-medium">
+      Value (signal):{' '}
+      <FlashWrapper>
+        <span className="text-green-400">{state.simpleCounter.$get()}</span>
+      </FlashWrapper>
+    </div>
+  );
+}
+
 // --- Enhanced Counter Example ---
 function CounterExample() {
   const state = useCogsState('appData');
@@ -95,60 +121,130 @@ function CounterExample() {
       <div className="space-y-6">
         {/* .get() example */}
         <div className="bg-black/20 rounded-lg p-4 space-y-3">
-          <h4 className="text-sm font-medium text-gray-300">Using .get()</h4>
           <div className="flex items-center gap-4">
             <button
               onClick={() => {
-                const current = state.simpleCounter.get();
-                state.simpleCounter.update(current + 1);
+                state.simpleCounter.update((p) => p + 1);
               }}
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm"
             >
               Increment
             </button>
             <CodeSnippetDisplay
-              code={`const current = state.simpleCounter.get();
-state.simpleCounter.update(current + 1);`}
+              code={`set {state.simpleCounter.update((prev) => prev +1) 
+get state.simpleCounter.get()}`}
             />
-            <div className="text-gray-200 font-medium">
-              Value:{' '}
-              <FlashWrapper>
-                <span className="text-blue-400">
-                  {state.simpleCounter.get()}
-                </span>
-              </FlashWrapper>
-            </div>
+            <GetCounterDisplay />
           </div>
         </div>
-
         {/* .$get() example */}
+
         <div className="bg-black/20 rounded-lg p-4 space-y-3">
-          <h4 className="text-sm font-medium text-gray-300">
-            Using .$get() - Reactive Signal
-          </h4>
           <div className="flex items-center gap-4">
             <button
-              onClick={() => state.simpleCounter.update((prev) => prev + 5)}
+              onClick={() => state.simpleCounter.update((prev) => prev * 2)}
               className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm"
             >
-              Add 5
+              Double Counter
             </button>
             <CodeSnippetDisplay
-              code={`// In JSX for reactive display
-{state.simpleCounter.$get()}`}
+              code={`set {state.simpleCounter.update((prev) => prev * 2) 
+get state.simpleCounter.$get()}`}
             />
-            <div className="text-gray-200 font-medium">
-              Live:{' '}
+            <SignalCounterDisplay />
+          </div>
+        </div>
+        <div className="bg-black/20 rounded-lg p-4 space-y-3">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => state.isBooleanValue.toggle()}
+              className={`px-4 py-2  text-white rounded-lg hover:bg-green-200 text-sm  ${
+                state.isBooleanValue.get() ? 'bg-green-500' : 'bg-gray-700'
+              }`}
+            >
+              is Boolean Value
+            </button>
+            <CodeSnippetDisplay
+              code={`//  boolean special method
+{state.isFeatureEnabled.toggle()}`}
+            />
+          </div>
+        </div>
+        {/* Additional operations */}
+        <div className="bg-black/20 rounded-lg p-4 space-y-3 ">
+          <div className="mt-4 space-y-2">
+            <p className="text-sm text-gray-400">
+              Toggle numbers in/out of array:
+            </p>
+            <div className="flex gap-2">
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
+                <button
+                  key={num}
+                  onClick={() => state.activeNumbers.toggleByValue(num)}
+                  className={`px-3 py-1.5 rounded text-sm transition-colors ${state.activeNumbers.$deriveClass(
+                    (s, deps) =>
+                      s.includes(deps[0])
+                        ? 'bg-green-600 text-white hover:bg-green-500'
+                        : 'bg-gray-700 text-gray-300 hover:bg-gray-600',
+                    [num]
+                  )}`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+            <div className="text-sm text-gray-300">
+              Active:{' '}
               <FlashWrapper>
-                <span className="text-green-400">
-                  {state.simpleCounter.$get()}
-                </span>
+                [ {state.activeNumbers.$derive((s) => s.join(', '))}]
               </FlashWrapper>
             </div>
           </div>
+
+          <CodeSnippetDisplay
+            code={`// Double using function update
+state.simpleCounter.update(prev => prev * 2);
+
+// Toggle array values in/out
+state.activeNumbers.toggleByValue(5); // Adds 5 if not present, removes if present
+
+// Current implementation:
+// If value exists in array -> removes it
+// If value doesn't exist -> adds it`}
+          />
         </div>
       </div>
     </SectionWrapper>
+  );
+}
+
+// Separate component to demonstrate reactive .get() calls
+function ReactiveFormDisplay() {
+  const state = useCogsState('appData');
+
+  return (
+    <div className="space-y-3">
+      <div className="bg-black/20 rounded p-3">
+        <span className="text-gray-400 text-xs">Message:</span>
+        <div className="text-gray-100">
+          <FlashWrapper>{state.inputMessage.get()}</FlashWrapper>
+        </div>
+      </div>
+      <div className="bg-black/20 rounded p-3">
+        <span className="text-gray-400 text-xs">Feature:</span>
+        <div className="text-gray-100">
+          <FlashWrapper>
+            {state.isBooleanValue.get() ? '✅ Enabled' : '❌ Disabled'}
+          </FlashWrapper>
+        </div>
+      </div>
+      <div className="bg-black/20 rounded p-3">
+        <span className="text-gray-400 text-xs">Active Numbers:</span>
+        <div className="text-gray-100">
+          <FlashWrapper>[{state.activeNumbers.get().join(', ')}]</FlashWrapper>
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -175,7 +271,7 @@ function FormElementsExample() {
 
           <div className="flex items-center gap-3">
             <FlashWrapper>
-              {state.isFeatureEnabled.formElement((obj) => (
+              {state.isBooleanValue.formElement((obj) => (
                 <input
                   type="checkbox"
                   className="w-5 h-5 accent-green-500"
@@ -210,23 +306,9 @@ state.isFeatureEnabled.formElement((obj) => (
       <SectionWrapper title="Reactive Display">
         <p className="text-sm text-gray-400 mb-4">
           These values update automatically when you change the form inputs
+          (separate component to show reactivity)
         </p>
-        <div className="space-y-3">
-          <div className="bg-black/20 rounded p-3">
-            <span className="text-gray-400 text-xs">Message:</span>
-            <div className="text-gray-100">
-              <FlashWrapper>{state.inputMessage.get()}</FlashWrapper>
-            </div>
-          </div>
-          <div className="bg-black/20 rounded p-3">
-            <span className="text-gray-400 text-xs">Feature:</span>
-            <div className="text-gray-100">
-              <FlashWrapper>
-                {state.isFeatureEnabled.get() ? '✅ Enabled' : '❌ Disabled'}
-              </FlashWrapper>
-            </div>
-          </div>
-        </div>
+        <ReactiveFormDisplay />
       </SectionWrapper>
     </div>
   );
@@ -386,7 +468,7 @@ function ShowFullStateDisplay() {
 // --- Main Page ---
 export default function BasicCogsExamplePage() {
   return (
-    <div className="flex gap-6 p-6 font-mono bg-black min-h-screen">
+    <div className="flex gap-6 p-6 ">
       {/* Left Column */}
       <div className="flex-1 flex flex-col gap-6">
         <DotPattern>

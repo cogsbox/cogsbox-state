@@ -27,7 +27,12 @@ import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
 
-import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
+import {
+  formRefStore,
+  getGlobalStore,
+  type CogsEvent,
+  type ComponentsType,
+} from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { applyPatch } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
@@ -48,6 +53,7 @@ export type VirtualStateObjectResult<T extends any[]> = {
    * A new, fully-functional StateObject that represents the virtualized slice.
    * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
    */
+  virtualList: StateObject<T>['virtualList'];
   virtualState: StateObject<T>;
   /**
    * Props to be spread onto your DOM elements to enable virtualization.
@@ -241,7 +247,7 @@ export type ValidationError = {
   path: (string | number)[];
   message: string;
 };
-type EffectFunction<T, R> = (state: T) => R;
+type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
   addValidation: (errors: ValidationError[]) => void;
   applyJsonPatch: (patches: any[]) => void;
@@ -252,6 +258,7 @@ export type EndType<T, IsArrayElement = false> = {
   get: () => T;
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
+  $deriveClass: <R>(fn: EffectFunction<T, R>, deps?: any[]) => R;
   _status: 'fresh' | 'stale' | 'synced';
   getStatus: () => 'fresh' | 'stale';
 
@@ -283,6 +290,7 @@ export type StateObject<T> = (T extends any[]
       ? T
       : never) &
   EndType<T, true> & {
+    toggle: T extends boolean ? () => void : never;
     getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
@@ -1057,7 +1065,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const store = getGlobalStore.getState();
 
     setState(thisKey, (prevValue: TStateObject) => {
-      console.log('prevValue', prevValue);
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
 
@@ -1095,7 +1102,64 @@ export function useCogsStateFn<TStateObject extends unknown>(
           break;
         }
       }
+      const updatedShadowMeta = store.getShadowMetadata(thisKey, path);
+      const updatedShadowValue = store.getShadowValue(
+        [thisKey, ...path].join('.')
+      );
+      const valueChanged = !isDeepEqual(nestedShadowValue!, updatedShadowValue);
 
+      // Only proceed if the underlying array has actually changed.
+      if (valueChanged && updatedShadowMeta?.classSignals) {
+        // Use .map() to create a NEW array of signals. This is the immutable fix.
+        const newClassSignals = updatedShadowMeta.classSignals.map(
+          (signal: any) => {
+            let newClasses = '';
+            let oldClasses = signal.lastClasses;
+
+            try {
+              // Re-run the derivation function with its specific dependencies
+              const effectFn = new Function(
+                'state',
+                'deps',
+                `return (${signal.effect})(state, deps)`
+              );
+              newClasses = effectFn(updatedShadowValue, signal.deps);
+
+              // Only touch the DOM if the calculated classes have actually changed
+              if (newClasses !== oldClasses) {
+                const elements = document.querySelectorAll(`.${signal.id}`);
+                elements.forEach((element: Element) => {
+                  // Remove old classes
+                  if (oldClasses) {
+                    const oldClassesArray = oldClasses
+                      .split(' ')
+                      .filter(Boolean);
+                    if (oldClassesArray.length > 0) {
+                      element.classList.remove(...oldClassesArray);
+                    }
+                  }
+                  // Add new classes
+                  const newClassesArray = newClasses.split(' ').filter(Boolean);
+                  if (newClassesArray.length > 0) {
+                    element.classList.add(...newClassesArray);
+                  }
+                });
+              }
+            } catch (e) {
+              console.error('Error in deriveClass update:', e);
+            }
+
+            // Return a new object for the new array, with the updated `lastClasses`
+            return { ...signal, lastClasses: newClasses };
+          }
+        );
+
+        // Persist the metadata with the NEW array. This guarantees the change is saved.
+        store.setShadowMetadata(thisKey, path, {
+          ...updatedShadowMeta,
+          classSignals: newClassSignals,
+        });
+      }
       // Only process signals if they exist
       if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
         // Get the updated value from shadow store
@@ -1137,7 +1201,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       // Update in effectiveSetState for insert handling:
       if (updateObj.updateType === 'insert') {
-        getGlobalStore.getState().notifyPathSubscribers(fullPath);
+        getGlobalStore.getState().notifyPathSubscribers(fullPath, payload);
         const arrayMeta = store.getShadowMetadata(thisKey, path);
 
         if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
@@ -1346,6 +1410,64 @@ export function useCogsStateFn<TStateObject extends unknown>(
             }
           }
         });
+      }
+      if (updateObj.updateType === 'insert' || updateObj.updateType === 'cut') {
+        // For 'insert', the path is the array path. For 'cut', it's the item path.
+        const parentArrayPath =
+          updateObj.updateType === 'insert' ? path : path.slice(0, -1); // Get parent path by removing the item ID
+
+        const parentMeta = store.getShadowMetadata(thisKey, parentArrayPath);
+
+        if (parentMeta?.signals && parentMeta.signals.length > 0) {
+          const parentFullPath = [thisKey, ...parentArrayPath].join('.');
+          const parentValue = store.getShadowValue(parentFullPath);
+
+          parentMeta.signals.forEach(({ parentId, position, effect }) => {
+            const parent = document.querySelector(
+              `[data-parent-id="${parentId}"]`
+            );
+            if (parent) {
+              const childNodes = Array.from(parent.childNodes);
+              if (childNodes[position]) {
+                let displayValue = parentValue;
+                if (effect) {
+                  try {
+                    displayValue = new Function(
+                      'state',
+                      `return (${effect})(state)`
+                    )(parentValue);
+                  } catch (err) {
+                    console.error('Error evaluating effect function:', err);
+                    displayValue = parentValue;
+                  }
+                }
+
+                if (
+                  displayValue !== null &&
+                  displayValue !== undefined &&
+                  typeof displayValue === 'object'
+                ) {
+                  displayValue = JSON.stringify(displayValue);
+                }
+
+                childNodes[position].textContent = String(displayValue ?? '');
+              }
+            }
+          });
+        }
+
+        if (parentMeta?.pathComponents) {
+          parentMeta.pathComponents.forEach((componentId) => {
+            // Check if we've already notified this component to prevent redundant updates
+            if (!notifiedComponents.has(componentId)) {
+              const component = rootMeta.components?.get(componentId);
+              if (component) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            }
+          });
+        }
       }
 
       // --- PASS 2: Single Global Loop for 'all' and 'deps' ---
@@ -1826,334 +1948,231 @@ function createProxyHandler<T>(
                 itemHeight = 50,
                 overscan = 6,
                 stickToBottom = false,
-                dependencies = [],
-                scrollStickTolerance = 100,
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
+              const totalHeight = useRef(0);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
-              const [shadowUpdateTrigger, setShadowUpdateTrigger] = useState(0);
-              const wasAtBottomRef = useRef(true);
-              const userHasScrolledAwayRef = useRef(false);
-              const previousCountRef = useRef(0);
-              const setInitialSCrollDone = useRef(false);
-              const lastItemId = useRef<any>(null);
-              // Subscribe to shadow state updates
-              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                setShadowUpdateTrigger((prev) => prev + 1);
-              });
 
-              const sourceArray = getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey) as any[];
-              const totalCount = sourceArray.length;
+              useLayoutEffect(() => {
+                const store = getGlobalStore.getState();
+                const arrayKeys =
+                  store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
+                const initialHeight = arrayKeys.length * itemHeight;
 
-              const initialTotalHeight = totalCount * itemHeight;
-              const shadowArray = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, path);
-              const orderedIds = shadowArray?.arrayKeys || [];
+                totalHeight.current = initialHeight;
 
-              const { calcedTotalHeight, positions, lastItem } = useMemo(() => {
-                let height = 0;
-                let positions: number[] = [];
-                let lastItem = null;
-                for (let id of orderedIds) {
-                  const itemMeta = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, id.split('.').slice(1));
-
-                  let measuredHeight =
-                    itemMeta?.virtualizer?.itemHeight || itemHeight;
-                  lastItem = itemMeta;
-                  positions.push(height);
-                  height += measuredHeight;
-                }
-                lastItemId.current = orderedIds[totalCount - 1];
-                return { calcedTotalHeight: height, positions, lastItem };
-              }, [shadowUpdateTrigger, itemHeight]);
-              const totalHeight = calcedTotalHeight ?? initialTotalHeight;
-              // Helper to scroll to last item using stored ref
-              const scrollToLastItem = () => {
-                if (
-                  !shadowArray ||
-                  (shadowArray && shadowArray?.arrayKeys?.length === 0)
-                ) {
-                  return false;
-                }
-                const maxAttempts = 50; // 5 seconds total
-                let attempts = 0;
-                const findAndScroll = () => {
-                  const shadowStore = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(
-                      stateKey,
-                      lastItemId.current.split('.').slice(1)
-                    );
-
-                  if (shadowStore?.virtualizer?.domRef) {
-                    const element = shadowStore.virtualizer.domRef;
-                    if (element) {
-                      const container = containerRef.current!;
-                      container.scrollTo({
-                        top: container.scrollHeight,
-                        behavior: 'smooth',
-                      });
-
-                      return true;
-                    }
-                  }
-                  return false;
-                };
-
-                const intervalId = setInterval(() => {
-                  attempts++;
-                  if (findAndScroll() || attempts >= maxAttempts) {
-                    clearInterval(intervalId);
-                  }
-                }, 100);
-                return false;
-              };
-
-              // Always handle scroll to update range
-              useEffect(() => {
-                const container = containerRef.current;
-                if (!container || positions.length === 0) return;
-                const handleScroll = () => {
-                  const { scrollTop, clientHeight, scrollHeight } = container;
-                  const scrollBottom = scrollTop + clientHeight;
-                  let endIndex = totalCount - 1;
-                  // If we're near the bottom, just show items to the end
-                  const nearBottom =
-                    scrollHeight - scrollBottom < itemHeight * 2;
-
-                  // Binary search for first visible item
-                  let startIndex = 0;
-                  let left = 0;
-                  let right = positions.length - 1;
-
-                  while (left <= right) {
-                    const mid = Math.floor((left + right) / 2);
-                    const itemTop = positions[mid]!;
-                    const itemBottom = positions[mid + 1] || totalHeight;
-
-                    if (itemBottom < scrollTop) {
-                      left = mid + 1;
-                    } else if (itemTop > scrollTop) {
-                      right = mid - 1;
-                    } else {
-                      startIndex = mid;
-                      break;
-                    }
-                  }
-
-                  if (nearBottom) {
-                    // If near bottom, include all remaining items
-                    endIndex = totalCount - 1;
-                  } else {
-                    // Binary search for last visible item
-                    left = startIndex;
-                    right = Math.min(positions.length - 1, totalCount - 1);
-
-                    while (left <= right) {
-                      const mid = Math.floor((left + right) / 2);
-                      const itemTop = positions[mid] || mid * itemHeight;
-
-                      if (itemTop <= scrollBottom) {
-                        endIndex = mid;
-                        left = mid + 1;
-                      } else {
-                        right = mid - 1;
-                      }
-                    }
-                  }
-
-                  // Apply overscan
-                  startIndex = Math.max(0, startIndex - overscan);
-                  endIndex = Math.min(totalCount - 1, endIndex + overscan);
-
+                // If stick to bottom, show the END of the array
+                if (stickToBottom && arrayKeys.length > 0) {
+                  const endIndex = arrayKeys.length - 1;
+                  const startIndex = Math.max(0, endIndex - 10); // Show last 10 items
                   setRange({ startIndex, endIndex });
-                };
-                handleScroll();
-                container.addEventListener('scroll', handleScroll, {
-                  passive: true,
-                });
-
-                return () => {
-                  container.removeEventListener('scroll', handleScroll);
-                };
-              }, [positions, totalCount, shadowUpdateTrigger, totalHeight]);
-
+                }
+                if (containerRef.current) {
+                  containerRef.current.scrollTop = initialHeight;
+                }
+              }, []);
+              const initialScroll = useRef(true);
+              const hasReachedBottomRef = useRef(false);
+              const heightUpdateTimeoutRef = useRef<NodeJS.Timeout>();
+              const isProgrammaticScrollRef = useRef(stickToBottom);
+              const [trigger, forceUpdate] = useState({});
+              // Listen for height updates
               useEffect(() => {
-                if (!stickToBottom || totalCount === 0) return;
+                if (!containerRef.current) return;
 
+                // Add ref at the top of the hook
+
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToPath(stateKeyPathKey, (event: any) => {
+                    if (event.type === 'INSERT') {
+                      // Get fresh array length
+                      const store = getGlobalStore.getState();
+                      const arrayKeys =
+                        store.getShadowMetadata(stateKey, path)?.arrayKeys ||
+                        [];
+
+                      // If we're at bottom, update range to include new item
+                      if (stickToBottom && arrayKeys.length > 0) {
+                        const endIndex = arrayKeys.length - 1;
+                        const startIndex = Math.max(0, endIndex - 10);
+                        setRange({ startIndex, endIndex });
+                      }
+                      forceUpdate({});
+                      // Update total height with estimated height for new item
+                      totalHeight.current = arrayKeys.length * itemHeight;
+                    }
+
+                    if (event.type === 'ITEMHEIGHT') {
+                      clearTimeout(heightUpdateTimeoutRef.current);
+
+                      heightUpdateTimeoutRef.current = setTimeout(() => {
+                        // Update total height
+                        const store = getGlobalStore.getState();
+                        const arrayKeys =
+                          store.getShadowMetadata(stateKey, path)?.arrayKeys ||
+                          [];
+
+                        let newHeight = 0;
+                        for (const key of arrayKeys) {
+                          const meta = store.getShadowMetadata(
+                            stateKey,
+                            key.split('.').slice(1)
+                          );
+                          newHeight +=
+                            meta?.virtualizer?.itemHeight || itemHeight;
+                        }
+                        totalHeight.current = newHeight;
+
+                        // If we're sticking to bottom, update range to show last items
+                        if (stickToBottom && arrayKeys.length > 0) {
+                          const endIndex = arrayKeys.length - 1;
+                          const startIndex = Math.max(0, endIndex - 10); // Show last N items
+                          setRange({ startIndex, endIndex });
+                        }
+
+                        // Then scroll to bottom
+                        if (containerRef.current && stickToBottom) {
+                          containerRef.current.scrollTop = newHeight;
+                          const container = containerRef.current;
+                          const stillAtBottom =
+                            container.scrollHeight -
+                              container.scrollTop -
+                              container.clientHeight <
+                            10;
+
+                          if (!stillAtBottom) {
+                            // Event pushed us away from bottom
+                            hasReachedBottomRef.current = false;
+                          }
+                        }
+                        forceUpdate({});
+                      }, 100); // 100ms debounce
+                    }
+                  });
+
+                // Scroll handler remains the same
+
+                return unsubscribe;
+              }, [stateKey, path, itemHeight, stickToBottom]);
+              useEffect(() => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const hasNewItems = totalCount > previousCountRef.current;
-
-                const nearBottom =
-                  container.scrollHeight - container.scrollTop <=
-                  container.clientHeight + scrollStickTolerance;
-                if (hasNewItems && stickToBottom && nearBottom) {
-                  scrollToLastItem();
-                  previousCountRef.current = totalCount;
-                }
-
-                const initalScroll = () => {
-                  const { scrollTop, scrollHeight, clientHeight } = container;
-                  const distanceFromBottom =
-                    scrollHeight - scrollTop - clientHeight;
-                  wasAtBottomRef.current = distanceFromBottom < 8;
-
-                  if (
-                    !wasAtBottomRef.current &&
-                    !setInitialSCrollDone.current
-                  ) {
-                    // If the list is NOT at the bottom after scrolling
-                    container.scrollTop = container.scrollHeight;
-                    wasAtBottomRef.current = true;
-
-                    if (lastItem?.virtualizer?.domRef) {
-                      const element = lastItem.virtualizer.domRef as any;
-
-                      if (element) {
-                        const rect = element.getBoundingClientRect();
-                        const isInView =
-                          rect.top >= 0 &&
-                          rect.left >= 0 &&
-                          rect.bottom <=
-                            (window.innerHeight ||
-                              document.documentElement.clientHeight) &&
-                          rect.right <=
-                            (window.innerWidth ||
-                              document.documentElement.clientWidth);
-
-                        if (isInView) {
-                          setInitialSCrollDone.current = true;
-                          //  previousCountRef.current = totalCount;
-                        }
-                      }
-                    }
+                const handleScroll = () => {
+                  if (isProgrammaticScrollRef.current) {
+                    isProgrammaticScrollRef.current = false;
+                    return;
                   }
+
+                  const { scrollTop, clientHeight } = container;
+                  const arrayKeys =
+                    getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                      ?.arrayKeys || [];
+
+                  // Calculate visible range
+                  const startIndex = Math.floor(scrollTop / itemHeight);
+                  const visibleCount = Math.ceil(clientHeight / itemHeight);
+
+                  setRange({
+                    startIndex: Math.max(0, startIndex - overscan),
+                    endIndex: Math.min(
+                      arrayKeys.length - 1,
+                      startIndex + visibleCount + overscan
+                    ),
+                  });
                 };
-                if (!setInitialSCrollDone.current) initalScroll();
-              }, [
-                positions,
-                totalCount,
-                itemHeight,
-                overscan,
-                stickToBottom,
-                lastItem,
-              ]);
 
-              const scrollToBottom = useCallback(() => {
-                wasAtBottomRef.current = true;
-                userHasScrolledAwayRef.current = false;
-                const scrolled = scrollToLastItem();
-                if (!scrolled && containerRef.current) {
-                  containerRef.current.scrollTop =
-                    containerRef.current.scrollHeight;
-                }
+                container.addEventListener('scroll', handleScroll);
+                return () =>
+                  container.removeEventListener('scroll', handleScroll);
               }, []);
-              const scrollToIndex = useCallback(
-                (index: number, behavior: ScrollBehavior = 'smooth') => {
-                  const container = containerRef.current;
-                  if (!container) return;
 
-                  const isLastItem = index === totalCount - 1;
+              ///////////////////////////////
 
-                  // --- Special Case: The Last Item ---
-                  if (isLastItem) {
-                    // For the last item, scrollIntoView can fail. The most reliable method
-                    // is to scroll the parent container to its maximum scroll height.
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: behavior,
-                    });
-                    return; // We're done.
-                  }
-
-                  // --- Standard Case: All Other Items ---
-                  // For all other items, we find the ref and use scrollIntoView.
-                  const arrayMeta = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, path);
-                  const orderedIds = arrayMeta?.arrayKeys || [];
-                  const itemId = orderedIds[index];
-                  let element: HTMLElement | null | undefined = undefined;
-
-                  if (itemId) {
-                    const itemMeta = getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, [...path, itemId]);
-                    element = itemMeta?.virtualizer?.domRef;
-                  }
-
-                  if (element) {
-                    // 'center' gives a better user experience for items in the middle of the list.
-                    element.scrollIntoView({
-                      behavior: behavior,
-                      block: 'center',
-                    });
-                  } else if (positions[index] !== undefined) {
-                    // Fallback if the ref isn't available for some reason.
-                    container.scrollTo({
-                      top: positions[index],
-                      behavior,
-                    });
-                  }
-                },
-                [positions, stateKey, path, totalCount] // Add totalCount to the dependencies
-              );
-              // Create virtual state
               const virtualState = useMemo(() => {
-                const start = Math.max(0, range.startIndex);
+                const store = getGlobalStore.getState();
+                const sourceArray = store.getShadowValue(
+                  [stateKey, ...path].join('.')
+                ) as any[];
+                const arrayKeys =
+                  store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
 
-                const end = Math.min(totalCount, range.endIndex + 1);
-                //
-                const orderedIds = shadowArray?.arrayKeys || [];
-
-                const slicedArray = sourceArray.slice(start, end);
-                const slicedIds = orderedIds.slice(start, end);
+                const slicedArray = sourceArray.slice(
+                  range.startIndex,
+                  range.endIndex + 1
+                );
+                const slicedIds = arrayKeys.slice(
+                  range.startIndex,
+                  range.endIndex + 1
+                );
 
                 return rebuildStateShape({
                   currentState: slicedArray as any,
                   path,
                   componentId: componentId!,
-                  meta: {
-                    ...meta,
-                    validIds: slicedIds,
-                  },
+                  meta: { ...meta, validIds: slicedIds },
                 });
-              }, [range.startIndex, range.endIndex, sourceArray, totalCount]);
+              }, [range, stateKey, path]);
 
-              const virtualizerProps = {
-                outer: {
-                  ref: containerRef,
-                  style: { overflowY: 'auto' as const, height: '100%' },
-                },
-                inner: {
-                  style: {
-                    height: `${totalHeight}px`,
-                    position: 'relative' as const,
-                  },
-                },
-                list: {
-                  style: {
-                    transform: `translateY(${positions[range.startIndex] || 0}px)`,
-                  },
-                },
-              };
+              // In render
+              useEffect(() => {
+                if (
+                  !stickToBottom ||
+                  !containerRef.current ||
+                  !isProgrammaticScrollRef.current
+                )
+                  return;
 
+                const scrollInterval = setInterval(() => {
+                  if (containerRef.current) {
+                    const container = containerRef.current;
+
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: initialScroll ? 'instant' : 'smooth',
+                    });
+                    const distanceFromBottom =
+                      container.scrollHeight -
+                      container.scrollTop -
+                      container.clientHeight;
+                    if (distanceFromBottom < 10) {
+                      hasReachedBottomRef.current = true;
+                      isProgrammaticScrollRef.current = false;
+                      initialScroll.current = false;
+                    }
+                  }
+                }, 100); // Check every 100ms
+
+                return () => clearInterval(scrollInterval);
+              }, [stickToBottom, trigger]);
               return {
+                virtualList: virtualState.virtualList,
                 virtualState,
-                virtualizerProps,
-                scrollToBottom,
-                scrollToIndex,
+                virtualizerProps: {
+                  outer: {
+                    ref: containerRef,
+                    style: { overflowY: 'auto', height: '100%' },
+                  },
+                  inner: {
+                    style: { height: `${totalHeight}px`, position: 'relative' },
+                  },
+                  list: {
+                    style: {
+                      transform: `translateY(${range.startIndex * itemHeight}px)`,
+                    },
+                  },
+                },
+                scrollToBottom: () => {
+                  if (containerRef.current) {
+                    containerRef.current.scrollTop = totalHeight.current;
+                  }
+                },
+                scrollToIndex: () => {},
               };
             };
           }
@@ -2682,68 +2701,65 @@ function createProxyHandler<T>(
           }
           if (prop === 'cutByValue') {
             return (value: string | number | boolean) => {
-              const arrayKeys = getGlobalStore
+              // Step 1: Get the list of all unique keys for the current view.
+              const arrayMeta = getGlobalStore
                 .getState()
-                .getShadowMetadata(stateKey, path)?.arrayKeys;
+                .getShadowMetadata(stateKey, path);
+              const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
 
-              if (!arrayKeys) return;
+              if (!relevantKeys) return;
 
-              // Find the item ID that matches the value
-              let targetItemId = null;
-              for (const itemId of arrayKeys) {
-                const itemValue = getGlobalStore
-                  .getState()
-                  .getShadowValue(itemId);
+              let keyToCut: string | null = null;
+
+              // Step 2: Iterate through the KEYS, get the value for each, and find the match.
+              for (const key of relevantKeys) {
+                const itemValue = getGlobalStore.getState().getShadowValue(key);
                 if (itemValue === value) {
-                  targetItemId = itemId;
-                  break;
+                  keyToCut = key;
+                  break; // We found the key, no need to search further.
                 }
               }
 
-              if (targetItemId) {
-                effectiveSetState(
-                  value as any,
-                  targetItemId.split('.').slice(1),
-                  { updateType: 'cut' }
-                );
+              // Step 3: If we found a matching key, use it to perform the cut.
+              if (keyToCut) {
+                const itemPath = keyToCut.split('.').slice(1);
+                effectiveSetState(null as any, itemPath, { updateType: 'cut' });
               }
             };
           }
 
           if (prop === 'toggleByValue') {
             return (value: string | number | boolean) => {
-              const arrayKeys = getGlobalStore
+              // Step 1: Get the list of all unique keys for the current view.
+              const arrayMeta = getGlobalStore
                 .getState()
-                .getShadowMetadata(stateKey, path)?.arrayKeys;
+                .getShadowMetadata(stateKey, path);
+              const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
 
-              if (!arrayKeys) return;
+              if (!relevantKeys) return;
 
-              // Find if item exists
-              let existingItemId = null;
-              for (const itemId of arrayKeys) {
-                const itemValue = getGlobalStore
-                  .getState()
-                  .getShadowValue(itemId);
+              let keyToCut: string | null = null;
+
+              // Step 2: Iterate through the KEYS to find the one matching the value. This is the robust way.
+              for (const key of relevantKeys) {
+                const itemValue = getGlobalStore.getState().getShadowValue(key);
                 if (itemValue === value) {
-                  existingItemId = itemId;
-                  break;
+                  keyToCut = key;
+                  break; // Found it!
                 }
               }
 
-              if (existingItemId) {
-                // Item exists, cut it
-                effectiveSetState(
-                  value as any,
-                  existingItemId.split('.').slice(1),
-                  { updateType: 'cut' }
-                );
+              // Step 3: Act based on whether the key was found.
+              if (keyToCut) {
+                // Item exists, so we CUT it using its *actual* key.
+                const itemPath = keyToCut.split('.').slice(1);
+                effectiveSetState(null as any, itemPath, { updateType: 'cut' });
               } else {
-                // Item doesn't exist, insert it
+                // Item does not exist, so we INSERT it.
                 effectiveSetState(value as any, path, { updateType: 'insert' });
               }
             };
           }
-
           if (prop === 'findWith') {
             return (
               searchKey: keyof InferArrayElement<T>,
@@ -2807,6 +2823,55 @@ function createProxyHandler<T>(
               _effect: fn.toString(),
               _meta: meta,
             });
+        }
+        // in CogsState.ts -> createProxyHandler -> handler -> get
+
+        if (prop === '$deriveClass') {
+          // The function signature is correct: it accepts the function and its deps
+          return (fn: (state: T, deps: any[]) => string, deps: any[] = []) => {
+            const uniqueId = `cogs-cls-${uuidv4()}`;
+            const store = getGlobalStore.getState();
+            const stateKeyPathKey = [stateKey, ...path].join('.');
+            const currentValue = store.getShadowValue(
+              stateKeyPathKey,
+              meta?.validIds
+            );
+            console.log('dsazdasdasdasdasd', currentValue);
+            let initialClasses = '';
+            try {
+              // THIS IS THE CRITICAL FIX:
+              // We must construct and execute the function with its dependencies, even on the first run.
+              const initialExecFn = new Function(
+                'state',
+                'deps',
+                `return (${fn.toString()})(state, deps)`
+              );
+              initialClasses = initialExecFn(currentValue, deps); // Pass deps here
+            } catch (e) {
+              console.error('Error in initial deriveClass execution:', e);
+            }
+
+            // The rest of the logic remains the same. We store the stringified
+            // function and the deps array for later updates.
+            const currentMeta = store.getShadowMetadata(stateKey, path) || {};
+            const classSignals = currentMeta.classSignals || [];
+            classSignals.push({
+              id: uniqueId,
+              effect: fn.toString(), // Store the original stringified function
+              lastClasses: initialClasses,
+              deps: deps, // Store the dependencies
+            });
+
+            store.setShadowMetadata(stateKey, path, {
+              ...currentMeta,
+              classSignals,
+            });
+            console.log(
+              '`${uniqueId} ${initialClasses}`.trim()',
+              `${uniqueId} ${initialClasses}`.trim()
+            );
+            return `${uniqueId} ${initialClasses}`.trim();
+          };
         }
         if (prop === '$get') {
           return () =>
@@ -3029,6 +3094,31 @@ function createProxyHandler<T>(
             effectiveSetState(payload as any, path, { updateType: 'update' });
             invalidateCachePath(path);
           };
+        }
+        if (prop === 'toggle') {
+          // Get the *actual* current value at the specific path this proxy represents
+          const currentValueAtPath = getGlobalStore
+            .getState()
+            .getShadowValue([stateKey, ...path].join('.'));
+
+          // Check if the current value is a boolean
+          if (typeof currentValueAtPath === 'boolean') {
+            // Return the function that performs the toggle
+            return () => {
+              // Use effectiveSetState to update the value at the current path
+              // Pass the toggled value (!currentValueAtPath)
+              // Cast to any because effectiveSetState expects a payload matching the root TStateObject type signature,
+              // but here we are passing a boolean payload for a nested path.
+              effectiveSetState(!currentValueAtPath as any, path, {
+                updateType: 'update',
+              });
+            };
+          } else {
+            // If the value is not a boolean, 'toggle' is not applicable.
+            // Returning undefined makes it behave like it doesn't exist on this proxy instance,
+            // matching the `never` type we added conditionally.
+            return undefined;
+          }
         }
         if (prop === 'formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => (
@@ -3419,13 +3509,11 @@ function SignalRenderer({
       if (displayValue !== null && typeof displayValue === 'object') {
         displayValue = JSON.stringify(displayValue);
       }
-
-      const textNode = document.createTextNode(String(displayValue));
+      const textNode = document.createTextNode(String(displayValue ?? ''));
       element.replaceWith(textNode);
       isSetupRef.current = true;
     }, 0);
 
-    // Cleanup only on unmount
     return () => {
       clearTimeout(timeoutId);
       if (instanceIdRef.current) {
@@ -3443,7 +3531,7 @@ function SignalRenderer({
         }
       }
     };
-  }, []); // Empty deps - only run once
+  }, []);
 
   return createElement('span', {
     ref: elementRef,
@@ -3451,6 +3539,7 @@ function SignalRenderer({
     'data-signal-id': signalId,
   });
 }
+
 const MemoizedCogsItemWrapper = memo(
   CogsItemWrapper,
   (prevProps, nextProps) => {
@@ -3464,6 +3553,54 @@ const MemoizedCogsItemWrapper = memo(
     );
   }
 );
+
+const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
+  const [loaded, setLoaded] = useState(false);
+
+  useLayoutEffect(() => {
+    if (!ref.current) {
+      setLoaded(true);
+      return;
+    }
+
+    const images = Array.from(ref.current.querySelectorAll('img'));
+
+    // If there are no images, we are "loaded" immediately.
+    if (images.length === 0) {
+      setLoaded(true);
+      return;
+    }
+
+    let loadedCount = 0;
+    const handleImageLoad = () => {
+      loadedCount++;
+      if (loadedCount === images.length) {
+        setLoaded(true);
+      }
+    };
+
+    images.forEach((image) => {
+      // If the image is already complete (e.g., cached), count it immediately.
+      if (image.complete) {
+        handleImageLoad();
+      } else {
+        image.addEventListener('load', handleImageLoad);
+        image.addEventListener('error', handleImageLoad); // Also count errors as "loaded"
+      }
+    });
+
+    // Cleanup function
+    return () => {
+      images.forEach((image) => {
+        image.removeEventListener('load', handleImageLoad);
+        image.removeEventListener('error', handleImageLoad);
+      });
+    };
+  }, [ref.current]); // Rerun if the ref's element changes
+
+  return loaded;
+};
+
 function CogsItemWrapper({
   stateKey,
   itemComponentId,
@@ -3494,54 +3631,69 @@ function CogsItemWrapper({
   ) => React.ReactNode;
 }) {
   const [, forceUpdate] = useState({});
-  const { ref, inView, entry } = useInView();
+  const { ref: inViewRef, inView } = useInView(); // Renamed to avoid conflict
   const elementRef = useRef<HTMLDivElement | null>(null);
   const lastReportedHeight = useRef<number | null>(null);
+
+  // ANNOTATION: The two key hooks for the fix.
+  const imagesLoaded = useImageLoaded(elementRef); // Our new hook
+  const hasReportedInitialHeight = useRef(false); // A flag to prevent re-reporting
 
   // Proper way to merge refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
-      // Set your own ref
       elementRef.current = element;
-
-      // Call measureRef (it's a callback function from useMeasure)
-      ref(element);
+      inViewRef(element); // This is the ref from useInView
     },
-    [ref]
+    [inViewRef]
   );
 
+  // ANNOTATION: This effect now waits for images to be loaded.
   useEffect(() => {
-    const currentItemMetadata = getGlobalStore
-      .getState()
-      .getShadowMetadata(stateKey, itemPath);
-    const existingItemHeight = currentItemMetadata?.virtualizer?.itemHeight;
+    // We only want to report the height if:
+    // 1. The item is in view.
+    // 2. All its images have loaded.
+    // 3. We haven't already reported its initial height.
+    if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
+      return;
+    }
 
-    if (
-      entry?.target instanceof HTMLElement &&
-      entry.target.offsetHeight > 0 &&
-      entry.target.offsetHeight !== lastReportedHeight.current &&
-      entry.target.offsetHeight !== existingItemHeight
-    ) {
-      lastReportedHeight.current = entry.target.offsetHeight;
+    const element = elementRef.current;
+    if (element && element.offsetHeight > 0) {
+      // Once we report the height, set the flag so we don't do it again
+      // unless the component re-mounts.
+      hasReportedInitialHeight.current = true;
+
+      const newHeight = element.offsetHeight;
+
+      // Update the shadow metadata with the correct height.
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
         virtualizer: {
-          itemHeight: entry.target.offsetHeight,
-          domRef: elementRef.current,
+          itemHeight: newHeight,
+          domRef: element,
         },
       });
-      const arrayPath = itemPath.slice(0, -1); // Remove the item ID
-      const arrayPathKey = [stateKey, ...arrayPath].join('.');
 
-      getGlobalStore.getState().notifyPathSubscribers(arrayPathKey);
+      // Notify the virtualizer so it can update its layout.
+      const arrayPath = itemPath.slice(0, -1);
+      const arrayPathKey = [stateKey, ...arrayPath].join('.');
+      getGlobalStore.getState().notifyPathSubscribers(arrayPathKey, {
+        type: 'ITEMHEIGHT', // This should trigger the *incremental* update path
+        itemKey: itemPath.join('.'),
+        height: newHeight,
+        ref: elementRef.current,
+      });
     }
-  }, [entry, stateKey, itemPath]);
+  }, [inView, imagesLoaded, stateKey, itemPath]); // Effect dependencies
+
+  // ... rest of the component is unchanged ...
   const fullComponentId = `${stateKey}////${itemComponentId}`;
   const stateEntry = getGlobalStore.getState().getShadowMetadata(stateKey, []);
 
   if (!stateEntry?.components?.has(fullComponentId)) {
     stateEntry?.components?.set(fullComponentId, {
       forceUpdate: () => forceUpdate({}),
-      paths: new Set(), // <--- THE FIX
+      paths: new Set(),
       reactiveType: ['component'],
     });
   }
@@ -3550,36 +3702,25 @@ function CogsItemWrapper({
     return () => {
       cleanupComponentRegistration(stateKey, fullComponentId);
     };
-    // The itemPath is no longer needed as a dependency for this effect
   }, [stateKey, itemComponentId]);
+
   const fullItemPath = [stateKey, ...itemPath].join('.');
   const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
 
-  // If the item was deleted from the store, it might be null.
   if (itemValue === undefined) {
     return null;
   }
 
-  const arrayValue = arraySetter.get();
-
-  // Re-create the specific proxy for this item with the latest data.
   const itemSetter = rebuildStateShape({
     currentState: itemValue,
     path: itemPath,
     componentId: itemComponentId,
   });
-  const children = renderFn(
-    itemSetter,
-    localIndex,
+  const children = renderFn(itemSetter, localIndex, arraySetter);
 
-    arraySetter
-  );
-
-  return (
-    <div ref={setRefs} onClick={() => forceUpdate({})}>
-      {children}
-    </div>
-  );
+  // The key change is that the `setRefs` now correctly wires up our `elementRef`
+  // which the `useImageLoaded` hook is watching.
+  return <div ref={setRefs}>{children}</div>;
 }
 const cleanupComponentRegistration = (
   stateKey: string,

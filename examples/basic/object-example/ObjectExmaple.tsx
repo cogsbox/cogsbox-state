@@ -1,22 +1,22 @@
-"use client";
+'use client';
 
-import { useEffect, useRef, useState } from "react";
-import type { StateObject } from "../../../src/CogsState";
-import { createCogsState } from "../../../src/CogsState";
-import DotPattern from "../DotWrapper";
-import { FlashWrapper } from "../FlashOnUpdate";
-import { faker } from "@faker-js/faker";
+import { useEffect, useRef, useState } from 'react';
+import type { StateObject } from '../../../src/CogsState';
+import { createCogsState } from '../../../src/CogsState';
+import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../FlashOnUpdate';
+import { faker } from '@faker-js/faker';
 // --- IMPORTS for syntax highlighting in the main component ---
-import SyntaxHighlighter from "react-syntax-highlighter";
-import { atomOneDark } from "react-syntax-highlighter/dist/esm/styles/hljs";
+import SyntaxHighlighter from 'react-syntax-highlighter';
+import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
 // --- State Definition with a Flat Player List ---
 export type Player = {
   id: string | number;
   name: string;
   score: number;
-  specialty: "Offense" | "Defense" | "Support";
-  team: "red" | "blue";
+  specialty: 'Offense' | 'Defense' | 'Support';
+  team: 'red' | 'blue';
 };
 
 export type GameDashboardState = {
@@ -27,14 +27,14 @@ export type GameDashboardState = {
 
 // --- Initial state now uses the flat structure ---
 const initialState: GameDashboardState = {
-  gameName: "Cogs Team Battle",
+  gameName: 'Cogs Team Battle',
   isLive: true,
   players: [
-    { id: 1, name: "Blaze", score: 1500, specialty: "Offense", team: "red" },
-    { id: 2, name: "Rook", score: 900, specialty: "Defense", team: "red" },
-    { id: 3, name: "Viper", score: 1250, specialty: "Offense", team: "blue" },
-    { id: 4, name: "Aegis", score: 1100, specialty: "Support", team: "blue" },
-    { id: 5, name: "Ghost", score: 850, specialty: "Defense", team: "blue" },
+    { id: 1, name: 'Blaze', score: 1500, specialty: 'Offense', team: 'red' },
+    { id: 2, name: 'Rook', score: 900, specialty: 'Defense', team: 'red' },
+    { id: 3, name: 'Viper', score: 1250, specialty: 'Offense', team: 'blue' },
+    { id: 4, name: 'Aegis', score: 1100, specialty: 'Support', team: 'blue' },
+    { id: 5, name: 'Ghost', score: 850, specialty: 'Defense', team: 'blue' },
   ],
 };
 
@@ -42,7 +42,7 @@ export const { useCogsState } = createCogsState(
   {
     gameDashboard: initialState,
   },
-  { validation: { key: "gameDashboard" } }
+  { validation: { key: 'gameDashboard' } }
 );
 
 // --- Main Page Component ---
@@ -85,7 +85,7 @@ export default function ArrayMethodsPage() {
 // --- Left Column Components ---
 
 function GameDetails() {
-  const rootState = useCogsState("gameDashboard");
+  const rootState = useCogsState('gameDashboard');
   //const rootState2 = useCogsState("gameDashboard");
   // rootState2.players.index(0).name.update("test");//fine
   //   let testMap = rootState2.players.stateMap((setter) => {
@@ -120,23 +120,23 @@ function GameDetails() {
   );
 }
 
-function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
-  const dashboardState = useCogsState("gameDashboard", {
-    reactiveType: "none",
+function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
+  const dashboardState = useCogsState('gameDashboard', {
+    reactiveType: 'none',
   });
 
-  const [sortBy, setSortBy] = useState<"score" | "name">("score");
+  const [sortBy, setSortBy] = useState<'score' | 'name'>('score');
   // Keep state for sort direction
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("asc");
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   // --- THIS IS THE KEY SIMPLIFICATION ---
   const filteredAndSorted = dashboardState.players
     .stateFilter((player) => player.team === color)
     .stateSort(
       (a, b) => {
-        const direction = sortDirection === "asc" ? 1 : -1;
+        const direction = sortDirection === 'asc' ? 1 : -1;
         // Use a simple ternary to pick the comparison logic
-        return sortBy === "score"
+        return sortBy === 'score'
           ? (a.score - b.score) * direction
           : a.name.localeCompare(b.name) * direction;
       },
@@ -145,14 +145,14 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
 
   const teamColors = {
     red: {
-      selected: "bg-red-800/80 text-white font-semibold ring-2 ring-red-500",
-      button: "bg-red-900/80 text-red-200 hover:bg-red-800",
-      text: "text-red-400",
+      selected: 'bg-red-800/80 text-white font-semibold ring-2 ring-red-500',
+      button: 'bg-red-900/80 text-red-200 hover:bg-red-800',
+      text: 'text-red-400',
     },
     blue: {
-      selected: "bg-blue-800/80 text-white font-semibold ring-2 ring-blue-500",
-      button: "bg-blue-900/80 text-blue-200 hover:bg-blue-800",
-      text: "text-blue-400",
+      selected: 'bg-blue-800/80 text-white font-semibold ring-2 ring-blue-500',
+      button: 'bg-blue-900/80 text-blue-200 hover:bg-blue-800',
+      text: 'text-blue-400',
     },
   };
 
@@ -183,31 +183,31 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
           <div className="flex gap-2">
             <button
               onClick={() => {
-                setSortBy("score");
-                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                setSortBy('score');
+                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
               }}
               className={`px-2 py-1 text-xs rounded transition-colors ${
-                sortBy === "score"
-                  ? "bg-sky-700 text-gray-300 hover:bg-gray-600"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                sortBy === 'score'
+                  ? 'bg-sky-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              Sort Score{" "}
-              {sortBy === "score" && (sortDirection === "asc" ? "↑" : "↓")}
+              Sort Score{' '}
+              {sortBy === 'score' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button
               onClick={() => {
-                setSortBy("name");
-                setSortDirection(sortDirection === "asc" ? "desc" : "asc");
+                setSortBy('name');
+                setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
               }}
               className={`px-2 py-1 text-xs rounded transition-colors ${
-                sortBy === "name"
-                  ? "bg-sky-700 text-gray-300 hover:bg-gray-600"
-                  : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                sortBy === 'name'
+                  ? 'bg-sky-700 text-gray-300 hover:bg-gray-600'
+                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              Sort Name{" "}
-              {sortBy === "name" && (sortDirection === "asc" ? "↑" : "↓")}
+              Sort Name{' '}
+              {sortBy === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
           </div>
         </div>
@@ -220,10 +220,10 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
                 className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
                   itemSetter._selected
                     ? teamColors[color].selected
-                    : "bg-gray-800 hover:bg-gray-700/70"
+                    : 'bg-gray-800 hover:bg-gray-700/70'
                 }`}
               >
-                <div>{itemSetter.name.get()}</div>{" "}
+                <div>{itemSetter.name.get()}</div>{' '}
                 <div>{itemSetter.score.get()}</div>
               </button>
             </FlashWrapper>
@@ -236,7 +236,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
                 filteredAndSorted.insert(({ uuid }) => ({
                   name: faker.person.firstName(),
                   score: 0,
-                  specialty: "Support" as const,
+                  specialty: 'Support' as const,
                   id: uuid,
                   team: color,
                 }))
@@ -267,7 +267,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
 // --- Right Column Components ---
 
 function ItemDetailForm() {
-  const dashboardState = useCogsState("gameDashboard");
+  const dashboardState = useCogsState('gameDashboard');
   const selectedPlayer = dashboardState.players.getSelected();
 
   return (
@@ -277,9 +277,9 @@ function ItemDetailForm() {
         {selectedPlayer && (
           <div
             className={`text-white text-center p-2 rounded-md mb-4 text-sm font-semibold ${
-              selectedPlayer.team.get() === "red"
-                ? "bg-red-500/50"
-                : "bg-blue-500/50"
+              selectedPlayer.team.get() === 'red'
+                ? 'bg-red-500/50'
+                : 'bg-blue-500/50'
             }`}
           >
             {selectedPlayer.team.get()?.toUpperCase()} TEAM
@@ -309,13 +309,13 @@ function PlayerForm({
   playersArrayState: StateObject<Player[]>;
 }) {
   const formInputClass =
-    "block w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-200 focus:ring-1 focus:ring-green-500 focus:outline-none";
-  const formLabelClass = "block text-sm font-medium text-gray-400 mb-1";
+    'block w-full bg-gray-800 border border-gray-600 rounded px-2 py-1 text-gray-200 focus:ring-1 focus:ring-green-500 focus:outline-none';
+  const formLabelClass = 'block text-sm font-medium text-gray-400 mb-1';
 
   return (
     <div className="space-y-4 text-sm">
       <div className="font-semibold text-gray-500">
-        Editing Player ID:{" "}
+        Editing Player ID:{' '}
         <span className="text-green-300">{playerState.id.get()}</span>
       </div>
 
@@ -338,7 +338,7 @@ function PlayerForm({
           <label className={formLabelClass}>Specialty</label>
           <select
             value={obj.get()}
-            onChange={(e) => obj.set(e.target.value as Player["specialty"])}
+            onChange={(e) => obj.set(e.target.value as Player['specialty'])}
             className={formInputClass}
           >
             <option>Offense</option>
@@ -380,12 +380,12 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
           language="javascript"
           style={atomOneDark}
           customStyle={{
-            backgroundColor: "transparent",
-            fontSize: "11px",
-            padding: "0.5rem",
+            backgroundColor: 'transparent',
+            fontSize: '11px',
+            padding: '0.5rem',
             margin: 0,
           }}
-          codeTagProps={{ style: { fontFamily: "inherit" } }}
+          codeTagProps={{ style: { fontFamily: 'inherit' } }}
         >
           {code.trim()}
         </SyntaxHighlighter>
@@ -395,7 +395,7 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
 }
 
 function ShowFullState() {
-  const dashboardState = useCogsState("gameDashboard", { reactiveType: "all" });
+  const dashboardState = useCogsState('gameDashboard', { reactiveType: 'all' });
   const preRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {

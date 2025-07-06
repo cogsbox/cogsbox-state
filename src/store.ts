@@ -101,6 +101,13 @@ export type ShadowMetadata = {
   syncInfo?: { status: string };
   lastUpdated?: number;
   value?: any;
+  classSignals?: Array<{
+    // <-- ADD THIS BLOCK
+    id: string;
+    effect: string;
+    lastClasses: string;
+    deps: any[];
+  }>;
   signals?: Array<{
     instanceId: string;
     parentId: string;
@@ -131,7 +138,12 @@ export type ShadowMetadata = {
   >;
   pathComponents?: Set<string>;
 } & ComponentsType;
-
+export type CogsEvent =
+  | { type: 'INSERT'; path: string; itemKey: string; index: number }
+  | { type: 'REMOVE'; path: string; itemKey: string }
+  | { type: 'UPDATE'; path: string; newValue: any }
+  | { type: 'ITEMHEIGHT'; itemKey: string; height: number } // For full re-initializations (e.g., when a component is removed)
+  | { type: 'RELOAD'; path: string }; // For full re-initializations
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
   shadowStateStore: Map<string, ShadowMetadata>;
@@ -167,9 +179,12 @@ export type CogsGlobalState = {
     cacheData: any
   ) => void;
 
-  pathSubscribers: Map<string, Set<() => void>>;
-  subscribeToPath: (path: string, callback: () => void) => () => void; // Returns an unsubscribe function
-  notifyPathSubscribers: (updatedPath: string) => void;
+  pathSubscribers: Map<string, Set<(newValue: any) => void>>;
+  subscribeToPath: (
+    path: string,
+    callback: (newValue: any) => void
+  ) => () => void;
+  notifyPathSubscribers: (updatedPath: string, newValue: any) => void;
 
   selectedIndicesMap: Map<string, string>; // stateKey -> (parentPath -> selectedIndex)
   getSelectedIndex: (stateKey: string, validArrayIds?: string[]) => number;
@@ -311,7 +326,7 @@ const isSimpleObject = (value: any): boolean => {
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   shadowStateStore: new Map(),
-  pathSubscribers: new Map(),
+  pathSubscribers: new Map<string, Set<(newValue: any) => void>>(),
 
   subscribeToPath: (path, callback) => {
     const subscribers = get().pathSubscribers;
@@ -330,15 +345,14 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     };
   },
 
-  notifyPathSubscribers: (updatedPath) => {
+  notifyPathSubscribers: (updatedPath, newValue) => {
+    // <-- Now accepts newValue
     const subscribers = get().pathSubscribers;
-
-    // Perform a direct, exact lookup. No loop.
     const subs = subscribers.get(updatedPath);
 
-    // If we found subscribers for the exact path, notify them.
     if (subs) {
-      subs.forEach((callback) => callback());
+      // Pass the newValue to every callback
+      subs.forEach((callback) => callback(newValue));
     }
   },
   initializeShadowState: (key: string, initialState: any) => {
@@ -473,7 +487,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       });
       return;
     }
-    get().notifyPathSubscribers(key);
+    get().notifyPathSubscribers(key, value);
   },
   getShadowMetadata: (
     key: string,
@@ -494,7 +508,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     set({ shadowStateStore: newShadowStore });
 
     if (metadata.virtualizer?.itemHeight) {
-      get().notifyPathSubscribers(fullKey);
+      get().notifyPathSubscribers(fullKey, get().getShadowValue(fullKey));
     }
   },
   setTransformCache: (
@@ -567,7 +581,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     processNewItem(newItem, [...arrayPath, newItemId]);
     set({ shadowStateStore: newShadowStore });
-    get().notifyPathSubscribers(arrayKey);
+    get().notifyPathSubscribers(arrayKey, {
+      type: 'INSERT',
+      path: arrayKey,
+      itemKey: fullItemKey,
+    });
   },
   removeShadowArrayElement: (key: string, itemPath: string[]) => {
     const newShadowStore = new Map(get().shadowStateStore);
@@ -613,7 +631,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     set({ shadowStateStore: newShadowStore });
 
-    get().notifyPathSubscribers(parentKey);
+    get().notifyPathSubscribers(parentKey, {
+      type: 'REMOVE',
+      path: parentKey,
+      itemKey: itemKey, // The exact ID of the removed item
+    });
   },
   updateShadowAtPath: (key, path, newValue) => {
     const newShadowStore = new Map(get().shadowStateStore);
@@ -644,7 +666,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     updateValue(fullKey, newValue);
     set({ shadowStateStore: newShadowStore });
-    get().notifyPathSubscribers(fullKey);
+    get().notifyPathSubscribers(fullKey, newValue);
   },
   selectedIndicesMap: new Map<string, string>(),
   getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {
