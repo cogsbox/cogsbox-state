@@ -177,7 +177,6 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 flex flex-col gap-2 h-full">
         <div className="flex items-center justify-between">
-          <span className="text-white"> {dashboardState._componentId}</span>
           <h3 className={`font-bold text-base ${teamColors[color].text}`}>
             {title}
           </h3>
@@ -235,7 +234,7 @@ function ItemList({ title, color }: { title: string; color: "red" | "blue" }) {
             <button
               onClick={() =>
                 filteredAndSorted.insert(({ uuid }) => ({
-                  name: faker.name.firstName(),
+                  name: faker.person.firstName(),
                   score: 0,
                   specialty: "Support" as const,
                   id: uuid,

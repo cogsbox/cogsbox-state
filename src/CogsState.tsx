@@ -2440,7 +2440,7 @@ function createProxyHandler<T>(
                   meta?.transforms && meta.transforms.length > 0
                     ? `${componentId}-${hashTransforms(meta.transforms)}`
                     : `${componentId}-base`;
-                console.log("dsadasdasdasdasda");
+
                 // Force update mechanism. This is correct.
                 const [updateTrigger, forceUpdate] = useState({});
 

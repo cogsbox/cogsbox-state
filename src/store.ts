@@ -284,7 +284,31 @@ export type CogsGlobalState = {
   deleteReactiveDeps: (key: string) => void;
   subscribe: (listener: () => void) => () => void;
 };
+const isSimpleObject = (value: any): boolean => {
+  if (value === null || typeof value !== "object") return false;
 
+  // Handle special cases that should be treated as primitives
+  if (
+    value instanceof Uint8Array ||
+    value instanceof Int8Array ||
+    value instanceof Uint16Array ||
+    value instanceof Int16Array ||
+    value instanceof Uint32Array ||
+    value instanceof Int32Array ||
+    value instanceof Float32Array ||
+    value instanceof Float64Array ||
+    value instanceof ArrayBuffer ||
+    value instanceof Date ||
+    value instanceof RegExp ||
+    value instanceof Map ||
+    value instanceof Set
+  ) {
+    return false; // Treat as primitive
+  }
+
+  // Arrays and plain objects are complex
+  return Array.isArray(value) || value.constructor === Object;
+};
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   shadowStateStore: new Map(),
   pathSubscribers: new Map(),
@@ -318,30 +342,28 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
   },
   initializeShadowState: (key: string, initialState: any) => {
-    // Get the existing shadow store
     const existingShadowStore = new Map(get().shadowStateStore);
-    console.log("existingShadowStore", existingShadowStore);
+
     const processValue = (value: any, path: string[]) => {
       const nodeKey = [key, ...path].join(".");
 
       if (Array.isArray(value)) {
+        // Handle arrays as before
         const childIds: string[] = [];
 
-        // First, collect all IDs
         value.forEach((item) => {
           const itemId = `id:${ulid()}`;
           childIds.push(nodeKey + "." + itemId);
         });
 
-        // Set the array metadata FIRST
         existingShadowStore.set(nodeKey, { arrayKeys: childIds });
 
-        // THEN process each item
         value.forEach((item, index) => {
-          const itemId = childIds[index]!.split(".").pop(); // Extract just the id:xxx part
+          const itemId = childIds[index]!.split(".").pop();
           processValue(item, [...path!, itemId!]);
         });
-      } else if (typeof value === "object" && value !== null) {
+      } else if (isSimpleObject(value)) {
+        // Only create field mappings for simple objects
         const fields = Object.fromEntries(
           Object.keys(value).map((k) => [k, nodeKey + "." + k])
         );
@@ -351,13 +373,12 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
           processValue(value[k], [...path, k]);
         });
       } else {
-        // Primitive value - store with value property
+        // Treat everything else (including Uint8Array) as primitive values
         existingShadowStore.set(nodeKey, { value });
       }
     };
 
     processValue(initialState, []);
-
     set({ shadowStateStore: existingShadowStore });
   },
 
@@ -598,58 +619,30 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     const fullKey = [key, ...path].join(".");
 
-    // This is the recursive function that does the real work.
     const updateValue = (currentKey: string, valueToSet: any) => {
       const meta = newShadowStore.get(currentKey);
 
-      // Case 1: The value to set is an object (but not an array).
-      // We must traverse its keys and update children, not replace the object itself.
-      if (
-        typeof valueToSet === "object" &&
-        valueToSet !== null &&
-        !Array.isArray(valueToSet)
-      ) {
-        // This is the crucial fix.
-        // We must find the metadata for this object to know its children's paths.
-        if (meta && meta.fields) {
-          // For each key in the new partial object (e.g., 'name', 'price')...
-          for (const fieldKey in valueToSet) {
-            if (Object.prototype.hasOwnProperty.call(valueToSet, fieldKey)) {
-              const childPath = meta.fields[fieldKey];
-              const childValue = valueToSet[fieldKey];
+      // If it's a simple object with fields, update recursively
+      if (isSimpleObject(valueToSet) && meta && meta.fields) {
+        for (const fieldKey in valueToSet) {
+          if (Object.prototype.hasOwnProperty.call(valueToSet, fieldKey)) {
+            const childPath = meta.fields[fieldKey];
+            const childValue = valueToSet[fieldKey];
 
-              // ...if a child path exists in the metadata, recursively call updateValue on it.
-              if (childPath) {
-                updateValue(childPath as string, childValue);
-              } else {
-                // NOTE: This logic ignores keys in the update object that don't exist in the state.
-                // A more advanced implementation might add new shadow nodes here.
-              }
+            if (childPath) {
+              updateValue(childPath as string, childValue);
             }
           }
-        } else {
-          // This is a recovery path. If told to update an object but it has no fields metadata,
-          // we fall back to the old (and potentially destructive) behavior, but with a warning.
-          console.warn(
-            `Attempted to update an object at ${currentKey}, but no 'fields' metadata was found. Replacing the value directly.`
-          );
-          const existing = newShadowStore.get(currentKey) || {};
-          newShadowStore.set(currentKey, { ...existing, value: valueToSet });
         }
-      }
-      // Case 2: The value is a primitive (or an array, which we treat as a single value).
-      // This is the base case for the recursion.
-      else {
+      } else {
+        // For primitives (including Uint8Array), just replace the value
+        // This gives you useState-like behavior
         const existing = newShadowStore.get(currentKey) || {};
-        // Only update the 'value' property, preserving other metadata like 'signals' or 'components'.
         newShadowStore.set(currentKey, { ...existing, value: valueToSet });
       }
     };
 
-    // Start the recursive update process from the top-level key for this update.
     updateValue(fullKey, newValue);
-
-    // Set the new shadow store in state.
     set({ shadowStateStore: newShadowStore });
     get().notifyPathSubscribers(fullKey);
   },

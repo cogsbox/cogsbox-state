@@ -1,13 +1,13 @@
-"use client";
-import { useMemo, useState, useCallback, useEffect, useRef } from "react";
+'use client';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 
 // Assuming these are in separate files as in your original code
-import FlyingCars from "./FlyingCars";
-import BlimpWithSpotlights from "./Blimp";
+import FlyingCars from './FlyingCars';
+import BlimpWithSpotlights from './Blimp';
 
-import { CloudLayers } from "./CloudTiler";
-import { ShadowSilhouette } from "./ShadowSilhouette";
-import { cyberShadow } from "./assets/svgs";
+import { CloudLayers } from './CloudTiler';
+import { ShadowSilhouette } from './ShadowSilhouette';
+import { cyberShadow } from './assets/svgs';
 
 // Centralized Z-Index Management System
 const Z_INDICES = {
@@ -96,7 +96,7 @@ function MoonGlow({
       onMoonIntensityChange(baseIntensity * 0.3);
 
       moonRef.current.style.background = `radial-gradient(circle 180vh at ${subtleX}vw ${subtleY}vh, transparent ${glowStartRadius}vh, ${gradientSteps.join(
-        ", "
+        ', '
       )})`;
     };
     glowInterval = setInterval(updateMoonGlow, 400);
@@ -112,32 +112,32 @@ function MoonGlow({
       <div
         ref={moonRef}
         style={{
-          position: "fixed",
+          position: 'fixed',
           top: 0,
           left: 0,
           right: 0,
           bottom: 0,
           zIndex: Z_INDICES.MOON_GLOW,
-          pointerEvents: "none",
-          background: "transparent",
-          mixBlendMode: "screen",
-          imageRendering: "pixelated",
+          pointerEvents: 'none',
+          background: 'transparent',
+          mixBlendMode: 'screen',
+          imageRendering: 'pixelated',
         }}
       />
 
       <div
         ref={moonCircleRef}
         style={{
-          position: "fixed",
-          width: "120px",
-          height: "120px",
-          borderRadius: "50%",
-          backgroundColor: "rgba(215, 215, 215, 0.9)",
+          position: 'fixed',
+          width: '120px',
+          height: '120px',
+          borderRadius: '50%',
+          backgroundColor: 'rgba(215, 215, 215, 0.9)',
           zIndex: Z_INDICES.MOON_GLOW,
-          pointerEvents: "none",
-          filter: "blur(1px)",
-          transform: "translate(-50%, -50%)",
-          imageRendering: "pixelated",
+          pointerEvents: 'none',
+          filter: 'blur(1px)',
+          transform: 'translate(-50%, -50%)',
+          imageRendering: 'pixelated',
         }}
       />
     </>
@@ -163,7 +163,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
 
         if (currentIntensity < 0.01) {
           if (lightningRef.current) {
-            lightningRef.current.style.background = "transparent";
+            lightningRef.current.style.background = 'transparent';
           }
           onBrightnessChange(BASE_SKYLINE_BRIGHTNESS);
           clearInterval(fadeInterval as NodeJS.Timeout);
@@ -218,16 +218,16 @@ function Lightning({ onBrightnessChange }: LightningProps) {
     <div
       ref={lightningRef}
       style={{
-        position: "fixed",
-        top: "-400px",
+        position: 'fixed',
+        top: '-400px',
         left: 0,
         right: 0,
         bottom: 0,
         zIndex: Z_INDICES.LIGHTNING,
-        pointerEvents: "none",
-        background: "transparent",
-        mixBlendMode: "screen",
-        imageRendering: "pixelated",
+        pointerEvents: 'none',
+        background: 'transparent',
+        mixBlendMode: 'screen',
+        imageRendering: 'pixelated',
       }}
     />
   );
@@ -249,9 +249,9 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
 
   const steppedGradient = useMemo(() => {
     const steps = 40;
-    const startColor = { r: 25, g: 60, b: 75 };
-    const endColor = { r: 0, g: 0, b: 0 };
-    const opacity = 0.8;
+    const startColor = { r: 35, g: 35, b: 85 }; // Deep CRT blue
+    const endColor = { r: 10, g: 10, b: 20 };
+    const opacity = 0.85;
     let gradientSteps = [];
     const easeOutQuint = (t: number) => Math.pow(t, 8);
     for (let i = 0; i < steps; i++) {
@@ -267,7 +267,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         `rgba(${r}, ${g}, ${b}, ${opacity}) ${posEnd}%`
       );
     }
-    return `linear-gradient(180deg, ${gradientSteps.join(", ")})`;
+    return `linear-gradient(180deg, ${gradientSteps.join(', ')})`;
   }, []);
 
   const drops = useMemo(() => {
@@ -305,8 +305,8 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           className="pixel-gradient"
           style={{
             background: steppedGradient,
-            imageRendering: "pixelated",
-            position: "absolute",
+            imageRendering: 'pixelated',
+            position: 'absolute',
             inset: -10,
             opacity: 0.6,
           }}
@@ -329,12 +329,12 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         className="fixed bottom-[10vh] left-[10vh] h-[500px]"
         style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
-        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{" "}
+        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{' '}
         <div
           style={{ zIndex: Z_INDICES.CYBERMAN - 1 }}
           className="h-[500px] w-auto absolute top-[0px] left-[5px] text-sky-400/50 shadow-lg "
         >
-          {" "}
+          {' '}
           {cyberShadow}
         </div>
         <div className="mt-[-70px] relative">
@@ -356,7 +356,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           className="absolute bottom-[-100px] left-[-50px] w-[200px] h-[200px]"
           style={{
             background:
-              "radial-gradient(circle at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.01) 80%,  rgba(0,0,0,0.0) 100%)",
+              'radial-gradient(circle at center, rgba(0,0,0,1) 0%, rgba(0,0,0,0.01) 80%,  rgba(0,0,0,0.0) 100%)',
           }}
         />
         <img src="./cat.png" alt="Hero background" className="h-[400px]" />
@@ -377,44 +377,44 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
 
       <div
         style={{
-          position: "fixed",
+          position: 'fixed',
           inset: 0,
-          height: "42%",
+          height: '42%',
           zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_1,
-          pointerEvents: "none",
+          pointerEvents: 'none',
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.3) 25%, transparent 67%)",
+            'linear-gradient(to top, rgba(255, 120, 70, 0.3) 25%, transparent 67%)',
         }}
       />
       <div
         style={{
-          position: "fixed",
+          position: 'fixed',
           inset: 0,
-          top: "9vh",
-          height: "32%",
+          top: '9vh',
+          height: '32%',
           zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_2,
-          pointerEvents: "none",
+          pointerEvents: 'none',
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.25) 10%, transparent 67%)",
+            'linear-gradient(to top, rgba(255, 120, 70, 0.25) 10%, transparent 67%)',
         }}
       />
       <div
         style={{
-          position: "fixed",
+          position: 'fixed',
           inset: 0,
-          top: "22%",
-          height: "60%",
-          filter: "blur(20px)",
+          top: '22%',
+          height: '60%',
+          filter: 'blur(20px)',
           zIndex: Z_INDICES.ATMOSPHERIC_OVERLAY_3,
-          pointerEvents: "none",
+          pointerEvents: 'none',
           background:
-            "linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.2) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)",
+            'linear-gradient(to top, rgba(255, 120, 70, 0.0) 0%,rgba(255, 120, 30, 0.2) 45%,rgba(255, 120, 70, 0.005) 80%, rgba(255, 120, 70, 0.0) 100%,transparent 37%)',
         }}
       />
 
       <CloudLayers
         lightningBrightness={skylineBrightness}
-        style={{ zIndex: Z_INDICES.CLOUDS, filter: "blur(5px)" }}
+        style={{ zIndex: Z_INDICES.CLOUDS, filter: 'blur(5px)' }}
       />
 
       {/* Blimp Layer */}
@@ -423,9 +423,9 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         className="fixed top-[23vh]"
         style={{
           zIndex: Z_INDICES.BLIMP,
-          animation: "moveAcross 240s linear infinite",
-          transform: "translateX(-100%)",
-          filter: "contrast(1.1)",
+          animation: 'moveAcross 240s linear infinite',
+          transform: 'translateX(-100%)',
+          filter: 'contrast(1.1)',
         }}
       >
         <BlimpWithSpotlights />
@@ -435,72 +435,72 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       <div
         ref={skylineRef}
         style={{
-          position: "fixed",
+          position: 'fixed',
           top: 0,
           left: 0,
-          width: "100%",
-          height: "100vh",
+          width: '100%',
+          height: '100vh',
           zIndex: Z_INDICES.SKYLINE_BACKGROUND,
-          pointerEvents: "none",
-          imageRendering: "pixelated",
+          pointerEvents: 'none',
+          imageRendering: 'pixelated',
         }}
       >
         <div
           style={{
-            position: "absolute",
+            position: 'absolute',
             top: 0,
             left: 0,
-            width: "100%",
-            height: "100%",
+            width: '100%',
+            height: '100%',
             zIndex: Z_INDICES.SKYLINE_BACKGROUND,
-            backgroundColor: "rgba(255, 255, 255, 0.3)",
+            backgroundColor: 'rgba(255, 255, 255, 0.3)',
             filter: `brightness(${
               0.5 * skylineBrightness + moonIntensity * 0.02
             }) contrast(0.97) saturate(0.8)`,
-            maskImage: "url(/skyline.svg)",
-            maskSize: "100% 100vh",
-            maskPosition: "0 -2vh",
-            maskRepeat: "no-repeat",
+            maskImage: 'url(/skyline.svg)',
+            maskSize: '100% 100vh',
+            maskPosition: '0 -2vh',
+            maskRepeat: 'no-repeat',
           }}
         />
 
         <div
           style={{
-            position: "absolute",
+            position: 'absolute',
             top: 0,
             left: 0,
-            width: "100%",
-            height: "100%",
+            width: '100%',
+            height: '100%',
             zIndex: Z_INDICES.SKYLINE_BACKGROUND,
-            background: "rgba(0, 0, 0, 0.85)",
-            maskImage: "url(/skyline.svg)",
-            maskSize: "100% 100vh",
-            maskPosition: "0 -2vh",
-            maskRepeat: "no-repeat",
+            background: 'rgba(0, 0, 0, 0.85)',
+            maskImage: 'url(/skyline.svg)',
+            maskSize: '100% 100vh',
+            maskPosition: '0 -2vh',
+            maskRepeat: 'no-repeat',
           }}
         />
       </div>
 
       <div
         style={{
-          position: "fixed",
+          position: 'fixed',
           top: 0,
           left: 0,
-          width: "100%",
-          height: "100vh",
+          width: '100%',
+          height: '100vh',
           zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
-          pointerEvents: "none",
+          pointerEvents: 'none',
           filter: `brightness(${
             1 + (1 - skylineBrightness + moonIntensity * 0.02)
           }) contrast(0.93) saturate(0.88)`,
-          background: "black",
-          backgroundAttachment: "fixed",
-          imageRendering: "pixelated",
-          transform: "scaleX(-1)",
-          maskImage: "url(/skyline.svg)",
-          maskSize: "100% 60vh",
-          maskPosition: "0 20vh",
-          maskRepeat: "no-repeat",
+          background: 'black',
+          backgroundAttachment: 'fixed',
+          imageRendering: 'pixelated',
+          transform: 'scaleX(-1)',
+          maskImage: 'url(/skyline.svg)',
+          maskSize: '100% 60vh',
+          maskPosition: '0 20vh',
+          maskRepeat: 'no-repeat',
         }}
       />
 
@@ -522,10 +522,10 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             style={
               {
                 left: drop.left,
-                "--delay": drop.animationDelay,
-                "--drop-opacity": drop.opacity,
-                "--duration": drop.animationDuration,
-                "--end-height": drop.endHeight,
+                '--delay': drop.animationDelay,
+                '--drop-opacity': drop.opacity,
+                '--duration': drop.animationDuration,
+                '--end-height': drop.endHeight,
               } as any
             }
           />
@@ -545,14 +545,14 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             style={
               {
                 left: drop.left,
-                "--delay": drop.animationDelay,
-                "--drop-opacity": drop.opacity,
-                "--duration": drop.animationDuration,
-                "--end-height": drop.endHeight,
-                "--splat-duration": `${
+                '--delay': drop.animationDelay,
+                '--drop-opacity': drop.opacity,
+                '--duration': drop.animationDuration,
+                '--end-height': drop.endHeight,
+                '--splat-duration': `${
                   parseFloat(drop.animationDuration) * 2
                 }s`,
-                "--size-modifier": drop.sizeModifier,
+                '--size-modifier': drop.sizeModifier,
               } as any
             }
           />

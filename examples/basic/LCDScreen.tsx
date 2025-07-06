@@ -1,103 +1,126 @@
-import { useEffect, useRef, useState } from "react";
+import { createCogsState } from '@lib/CogsState';
+import { useEffect, useRef, useState } from 'react';
 
-const WIDTH = 96;
-const HEIGHT = 24;
+// --- Configuration ---
+export const WIDTH = 88;
+export const HEIGHT = 22;
 const TOTAL = WIDTH * HEIGHT;
 
-type Props = {
-  svg: string; // inline SVG string (e.g. from <svg>...</svg>)
-  speed?: number; // pixels/frame
-  scale?: number; // visual scaling multiplier
+// Define the initial state for our LCD screen
+const initialState = {
+  lcd: {
+    pixels: Array.from(new Uint8Array(TOTAL)), // Convert to regular array
+  },
 };
 
-export default function LCDCatScroller({ svg, speed = 1, scale = 4 }: Props) {
-  const [pixels, setPixels] = useState<Uint8Array>(() => new Uint8Array(TOTAL));
-  const [cat, setCat] = useState<Uint8Array | null>(null);
-  const [catWidth, setCatWidth] = useState(0);
-  const frameRef = useRef(0);
+// Create the state and the hook we'll use in our components
+export const { useCogsState: useLcdState } = createCogsState(initialState);
 
+type AnimationState =
+  | 'INITIAL_DELAY'
+  | 'SCROLLING'
+  | 'FINAL_DELAY'
+  | 'FADING_OUT'
+  | 'FINISHED';
+
+type Props = {
+  svg: string;
+  speed?: number;
+  scale?: number;
+  fade?: number;
+  startX?: number;
+  endX?: number;
+  initialDelay?: number;
+  finalDelay?: number;
+  repeat?: boolean;
+  stressTest?: boolean; // NEW: Enable stress testing
+  randomPixels?: number; // NEW: Number of random pixels to update per frame
+};
+
+export default function LCDCatScroller({
+  svg,
+  speed = 1,
+  scale = 4,
+  fade = 0.85,
+  startX = 0,
+  endX = 0,
+  initialDelay = 2,
+  finalDelay = 3,
+  repeat = true,
+  stressTest = false, // NEW
+  randomPixels = 100, // NEW
+}: Props) {
+  // Use the state manager instead of local state
+  const lcdState = useLcdState('lcd');
+
+  const [cat, setCat] = useState<{ data: Uint8Array; width: number } | null>(
+    null
+  );
+
+  const frameRef = useRef(0);
+  const animationStateRef = useRef<AnimationState>('INITIAL_DELAY');
+
+  // --- Effect 1: Rasterize the SVG (No changes here) ---
   useEffect(() => {
     const rasterizeSvgToGrid = async (
-      svgString: string,
-      width: number,
-      height: number
-    ): Promise<{ data: Uint8Array; w: number }> => {
-      const blob = new Blob([svgString], { type: "image/svg+xml" });
+      svgString: string
+    ): Promise<{ data: Uint8Array; width: number }> => {
+      const blob = new Blob([svgString], { type: 'image/svg+xml' });
       const url = URL.createObjectURL(blob);
-
-      // CHANGE 1: Specify the image dimensions in the constructor.
-      // This is crucial for the browser to correctly render the SVG at the desired size.
-      const img = new Image(width, height);
-
+      const img = new Image();
       const p = new Promise((resolve, reject) => {
         img.onload = resolve;
         img.onerror = reject;
       });
       img.src = url;
-
       await p;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-      const ctx = canvas.getContext("2d")!;
-      ctx.clearRect(0, 0, width, height);
-      ctx.drawImage(img, 0, 0, width, height);
-
-      const imageData = ctx.getImageData(0, 0, width, height).data;
-      const out = new Uint8Array(width * height);
-
-      // CHANGE 2: Calculate the *actual* width of the rendered graphic.
-      // We will scan the pixels to find the right-most "on" pixel.
-      let actualWidth = 0;
-
-      for (let i = 0; i < width * height; i++) {
-        const [r, g, b, a] = [
-          imageData[i * 4],
-          imageData[i * 4 + 1],
-          imageData[i * 4 + 2],
-          imageData[i * 4 + 3],
-        ];
-        // Check if the pixel is not transparent and is dark.
-        if (a > 128 && (r + g + b) / 3 < 128) {
+      const aspectRatio = img.naturalWidth / img.naturalHeight;
+      const catCanvasWidth = Math.round(HEIGHT * aspectRatio);
+      const canvas = document.createElement('canvas');
+      canvas.width = catCanvasWidth;
+      canvas.height = HEIGHT;
+      const ctx = canvas.getContext('2d')!;
+      ctx.drawImage(img, 0, 0, catCanvasWidth, HEIGHT);
+      const imageData = ctx.getImageData(0, 0, catCanvasWidth, HEIGHT).data;
+      const out = new Uint8Array(catCanvasWidth * HEIGHT);
+      for (let i = 0; i < out.length; i++) {
+        const a = imageData[i * 4 + 3];
+        const brightness =
+          (imageData[i * 4] + imageData[i * 4 + 1] + imageData[i * 4 + 2]) / 3;
+        if (a > 128 && brightness < 128) {
           out[i] = 255;
-          const x = i % width; // get the x-coordinate of the pixel
-          if (x > actualWidth) {
-            actualWidth = x;
-          }
-        } else {
-          out[i] = 0;
         }
       }
-
       URL.revokeObjectURL(url);
-      // Return the detected width (+1 because it's an index)
-      return { data: out, w: actualWidth + 1 };
+      return { data: out, width: catCanvasWidth };
     };
-
-    // The rest of your component logic depends on the rasterization being correct.
-    // The SVG is squished into 96x24 to fit the "LCD" screen.
-    rasterizeSvgToGrid(svg, WIDTH, HEIGHT).then(({ data, w }) => {
-      setCat(data);
-      setCatWidth(w);
-    });
+    rasterizeSvgToGrid(svg).then(setCat);
   }, [svg]);
 
+  // --- Effect 2: Animate the scroller ---
   useEffect(() => {
-    if (!cat || catWidth === 0) return; // Don't start if cat isn't ready
+    if (!cat) return;
+
+    // Reset animation state
+    animationStateRef.current = 'INITIAL_DELAY';
+    frameRef.current = 0;
+
+    const finalEndX = endX ?? WIDTH - cat.width;
+    const INITIAL_DELAY_FRAMES = initialDelay * 60;
+    const FINAL_DELAY_FRAMES = finalDelay * 60;
+
     let raf: number;
     const buffer = new Uint8Array(TOTAL);
-    const fade = 0.92;
+    const { data: catPixels, width: catWidth } = cat;
 
     const drawAt = (xOffset: number) => {
+      const roundedX = Math.round(xOffset);
       for (let y = 0; y < HEIGHT; y++) {
         for (let x = 0; x < catWidth; x++) {
-          const src = y * catWidth + x; // Use catWidth for source index
-          const dstX = Math.round(x + xOffset);
+          const dstX = roundedX + x;
           if (dstX >= 0 && dstX < WIDTH) {
-            const dst = y * WIDTH + dstX;
-            if (cat[y * WIDTH + x]) {
-              // Check source from the full-width grid
+            if (catPixels[y * catWidth + x]) {
+              const dst = y * WIDTH + dstX;
               buffer[dst] = 255;
             }
           }
@@ -106,38 +129,111 @@ export default function LCDCatScroller({ svg, speed = 1, scale = 4 }: Props) {
     };
 
     const loop = () => {
+      const currentState = animationStateRef.current;
+      if (currentState === 'FINISHED') {
+        cancelAnimationFrame(raf);
+        return;
+      }
+
       const frame = frameRef.current++;
+
+      // Apply fade effect
       for (let i = 0; i < TOTAL; i++) {
         buffer[i] = Math.floor(buffer[i] * fade);
       }
 
-      const scrollDistance = WIDTH + catWidth;
-      const offset = ((frame * speed) % scrollDistance) - catWidth;
-      drawAt(offset);
-      setPixels(new Uint8Array(buffer));
+      switch (currentState) {
+        case 'INITIAL_DELAY':
+          drawAt(startX);
+          if (frame > INITIAL_DELAY_FRAMES) {
+            animationStateRef.current = 'SCROLLING';
+            frameRef.current = 0;
+          }
+          break;
+
+        case 'SCROLLING':
+          const distance = finalEndX - startX;
+          const scrollDurationFrames = Math.max(1, Math.abs(distance) / speed);
+          const progress = Math.min(frame / scrollDurationFrames, 1);
+          const currentX = startX + distance * progress;
+          drawAt(currentX);
+
+          if (progress >= 1) {
+            animationStateRef.current = 'FINAL_DELAY';
+            frameRef.current = 0;
+          }
+          break;
+
+        case 'FINAL_DELAY':
+          drawAt(finalEndX);
+          if (frame > FINAL_DELAY_FRAMES) {
+            animationStateRef.current = 'FADING_OUT';
+            frameRef.current = 0;
+          }
+          break;
+
+        case 'FADING_OUT':
+          if (buffer.every((p) => p === 0)) {
+            if (repeat) {
+              animationStateRef.current = 'INITIAL_DELAY';
+              frameRef.current = 0;
+            } else {
+              animationStateRef.current = 'FINISHED';
+            }
+          }
+          break;
+      }
+
+      // NEW: Add stress test random pixels AFTER cat drawing
+      if (stressTest) {
+        for (let i = 0; i < randomPixels; i++) {
+          const randomIndex = Math.floor(Math.random() * TOTAL);
+          buffer[randomIndex] = 255; // Always max brightness so we can see them
+        }
+      }
+
+      // KEY FIX: Update the state manager with the new pixel data
+      // Convert Uint8Array to regular array for better compatibility with the shadow system
+      lcdState.pixels.update(Array.from(buffer));
+
       raf = requestAnimationFrame(loop);
     };
 
     loop();
     return () => cancelAnimationFrame(raf);
-  }, [cat, catWidth, speed]);
+  }, [
+    cat,
+    speed,
+    fade,
+    startX,
+    endX,
+    initialDelay,
+    finalDelay,
+    repeat,
+    stressTest,
+    randomPixels,
+    lcdState,
+  ]);
+
+  // Get the current pixel data from state manager
+  const currentPixels = lcdState.pixels.get();
 
   return (
     <div
-      className="grid bg-black crt"
+      className="grid bg-black"
       style={{
-        display: "grid",
+        display: 'grid',
         gridTemplateColumns: `repeat(${WIDTH}, ${scale}px)`,
         width: WIDTH * scale,
       }}
     >
-      {Array.from(pixels).map((val, i) => (
+      {Array.from(currentPixels).map((val, i) => (
         <div
           key={i}
           style={{
             backgroundColor: `rgb(0, ${val}, 0)`,
             width: `${scale}px`,
-            aspectRatio: "1 / 1",
+            aspectRatio: '1 / 1',
           }}
         />
       ))}
