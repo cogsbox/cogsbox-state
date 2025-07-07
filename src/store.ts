@@ -4,7 +4,6 @@ import type {
   OptionsType,
   ReactivityType,
   StateKeys,
-  SyncActionsType,
   SyncInfo,
   UpdateTypeDetail,
 } from './CogsState.js';
@@ -246,6 +245,17 @@ export type CogsGlobalState = {
 
   // --- Server Sync and Logging ---
 
+  serverStateUpdates: Map<
+    string,
+    {
+      data: any;
+      status: 'loading' | 'success' | 'error';
+      timestamp: number;
+    }
+  >;
+
+  setServerStateUpdate: (key: string, serverState: any) => void;
+
   serverSyncLog: { [key: string]: SyncLogType[] };
   stateLog: { [key: string]: UpdateTypeDetail[] };
   syncInfoStore: Map<string, SyncInfo>;
@@ -333,6 +343,20 @@ const isSimpleObject = (value: any): boolean => {
   return Array.isArray(value) || value.constructor === Object;
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  serverStateUpdates: new Map(),
+  setServerStateUpdate: (key, serverState) => {
+    set((state) => {
+      const newMap = new Map(state.serverStateUpdates);
+      newMap.set(key, serverState);
+      return { serverStateUpdates: newMap };
+    });
+
+    // Notify all subscribers for this key
+    get().notifyPathSubscribers(key, {
+      type: 'SERVER_STATE_UPDATE',
+      serverState,
+    });
+  },
   shadowStateStore: new Map(),
   pathSubscribers: new Map<string, Set<(newValue: any) => void>>(),
 

@@ -8,6 +8,7 @@ import ArrayMethodsPage from './object-example/ObjectExmaple';
 import { catSvg } from './assets/svgs';
 import LCDCatScrollerDemo from './LCDDemo';
 import StateOverview from './basic-overview/StateOverview';
+import VirtualizedChatExampleFetch from './virtualiser/VirtualizedChatExampleFetch';
 
 const sections = [
   { id: 'home', name: 'Home' },
@@ -57,7 +58,10 @@ function App() {
         ) : activeSection === 'basic' ? (
           <StateOverview />
         ) : activeSection === 'chat' ? (
-          <VirtualizedChatExample />
+          <>
+            {/* <VirtualizedChatExample /> */}
+            <VirtualizedChatExampleFetch />
+          </>
         ) : activeSection === 'lcd' ? (
           <LCDCatScrollerDemo catSvg={catSvg} />
         ) : activeSection === 'array' ? (

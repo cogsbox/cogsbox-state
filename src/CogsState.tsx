@@ -264,9 +264,9 @@ export type EndType<T, IsArrayElement = false> = {
   get: () => T;
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
-  $deriveClass: <R>(fn: EffectFunction<T, R>, deps?: any[]) => R;
-  _status: 'fresh' | 'stale' | 'synced';
-  getStatus: () => 'fresh' | 'stale';
+
+  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
 
   showValidationErrors: () => string[];
   setValidation: (ctx: string) => void;
@@ -376,7 +376,7 @@ export type OptionsType<T extends unknown = unknown> = {
   serverState?: {
     id?: string | number;
     data?: T;
-    status?: 'pending' | 'error' | 'success';
+    status?: 'pending' | 'error' | 'success' | 'loading';
     timestamp?: number;
   };
   sync?: {
@@ -422,27 +422,6 @@ export type ServerSyncType<T> = {
 
   snapshot?: {
     name: (({ state }: { state: T }) => string) | string;
-    stateKeys: StateKeys[];
-    currentUrl: string;
-    currentParams?: URLSearchParams;
-  };
-};
-
-export type SyncActionsType<T> = {
-  syncKey: string;
-
-  rollBackState?: T;
-  actionTimeStamp: number;
-  retryCount?: number;
-  status:
-    | 'success'
-    | 'waiting'
-    | 'rolledBack'
-    | 'error'
-    | 'cancelled'
-    | 'failed';
-  snapshot?: {
-    name: string;
     stateKeys: StateKeys[];
     currentUrl: string;
     currentParams?: URLSearchParams;
@@ -628,7 +607,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     options?: OptionsType<(typeof statePart)[StateKey]>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-
     setOptions({
       stateKey,
       options,
@@ -636,7 +614,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     });
 
     const thiState =
-      getGlobalStore.getState().cogsStateStore[stateKey as string] ||
+      getGlobalStore.getState().getShadowValue(stateKey as string) ||
       statePart[stateKey as string];
     const partialState = options?.modifyState
       ? options.modifyState(thiState)
@@ -788,31 +766,6 @@ type LocalStorageData<T> = {
   stateSource?: 'default' | 'server' | 'localStorage'; // Track origin
 };
 
-const updateGlobalState = (
-  thisKey: string,
-  initialState: any,
-  newState: any,
-  effectiveSetState: EffectiveSetState<any>,
-  componentId: string,
-  sessionId?: string
-) => {
-  // Update all global state at once
-  const updates = {
-    initialState: initialState,
-    updaterState: createProxyHandler(
-      thisKey,
-      effectiveSetState,
-      componentId,
-      sessionId
-    ),
-    state: newState,
-  };
-
-  updateInitialStateGlobal(thisKey, updates.initialState);
-  setUpdaterState(thisKey, updates.updaterState);
-  setState(thisKey, updates.state);
-};
-
 const notifyComponents = (thisKey: string) => {
   const stateEntry = getGlobalStore.getState().getShadowMetadata(thisKey, []);
   if (!stateEntry) return;
@@ -911,124 +864,161 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
   }, [syncUpdate]);
 
-  useEffect(() => {
-    const options = latestInitialOptionsRef.current;
-    // Only proceed if defaultState is provided
-    if (options?.defaultState !== undefined) {
-      setAndMergeOptions(thisKey as string, {
-        defaultState: options.defaultState,
-      });
+  const resolveInitialState = useCallback(
+    (
+      overrideOptions?: OptionsType<TStateObject>
+    ): {
+      value: TStateObject;
+      source: 'default' | 'server' | 'localStorage';
+      timestamp: number;
+    } => {
+      // If we pass in options, use them. Otherwise, get from the global store.
+      const optionsToUse = overrideOptions
+        ? { ...getInitialOptions(thisKey as string), ...overrideOptions }
+        : getInitialOptions(thisKey as string);
 
-      const currentOptions = latestInitialOptionsRef.current;
+      const currentOptions = optionsToUse;
+      const finalDefaultState =
+        currentOptions?.defaultState || defaultState || stateObject;
 
-      // Resolve the initial state based on priority
-      const resolveInitialState = (): {
-        value: TStateObject;
-        source: 'default' | 'server' | 'localStorage';
-        timestamp: number;
-      } => {
-        // 1. Check server state
-        const hasValidServerData =
-          currentOptions?.serverState?.status === 'success' &&
-          currentOptions?.serverState?.data !== undefined;
+      // 1. Check server state
+      const hasValidServerData =
+        currentOptions?.serverState?.status === 'success' &&
+        currentOptions?.serverState?.data !== undefined;
 
-        if (hasValidServerData) {
+      if (hasValidServerData) {
+        return {
+          value: currentOptions.serverState!.data! as any,
+          source: 'server',
+          timestamp: currentOptions.serverState!.timestamp || Date.now(),
+        };
+      }
+      // 2. Check localStorage
+      if (currentOptions?.localStorage?.key && sessionId) {
+        const localKey = isFunction(currentOptions.localStorage.key)
+          ? currentOptions.localStorage.key(finalDefaultState)
+          : currentOptions.localStorage.key;
+
+        const localData = loadFromLocalStorage(
+          `${sessionId}-${thisKey}-${localKey}`
+        );
+
+        if (
+          localData &&
+          localData.lastUpdated > (currentOptions?.serverState?.timestamp || 0)
+        ) {
           return {
-            value: currentOptions.serverState!.data!,
-            source: 'server',
-            timestamp: currentOptions.serverState!.timestamp || Date.now(),
+            value: localData.state,
+            source: 'localStorage',
+            timestamp: localData.lastUpdated,
           };
         }
+      }
 
-        // 2. Check localStorage
-        if (currentOptions?.localStorage?.key && sessionId) {
-          const localKey = isFunction(currentOptions.localStorage.key)
-            ? currentOptions.localStorage.key(options.defaultState)
-            : currentOptions.localStorage.key;
+      // 3. Use default state
+      return {
+        value: finalDefaultState || (stateObject as any),
+        source: 'default',
+        timestamp: Date.now(),
+      };
+    },
+    [thisKey, defaultState, stateObject, sessionId]
+  );
 
-          const localData = loadFromLocalStorage(
-            `${sessionId}-${thisKey}-${localKey}`
-          );
+  // Effect 1: When this component's serverState prop changes, broadcast it
+  useEffect(() => {
+    if (serverState && serverState.status === 'success') {
+      getGlobalStore.getState().setServerStateUpdate(thisKey, serverState);
+    }
+  }, [serverState, thisKey]);
 
-          if (
-            localData &&
-            localData.lastUpdated >
-              (currentOptions?.serverState?.timestamp || 0)
-          ) {
-            return {
-              value: localData.state,
-              source: 'localStorage',
-              timestamp: localData.lastUpdated,
-            };
+  // Effect 2: Listen for server state updates from ANY component
+  useEffect(() => {
+    const unsubscribe = getGlobalStore
+      .getState()
+      .subscribeToPath(thisKey, (event) => {
+        if (event?.type === 'SERVER_STATE_UPDATE') {
+          const serverStateData = event.serverState;
+          if (serverStateData?.status === 'success' && serverStateData?.data) {
+            // 1. Define the new options we want to apply
+            const newOptions = { serverState: serverStateData };
+
+            // 2. Update the global store for other components and future renders
+            setAndMergeOptions(thisKey as string, newOptions);
+
+            // 3. Re-resolve state by PASSING the new options DIRECTLY
+            const {
+              value: newState,
+              source,
+              timestamp,
+            } = resolveInitialState(newOptions); // <-- FIX: Pass the data in
+
+            // 4. NOW THIS WILL WORK, BECAUSE `newState` IS CORRECT
+            getGlobalStore.getState().initializeShadowState(thisKey, newState);
+            console.log(
+              'thisKey',
+              getGlobalStore.getState().getShadowValue(thisKey)
+            );
+            // ... rest of your logic ...
+            getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+              stateSource: source,
+              lastServerSync: source === 'server' ? timestamp : undefined,
+              isDirty: false,
+              baseServerState: source === 'server' ? newState : undefined,
+            });
+
+            notifyComponents(thisKey);
+            forceUpdate({});
           }
         }
+      });
 
-        // 3. Use default state
-        return {
-          value: options.defaultState as TStateObject,
-          source: 'default',
-          timestamp: Date.now(),
-        };
-      };
+    return unsubscribe;
+  }, [thisKey, resolveInitialState]);
 
-      const { value: newState, source, timestamp } = resolveInitialState();
+  useEffect(() => {
+    // Get the CURRENT metadata. If a source is already set (e.g., from a server update),
+    // it means we've already been initialized. Do nothing.
+    const existingMeta = getGlobalStore
+      .getState()
+      .getShadowMetadata(thisKey, []);
+    if (existingMeta && existingMeta.stateSource) {
+      return; // Already initialized, bail out.
+    }
 
-      // Initialize shadow state with metadata
-      getGlobalStore
-        .getState()
-        .initializeShadowState(thisKey, options.defaultState);
+    const options = getInitialOptions(thisKey as string);
 
-      // Set shadow metadata with source info
+    if (options?.defaultState !== undefined || defaultState !== undefined) {
+      const finalDefaultState = options?.defaultState || defaultState;
+
+      // Only set defaultState if it's not already set
+      if (!options?.defaultState) {
+        setAndMergeOptions(thisKey as string, {
+          defaultState: finalDefaultState,
+        });
+      }
+
+      // Resolve initial state based on current options (which might include localStorage)
+      const { value: resolvedState, source, timestamp } = resolveInitialState();
+
+      // Initialize shadow state with the RESOLVED value, not the default.
+      getGlobalStore.getState().initializeShadowState(thisKey, resolvedState);
+
+      // Set shadow metadata with the correct source info
       getGlobalStore.getState().setShadowMetadata(thisKey, [], {
         stateSource: source,
         lastServerSync: source === 'server' ? timestamp : undefined,
         isDirty: false,
-        baseServerState: source === 'server' ? newState : undefined,
+        baseServerState: source === 'server' ? resolvedState : undefined,
       });
 
-      // Update global state
-      updateGlobalState(
-        thisKey,
-        options.defaultState, // Always use defaultState as the "initial"
-        newState, // This is what we actually use
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      );
-
-      // Save to localStorage if we used server data
-      if (
-        source === 'server' &&
-        currentOptions?.localStorage?.key &&
-        sessionId
-      ) {
-        saveToLocalStorage(
-          newState,
-          thisKey,
-          currentOptions,
-          sessionId,
-          timestamp
-        );
-      }
-
-      // Notify components
+      // Notify components of this initial setup
       notifyComponents(thisKey);
-
-      const reactiveTypes = Array.isArray(reactiveType)
-        ? reactiveType
-        : [reactiveType || 'component'];
-
-      if (!reactiveTypes.includes('none')) {
-        forceUpdate({});
-      }
     }
-  }, [
-    latestInitialOptionsRef.current?.defaultState, // Changed from initialState
-    serverState?.status,
-    serverState?.data,
-    serverState?.timestamp, // NEW
-    ...(dependencies || []),
-  ]);
+
+    // This effect should only run once on mount for a given component instance.
+    // The dependencies prop is for cases where the user *wants* to force a re-initialization.
+  }, [thisKey, ...(dependencies || [])]);
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
@@ -1099,14 +1089,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     };
   }, []);
-
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
     updateObj: { updateType: 'insert' | 'cut' | 'update' },
     validationKey?: string
   ) => {
-    const fullPath = [thisKey, ...path].join('.'); // This is the full path to the state slice
+    const fullPath = [thisKey, ...path].join('.');
     if (Array.isArray(path)) {
       const pathKey = `${thisKey}-${path.join('.')}`;
       componentUpdatesRef.current.add(pathKey);
@@ -1114,6 +1103,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const store = getGlobalStore.getState();
 
     setState(thisKey, (prevValue: TStateObject) => {
+      // FETCH ONCE at the beginning
       const shadowMeta = store.getShadowMetadata(thisKey, path);
       const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
 
@@ -1137,6 +1127,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         newValue: payload,
       } satisfies UpdateTypeDetail;
 
+      // Perform the update
       switch (updateObj.updateType) {
         case 'insert': {
           store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
@@ -1152,91 +1143,41 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
 
-      const updatedShadowMeta = store.getShadowMetadata(
-        thisKey,
-        updateObj.updateType === 'insert' ? path : path.slice(0, -1)
-      );
-      if (updatedShadowMeta && updatedShadowMeta.stateSource === 'server') {
-        store.setShadowMetadata(thisKey, [], {
-          ...updatedShadowMeta,
+      // Mark as dirty - reuse shadowMeta from above!
+      if (shadowMeta && shadowMeta.stateSource === 'server') {
+        store.setShadowMetadata(thisKey, path, {
+          ...shadowMeta,
           isDirty: true,
         });
       }
+
+      // Mark parent paths as dirty
+      let currentPath = [...path];
+      while (currentPath.length > 0) {
+        currentPath.pop();
+        const parentMeta = store.getShadowMetadata(thisKey, currentPath);
+        if (parentMeta && parentMeta.stateSource === 'server') {
+          store.setShadowMetadata(thisKey, currentPath, {
+            ...parentMeta,
+            isDirty: true,
+          });
+        }
+      }
+
+      // Get updated metadata ONCE after the update
+      const updatePath =
+        updateObj.updateType === 'insert' ? path : path.slice(0, -1);
+      const updatedShadowMeta = store.getShadowMetadata(thisKey, updatePath);
       const updatedShadowValue = store.getShadowValue(
-        [
-          thisKey,
-          ...(updateObj.updateType === 'insert' ? path : path.slice(0, -1)),
-        ].join('.')
+        [thisKey, ...updatePath].join('.')
       );
 
-      // Only proceed if the underlying array has actually changed.
-      if (updatedShadowMeta?.classSignals) {
-        // Use .map() to create a NEW array of signals. This is the immutable fix.
-        const newClassSignals = updatedShadowMeta.classSignals.map(
-          (signal: any) => {
-            let newClasses = '';
-            let oldClasses = signal.lastClasses;
+      // Handle class signals - use updatedShadowMeta
 
-            try {
-              // Re-run the derivation function with its specific dependencies
-              const effectFn = new Function(
-                'state',
-                'deps',
-                `return (${signal.effect})(state, deps)`
-              );
-
-              newClasses = effectFn(updatedShadowValue, signal.deps); //updatedShadowValue
-
-              // Only touch the DOM if the calculated classes have actually changed
-              // In effectiveSetState where you update classSignals
-              if (newClasses !== oldClasses) {
-                const elements = document.querySelectorAll(`.${signal.id}`);
-                elements.forEach((element: Element) => {
-                  // Remove old classes
-                  if (oldClasses) {
-                    const oldClassesArray = oldClasses
-                      .split(' ')
-                      .filter(Boolean);
-                    if (oldClassesArray.length > 0) {
-                      element.classList.remove(...oldClassesArray);
-                    }
-                  }
-
-                  // Force React to re-process this element
-                  const onClick = (element as any).onclick;
-                  if (onClick) {
-                    (element as any).onclick = null;
-                    queueMicrotask(() => {
-                      (element as any).onclick = onClick;
-                    });
-                  }
-
-                  // Add new classes
-                  const newClassesArray = newClasses.split(' ').filter(Boolean);
-                  if (newClassesArray.length > 0) {
-                    element.classList.add(...newClassesArray);
-                  }
-                });
-              }
-            } catch (e) {
-              console.error('Error in deriveClass update:', e);
-            }
-
-            // Return a new object for the new array, with the updated `lastClasses`
-            return { ...signal, lastClasses: newClasses };
-          }
-        );
-
-        // Persist the metadata with the NEW array. This guarantees the change is saved.
-        store.setShadowMetadata(thisKey, path, {
-          ...updatedShadowMeta,
-          classSignals: newClassSignals,
-        });
-      }
-      // Only process signals if they exist
+      // Handle signals - reuse shadowMeta from the beginning
       if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
-        // Get the updated value from shadow store
-        const updatedShadowValue = store.getShadowValue(fullPath);
+        // Use updatedShadowValue if we need the new value, otherwise use payload
+        const displayValue = updateObj.updateType === 'cut' ? null : payload;
 
         shadowMeta.signals.forEach(({ parentId, position, effect }) => {
           const parent = document.querySelector(
@@ -1245,28 +1186,29 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (parent) {
             const childNodes = Array.from(parent.childNodes);
             if (childNodes[position]) {
-              let displayValue = updatedShadowValue;
-              if (effect) {
+              let finalDisplayValue = displayValue;
+              if (effect && displayValue !== null) {
                 try {
-                  displayValue = new Function(
+                  finalDisplayValue = new Function(
                     'state',
                     `return (${effect})(state)`
-                  )(updatedShadowValue);
+                  )(displayValue);
                 } catch (err) {
                   console.error('Error evaluating effect function:', err);
-                  displayValue = updatedShadowValue;
                 }
               }
 
               if (
-                displayValue !== null &&
-                displayValue !== undefined &&
-                typeof displayValue === 'object'
+                finalDisplayValue !== null &&
+                finalDisplayValue !== undefined &&
+                typeof finalDisplayValue === 'object'
               ) {
-                displayValue = JSON.stringify(displayValue);
+                finalDisplayValue = JSON.stringify(finalDisplayValue) as any;
               }
 
-              childNodes[position].textContent = String(displayValue ?? '');
+              childNodes[position].textContent = String(
+                finalDisplayValue ?? ''
+              );
             }
           }
         });
@@ -1275,9 +1217,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
       // Update in effectiveSetState for insert handling:
       if (updateObj.updateType === 'insert') {
         getGlobalStore.getState().notifyPathSubscribers(fullPath, payload);
-        const arrayMeta = store.getShadowMetadata(thisKey, path);
 
-        if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
+        // Use shadowMeta from beginning if it's an array
+        if (shadowMeta?.mapWrappers && shadowMeta.mapWrappers.length > 0) {
+          // Get fresh array keys after insert
           const sourceArrayKeys =
             store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
           const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
@@ -1288,7 +1231,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
           if (!newItemKey || newItemValue === undefined) return;
 
-          arrayMeta.mapWrappers.forEach((wrapper) => {
+          shadowMeta.mapWrappers.forEach((wrapper) => {
             let shouldRender = true;
             let insertPosition = -1;
 
@@ -1389,16 +1332,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       }
       if (updateObj.updateType === 'cut') {
-        // For cut, path includes the item ID like ['todoArray', 'id:xxx']
-        const arrayPath = path.slice(0, -1); // Remove the item ID
-
+        const arrayPath = path.slice(0, -1);
         const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
 
         if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
           arrayMeta.mapWrappers.forEach((wrapper) => {
             if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-              // Find and remove the element
-
               const elementToRemove = wrapper.containerRef.querySelector(
                 `[data-item-path="${fullPath}"]`
               );
@@ -1409,7 +1348,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
           });
         }
       }
-
       if (
         updateObj.updateType === 'update' &&
         (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
@@ -1463,14 +1401,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
       const notifiedComponents = new Set<string>();
 
       if (!rootMeta?.components) {
-        return; // No components to notify, exit early.
+        return newState;
       }
 
-      // --- PASS 1: High-Performance Path-Specific Updates ---
-      // This is the fastest check and handles the most common case. We do it first.
-      const pathMeta = store.getShadowMetadata(thisKey, path);
-      if (pathMeta?.pathComponents) {
-        pathMeta.pathComponents.forEach((componentId) => {
+      // REUSE shadowMeta from beginning instead of fetching again!
+      if (shadowMeta?.pathComponents) {
+        shadowMeta.pathComponents.forEach((componentId) => {
           const component = rootMeta.components?.get(componentId);
           if (component) {
             const reactiveTypes = Array.isArray(component.reactiveType)
@@ -2096,16 +2032,37 @@ function createProxyHandler<T>(
                 overscan = 6,
                 stickToBottom = false,
               } = options;
+
               const initialScrollRef = useRef(true);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
+              const [rerender, forceUpdate] = useState({});
               // Inside useVirtualView, near the top
               const measurementCache = useRef(
                 new Map<string, { height: number; offset: number }>()
               );
+              console.log('range', range);
+
+              useEffect(() => {
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToPath(stateKey, (event) => {
+                    if (event?.type === 'SERVER_STATE_UPDATE') {
+                      const serverStateData = event.serverState;
+                      if (
+                        serverStateData?.status === 'success' &&
+                        serverStateData?.data
+                      ) {
+                        forceUpdate({});
+                      }
+                    }
+                  });
+
+                return unsubscribe;
+              }, []);
 
               const mutationObserverRef = useRef<MutationObserver | null>(null);
               // Calculate total height based on actual array length
@@ -2273,7 +2230,7 @@ function createProxyHandler<T>(
                   mutationObserverRef.current?.disconnect();
                   container.removeEventListener('load', handleImageLoad, true);
                 };
-              }, [stickToBottom]);
+              }, [stickToBottom, rerender]);
 
               // Create virtual state
               const virtualState = useMemo(() => {
@@ -3027,53 +2984,6 @@ function createProxyHandler<T>(
         }
         // in CogsState.ts -> createProxyHandler -> handler -> get
 
-        if (prop === '$deriveClass') {
-          // The function signature is correct: it accepts the function and its deps
-          return (fn: (state: T, deps: any[]) => string, deps: any[] = []) => {
-            const uniqueId = `cogs-cls-${uuidv4()}`;
-            const store = getGlobalStore.getState();
-            const stateKeyPathKey = [stateKey, ...path].join('.');
-            const currentValue = store.getShadowValue(
-              stateKeyPathKey,
-              meta?.validIds
-            );
-            console.log('dsazdasdasdasdasd', currentValue);
-            let initialClasses = '';
-            try {
-              // THIS IS THE CRITICAL FIX:
-              // We must construct and execute the function with its dependencies, even on the first run.
-              const initialExecFn = new Function(
-                'state',
-                'deps',
-                `return (${fn.toString()})(state, deps)`
-              );
-              initialClasses = initialExecFn(currentValue, deps); // Pass deps here
-            } catch (e) {
-              console.error('Error in initial deriveClass execution:', e);
-            }
-
-            // The rest of the logic remains the same. We store the stringified
-            // function and the deps array for later updates.
-            const currentMeta = store.getShadowMetadata(stateKey, path) || {};
-            const classSignals = currentMeta.classSignals || [];
-            classSignals.push({
-              id: uniqueId,
-              effect: fn.toString(), // Store the original stringified function
-              lastClasses: initialClasses,
-              deps: deps, // Store the dependencies
-            });
-
-            store.setShadowMetadata(stateKey, path, {
-              ...currentMeta,
-              classSignals,
-            });
-            console.log(
-              '`${uniqueId} ${initialClasses}`.trim()',
-              `${uniqueId} ${initialClasses}`.trim()
-            );
-            return `${uniqueId} ${initialClasses}`.trim();
-          };
-        }
         if (prop === '$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
@@ -3177,14 +3087,7 @@ function createProxyHandler<T>(
                 .getState()
                 .getShadowValue(stateKeyPathKey, meta?.validIds);
               const newState = applyPatch(currentState, patches).newDocument;
-              updateGlobalState(
-                stateKey,
-                getGlobalStore.getState().initialStateGlobal[stateKey],
-                newState,
-                effectiveSetState,
-                componentId,
-                sessionId
-              );
+
               notifyComponents(stateKey);
             };
           }

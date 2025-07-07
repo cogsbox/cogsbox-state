@@ -9,7 +9,7 @@ import { faker } from '@faker-js/faker';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
 
-// --- Data Generation & State Definition (No Changes Here) ---
+// --- Data Generation & State Definition ---
 
 type Message = {
   id: number;
@@ -28,35 +28,85 @@ const generateMessages = (count: number): Message[] => {
       author: faker.helpers.arrayElement(authors),
       text: faker.lorem.sentence({ min: 3, max: 25 }),
       photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
-
       timestamp: Date.now() - (count - i) * 60000,
     });
   }
   return messages;
 };
 
-const allState = {
-  messages: generateMessages(100),
+// Simulate server fetch
+const fetchMessagesFromServer = async (): Promise<{
+  data: Message[];
+  timestamp: number;
+}> => {
+  // Simulate network delay
+  await new Promise((resolve) => setTimeout(resolve, 1500));
+
+  // Generate the data "server-side"
+  return {
+    data: generateMessages(100),
+    timestamp: Date.now(),
+  };
+};
+
+// Default state - empty or minimal data for instant render
+const defaultState = {
+  messages: [] as Message[], // Start with empty array
 };
 
 export type ChatState = {
   messages: Message[];
 };
 
-export const { useCogsState } = createCogsState<ChatState>(allState, {
+export const { useCogsState } = createCogsState<ChatState>(defaultState, {
   validation: { key: 'chatApp' },
 });
 
-// --- Main Application Component (No Changes Here) ---
+// --- Main Application Component ---
 
 export default function VirtualizedChatExample() {
-  const messages = useCogsState('messages', { reactiveType: 'none' });
-  const { ref, inView, entry } = useInView();
+  const [serverData, setServerData] = useState<{
+    status: 'loading' | 'success' | 'error';
+    data?: Message[];
+    timestamp?: number;
+  }>({ status: 'loading' });
+
+  // Fetch data on mount
   useEffect(() => {
-    if (!inView) return;
+    fetchMessagesFromServer()
+      .then(({ data, timestamp }) => {
+        setServerData({
+          status: 'success',
+          data,
+          timestamp,
+        });
+      })
+      .catch(() => {
+        setServerData({ status: 'error' });
+      });
+  }, []);
+
+  const messages = useCogsState('messages', {
+    reactiveType: 'none',
+    defaultState: defaultState.messages,
+    serverState: serverData,
+    localStorage: {
+      key: 'chat-messages',
+      onChange: (state) => console.log('Messages saved to localStorage'),
+    },
+  });
+
+  const { ref, inView } = useInView();
+
+  useEffect(() => {
+    if (!inView || serverData.status !== 'success') return;
+
     const interval = setInterval(() => {
       const allMessages = messages.get();
-      const newId = Math.max(...allMessages.map((m) => m.id)) + 1;
+      const newId =
+        allMessages.length > 0
+          ? Math.max(...allMessages.map((m) => m.id)) + 1
+          : 1;
 
       messages.insert({
         id: newId,
@@ -65,10 +115,13 @@ export default function VirtualizedChatExample() {
         timestamp: Date.now(),
         photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
       });
-    }, 2000 + Math.random() * 2.5); // Send a new message every 3 seconds
+    }, 2000 + Math.random() * 2500);
 
     return () => clearInterval(interval);
-  }, [inView]);
+  }, [inView, serverData.status]);
+
+  const status = messages.getStatus();
+
   return (
     <div className="flex gap-4 text-green-400 h-screen p-4">
       <div className="w-3/5 flex flex-col gap-3">
@@ -79,42 +132,88 @@ export default function VirtualizedChatExample() {
             </h1>
             <p className="text-sm text-gray-400 max-w-2xl">
               Correctly rendering thousands of items with a smooth, scrolling
-              layout.
+              layout. Status: <span className="text-green-400">{status}</span>
             </p>
           </div>
         </DotPattern>
         <div ref={ref}>
-          <div className="flex flex-col  max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
-            <ChatWindow />
-            <MessageInput />
-          </div>{' '}
+          <div className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
+            {serverData.status === 'loading' ? (
+              <LoadingState />
+            ) : serverData.status === 'error' ? (
+              <ErrorState />
+            ) : (
+              <>
+                <ChatWindow />
+                <MessageInput />
+              </>
+            )}
+          </div>
         </div>
       </div>
 
       <div className="w-2/5">
-        <ShowState layout="vertical" />
+        <ShowState layout="vertical" serverStatus={serverData.status} />
       </div>
     </div>
   );
 }
 
-// --- Child Components ---
+// --- Loading and Error States ---
+
+function LoadingState() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto mb-4"></div>
+        <p className="text-gray-400">Loading messages from server...</p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorState() {
+  return (
+    <div className="flex-1 flex items-center justify-center">
+      <div className="text-center">
+        <p className="text-red-400 mb-2">Failed to load messages</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
+        >
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// --- Chat Window with Loading State ---
 
 function ChatWindow() {
   const messages = useCogsState('messages', { reactiveType: 'none' });
+  const messageCount = messages.get().length;
 
   const { virtualState, virtualizerProps } = messages.useVirtualView({
-    itemHeight: 65, // Adjusted estimated height for better spacing
+    itemHeight: 65,
     overscan: 10,
     stickToBottom: true,
   });
-  console.log('relaoding');
+  console.log('virtualState', messages._componentId, virtualState.get());
+  if (messageCount === 0) {
+    return (
+      <div className="flex-1 flex items-center justify-center text-gray-500">
+        <p>No messages yet. Start a conversation!</p>
+      </div>
+    );
+  }
+
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
       <div style={virtualizerProps.inner.style}>
         <div
           style={virtualizerProps.list.style}
-          className="px-4  space-y-4 pb-8"
+          className="px-4 space-y-4 pb-8"
         >
           {virtualState.stateList((setter, index, array) => {
             return (
@@ -130,15 +229,14 @@ function ChatWindow() {
   );
 }
 
+// MessageItem component remains the same...
 function MessageItem({ message }: { message: Message }) {
   const isFromYou = message.author === 'You';
-  // 1. Use state to track visibility
   const [isVisible, setIsVisible] = useState(false);
 
   const containerClasses = `w-full flex items-end gap-2 ${
     isFromYou ? 'justify-end' : 'justify-start'
-  } transition-opacity duration-100  ${
-    // 2. Apply class based on state
+  } transition-opacity duration-100 ${
     isVisible ? 'opacity-100' : 'opacity-20'
   }`;
 
@@ -147,10 +245,10 @@ function MessageItem({ message }: { message: Message }) {
   }`;
 
   useEffect(() => {
-    // We still need a tiny delay to give the browser time to paint the opacity-0 state first.
     const timeoutId = setTimeout(() => setIsVisible(true), 10);
     return () => clearTimeout(timeoutId);
   }, []);
+
   return (
     <div className={containerClasses}>
       {!isFromYou && (
@@ -160,11 +258,10 @@ function MessageItem({ message }: { message: Message }) {
       )}
       <div className={bubbleClasses}>
         {!isFromYou && (
-          <p className="font-bold text-green-400 text-xs ">{message.author}</p>
+          <p className="font-bold text-green-400 text-xs">{message.author}</p>
         )}
         <div className="flex items-center gap-2">
           <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
-
           <p
             className={`text-xs ${
               isFromYou ? 'text-green-200/60' : 'text-gray-400'
@@ -179,16 +276,15 @@ function MessageItem({ message }: { message: Message }) {
         {message.photo && (
           <img
             src={message.photo}
-            className="w-full  rounded-lg max-h-[300px] object-cover"
+            className="w-full rounded-lg max-h-[300px] object-cover"
           />
         )}
       </div>
     </div>
   );
 }
-// MessageInput and ShowState components remain the same as the previous correct version.
-// No changes needed for them.
 
+// MessageInput remains the same...
 function MessageInput() {
   const [text, setText] = useState('');
   const messages = useCogsState('messages', { reactiveType: 'none' });
@@ -240,12 +336,16 @@ function MessageInput() {
   );
 }
 
+// Updated ShowState to show server status
 function ShowState({
   layout = 'horizontal',
+  serverStatus,
 }: {
   layout?: 'horizontal' | 'vertical';
+  serverStatus: string;
 }) {
   const messages = useCogsState('messages');
+  const status = messages.getStatus();
 
   const containerClasses =
     layout === 'vertical'
@@ -257,7 +357,7 @@ function ShowState({
       <div className={containerClasses}>
         <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
           <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
-            Code Snippet
+            State Management Info
           </h3>
           <div className="flex-grow overflow-auto">
             <SyntaxHighlighter
@@ -265,24 +365,35 @@ function ShowState({
               style={atomOneDark}
               customStyle={{ backgroundColor: 'transparent', fontSize: '12px' }}
             >
-              {`// THE FIX: A wrapper div that handles the flexbox layout
-<div className="flex-1 min-h-0">
-  {/* The virtualizer now correctly fills its parent */}
-  <div {...virtualizerProps.outer}>
-    <div {...virtualizerProps.inner}>
-      <div {...virtualizerProps.list} className="p-4 space-y-3">
-        {/* ... items ... */}
-      </div>
-    </div>
-  </div>
-</div>`}
+              {`// Server State Pattern
+const messages = useCogsState('messages', { 
+  defaultState: [], // Empty initial state
+  serverState: {
+    status: '${serverStatus}',
+    data: [...], // 500 messages from server
+    timestamp: ${Date.now()}
+  },
+  localStorage: {
+    key: 'chat-messages'
+  }
+});
+
+// Current Status: ${status}
+// Message Count: ${messages.get().length}
+// Source: ${
+                status === 'synced'
+                  ? 'Server'
+                  : status === 'dirty'
+                  ? 'Modified locally'
+                  : 'Default'
+              }`}
             </SyntaxHighlighter>
           </div>
         </div>
 
         <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
           <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
-            Live Global State (Truncated)
+            Live Global State (Last 5 messages)
           </h3>
           <pre className="text-xs overflow-auto">
             {`// Showing last 5 of ${messages.get().length} total messages\n\n`}

@@ -75,7 +75,7 @@ function CounterExample() {
 
         <div className="grid gap-6">
           {/* .get() example */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.update()</div>
               <button
@@ -95,7 +95,7 @@ function CounterExample() {
               <CodeSnippetDisplay code={`state.simpleCounter.get();`} />
             </div>
           </div>
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               <button
@@ -113,10 +113,10 @@ function CounterExample() {
               <CodeSnippetDisplay code={`state.isBooleanValue.get();`} />
             </div>
           </div>{' '}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             Below are the signal versions
           </div>
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.update()</div>
               <button
@@ -136,7 +136,7 @@ function CounterExample() {
               <CodeSnippetDisplay code={`state.simpleCounter2.$get();`} />
             </div>
           </div>
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               <button
@@ -166,7 +166,7 @@ function CounterExample() {
               isolates the form element and allows in place updates.
             </p>
           </div>
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               {state.isBooleanValue2.formElement((obj) => (
@@ -564,7 +564,7 @@ function ArrayManipulationExample() {
         </div>
 
         {/* Condensed Todo List Display */}
-        <div className="bg-black/20 rounded-lg p-4 mb-6">
+        <div className="bg-black/20 rounded-lg p-2 px-4 mb-6">
           <div className="text-sm text-gray-400 mb-2">
             Current Todos ({todos.get().length} items):
           </div>
@@ -612,7 +612,7 @@ function ArrayManipulationExample() {
         {/* Button Action Rows */}
         <div className="grid gap-6">
           {/* Insert Operations */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
               <button
                 onClick={() => {
@@ -642,7 +642,7 @@ function ArrayManipulationExample() {
           </div>
 
           {/* Cut First */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
               <button
                 onClick={() => todos.cut(0)}
@@ -663,7 +663,7 @@ function ArrayManipulationExample() {
           </div>
 
           {/* Cut Selected */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
               <button
                 onClick={() => todos.cutSelected()}
@@ -684,7 +684,7 @@ function ArrayManipulationExample() {
           </div>
 
           {/* Toggle Selection */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
               <button
                 onClick={() => {
@@ -711,7 +711,7 @@ function ArrayManipulationExample() {
           </div>
 
           {/* Clear Selection */}
-          <div className="bg-black/20 rounded-lg p-4">
+          <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
               <button
                 onClick={() => todos.clearSelected()}

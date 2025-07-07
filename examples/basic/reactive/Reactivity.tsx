@@ -35,12 +35,14 @@ export default function ReactivityPage() {
                 Reactivity Types
               </h1>
               <p className="text-sm text-gray-200 max-w-2xl">
-                Cogs offers several strategies to control when components
-                re-render. Select a tab to see how each strategy works. Click
-                the "Toggle" buttons and watch which components flash,
-                indicating a re-render. Notice how the isolated component uses a
-                separate useCogsState instance, minimizing unnecessary
-                re-renders.
+                cogsbox-state promotes managing large UI data through a single,
+                monolithic state object. To avoid unnecessary re-renders from
+                this approach, it provides several strategies for fine-grained
+                control over component updates. Select a tab to explore each
+                strategy in action. Click the "Toggle" buttons to see which
+                components flash, indicating a re-render. Notice how the
+                isolated component uses a separate useCogsState instance to stay
+                unaffected by unrelated state changes.
               </p>
               {/* Tab Navigation */}
               <div className="flex border-b border-gray-700 bg-gray-900/90 rounded-px-2 py-1">
