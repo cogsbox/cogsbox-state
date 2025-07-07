@@ -377,6 +377,7 @@ export type OptionsType<T extends unknown = unknown> = {
     id?: string | number;
     data?: T;
     status?: 'pending' | 'error' | 'success';
+    timestamp?: number;
   };
   sync?: {
     action: (state: T) => Promise<{
@@ -410,7 +411,7 @@ export type OptionsType<T extends unknown = unknown> = {
   reactiveType?: ReactivityType;
   syncUpdate?: Partial<UpdateTypeDetail>;
 
-  initialState?: T;
+  defaultState?: T;
   dependencies?: any[];
 };
 export type ServerSyncType<T> = {
@@ -533,7 +534,7 @@ function setOptions<StateKey, Opt>({
           mergedOptions[key] = options[key];
         }
         if (
-          key == 'initialState' &&
+          key == 'defaultState' &&
           options[key] &&
           mergedOptions[key] !== options[key] && // Different references
           !isDeepEqual(mergedOptions[key], options[key]) // And different values
@@ -652,7 +653,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
         reactiveType: options?.reactiveType,
         reactiveDeps: options?.reactiveDeps,
-        initialState: options?.initialState as any,
+        defaultState: options?.defaultState as any,
         dependencies: options?.dependencies,
         serverState: options?.serverState,
       }
@@ -719,11 +720,14 @@ const saveToLocalStorage = <T,>(
     } catch {
       // Ignore errors, will use undefined
     }
+    const shadowMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
 
     const data: LocalStorageData<T> = {
       state,
       lastUpdated: Date.now(),
       lastSyncedWithServer: lastSyncedWithServer ?? existingLastSynced,
+      stateSource: shadowMeta?.stateSource,
+      baseServerState: shadowMeta?.baseServerState,
     };
 
     // Use SuperJSON serialize to get the json part only
@@ -780,7 +784,8 @@ type LocalStorageData<T> = {
   state: T;
   lastUpdated: number;
   lastSyncedWithServer?: number;
-  baseServerState?: T; // Add this to track what server state our changes are based on
+  baseServerState?: T; // Keep reference to what server state this is based on
+  stateSource?: 'default' | 'server' | 'localStorage'; // Track origin
 };
 
 const updateGlobalState = (
@@ -865,14 +870,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
     reactiveDeps,
     reactiveType,
     componentId,
-    initialState,
+    defaultState,
     syncUpdate,
     dependencies,
     serverState,
   }: {
     stateKey?: string;
     componentId?: string;
-    initialState?: TStateObject;
+    defaultState?: TStateObject;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -905,74 +910,108 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
   }, [syncUpdate]);
+
   useEffect(() => {
-    // Only proceed if initialState is provided
-    if (initialState) {
+    const options = latestInitialOptionsRef.current;
+    // Only proceed if defaultState is provided
+    if (options?.defaultState !== undefined) {
       setAndMergeOptions(thisKey as string, {
-        initialState,
+        defaultState: options.defaultState,
       });
 
-      const options = latestInitialOptionsRef.current;
-      const hasServerId = options?.serverState?.id !== undefined;
-      const hasServerData =
-        hasServerId &&
-        options?.serverState?.status === 'success' &&
-        options?.serverState?.data;
+      const currentOptions = latestInitialOptionsRef.current;
 
-      const currentGloballyStoredInitialState =
-        getGlobalStore.getState().initialStateGlobal[thisKey];
+      // Resolve the initial state based on priority
+      const resolveInitialState = (): {
+        value: TStateObject;
+        source: 'default' | 'server' | 'localStorage';
+        timestamp: number;
+      } => {
+        // 1. Check server state
+        const hasValidServerData =
+          currentOptions?.serverState?.status === 'success' &&
+          currentOptions?.serverState?.data !== undefined;
 
-      const initialStateChanged =
-        (currentGloballyStoredInitialState &&
-          !isDeepEqual(currentGloballyStoredInitialState, initialState)) ||
-        !currentGloballyStoredInitialState;
-
-      if (!initialStateChanged && !hasServerData) {
-        return;
-      }
-
-      let localData = null;
-      const localkey = isFunction(options?.localStorage?.key)
-        ? options?.localStorage?.key(initialState)
-        : options?.localStorage?.key;
-
-      if (localkey && sessionId) {
-        localData = loadFromLocalStorage(`${sessionId}-${thisKey}-${localkey}`);
-      }
-
-      let newState = initialState;
-      let isFromServer = false;
-
-      const serverTimestamp = hasServerData ? Date.now() : 0;
-      const localTimestamp = localData?.lastUpdated || 0;
-      const lastSyncTimestamp = localData?.lastSyncedWithServer || 0;
-
-      if (hasServerData && serverTimestamp > localTimestamp) {
-        newState = options.serverState!.data!;
-        isFromServer = true;
-      } else if (localData && localTimestamp > lastSyncTimestamp) {
-        newState = localData.state;
-        if (options?.localStorage?.onChange) {
-          options?.localStorage?.onChange(newState);
+        if (hasValidServerData) {
+          return {
+            value: currentOptions.serverState!.data!,
+            source: 'server',
+            timestamp: currentOptions.serverState!.timestamp || Date.now(),
+          };
         }
-      }
-      getGlobalStore.getState().initializeShadowState(thisKey, initialState);
-      // Update the global state
+
+        // 2. Check localStorage
+        if (currentOptions?.localStorage?.key && sessionId) {
+          const localKey = isFunction(currentOptions.localStorage.key)
+            ? currentOptions.localStorage.key(options.defaultState)
+            : currentOptions.localStorage.key;
+
+          const localData = loadFromLocalStorage(
+            `${sessionId}-${thisKey}-${localKey}`
+          );
+
+          if (
+            localData &&
+            localData.lastUpdated >
+              (currentOptions?.serverState?.timestamp || 0)
+          ) {
+            return {
+              value: localData.state,
+              source: 'localStorage',
+              timestamp: localData.lastUpdated,
+            };
+          }
+        }
+
+        // 3. Use default state
+        return {
+          value: options.defaultState as TStateObject,
+          source: 'default',
+          timestamp: Date.now(),
+        };
+      };
+
+      const { value: newState, source, timestamp } = resolveInitialState();
+
+      // Initialize shadow state with metadata
+      getGlobalStore
+        .getState()
+        .initializeShadowState(thisKey, options.defaultState);
+
+      // Set shadow metadata with source info
+      getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+        stateSource: source,
+        lastServerSync: source === 'server' ? timestamp : undefined,
+        isDirty: false,
+        baseServerState: source === 'server' ? newState : undefined,
+      });
+
+      // Update global state
       updateGlobalState(
         thisKey,
-        initialState,
-        newState,
+        options.defaultState, // Always use defaultState as the "initial"
+        newState, // This is what we actually use
         effectiveSetState,
         componentIdRef.current,
         sessionId
       );
 
       // Save to localStorage if we used server data
-      if (isFromServer && localkey && sessionId) {
-        saveToLocalStorage(newState, thisKey, options, sessionId, Date.now());
+      if (
+        source === 'server' &&
+        currentOptions?.localStorage?.key &&
+        sessionId
+      ) {
+        saveToLocalStorage(
+          newState,
+          thisKey,
+          currentOptions,
+          sessionId,
+          timestamp
+        );
       }
 
-      // Notify components of the change
+      // Notify components
       notifyComponents(thisKey);
 
       const reactiveTypes = Array.isArray(reactiveType)
@@ -984,9 +1023,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
   }, [
-    initialState,
+    latestInitialOptionsRef.current?.defaultState, // Changed from initialState
     serverState?.status,
     serverState?.data,
+    serverState?.timestamp, // NEW
     ...(dependencies || []),
   ]);
   useLayoutEffect(() => {
@@ -994,7 +1034,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       setAndMergeOptions(thisKey as string, {
         serverSync,
         formElements,
-        initialState,
+        defaultState,
         localStorage,
         middleware: latestInitialOptionsRef.current?.middleware,
       });
@@ -1111,10 +1151,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
           break;
         }
       }
+
       const updatedShadowMeta = store.getShadowMetadata(
         thisKey,
         updateObj.updateType === 'insert' ? path : path.slice(0, -1)
       );
+      if (updatedShadowMeta && updatedShadowMeta.stateSource === 'server') {
+        store.setShadowMetadata(thisKey, [], {
+          ...updatedShadowMeta,
+          isDirty: true,
+        });
+      }
       const updatedShadowValue = store.getShadowValue(
         [
           thisKey,
@@ -1856,11 +1903,27 @@ function createProxyHandler<T>(
         // ^--------- END OF FIX ---------^
 
         if (prop === 'getDifferences') {
-          return () =>
-            getDifferences(
-              getGlobalStore.getState().cogsStateStore[stateKey],
-              getGlobalStore.getState().initialStateGlobal[stateKey]
-            );
+          return () => {
+            const shadowMeta = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, []);
+            const currentState =
+              getGlobalStore.getState().cogsStateStore[stateKey];
+
+            // Use the appropriate base state for comparison
+            let baseState;
+            if (
+              shadowMeta?.stateSource === 'server' &&
+              shadowMeta.baseServerState
+            ) {
+              baseState = shadowMeta.baseServerState;
+            } else {
+              baseState =
+                getGlobalStore.getState().initialStateGlobal[stateKey];
+            }
+
+            return getDifferences(currentState, baseState);
+          };
         }
         if (prop === 'sync' && path.length === 0) {
           return async function () {
@@ -1897,9 +1960,23 @@ function createProxyHandler<T>(
                 notifyComponents(stateKey);
               }
 
-              if (response?.success && sync.onSuccess)
-                sync.onSuccess(response.data);
-              else if (!response?.success && sync.onError)
+              if (response?.success) {
+                // Mark as synced and not dirty
+                const shadowMeta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, []);
+                getGlobalStore.getState().setShadowMetadata(stateKey, [], {
+                  ...shadowMeta,
+                  isDirty: false,
+                  lastServerSync: Date.now(),
+                  stateSource: 'server',
+                  baseServerState: state, // Update base server state
+                });
+
+                if (sync.onSuccess) {
+                  sync.onSuccess(response.data);
+                }
+              } else if (!response?.success && sync.onError)
                 sync.onError(response.error);
 
               return response;
@@ -1909,38 +1986,25 @@ function createProxyHandler<T>(
             }
           };
         }
-        if (prop === '_status') {
-          const thisReactiveState = getGlobalStore
-            .getState()
-            .getNestedState(stateKey, path);
-          const initialState =
-            getGlobalStore.getState().initialStateGlobal[stateKey];
-          const initialStateAtPath = getNestedValue(
-            initialState,
-            path,
-            stateKey!
-          );
-          return isDeepEqual(thisReactiveState, initialStateAtPath)
-            ? 'fresh'
-            : 'stale';
-        }
-        if (prop === 'getStatus') {
-          return function () {
-            const thisReactiveState = getGlobalStore().getNestedState(
-              stateKey,
-              path
-            );
-            const initialState =
-              getGlobalStore.getState().initialStateGlobal[stateKey];
-            const initialStateAtPath = getNestedValue(
-              initialState,
-              path,
-              stateKey!
-            );
-            return isDeepEqual(thisReactiveState, initialStateAtPath)
-              ? 'fresh'
-              : 'stale';
+        if (prop === '_status' || prop === 'getStatus') {
+          const getStatusFunc = () => {
+            const shadowMeta = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, []);
+
+            if (shadowMeta?.stateSource === 'server' && !shadowMeta.isDirty) {
+              return 'synced';
+            } else if (shadowMeta?.isDirty) {
+              return 'dirty';
+            } else if (shadowMeta?.stateSource === 'localStorage') {
+              return 'restored';
+            } else if (shadowMeta?.stateSource === 'default') {
+              return 'fresh';
+            }
+            return 'unknown';
           };
+
+          return prop === '_status' ? getStatusFunc() : getStatusFunc;
         }
         if (prop === 'removeStorage') {
           return () => {
@@ -3264,6 +3328,18 @@ function createProxyHandler<T>(
         removeValidationError(obj.validationKey);
       }
 
+      const shadowMeta = getGlobalStore
+        .getState()
+        .getShadowMetadata(stateKey, []);
+      let revertState;
+
+      if (shadowMeta?.stateSource === 'server' && shadowMeta.baseServerState) {
+        // Revert to last known server state
+        revertState = shadowMeta.baseServerState;
+      } else {
+        // Revert to initial/default state
+        revertState = getGlobalStore.getState().initialStateGlobal[stateKey];
+      }
       const initialState =
         getGlobalStore.getState().initialStateGlobal[stateKey];
 

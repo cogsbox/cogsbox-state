@@ -361,7 +361,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         />
         <img src="./cat.png" alt="Hero background" className="h-[400px]" />
       </div> */}
-
+      {/* 
       <div
         className="fixed w-[50vw] left-0 h-[50%] bottom-0 saturate-50 contrast-150"
         style={{ zIndex: Z_INDICES.GROUND }}
@@ -373,8 +373,15 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         style={{ zIndex: Z_INDICES.GROUND }}
       >
         <img src="./backgroundSand.png" alt="" className="h-[100%]" />
+      </div> */}
+      <div
+        className="fixed w-[100%] left-0 h-[50%] bottom-0 saturate-50  contrast-150"
+        style={{ zIndex: Z_INDICES.GROUND }}
+      >
+        {' '}
+        <div className="absolute w-full h-[50%]  top-0 bg-gradient-to-b from-black to-black-0 "></div>
+        <img src="./groundTexture.png" alt="" className="h-[100%] w-full" />
       </div>
-
       <div
         style={{
           position: 'fixed',
@@ -509,7 +516,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}
       />
 
-      {/* <div
+      <div
         ref={rainContainerRef}
         aria-hidden="true"
         className="pixel-rain-container"
@@ -557,7 +564,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             }
           />
         ))}
-      </div> */}
+      </div>
     </div>
   );
 }

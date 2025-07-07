@@ -63,6 +63,7 @@ function App() {
         ) : activeSection === 'array' ? (
           <ArrayMethodsPage />
         ) : null}
+        <div className="h-40" />
       </div>
     </div>
   );

@@ -92,8 +92,14 @@ export type ComponentsType = {
 };
 export type ShadowMetadata = {
   id?: string;
+
+  stateSource?: 'default' | 'server' | 'localStorage';
+  lastServerSync?: number;
+  isDirty?: boolean;
+  baseServerState?: any;
+
   arrayKeys?: string[];
-  objectKeys?: string[];
+
   fields?: Record<string, any>;
   virtualizer?: {
     itemHeight?: number;
