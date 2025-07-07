@@ -77,7 +77,7 @@ function CounterExample() {
           {/* .get() example */}
           <div className="bg-black/20 rounded-lg p-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
-              <div className="text-lg font-bold">.update(fn(value)| value)</div>
+              <div className="text-lg font-bold">.update()</div>
               <button
                 onClick={() => {
                   state.simpleCounter.update((p) => p + 1);
@@ -118,7 +118,7 @@ function CounterExample() {
           </div>
           <div className="bg-black/20 rounded-lg p-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
-              <div className="text-lg font-bold">.update(fn(value)| value)</div>
+              <div className="text-lg font-bold">.update()</div>
               <button
                 onClick={() => {
                   state.simpleCounter2.update((p) => p + 1);
@@ -155,13 +155,14 @@ function CounterExample() {
           <div className=" p-4">
             <p>
               {' '}
-              You may notice in the signal based toggle example, the button
-              itself is not changing color. That is because the signal can only
-              exist in a dom node, if we alter the classes (which is possible)
-              then react can lose track of the element and the event handlers.
+              You may notice in the signal based toggle example above, the
+              button itself is not changing color. That is because the signal
+              can only exist in a dom node, if we alter the classes (which is
+              possible) then react can lose track of the element and the event
+              handlers.
             </p>
             <p>
-              The toggle example below is the "formElement" way to do it which
+              The toggle example below is the "formElement" way to do it, which
               isolates the form element and allows in place updates.
             </p>
           </div>
@@ -189,9 +190,6 @@ function CounterExample() {
               </span>
               <CodeSnippetDisplay code={`state.isBooleanValue2.$get();`} />
             </div>
-          </div>
-          <div className=" p-4">
-            <p>More form element examples are below.</p>
           </div>
         </div>
       </div>
@@ -278,7 +276,7 @@ state.newsletter.formElement(({state}) => (
                   />{' '}
                 </FlashWrapper>
               ))}
-              First Name (copy)
+              First Name (copy to show binding)
               {state.firstName.formElement((obj) => (
                 <FlashWrapper>
                   {' '}

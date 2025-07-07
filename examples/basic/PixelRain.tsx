@@ -326,7 +326,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
 
       <div
         ref={cybermanRef}
-        className="fixed bottom-[10vh] left-[10vh] h-[500px]"
+        className="fixed bottom-[5vh] left-[5vh] h-[500px]"
         style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
         <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{' '}
@@ -348,7 +348,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       </div>
 
       {/* Cat */}
-      <div
+      {/* <div
         className="fixed bottom-[2vh] left-[50vw] h-[25vh]"
         style={{ zIndex: Z_INDICES.CAT }}
       >
@@ -360,7 +360,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
           }}
         />
         <img src="./cat.png" alt="Hero background" className="h-[400px]" />
-      </div>
+      </div> */}
 
       <div
         className="fixed w-[50vw] left-0 h-[50%] bottom-0 saturate-50 contrast-150"
@@ -509,7 +509,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}
       />
 
-      <div
+      {/* <div
         ref={rainContainerRef}
         aria-hidden="true"
         className="pixel-rain-container"
@@ -557,7 +557,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
             }
           />
         ))}
-      </div>
+      </div> */}
     </div>
   );
 }

@@ -3901,7 +3901,7 @@ function FormElementWrapper({
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
-        //   forceUpdate({});
+        forceUpdate({});
       });
     return () => {
       unsubscribe();

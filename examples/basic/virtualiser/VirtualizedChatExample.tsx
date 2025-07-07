@@ -137,7 +137,7 @@ function MessageItem({ message }: { message: Message }) {
 
   const containerClasses = `w-full flex items-end gap-2 ${
     isFromYou ? 'justify-end' : 'justify-start'
-  } transition-opacity duration-300 ease-in ${
+  } transition-opacity duration-100  ${
     // 2. Apply class based on state
     isVisible ? 'opacity-100' : 'opacity-20'
   }`;
