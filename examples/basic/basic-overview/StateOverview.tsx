@@ -761,12 +761,11 @@ function ArrayManipulationExample() {
         <div className=" overflow-y-auto space-y-1">
           {todos.get().length > 0 ? (
             todos.stateList((todo, index) => {
-              const isSelected = todo._selected;
               return (
                 <div
                   key={todo.id.get()}
                   className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
-                    isSelected
+                    todo.isSelected
                       ? 'bg-blue-800/50 text-green-300'
                       : 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/30'
                   }`}

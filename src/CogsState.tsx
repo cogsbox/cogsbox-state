@@ -262,7 +262,7 @@ export type EndType<T, IsArrayElement = false> = {
   setValidation: (ctx: string) => void;
   removeValidation: (ctx: string) => void;
   ignoreFields: (fields: string[]) => StateObject<T>;
-  _selected: boolean;
+  isSelected: boolean;
   setSelected: (value: boolean) => void;
   toggleSelected: () => void;
   getFormRef: () => React.RefObject<any> | undefined;
@@ -2627,6 +2627,9 @@ function createProxyHandler<T>(
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
                       console.log('e', stateKeyPathKey, e);
+                      if (e.type === 'GET_SELECTED') {
+                        return;
+                      }
                       const shadowMeta = getGlobalStore
                         .getState()
                         .getShadowMetadata(stateKey, path);
@@ -3017,24 +3020,26 @@ function createProxyHandler<T>(
           return (key: string) =>
             loadFromLocalStorage(sessionId + '-' + stateKey + '-' + key);
         }
-        if (prop === '_selected') {
-          const parentPath = path.slice(0, -1);
 
-          registerComponentDependency(stateKey, componentId, [
-            ...path,
-            'selected',
-          ]);
+        if (prop === 'isSelected') {
+          const parentPath = [stateKey, ...path].slice(0, -1);
+
           if (
             Array.isArray(
-              getGlobalStore.getState().getShadowValue(stateKey, parentPath)
+              getGlobalStore
+                .getState()
+                .getShadowValue(parentPath.join('.'), meta?.validIds)
             )
           ) {
             const itemId = path[path.length - 1];
-            const fullParentKey = stateKey + '.' + parentPath.join('.');
+            const fullParentKey = parentPath.join('.');
+
             const selectedItemKey = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
+
             const fullItemKey = stateKey + '.' + path.join('.');
+
             return selectedItemKey === fullItemKey;
           }
           return undefined;
@@ -3046,6 +3051,12 @@ function createProxyHandler<T>(
             const parentPath = path.slice(0, -1);
             const fullParentKey = stateKey + '.' + parentPath.join('.');
             const fullItemKey = stateKey + '.' + path.join('.');
+
+            notifySelectionComponents(stateKey, parentPath, undefined);
+
+            const selectedIndex = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(fullParentKey);
 
             if (value) {
               getGlobalStore
@@ -3064,6 +3075,8 @@ function createProxyHandler<T>(
             const currentSelected = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
+
+            notifySelectionComponents(stateKey, parentPath, currentSelected);
 
             if (currentSelected === fullItemKey) {
               getGlobalStore
@@ -3712,8 +3725,10 @@ function ListItemWrapper({
     },
     [inViewRef]
   );
+
   useEffect(() => {
     getGlobalStore.getState().subscribeToPath(fullKey, (e) => {
+      console.log('e itemList', fullKey, e);
       forceUpdate({});
     });
   }, []);

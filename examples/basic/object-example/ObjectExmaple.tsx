@@ -219,14 +219,20 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
-                  filteredAndSorted.getSelected()?.id.get() ===
-                  itemSetter.id.get()
+                  itemSetter.isSelected
                     ? teamColors[color].selected
                     : 'bg-gray-800 hover:bg-gray-700/70'
                 }`}
               >
                 <div>{itemSetter.name.get()}</div>
-                <div>{itemSetter.score.get()}</div>
+                <div>
+                  {itemSetter.score.formElement((obj) => (
+                    <input
+                      {...obj.inputProps}
+                      className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  ))}
+                </div>
               </button>
             </FlashWrapper>
           ))}
@@ -276,7 +282,7 @@ function ItemDetailForm() {
     <FlashWrapper>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 min-h-[300px]">
         <h3 className="font-bold text-gray-200 text-lg mb-4">Player Editor</h3>
-        {selectedPlayer && (
+        {selectedPlayer?.get() && (
           <div
             className={`text-white text-center p-2 rounded-md mb-4 text-sm font-semibold ${
               selectedPlayer.team.get() === 'red'
