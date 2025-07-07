@@ -207,9 +207,9 @@ function ExampleDisplay({
   const displayString = `const sharedState = useCogsState( "fooBarObject", ${formatOptions(
     options
   )} );`;
-  const getterString = `// Renders: ${
+  const getterString = `${
     isSignal ? 'sharedState.foo.$get()' : 'sharedState.foo.get()'
-  } (rootValue)`;
+  } `;
 
   return (
     <FlashWrapper>

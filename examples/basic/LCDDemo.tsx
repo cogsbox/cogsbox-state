@@ -428,7 +428,7 @@ export default function LCDCatScrollerDemo({ catSvg }: { catSvg: string }) {
               <div>
                 <label className="text-xs text-gray-400 block mb-1">
                   Speed (Pixels / Frame Unit)
-                </label>{' '}
+                </label>
                 {/* Clarified label based on original logic */}
                 <input
                   type="range"

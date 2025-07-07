@@ -87,7 +87,7 @@ export default function VirtualizedChatExample() {
           <div className="flex flex-col  max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
             <ChatWindow />
             <MessageInput />
-          </div>{' '}
+          </div>
         </div>
       </div>
 

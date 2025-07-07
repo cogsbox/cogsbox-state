@@ -329,12 +329,11 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         className="fixed bottom-[5vh] left-[5vh] h-[500px]"
         style={{ zIndex: Z_INDICES.CYBERMAN }}
       >
-        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />{' '}
+        <img src="./cyberman.png" alt="Hero background" className="h-[500px]" />
         <div
           style={{ zIndex: Z_INDICES.CYBERMAN - 1 }}
           className="h-[500px] w-auto absolute top-[0px] left-[5px] text-sky-400/50 shadow-lg "
         >
-          {' '}
           {cyberShadow}
         </div>
         <div className="mt-[-70px] relative">
@@ -378,7 +377,6 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
         className="fixed w-[100%] left-0 h-[50%] bottom-0 saturate-50  contrast-150"
         style={{ zIndex: Z_INDICES.GROUND }}
       >
-        {' '}
         <div className="absolute w-full h-[50%]  top-0 bg-gradient-to-b from-black to-black-0 "></div>
         <img src="./groundTexture.png" alt="" className="h-[100%] w-full" />
       </div>

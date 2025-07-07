@@ -192,7 +192,7 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              Sort Score{' '}
+              Sort Score
               {sortBy === 'score' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
             <button
@@ -206,7 +206,7 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
               }`}
             >
-              Sort Name{' '}
+              Sort Name
               {sortBy === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
             </button>
           </div>
@@ -223,7 +223,7 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
                     : 'bg-gray-800 hover:bg-gray-700/70'
                 }`}
               >
-                <div>{itemSetter.name.get()}</div>{' '}
+                <div>{itemSetter.name.get()}</div>
                 <div>{itemSetter.score.get()}</div>
               </button>
             </FlashWrapper>
@@ -315,7 +315,7 @@ function PlayerForm({
   return (
     <div className="space-y-4 text-sm">
       <div className="font-semibold text-gray-500">
-        Editing Player ID:{' '}
+        Editing Player ID:
         <span className="text-green-300">{playerState.id.get()}</span>
       </div>
 

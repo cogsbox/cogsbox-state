@@ -12,7 +12,7 @@ import { useInView } from 'react-intersection-observer';
 // --- Data Generation & State Definition ---
 
 type Message = {
-  id: number;
+  id: number | string;
   author: string;
   text: string;
   timestamp: number;
@@ -90,31 +90,22 @@ export default function VirtualizedChatExample() {
     reactiveType: 'none',
     defaultState: defaultState.messages,
     serverState: serverData,
-    localStorage: {
-      key: 'chat-messages',
-      onChange: (state) => console.log('Messages saved to localStorage'),
-    },
   });
 
   const { ref, inView } = useInView();
-
+  console.log('messagesmessagesmessages', messages.get().length);
   useEffect(() => {
     if (!inView || serverData.status !== 'success') return;
 
     const interval = setInterval(() => {
-      const allMessages = messages.get();
-      const newId =
-        allMessages.length > 0
-          ? Math.max(...allMessages.map((m) => m.id)) + 1
-          : 1;
-
-      messages.insert({
-        id: newId,
+      console.log('inVissssssssssssssssssssew', inView, messages.get());
+      messages.insert(({ uuid }) => ({
+        id: uuid,
         author: faker.person.firstName(),
         text: faker.lorem.sentence({ min: 3, max: 25 }),
         timestamp: Date.now(),
         photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
-      });
+      }));
     }, 2000 + Math.random() * 2500);
 
     return () => clearInterval(interval);
@@ -293,18 +284,14 @@ function MessageInput() {
     if (!text.trim()) return;
 
     const allMessages = messages.get();
-    const newId =
-      allMessages.length > 0
-        ? Math.max(...allMessages.map((m) => m.id)) + 1
-        : 1;
 
-    messages.insert({
-      id: newId,
+    messages.insert(({ uuid }) => ({
+      id: uuid,
       author: 'You',
       text: text,
       timestamp: Date.now(),
       photo: null,
-    });
+    }));
 
     setText('');
   };

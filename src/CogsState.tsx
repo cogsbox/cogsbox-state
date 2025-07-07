@@ -18,7 +18,6 @@ import { createRoot } from 'react-dom/client';
 import {
   debounce,
   getDifferences,
-  getNestedValue,
   isArray,
   isFunction,
   type GenericObject,
@@ -27,14 +26,9 @@ import { ValidationWrapper } from './Functions.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
-import { array, z } from 'zod';
+import { z } from 'zod';
 
-import {
-  formRefStore,
-  getGlobalStore,
-  type CogsEvent,
-  type ComponentsType,
-} from './store.js';
+import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { applyPatch } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
@@ -91,11 +85,6 @@ type findWithFuncType<U> = (
   thisKey: keyof U,
   thisValue: U[keyof U]
 ) => EndType<U> & StateObject<U>;
-export type PushArgs<U, T> = (
-  update:
-    | Prettify<U>
-    | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>)
-) => StateObject<T>;
 
 type CutFunctionType<T> = (
   index?: number,
@@ -318,7 +307,7 @@ export type StateObject<T> = (T extends any[]
         update: UpdateTypeDetail;
       }) => void
     ) => void;
-    _isServerSynced: () => boolean;
+
     getLocalStorage: (key: string) => LocalStorageData<T> | null;
   };
 
@@ -593,9 +582,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     }
   });
 
-  getGlobalStore.getState().setInitialStates(statePart);
-  getGlobalStore.getState().setCreatedState(statePart);
-
   Object.keys(statePart).forEach((key) => {
     getGlobalStore.getState().initializeShadowState(key, statePart[key]);
   });
@@ -620,22 +606,19 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       ? options.modifyState(thiState)
       : thiState;
 
-    const [state, updater] = useCogsStateFn<(typeof statePart)[StateKey]>(
-      partialState,
-      {
-        stateKey: stateKey as string,
-        syncUpdate: options?.syncUpdate,
-        componentId,
-        localStorage: options?.localStorage,
-        middleware: options?.middleware,
+    const updater = useCogsStateFn<(typeof statePart)[StateKey]>(partialState, {
+      stateKey: stateKey as string,
+      syncUpdate: options?.syncUpdate,
+      componentId,
+      localStorage: options?.localStorage,
+      middleware: options?.middleware,
 
-        reactiveType: options?.reactiveType,
-        reactiveDeps: options?.reactiveDeps,
-        defaultState: options?.defaultState as any,
-        dependencies: options?.dependencies,
-        serverState: options?.serverState,
-      }
-    );
+      reactiveType: options?.reactiveType,
+      reactiveDeps: options?.reactiveDeps,
+      defaultState: options?.defaultState as any,
+      dependencies: options?.dependencies,
+      serverState: options?.serverState,
+    });
 
     return updater;
   };
@@ -657,10 +640,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 };
 
 const {
-  setUpdaterState,
-  setState,
   getInitialOptions,
-  getKeyState,
   getValidationErrors,
   setStateLog,
   updateInitialStateGlobal,
@@ -734,7 +714,7 @@ const loadFromLocalStorage = (localStorageKey: string) => {
   }
 };
 const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
-  const currentState = getGlobalStore.getState().cogsStateStore[stateKey];
+  const currentState = getGlobalStore.getState().getShadowValue(stateKey);
   const { sessionId } = useCogsConfig();
   const localkey = isFunction(options?.localStorage?.key)
     ? options.localStorage.key(currentState)
@@ -749,8 +729,6 @@ const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
       localData &&
       localData.lastUpdated > (localData.lastSyncedWithServer || 0)
     ) {
-      setState(stateKey, localData.state);
-
       notifyComponents(stateKey);
       return true;
     }
@@ -850,10 +828,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useEffect(() => {
     if (syncUpdate && syncUpdate.stateKey === thisKey && syncUpdate.path?.[0]) {
       // Update the actual state value
-      setState(thisKey, (prevState: any) => ({
-        ...prevState,
-        [syncUpdate.path![0]!]: syncUpdate.newValue,
-      }));
 
       // Create combined key and update sync info
       const syncKey = `${syncUpdate.stateKey}:${syncUpdate.path.join('.')}`;
@@ -1102,490 +1076,445 @@ export function useCogsStateFn<TStateObject extends unknown>(
     }
     const store = getGlobalStore.getState();
 
-    setState(thisKey, (prevValue: TStateObject) => {
-      // FETCH ONCE at the beginning
-      const shadowMeta = store.getShadowMetadata(thisKey, path);
-      const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
+    // FETCH ONCE at the beginning
+    const shadowMeta = store.getShadowMetadata(thisKey, path);
+    const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
+    console.log('shadowMeta', shadowMeta, nestedShadowValue);
+    const payload = (
+      updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
+        ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
+        : isFunction(newStateOrFunction)
+          ? newStateOrFunction(nestedShadowValue)
+          : newStateOrFunction
+    ) as TStateObject;
 
-      const payload = (
-        updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
-          ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
-          : isFunction(newStateOrFunction)
-            ? newStateOrFunction(nestedShadowValue)
-            : newStateOrFunction
-      ) as TStateObject;
+    const timeStamp = Date.now();
 
-      const timeStamp = Date.now();
-
-      const newUpdate = {
-        timeStamp,
-        stateKey: thisKey,
-        path,
-        updateType: updateObj.updateType,
-        status: 'new' as const,
-        oldValue: nestedShadowValue,
-        newValue: payload,
-      } satisfies UpdateTypeDetail;
-
-      // Perform the update
-      switch (updateObj.updateType) {
-        case 'insert': {
-          store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
-          break;
-        }
-        case 'cut': {
-          store.removeShadowArrayElement(thisKey, path);
-          break;
-        }
-        case 'update': {
-          store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
-          break;
-        }
+    const newUpdate = {
+      timeStamp,
+      stateKey: thisKey,
+      path,
+      updateType: updateObj.updateType,
+      status: 'new' as const,
+      oldValue: nestedShadowValue,
+      newValue: payload,
+    } satisfies UpdateTypeDetail;
+    console.log('newudpate in useCogsState', newUpdate);
+    // Perform the update
+    switch (updateObj.updateType) {
+      case 'insert': {
+        store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
+        // The array at `path` has been modified. Mark it AND all its parents as dirty.
+        store.markAsDirty(thisKey, path, { bubble: true });
+        break;
       }
+      case 'cut': {
+        // The item is at `path`, so the parent array is at `path.slice(0, -1)`
+        const parentArrayPath = path.slice(0, -1);
+        store.removeShadowArrayElement(thisKey, path);
+        // The parent array has been modified. Mark it AND all its parents as dirty.
+        store.markAsDirty(thisKey, parentArrayPath, { bubble: true });
+        break;
+      }
+      case 'update': {
+        store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
+        // The item at `path` was updated. Mark it AND all its parents as dirty.
+        store.markAsDirty(thisKey, path, { bubble: true });
+        break;
+      }
+    }
 
-      // Mark as dirty - reuse shadowMeta from above!
-      if (shadowMeta && shadowMeta.stateSource === 'server') {
-        store.setShadowMetadata(thisKey, path, {
-          ...shadowMeta,
-          isDirty: true,
+    // Handle signals - reuse shadowMeta from the beginning
+    if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
+      // Use updatedShadowValue if we need the new value, otherwise use payload
+      const displayValue = updateObj.updateType === 'cut' ? null : payload;
+
+      shadowMeta.signals.forEach(({ parentId, position, effect }) => {
+        const parent = document.querySelector(`[data-parent-id="${parentId}"]`);
+        if (parent) {
+          const childNodes = Array.from(parent.childNodes);
+          if (childNodes[position]) {
+            let finalDisplayValue = displayValue;
+            if (effect && displayValue !== null) {
+              try {
+                finalDisplayValue = new Function(
+                  'state',
+                  `return (${effect})(state)`
+                )(displayValue);
+              } catch (err) {
+                console.error('Error evaluating effect function:', err);
+              }
+            }
+
+            if (
+              finalDisplayValue !== null &&
+              finalDisplayValue !== undefined &&
+              typeof finalDisplayValue === 'object'
+            ) {
+              finalDisplayValue = JSON.stringify(finalDisplayValue) as any;
+            }
+
+            childNodes[position].textContent = String(finalDisplayValue ?? '');
+          }
+        }
+      });
+    }
+
+    // Update in effectiveSetState for insert handling:
+    if (updateObj.updateType === 'insert') {
+      getGlobalStore.getState().notifyPathSubscribers(fullPath, payload);
+
+      // Use shadowMeta from beginning if it's an array
+      if (shadowMeta?.mapWrappers && shadowMeta.mapWrappers.length > 0) {
+        // Get fresh array keys after insert
+        const sourceArrayKeys =
+          store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
+        const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
+        const newItemValue = store.getShadowValue(newItemKey);
+        const fullSourceArray = store.getShadowValue(
+          [thisKey, ...path].join('.')
+        );
+
+        if (!newItemKey || newItemValue === undefined) return;
+
+        shadowMeta.mapWrappers.forEach((wrapper) => {
+          let shouldRender = true;
+          let insertPosition = -1;
+
+          // Check if wrapper has transforms
+          if (wrapper.meta?.transforms && wrapper.meta.transforms.length > 0) {
+            // Check if new item passes all filters
+            for (const transform of wrapper.meta.transforms) {
+              if (transform.type === 'filter') {
+                if (!transform.fn(newItemValue, -1)) {
+                  shouldRender = false;
+                  break;
+                }
+              }
+            }
+
+            if (shouldRender) {
+              // Get current valid keys by applying transforms
+              const currentValidKeys = applyTransforms(
+                thisKey,
+                path,
+                wrapper.meta.transforms
+              );
+
+              // Find where to insert based on sort
+              const sortTransform = wrapper.meta.transforms.find(
+                (t: any) => t.type === 'sort'
+              );
+              if (sortTransform) {
+                // Add new item to the list and sort to find position
+                const allItems = currentValidKeys.map((key) => ({
+                  key,
+                  value: store.getShadowValue(key),
+                }));
+
+                allItems.push({ key: newItemKey, value: newItemValue });
+                allItems.sort((a, b) => sortTransform.fn(a.value, b.value));
+
+                insertPosition = allItems.findIndex(
+                  (item) => item.key === newItemKey
+                );
+              } else {
+                // No sort, insert at end
+                insertPosition = currentValidKeys.length;
+              }
+            }
+          } else {
+            // No transforms, always render at end
+            shouldRender = true;
+            insertPosition = sourceArrayKeys.length - 1;
+          }
+
+          if (!shouldRender) {
+            return; // Skip this wrapper, item doesn't pass filters
+          }
+
+          if (wrapper.containerRef && wrapper.containerRef.isConnected) {
+            const itemElement = document.createElement('div');
+            itemElement.setAttribute('data-item-path', newItemKey);
+
+            // Insert at correct position
+            const children = Array.from(wrapper.containerRef.children);
+            if (insertPosition >= 0 && insertPosition < children.length) {
+              wrapper.containerRef.insertBefore(
+                itemElement,
+                children[insertPosition]!
+              );
+            } else {
+              wrapper.containerRef.appendChild(itemElement);
+            }
+
+            const root = createRoot(itemElement);
+            const componentId = uuidv4();
+            const itemPath = newItemKey.split('.').slice(1);
+
+            const arraySetter = wrapper.rebuildStateShape({
+              path: wrapper.path,
+              currentState: fullSourceArray,
+              componentId: wrapper.componentId,
+              meta: wrapper.meta,
+            });
+
+            root.render(
+              createElement(MemoizedCogsItemWrapper, {
+                stateKey: thisKey,
+                itemComponentId: componentId,
+                itemPath: itemPath,
+                localIndex: insertPosition,
+                arraySetter: arraySetter,
+                rebuildStateShape: wrapper.rebuildStateShape,
+                renderFn: wrapper.mapFn,
+              })
+            );
+          }
         });
       }
+    }
+    if (updateObj.updateType === 'cut') {
+      const arrayPath = path.slice(0, -1);
+      const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
 
-      // Mark parent paths as dirty
-      let currentPath = [...path];
-      while (currentPath.length > 0) {
-        currentPath.pop();
-        const parentMeta = store.getShadowMetadata(thisKey, currentPath);
-        if (parentMeta && parentMeta.stateSource === 'server') {
-          store.setShadowMetadata(thisKey, currentPath, {
-            ...parentMeta,
-            isDirty: true,
-          });
-        }
+      if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
+        arrayMeta.mapWrappers.forEach((wrapper) => {
+          if (wrapper.containerRef && wrapper.containerRef.isConnected) {
+            const elementToRemove = wrapper.containerRef.querySelector(
+              `[data-item-path="${fullPath}"]`
+            );
+            if (elementToRemove) {
+              elementToRemove.remove();
+            }
+          }
+        });
       }
-
-      // Get updated metadata ONCE after the update
-      const updatePath =
-        updateObj.updateType === 'insert' ? path : path.slice(0, -1);
-      const updatedShadowMeta = store.getShadowMetadata(thisKey, updatePath);
-      const updatedShadowValue = store.getShadowValue(
-        [thisKey, ...updatePath].join('.')
+    }
+    if (
+      updateObj.updateType === 'update' &&
+      (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
+      path
+    ) {
+      removeValidationError(
+        (validationKey || latestInitialOptionsRef.current?.validation?.key) +
+          '.' +
+          path.join('.')
+      );
+    }
+    const arrayWithoutIndex = path.slice(0, path.length - 1);
+    if (
+      updateObj.updateType === 'cut' &&
+      latestInitialOptionsRef.current?.validation?.key
+    ) {
+      removeValidationError(
+        latestInitialOptionsRef.current?.validation?.key +
+          '.' +
+          arrayWithoutIndex.join('.')
+      );
+    }
+    if (
+      updateObj.updateType === 'insert' &&
+      latestInitialOptionsRef.current?.validation?.key
+    ) {
+      const getValidation = getValidationErrors(
+        latestInitialOptionsRef.current?.validation?.key +
+          '.' +
+          arrayWithoutIndex.join('.')
       );
 
-      // Handle class signals - use updatedShadowMeta
+      getValidation.filter((k) => {
+        let length = k?.split('.').length;
+        const v = ''; // Placeholder as `v` is not used from getValidationErrors
 
-      // Handle signals - reuse shadowMeta from the beginning
-      if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
-        // Use updatedShadowValue if we need the new value, otherwise use payload
-        const displayValue = updateObj.updateType === 'cut' ? null : payload;
+        if (
+          k == arrayWithoutIndex.join('.') &&
+          length == arrayWithoutIndex.length - 1
+        ) {
+          let newKey = k + '.' + arrayWithoutIndex;
+          removeValidationError(k!);
+          addValidationError(newKey, v!);
+        }
+      });
+    }
+    // Assumes `isDeepEqual` is available in this scope.
 
-        shadowMeta.signals.forEach(({ parentId, position, effect }) => {
+    const newState = store.getShadowValue(thisKey);
+    const rootMeta = store.getShadowMetadata(thisKey, []);
+    const notifiedComponents = new Set<string>();
+
+    if (!rootMeta?.components) {
+      return newState;
+    }
+
+    // REUSE shadowMeta from beginning instead of fetching again!
+    if (shadowMeta?.pathComponents) {
+      shadowMeta.pathComponents.forEach((componentId) => {
+        const component = rootMeta.components?.get(componentId);
+        if (component) {
+          const reactiveTypes = Array.isArray(component.reactiveType)
+            ? component.reactiveType
+            : [component.reactiveType || 'component'];
+
+          if (!reactiveTypes.includes('none')) {
+            component.forceUpdate();
+            notifiedComponents.add(componentId);
+          }
+        }
+      });
+    }
+    if (updateObj.updateType === 'insert' || updateObj.updateType === 'cut') {
+      // For 'insert', the path is the array path. For 'cut', it's the item path.
+      const parentArrayPath =
+        updateObj.updateType === 'insert' ? path : path.slice(0, -1); // Get parent path by removing the item ID
+
+      const parentMeta = store.getShadowMetadata(thisKey, parentArrayPath);
+
+      if (parentMeta?.signals && parentMeta.signals.length > 0) {
+        const parentFullPath = [thisKey, ...parentArrayPath].join('.');
+        const parentValue = store.getShadowValue(parentFullPath);
+
+        parentMeta.signals.forEach(({ parentId, position, effect }) => {
           const parent = document.querySelector(
             `[data-parent-id="${parentId}"]`
           );
           if (parent) {
             const childNodes = Array.from(parent.childNodes);
             if (childNodes[position]) {
-              let finalDisplayValue = displayValue;
-              if (effect && displayValue !== null) {
+              let displayValue = parentValue;
+              if (effect) {
                 try {
-                  finalDisplayValue = new Function(
+                  displayValue = new Function(
                     'state',
                     `return (${effect})(state)`
-                  )(displayValue);
+                  )(parentValue);
                 } catch (err) {
                   console.error('Error evaluating effect function:', err);
+                  displayValue = parentValue;
                 }
               }
 
               if (
-                finalDisplayValue !== null &&
-                finalDisplayValue !== undefined &&
-                typeof finalDisplayValue === 'object'
+                displayValue !== null &&
+                displayValue !== undefined &&
+                typeof displayValue === 'object'
               ) {
-                finalDisplayValue = JSON.stringify(finalDisplayValue) as any;
+                displayValue = JSON.stringify(displayValue);
               }
 
-              childNodes[position].textContent = String(
-                finalDisplayValue ?? ''
-              );
+              childNodes[position].textContent = String(displayValue ?? '');
             }
           }
         });
       }
 
-      // Update in effectiveSetState for insert handling:
-      if (updateObj.updateType === 'insert') {
-        getGlobalStore.getState().notifyPathSubscribers(fullPath, payload);
-
-        // Use shadowMeta from beginning if it's an array
-        if (shadowMeta?.mapWrappers && shadowMeta.mapWrappers.length > 0) {
-          // Get fresh array keys after insert
-          const sourceArrayKeys =
-            store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
-          const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
-          const newItemValue = store.getShadowValue(newItemKey);
-          const fullSourceArray = store.getShadowValue(
-            [thisKey, ...path].join('.')
-          );
-
-          if (!newItemKey || newItemValue === undefined) return;
-
-          shadowMeta.mapWrappers.forEach((wrapper) => {
-            let shouldRender = true;
-            let insertPosition = -1;
-
-            // Check if wrapper has transforms
-            if (
-              wrapper.meta?.transforms &&
-              wrapper.meta.transforms.length > 0
-            ) {
-              // Check if new item passes all filters
-              for (const transform of wrapper.meta.transforms) {
-                if (transform.type === 'filter') {
-                  if (!transform.fn(newItemValue, -1)) {
-                    shouldRender = false;
-                    break;
-                  }
-                }
-              }
-
-              if (shouldRender) {
-                // Get current valid keys by applying transforms
-                const currentValidKeys = applyTransforms(
-                  thisKey,
-                  path,
-                  wrapper.meta.transforms
-                );
-
-                // Find where to insert based on sort
-                const sortTransform = wrapper.meta.transforms.find(
-                  (t: any) => t.type === 'sort'
-                );
-                if (sortTransform) {
-                  // Add new item to the list and sort to find position
-                  const allItems = currentValidKeys.map((key) => ({
-                    key,
-                    value: store.getShadowValue(key),
-                  }));
-
-                  allItems.push({ key: newItemKey, value: newItemValue });
-                  allItems.sort((a, b) => sortTransform.fn(a.value, b.value));
-
-                  insertPosition = allItems.findIndex(
-                    (item) => item.key === newItemKey
-                  );
-                } else {
-                  // No sort, insert at end
-                  insertPosition = currentValidKeys.length;
-                }
-              }
-            } else {
-              // No transforms, always render at end
-              shouldRender = true;
-              insertPosition = sourceArrayKeys.length - 1;
-            }
-
-            if (!shouldRender) {
-              return; // Skip this wrapper, item doesn't pass filters
-            }
-
-            if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-              const itemElement = document.createElement('div');
-              itemElement.setAttribute('data-item-path', newItemKey);
-
-              // Insert at correct position
-              const children = Array.from(wrapper.containerRef.children);
-              if (insertPosition >= 0 && insertPosition < children.length) {
-                wrapper.containerRef.insertBefore(
-                  itemElement,
-                  children[insertPosition]!
-                );
-              } else {
-                wrapper.containerRef.appendChild(itemElement);
-              }
-
-              const root = createRoot(itemElement);
-              const componentId = uuidv4();
-              const itemPath = newItemKey.split('.').slice(1);
-
-              const arraySetter = wrapper.rebuildStateShape({
-                path: wrapper.path,
-                currentState: fullSourceArray,
-                componentId: wrapper.componentId,
-                meta: wrapper.meta,
-              });
-
-              root.render(
-                createElement(MemoizedCogsItemWrapper, {
-                  stateKey: thisKey,
-                  itemComponentId: componentId,
-                  itemPath: itemPath,
-                  localIndex: insertPosition,
-                  arraySetter: arraySetter,
-                  rebuildStateShape: wrapper.rebuildStateShape,
-                  renderFn: wrapper.mapFn,
-                })
-              );
-            }
-          });
-        }
-      }
-      if (updateObj.updateType === 'cut') {
-        const arrayPath = path.slice(0, -1);
-        const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
-
-        if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
-          arrayMeta.mapWrappers.forEach((wrapper) => {
-            if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-              const elementToRemove = wrapper.containerRef.querySelector(
-                `[data-item-path="${fullPath}"]`
-              );
-              if (elementToRemove) {
-                elementToRemove.remove();
-              }
-            }
-          });
-        }
-      }
-      if (
-        updateObj.updateType === 'update' &&
-        (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
-        path
-      ) {
-        removeValidationError(
-          (validationKey || latestInitialOptionsRef.current?.validation?.key) +
-            '.' +
-            path.join('.')
-        );
-      }
-      const arrayWithoutIndex = path.slice(0, path.length - 1);
-      if (
-        updateObj.updateType === 'cut' &&
-        latestInitialOptionsRef.current?.validation?.key
-      ) {
-        removeValidationError(
-          latestInitialOptionsRef.current?.validation?.key +
-            '.' +
-            arrayWithoutIndex.join('.')
-        );
-      }
-      if (
-        updateObj.updateType === 'insert' &&
-        latestInitialOptionsRef.current?.validation?.key
-      ) {
-        const getValidation = getValidationErrors(
-          latestInitialOptionsRef.current?.validation?.key +
-            '.' +
-            arrayWithoutIndex.join('.')
-        );
-
-        getValidation.filter((k) => {
-          let length = k?.split('.').length;
-          const v = ''; // Placeholder as `v` is not used from getValidationErrors
-
-          if (
-            k == arrayWithoutIndex.join('.') &&
-            length == arrayWithoutIndex.length - 1
-          ) {
-            let newKey = k + '.' + arrayWithoutIndex;
-            removeValidationError(k!);
-            addValidationError(newKey, v!);
-          }
-        });
-      }
-      // Assumes `isDeepEqual` is available in this scope.
-
-      const newState = store.getShadowValue(thisKey);
-      const rootMeta = store.getShadowMetadata(thisKey, []);
-      const notifiedComponents = new Set<string>();
-
-      if (!rootMeta?.components) {
-        return newState;
-      }
-
-      // REUSE shadowMeta from beginning instead of fetching again!
-      if (shadowMeta?.pathComponents) {
-        shadowMeta.pathComponents.forEach((componentId) => {
-          const component = rootMeta.components?.get(componentId);
-          if (component) {
-            const reactiveTypes = Array.isArray(component.reactiveType)
-              ? component.reactiveType
-              : [component.reactiveType || 'component'];
-
-            if (!reactiveTypes.includes('none')) {
+      if (parentMeta?.pathComponents) {
+        parentMeta.pathComponents.forEach((componentId) => {
+          // Check if we've already notified this component to prevent redundant updates
+          if (!notifiedComponents.has(componentId)) {
+            const component = rootMeta.components?.get(componentId);
+            if (component) {
               component.forceUpdate();
               notifiedComponents.add(componentId);
             }
           }
         });
       }
-      if (updateObj.updateType === 'insert' || updateObj.updateType === 'cut') {
-        // For 'insert', the path is the array path. For 'cut', it's the item path.
-        const parentArrayPath =
-          updateObj.updateType === 'insert' ? path : path.slice(0, -1); // Get parent path by removing the item ID
+    }
 
-        const parentMeta = store.getShadowMetadata(thisKey, parentArrayPath);
-
-        if (parentMeta?.signals && parentMeta.signals.length > 0) {
-          const parentFullPath = [thisKey, ...parentArrayPath].join('.');
-          const parentValue = store.getShadowValue(parentFullPath);
-
-          parentMeta.signals.forEach(({ parentId, position, effect }) => {
-            const parent = document.querySelector(
-              `[data-parent-id="${parentId}"]`
-            );
-            if (parent) {
-              const childNodes = Array.from(parent.childNodes);
-              if (childNodes[position]) {
-                let displayValue = parentValue;
-                if (effect) {
-                  try {
-                    displayValue = new Function(
-                      'state',
-                      `return (${effect})(state)`
-                    )(parentValue);
-                  } catch (err) {
-                    console.error('Error evaluating effect function:', err);
-                    displayValue = parentValue;
-                  }
-                }
-
-                if (
-                  displayValue !== null &&
-                  displayValue !== undefined &&
-                  typeof displayValue === 'object'
-                ) {
-                  displayValue = JSON.stringify(displayValue);
-                }
-
-                childNodes[position].textContent = String(displayValue ?? '');
-              }
-            }
-          });
-        }
-
-        if (parentMeta?.pathComponents) {
-          parentMeta.pathComponents.forEach((componentId) => {
-            // Check if we've already notified this component to prevent redundant updates
-            if (!notifiedComponents.has(componentId)) {
-              const component = rootMeta.components?.get(componentId);
-              if (component) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
-              }
-            }
-          });
-        }
+    // --- PASS 2: Single Global Loop for 'all' and 'deps' ---
+    // Now iterate just ONCE over all components to handle the global cases.
+    rootMeta.components.forEach((component, componentId) => {
+      // CRITICAL: Skip any component that was already updated by the fast path.
+      if (notifiedComponents.has(componentId)) {
+        return; // equivalent to 'continue'
       }
 
-      // --- PASS 2: Single Global Loop for 'all' and 'deps' ---
-      // Now iterate just ONCE over all components to handle the global cases.
-      rootMeta.components.forEach((component, componentId) => {
-        // CRITICAL: Skip any component that was already updated by the fast path.
-        if (notifiedComponents.has(componentId)) {
-          return; // equivalent to 'continue'
-        }
+      const reactiveTypes = Array.isArray(component.reactiveType)
+        ? component.reactiveType
+        : [component.reactiveType || 'component'];
 
-        const reactiveTypes = Array.isArray(component.reactiveType)
-          ? component.reactiveType
-          : [component.reactiveType || 'component'];
+      // Check for 'all' first, as it's the strongest condition and needs no further work.
+      if (reactiveTypes.includes('all')) {
+        component.forceUpdate();
+        notifiedComponents.add(componentId);
+        return; // We're done with this component, no need to check 'deps'.
+      }
 
-        // Check for 'all' first, as it's the strongest condition and needs no further work.
-        if (reactiveTypes.includes('all')) {
-          component.forceUpdate();
-          notifiedComponents.add(componentId);
-          return; // We're done with this component, no need to check 'deps'.
-        }
-
-        // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
-        if (reactiveTypes.includes('deps')) {
-          if (component.depsFunction) {
-            const currentState = store.getShadowValue(thisKey);
-            const newDeps = component.depsFunction(currentState);
-            let shouldUpdate = false;
-            console.log('newDeps', componentId, component, newDeps);
-            // Case 1: The function returned `true` explicitly.
-            if (newDeps === true) {
+      // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
+      if (reactiveTypes.includes('deps')) {
+        if (component.depsFunction) {
+          const currentState = store.getShadowValue(thisKey);
+          const newDeps = component.depsFunction(currentState);
+          let shouldUpdate = false;
+          console.log('newDeps', componentId, component, newDeps);
+          // Case 1: The function returned `true` explicitly.
+          if (newDeps === true) {
+            shouldUpdate = true;
+          }
+          // Case 2: The function returned a dependency array.
+          else if (Array.isArray(newDeps)) {
+            // Compare against the PREVIOUS deps, not component.deps
+            if (!isDeepEqual(component.prevDeps, newDeps)) {
+              // The dependencies have changed, update the stored value for the next check.
+              component.prevDeps = newDeps;
               shouldUpdate = true;
             }
-            // Case 2: The function returned a dependency array.
-            else if (Array.isArray(newDeps)) {
-              // Compare against the PREVIOUS deps, not component.deps
-              if (!isDeepEqual(component.prevDeps, newDeps)) {
-                // The dependencies have changed, update the stored value for the next check.
-                component.prevDeps = newDeps;
-                shouldUpdate = true;
-              }
-            }
-            console.log(
-              'newDeps shouldUpdate',
-              componentId,
-              shouldUpdate,
-              notifiedComponents
-            );
-            if (shouldUpdate) {
-              component.forceUpdate();
-              notifiedComponents.add(componentId);
-            }
+          }
+          console.log(
+            'newDeps shouldUpdate',
+            componentId,
+            shouldUpdate,
+            notifiedComponents
+          );
+          if (shouldUpdate) {
+            component.forceUpdate();
+            notifiedComponents.add(componentId);
           }
         }
-      });
-      notifiedComponents.clear();
-      setStateLog(thisKey, (prevLogs) => {
-        const logs = [...(prevLogs ?? []), newUpdate];
-        const aggregatedLogs = new Map<string, typeof newUpdate>();
-
-        logs.forEach((log) => {
-          const uniqueKey = `${log.stateKey}:${JSON.stringify(log.path)}`;
-          const existing = aggregatedLogs.get(uniqueKey);
-
-          if (existing) {
-            existing.timeStamp = Math.max(existing.timeStamp, log.timeStamp);
-            existing.newValue = log.newValue;
-            existing.oldValue = existing.oldValue ?? log.oldValue;
-            existing.updateType = log.updateType;
-          } else {
-            aggregatedLogs.set(uniqueKey, { ...(log as any) });
-          }
-        });
-
-        return Array.from(aggregatedLogs.values());
-      });
-
-      saveToLocalStorage(
-        payload,
-        thisKey,
-        latestInitialOptionsRef.current,
-        sessionId
-      );
-
-      if (latestInitialOptionsRef.current?.middleware) {
-        latestInitialOptionsRef.current!.middleware({
-          updateLog: stateLog,
-          update: newUpdate,
-        });
       }
-
-      return newState;
     });
-  };
-  if (!getGlobalStore.getState().updaterState[thisKey]) {
-    setUpdaterState(
+    notifiedComponents.clear();
+    setStateLog(thisKey, (prevLogs) => {
+      const logs = [...(prevLogs ?? []), newUpdate];
+      const aggregatedLogs = new Map<string, typeof newUpdate>();
+
+      logs.forEach((log) => {
+        const uniqueKey = `${log.stateKey}:${JSON.stringify(log.path)}`;
+        const existing = aggregatedLogs.get(uniqueKey);
+
+        if (existing) {
+          existing.timeStamp = Math.max(existing.timeStamp, log.timeStamp);
+          existing.newValue = log.newValue;
+          existing.oldValue = existing.oldValue ?? log.oldValue;
+          existing.updateType = log.updateType;
+        } else {
+          aggregatedLogs.set(uniqueKey, { ...(log as any) });
+        }
+      });
+
+      return Array.from(aggregatedLogs.values());
+    });
+
+    saveToLocalStorage(
+      payload,
       thisKey,
-      createProxyHandler(
-        thisKey,
-        effectiveSetState,
-        componentIdRef.current,
-        sessionId
-      )
+      latestInitialOptionsRef.current,
+      sessionId
     );
-    if (!getGlobalStore.getState().cogsStateStore[thisKey]) {
-      setState(thisKey, stateObject);
+
+    if (latestInitialOptionsRef.current?.middleware) {
+      latestInitialOptionsRef.current!.middleware({
+        updateLog: stateLog,
+        update: newUpdate,
+      });
     }
-    if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
-      updateInitialStateGlobal(thisKey, stateObject);
-    }
+
+    return newState;
+  };
+
+  if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
+    updateInitialStateGlobal(thisKey, stateObject);
   }
 
   const updaterFinal = useMemo(() => {
@@ -1597,10 +1526,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     );
   }, [thisKey, sessionId]);
 
-  return [getKeyState(thisKey), updaterFinal] as [
-    TStateObject,
-    StateObject<TStateObject>,
-  ];
+  return updaterFinal as StateObject<TStateObject>;
 }
 
 export type MetaData = {
@@ -1706,14 +1632,7 @@ const registerComponentDependency = (
     getGlobalStore.getState().getShadowMetadata(stateKey, dependencyPath) || {};
   const pathComponents = pathMeta.pathComponents || new Set<string>();
   pathComponents.add(fullComponentId);
-  // console.log(
-  //   "pathComponents",
-  //   pathMeta,
-  //   pathComponents,
-  //   stateKey,
-  //   componentId,
-  //   dependencyPath
-  // );
+
   getGlobalStore.getState().setShadowMetadata(stateKey, dependencyPath, {
     ...pathMeta,
     pathComponents,
@@ -1814,7 +1733,7 @@ function createProxyHandler<T>(
     };
 
     const baseFunction = function () {
-      return getGlobalStore().getNestedState(stateKey, path);
+      return getGlobalStore().getShadowValue(stateKey, path);
     } as unknown as CallableStateObject<T>;
 
     // We attach baseObj properties *inside* the get trap now to avoid recursion
@@ -1822,7 +1741,7 @@ function createProxyHandler<T>(
 
     const handler = {
       apply(target: any, thisArg: any, args: any[]) {
-        //return getGlobalStore().getNestedState(stateKey, path);
+        //return getGlobalStore().getShadowValue(stateKey, path);
       },
 
       get(target: any, prop: string) {
@@ -1843,8 +1762,9 @@ function createProxyHandler<T>(
             const shadowMeta = getGlobalStore
               .getState()
               .getShadowMetadata(stateKey, []);
-            const currentState =
-              getGlobalStore.getState().cogsStateStore[stateKey];
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue(stateKey);
 
             // Use the appropriate base state for comparison
             let baseState;
@@ -1875,7 +1795,7 @@ function createProxyHandler<T>(
 
             const state = getGlobalStore
               .getState()
-              .getNestedState(stateKey, []);
+              .getShadowValue(stateKey, []);
             const validationKey = options?.validation?.key;
 
             try {
@@ -2725,7 +2645,7 @@ function createProxyHandler<T>(
             return () => {
               const currentArray = getGlobalStore
                 .getState()
-                .getNestedState(stateKey, path) as any[];
+                .getShadowValue(stateKey, path) as any[];
               if (currentArray.length === 0) return undefined;
               const lastIndex = currentArray.length - 1;
               const lastValue = currentArray[lastIndex];
@@ -2739,17 +2659,16 @@ function createProxyHandler<T>(
             };
           }
           if (prop === 'insert') {
+            console.log('inserting');
             return (
               payload: InsertParams<InferArrayElement<T>>,
               index?: number
             ) => {
-              invalidateCachePath(path);
-
               effectiveSetState(payload as any, path, { updateType: 'insert' });
               return rebuildStateShape({
                 currentState: getGlobalStore
                   .getState()
-                  .getNestedState(stateKey, path),
+                  .getShadowValue(stateKey, path),
                 path,
                 componentId: componentId!,
                 meta,
@@ -2764,7 +2683,7 @@ function createProxyHandler<T>(
             ) => {
               const currentArray = getGlobalStore
                 .getState()
-                .getNestedState(stateKey, path) as any[];
+                .getShadowValue(stateKey, path) as any[];
               const newValue = isFunction<T>(payload)
                 ? payload(currentArray as any)
                 : (payload as any);
@@ -3005,7 +2924,7 @@ function createProxyHandler<T>(
           ]);
           if (
             Array.isArray(
-              getGlobalStore.getState().getNestedState(stateKey, parentPath)
+              getGlobalStore.getState().getShadowValue(stateKey, parentPath)
             )
           ) {
             const itemId = path[path.length - 1];
@@ -3100,8 +3019,9 @@ function createProxyHandler<T>(
                 throw new Error('Zod schema or validation key not found');
 
               removeValidationError(init.key);
-              const thisObject =
-                getGlobalStore.getState().cogsStateStore[stateKey];
+              const thisObject = getGlobalStore
+                .getState()
+                .getShadowValue(stateKey);
               const result = init.zodSchema.safeParse(thisObject);
 
               if (!result.success) {
@@ -3118,7 +3038,8 @@ function createProxyHandler<T>(
 
           if (prop === 'getComponents')
             return () =>
-              getGlobalStore.getState().stateComponents.get(stateKey);
+              getGlobalStore.getState().getShadowMetadata(stateKey, [])
+                ?.components;
           if (prop === 'getAllFormRefs')
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);
@@ -3195,7 +3116,7 @@ function createProxyHandler<T>(
         const nextPath = [...path, prop];
         const nextValue = getGlobalStore
           .getState()
-          .getNestedState(stateKey, nextPath);
+          .getShadowValue(stateKey, nextPath);
         return rebuildStateShape({
           currentState: nextValue,
           path: nextPath,
@@ -3266,8 +3187,6 @@ function createProxyHandler<T>(
         localStorage.removeItem(storageKey);
       }
 
-      setUpdaterState(stateKey, newProxy);
-      setState(stateKey, initialState);
       const stateEntry = getGlobalStore
         .getState()
         .getShadowMetadata(stateKey, []);
@@ -3304,8 +3223,7 @@ function createProxyHandler<T>(
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
         getGlobalStore.getState().initializeShadowState(stateKey, newState);
-        setUpdaterState(stateKey, newUpdaterState);
-        setState(stateKey, newState);
+
         const stateEntry = getGlobalStore
           .getState()
           .getShadowMetadata(stateKey, []);
@@ -3321,18 +3239,9 @@ function createProxyHandler<T>(
         fetchId: (field: keyof T) => (newUpdaterState.get() as any)[field],
       };
     },
-    _initialState: getGlobalStore.getState().initialStateGlobal[stateKey],
-    _serverState: getGlobalStore.getState().serverState[stateKey],
-    _isLoading: getGlobalStore.getState().isLoadingGlobal[stateKey],
-    _isServerSynced: () => {
-      const serverState = getGlobalStore.getState().serverState[stateKey];
-      return Boolean(
-        serverState && isDeepEqual(serverState, getKeyState(stateKey))
-      );
-    },
   };
   const returnShape = rebuildStateShape({
-    currentState: getGlobalStore.getState().getNestedState(stateKey, []),
+    currentState: getGlobalStore.getState().getShadowValue(stateKey, []),
     componentId,
     path: [],
   });

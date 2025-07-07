@@ -50,30 +50,30 @@ function CounterExample() {
 
   return (
     <SectionWrapper>
-      <h2 className="text-2xl font-semibol</div> text-gray-200 mb-4 tracking-tight">
+      <h2 className="text-2xl font-semibol</div> text-gray-200  tracking-tight">
         Primitives & Core Methods
       </h2>
-      <div className="px-12 py-8">
+      <div className="px-12 py-12">
         <div className="prose prose-invert mb-6 max-w-none">
           <p className="text-sm text-gray-300 leading-relaxed">
-            Cogs State provides two ways to read values:{' '}
+            Cogs State provides two ways to read values:
             <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
               .get()
-            </code>{' '}
-            for reactive reads that trigger re-renders, and{' '}
+            </code>
+            for reactive reads that trigger re-renders, and
             <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
               .$get()
-            </code>{' '}
+            </code>
             for signal-based reads that update the DOM directly without
-            re-rendering. Updates are performed with{' '}
+            re-rendering. Updates are performed with
             <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
               .update()
-            </code>{' '}
+            </code>
             which accepts either a value or an updater function.
           </p>
         </div>
 
-        <div className="grid gap-6">
+        <div className="grid gap-2">
           {/* .get() example */}
           <div className="bg-black/20 rounded-lg p-2 px-4">
             <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
@@ -85,7 +85,7 @@ function CounterExample() {
                 className="px-4 py-2 bg-blue-600  cursor-pointer  text-white rounded-lg hover:bg-blue-500 text-sm"
               >
                 Increment
-              </button>{' '}
+              </button>
               <CodeSnippetDisplay
                 code={`state.simpleCounter.update((prev) => prev + 1);`}
               />
@@ -112,7 +112,7 @@ function CounterExample() {
               </span>
               <CodeSnippetDisplay code={`state.isBooleanValue.get();`} />
             </div>
-          </div>{' '}
+          </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
             Below are the signal versions
           </div>
@@ -126,7 +126,7 @@ function CounterExample() {
                 className="px-4 py-2 bg-blue-600 cursor-pointer text-white rounded-lg hover:bg-blue-500 text-sm"
               >
                 Increment
-              </button>{' '}
+              </button>
               <CodeSnippetDisplay
                 code={`state.simpleCounter2.update((prev) => prev + 1);`}
               />
@@ -154,7 +154,6 @@ function CounterExample() {
           </div>
           <div className=" p-4">
             <p>
-              {' '}
               You may notice in the signal based toggle example above, the
               button itself is not changing color. That is because the signal
               can only exist in a dom node, if we alter the classes (which is
@@ -203,45 +202,44 @@ function FormElementsExample() {
 
   return (
     <div className="grid grid-cols-[70%_30%] gap-6">
-      {' '}
       <SectionWrapper>
-        {' '}
-        <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
-          Form Bindings
-        </h2>
-        <div className="prose prose-invert mb-6 max-w-none">
-          <p className="text-sm text-gray-300 leading-relaxed">
-            The{' '}
-            <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
-              .formElement()
-            </code>{' '}
-            method provides automatic two-way binding for form inputs with
-            intelligent debouncing. It returns a fully type-safe state setter
-            that preserves all methods available on the underlying state type -
-            whether it's a primitive value, object with nested properties, or
-            array with methods like{' '}
-            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
-              .insert()
-            </code>
-            ,{' '}
-            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
-              .cut()
-            </code>
-            , and{' '}
-            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
-              .stateMap()
-            </code>
-            . The{' '}
-            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
-              inputProps
-            </code>{' '}
-            object handles value binding, change events, and form validation
-            while maintaining complete access to the state's API through the
-            same setter instance.
-          </p>
-        </div>
-        <CodeSnippetDisplay
-          code={`// Text input with automatic debouncing
+        <div className="px-12 py-8">
+          <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
+            Form Bindings
+          </h2>
+          <div className="prose prose-invert mb-6 max-w-none">
+            <p className="text-sm text-gray-300 leading-relaxed">
+              The
+              <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
+                .formElement()
+              </code>
+              method provides automatic two-way binding for form inputs with
+              intelligent debouncing. It returns a fully type-safe state setter
+              that preserves all methods available on the underlying state type
+              - whether it's a primitive value, object with nested properties,
+              or array with methods like
+              <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+                .insert()
+              </code>
+              ,
+              <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+                .cut()
+              </code>
+              , and
+              <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+                .stateMap()
+              </code>
+              . The
+              <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+                inputProps
+              </code>
+              object handles value binding, change events, and form validation
+              while maintaining complete access to the state's API through the
+              same setter instance.
+            </p>
+          </div>
+          <CodeSnippetDisplay
+            code={`// Text input with automatic debouncing
 state.firstName.formElement(({inputProps}) => (
   <input {...inputProps} />
 ))
@@ -258,185 +256,179 @@ state.newsletter.formElement(({state}) => (
   <input type="checkbox" checked={state.get()} onChange={() => state.toggle()} />
 ))
 `}
-        />
-        <div className="space-y-6">
-          {/* Form Grid */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* First Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                First Name
-              </label>
-              {state.firstName.formElement((obj) => (
-                <FlashWrapper>
-                  <input
-                    {...obj.inputProps}
-                    placeholder="John"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  />{' '}
-                </FlashWrapper>
-              ))}
-              First Name (copy to show binding)
-              {state.firstName.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <input
-                    {...obj.inputProps}
-                    placeholder="John"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  />{' '}
-                </FlashWrapper>
-              ))}
+          />
+          <div className="space-y-6">
+            {/* Form Grid */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* First Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  First Name
+                </label>
+                {state.firstName.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      {...obj.inputProps}
+                      placeholder="John"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  </FlashWrapper>
+                ))}
+                First Name (copy to show binding)
+                {state.firstName.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      {...obj.inputProps}
+                      placeholder="John"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Last Name
+                </label>
+
+                {state.lastName.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      {...obj.inputProps}
+                      placeholder="Doe"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address
+                </label>
+
+                {state.email.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      {...obj.inputProps}
+                      type="email"
+                      placeholder="john.doe@example.com"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Phone Number
+                </label>
+
+                {state.phoneNumber.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      {...obj.inputProps}
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Country */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Country
+                </label>
+
+                {state.country.formElement((obj) => (
+                  <FlashWrapper>
+                    <select
+                      value={obj.get()}
+                      onChange={(e) => obj.update(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="us">United States</option>
+                      <option value="uk">United Kingdom</option>
+                      <option value="ca">Canada</option>
+                      <option value="au">Australia</option>
+                    </select>
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Theme */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Theme Preference
+                </label>
+
+                {state.theme.formElement((obj) => (
+                  <FlashWrapper>
+                    <select
+                      value={obj.get()}
+                      onChange={(e) => obj.update(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="auto">Auto</option>
+                    </select>
+                  </FlashWrapper>
+                ))}
+              </div>
             </div>
 
-            {/* Last Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Last Name
-              </label>
+            {/* Checkboxes */}
+            <div className="space-y-3 border-t border-gray-700 pt-4">
+              <div className="flex items-center gap-3">
+                {state.newsletter.formElement((obj) => (
+                  <FlashWrapper>
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 accent-blue-500 rounded"
+                      checked={obj.get()}
+                      onChange={() => obj.toggle()}
+                    />
+                  </FlashWrapper>
+                ))}
 
-              {state.lastName.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <input
-                    {...obj.inputProps}
-                    placeholder="Doe"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  />{' '}
-                </FlashWrapper>
-              ))}
+                <label className="text-sm text-gray-300">
+                  Subscribe to newsletter for updates and special offers
+                </label>
+              </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
+            {/* Active Numbers Toggle */}
+            <div className="border-t border-gray-700 pt-4">
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Notification Days
               </label>
-
-              {state.email.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <input
-                    {...obj.inputProps}
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  />{' '}
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Phone Number
-              </label>
-
-              {state.phoneNumber.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <input
-                    {...obj.inputProps}
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  />{' '}
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Country */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Country
-              </label>
-
-              {state.country.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <select
-                    value={obj.get()}
-                    onChange={(e) => obj.update(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="us">United States</option>
-                    <option value="uk">United Kingdom</option>
-                    <option value="ca">Canada</option>
-                    <option value="au">Australia</option>
-                  </select>{' '}
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Theme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Theme Preference
-              </label>
-
-              {state.theme.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <select
-                    value={obj.get()}
-                    onChange={(e) => obj.update(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto</option>
-                  </select>{' '}
-                </FlashWrapper>
-              ))}
-            </div>
-          </div>
-
-          {/* Checkboxes */}
-          <div className="space-y-3 border-t border-gray-700 pt-4">
-            <div className="flex items-center gap-3">
-              {state.newsletter.formElement((obj) => (
-                <FlashWrapper>
-                  {' '}
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 accent-blue-500 rounded"
-                    checked={obj.get()}
-                    onChange={() => obj.toggle()}
-                  />{' '}
-                </FlashWrapper>
-              ))}
-
-              <label className="text-sm text-gray-300">
-                Subscribe to newsletter for updates and special offers
-              </label>
-            </div>
-          </div>
-
-          {/* Active Numbers Toggle */}
-          <div className="border-t border-gray-700 pt-4">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Notification Days
-            </label>
-            <div className="flex gap-2">
-              {state.daysOfWeek.formElement((obj) => (
-                <>
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
-                    (day, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => obj.toggleByValue(idx)}
-                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                          obj.get().includes(idx)
-                            ? 'bg-blue-600 text-white hover:bg-blue-500'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    )
-                  )}
-                </>
-              ))}
+              <div className="flex gap-2">
+                {state.daysOfWeek.formElement((obj) => (
+                  <>
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                      (day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => obj.toggleByValue(idx)}
+                          className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                            obj.get().includes(idx)
+                              ? 'bg-blue-600 text-white hover:bg-blue-500'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      )
+                    )}
+                  </>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -543,22 +535,22 @@ function ArrayManipulationExample() {
       <div className="px-12 py-8">
         <div className="prose prose-invert mb-6 max-w-none">
           <p className="text-sm text-gray-300 leading-relaxed">
-            Arrays in Cogs State support rich manipulation methods like{' '}
+            Arrays in Cogs State support rich manipulation methods like
             <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
               .insert()
             </code>
-            ,{' '}
+            ,
             <code className="text-red-400 bg-gray-800 px-1 py-0.5 rounded">
               .cut()
             </code>
-            , and{' '}
+            , and
             <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
               .getSelected()
             </code>
-            . Items can be selected with{' '}
+            . Items can be selected with
             <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
               .toggleSelected()
-            </code>{' '}
+            </code>
             and operations can target selected items directly.
           </p>
         </div>
@@ -603,7 +595,7 @@ function ArrayManipulationExample() {
           </div>
           {selectedTodo && (
             <div className="text-xs text-gray-400 mt-2 border-t border-gray-700 pt-2">
-              Selected:{' '}
+              Selected:
               <span className="text-blue-400">{selectedTodo.text.get()}</span>
             </div>
           )}
@@ -634,7 +626,7 @@ function ArrayManipulationExample() {
 }));`}
               />
               <div className="text-gray-200 font-medium">
-                Count:{' '}
+                Count:
                 <span className="text-purple-400">{todos.get().length}</span>
               </div>
               <CodeSnippetDisplay code={`todos.get().length`} />
@@ -653,7 +645,7 @@ function ArrayManipulationExample() {
               </button>
               <CodeSnippetDisplay code={`todos.cut(0);`} />
               <div className="text-gray-200 font-medium">
-                First:{' '}
+                First:
                 <span className="text-red-400">
                   {todos.get().length > 0 ? todos.get()[0].text : 'None'}
                 </span>
@@ -674,7 +666,7 @@ function ArrayManipulationExample() {
               </button>
               <CodeSnippetDisplay code={`todos.cutSelected();`} />
               <div className="text-gray-200 font-medium">
-                Selected:{' '}
+                Selected:
                 <span className="text-red-400">
                   {selectedTodo ? selectedTodo.text.get() : 'None'}
                 </span>
@@ -699,7 +691,7 @@ function ArrayManipulationExample() {
               </button>
               <CodeSnippetDisplay code={`todos.index(0)?.toggleSelected();`} />
               <div className="text-gray-200 font-medium">
-                Index:{' '}
+                Index:
                 <span className="text-blue-400">
                   {todos.getSelectedIndex() !== -1
                     ? todos.getSelectedIndex()
@@ -722,7 +714,7 @@ function ArrayManipulationExample() {
               </button>
               <CodeSnippetDisplay code={`todos.clearSelected();`} />
               <div className="text-gray-200 font-medium">
-                Has Selection:{' '}
+                Has Selection:
                 <span className="text-gray-400">
                   {selectedTodo ? 'Yes' : 'No'}
                 </span>

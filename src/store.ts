@@ -160,7 +160,11 @@ export type CogsEvent =
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
   shadowStateStore: Map<string, ShadowMetadata>;
-
+  markAsDirty: (
+    key: string,
+    path: string[],
+    options: { bubble: boolean }
+  ) => void;
   // These method signatures stay the same
   initializeShadowState: (key: string, initialState: any) => void;
   updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
@@ -175,7 +179,7 @@ export type CogsGlobalState = {
 
     validArrayIds?: string[]
   ) => any;
-  setShadowValue: (key: string, value: any, validArrayIds?: string[]) => any;
+
   getShadowMetadata: (
     key: string,
     path: string[]
@@ -206,34 +210,13 @@ export type CogsGlobalState = {
   clearSelectedIndexesForState: (stateKey: string) => void;
 
   // --- Core State and Updaters ---
-  updaterState: { [key: string]: any };
-  initialStateOptions: { [key: string]: OptionsType };
-  cogsStateStore: { [key: string]: StateValue };
-  isLoadingGlobal: { [key: string]: boolean };
-  initialStateGlobal: { [key: string]: StateValue };
-  iniitialCreatedState: { [key: string]: StateValue };
-  serverState: { [key: string]: StateValue };
 
-  getUpdaterState: (key: string) => StateUpdater<StateValue>;
-  setUpdaterState: (key: string, newUpdater: any) => void;
-  getKeyState: <StateKey extends StateKeys>(key: StateKey) => StateValue;
-  getNestedState: <StateKey extends StateKeys>(
-    key: StateKey,
-    path: string[]
-  ) => StateValue;
-  setState: <StateKey extends StateKeys>(
-    key: StateKey,
-    value: StateUpdater<StateValue>
-  ) => void;
-  setInitialStates: (initialState: StateValue) => void;
-  setCreatedState: (initialState: StateValue) => void;
+  initialStateOptions: { [key: string]: OptionsType };
+
+  initialStateGlobal: { [key: string]: StateValue };
+
   updateInitialStateGlobal: (key: string, newState: StateValue) => void;
-  updateInitialCreatedState: (key: string, newState: StateValue) => void;
-  setIsLoadingGlobal: (key: string, value: boolean) => void;
-  setServerState: <StateKey extends StateKeys>(
-    key: StateKey,
-    value: StateValue
-  ) => void;
+
   getInitialOptions: (key: string) => OptionsType | undefined;
   setInitialStateOptions: (key: string, value: OptionsType) => void;
 
@@ -256,14 +239,8 @@ export type CogsGlobalState = {
 
   setServerStateUpdate: (key: string, serverState: any) => void;
 
-  serverSyncLog: { [key: string]: SyncLogType[] };
   stateLog: { [key: string]: UpdateTypeDetail[] };
   syncInfoStore: Map<string, SyncInfo>;
-  serverSideOrNot: { [key: string]: boolean };
-  setServerSyncLog: (key: string, newValue: SyncLogType) => void;
-  setServerSideOrNot: (key: string, value: boolean) => void;
-  getServerSideOrNot: (key: string) => boolean | undefined;
-  getThisLocalUpdate: (key: string) => UpdateTypeDetail[] | undefined;
 
   setStateLog: (
     key: string,
@@ -271,51 +248,6 @@ export type CogsGlobalState = {
   ) => void;
   setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
   getSyncInfo: (key: string) => SyncInfo | null;
-
-  // --- Component and DOM Integration ---
-  signalDomElements: Map<
-    string,
-    Set<{
-      instanceId: string;
-      parentId: string;
-      position: number;
-      effect?: string;
-      map?: string;
-    }>
-  >;
-  addSignalElement: (
-    signalId: string,
-    elementInfo: {
-      instanceId: string;
-      parentId: string;
-      position: number;
-      effect?: string;
-      map?: string;
-    }
-  ) => void;
-  removeSignalElement: (signalId: string, instanceId: string) => void;
-  stateComponents: Map<string, ComponentsType>;
-
-  // --- Deprecated/Legacy (Review for removal) ---
-  reRenderTriggerPrevValue: Record<string, any>;
-  reactiveDeps: Record<
-    string,
-    {
-      deps: any[];
-      updaters: Set<() => void>;
-      depsFunction: ((state: any) => any[] | true) | null;
-    }
-  >;
-  setReactiveDeps: (
-    key: string,
-    record: {
-      deps: any[];
-      updaters: Set<() => void>;
-      depsFunction: ((state: any) => any[] | true) | null;
-    }
-  ) => void;
-  deleteReactiveDeps: (key: string) => void;
-  subscribe: (listener: () => void) => () => void;
 };
 const isSimpleObject = (value: any): boolean => {
   if (value === null || typeof value !== 'object') return false;
@@ -343,6 +275,40 @@ const isSimpleObject = (value: any): boolean => {
   return Array.isArray(value) || value.constructor === Object;
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  markAsDirty: (key: string, path: string[], options = { bubble: true }) => {
+    const newShadowStore = new Map(get().shadowStateStore);
+    let changed = false;
+
+    // This function marks a single path as dirty if it was previously synced.
+    const setDirty = (currentPath: string[]) => {
+      const fullKey = [key, ...currentPath].join('.');
+      const meta = newShadowStore.get(fullKey);
+
+      // We only mark something as dirty if it was previously synced from the server.
+      // We also check `isDirty !== true` to avoid redundant updates.
+      if (meta && meta.stateSource === 'server' && meta.isDirty !== true) {
+        newShadowStore.set(fullKey, { ...meta, isDirty: true });
+        changed = true;
+      }
+    };
+
+    // 1. Mark the target path itself as dirty.
+    setDirty(path);
+
+    // 2. If `bubble` is true, walk up the path and mark all parents as dirty.
+    if (options.bubble) {
+      let parentPath = [...path];
+      while (parentPath.length > 0) {
+        parentPath.pop();
+        setDirty(parentPath);
+      }
+    }
+
+    // Only update the global state if something actually changed.
+    if (changed) {
+      set({ shadowStateStore: newShadowStore });
+    }
+  },
   serverStateUpdates: new Map(),
   setServerStateUpdate: (key, serverState) => {
     set((state) => {
@@ -463,64 +429,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     return undefined;
   },
-  setShadowValue: (key: string, value: any, validArrayIds?: string[]) => {
-    const shadowMeta = get().shadowStateStore.get(key);
-
-    // For primitive values, set directly
-    if (shadowMeta?.value !== undefined || !shadowMeta) {
-      get().shadowStateStore.set(key, { value });
-
-      return;
-    }
-
-    // For arrays
-    if (shadowMeta.arrayKeys) {
-      const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
-
-      // Update array metadata
-      get().shadowStateStore.set(key, {
-        ...shadowMeta,
-        arrayKeys: arrayKeys,
-      });
-
-      // Update each array item
-      value.forEach((item: any, index: number) => {
-        const itemKey = arrayKeys[index]!;
-        if (typeof item === 'object') {
-          // For object items, update their fields
-          const itemMeta = get().shadowStateStore.get(itemKey);
-          if (itemMeta?.fields) {
-            Object.entries(item).forEach(([fieldKey, fieldValue]) => {
-              const fieldPath = itemMeta.fields![fieldKey];
-              if (fieldPath) {
-                get().shadowStateStore.set(fieldPath as string, {
-                  value: fieldValue,
-                });
-              }
-            });
-          }
-        } else {
-          // For primitive items
-          get().shadowStateStore.set(itemKey, { value: item });
-        }
-      });
-      return;
-    }
-
-    // For objects with fields
-    if (shadowMeta.fields) {
-      Object.entries(value).forEach(([fieldKey, fieldValue]) => {
-        const fieldPath = shadowMeta.fields![fieldKey];
-        if (fieldPath) {
-          get().shadowStateStore.set(fieldPath as string, {
-            value: fieldValue,
-          });
-        }
-      });
-      return;
-    }
-    get().notifyPathSubscribers(key, value);
-  },
   getShadowMetadata: (
     key: string,
     path: string[],
@@ -575,7 +483,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     const arrayKey = [key, ...arrayPath].join('.');
     const parentMeta = newShadowStore.get(arrayKey);
-
+    console.log('parentMetaparentMetaparentMeta', parentMeta);
     if (!parentMeta || !parentMeta.arrayKeys) return;
 
     // Generate the ID if it doesn't have one
@@ -761,114 +669,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       }
     });
   },
-  stateComponents: new Map(),
-  subscribe: (listener: () => void) => {
-    // zustand's subscribe returns an unsubscribe function
-    return get().subscribe(listener);
-  },
 
-  reactiveDeps: {},
-  setReactiveDeps: (key, record) =>
-    set((state) => ({
-      ...state,
-      reactiveDeps: {
-        ...state.reactiveDeps,
-        [key]: record,
-      },
-    })),
-  deleteReactiveDeps: (key) =>
-    set((state) => {
-      const { [key]: _, ...rest } = state.reactiveDeps;
-      return {
-        ...state,
-        reactiveDeps: rest,
-      };
-    }),
-
-  reRenderTriggerPrevValue: {},
-  signalDomElements: new Map(),
-  addSignalElement: (
-    signalId: string,
-    elementInfo: { instanceId: string; parentId: string; position: number }
-  ) => {
-    const current = get().signalDomElements;
-    if (!current.has(signalId)) {
-      current.set(signalId, new Set());
-    }
-    current.get(signalId)!.add(elementInfo);
-
-    set({ signalDomElements: new Map(current) }); // Create new reference to trigger update
-  },
-  removeSignalElement: (signalId: string, instanceId: string) => {
-    const current = get().signalDomElements;
-    const elements = current.get(signalId);
-    if (elements) {
-      elements.forEach((el) => {
-        if (el.instanceId === instanceId) {
-          elements.delete(el);
-        }
-      });
-    }
-    set({ signalDomElements: new Map(current) });
-  },
   initialStateOptions: {},
-  updaterState: {},
+
   stateTimeline: {},
   cogsStateStore: {},
   stateLog: {},
-  isLoadingGlobal: {},
 
   initialStateGlobal: {},
-  iniitialCreatedState: {},
-  updateInitialCreatedState: (key, newState) => {
-    set((prev) => ({
-      iniitialCreatedState: {
-        ...prev.iniitialCreatedState,
-        [key]: newState,
-      },
-    }));
-  },
 
   validationErrors: new Map(),
-
-  serverState: {},
-
-  serverSyncLog: {},
-  serverSideOrNot: {},
-  setServerSyncLog: (key, newValue) => {
-    set((state) => ({
-      serverSyncLog: {
-        ...state.serverSyncLog,
-        [key]: [...(state.serverSyncLog[key] ?? []), newValue],
-      },
-    }));
-  },
-  setServerSideOrNot: (key, value) => {
-    set((state) => ({
-      serverSideOrNot: {
-        ...state.serverSideOrNot,
-        [key]: value,
-      },
-    }));
-  },
-  getServerSideOrNot: (key) => {
-    return get().serverSideOrNot[key];
-  },
-
-  getThisLocalUpdate: (key: string) => {
-    return get().stateLog[key];
-  },
-  setServerState: <StateKey extends StateKeys>(
-    key: StateKey,
-    value: StateValue
-  ) => {
-    set((prev) => ({
-      serverState: {
-        ...prev.serverState,
-        [key]: value,
-      },
-    }));
-  },
 
   setStateLog: (
     key: string,
@@ -884,14 +694,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         },
       };
     });
-  },
-  setIsLoadingGlobal: (key: string, value: boolean) => {
-    set((prev) => ({
-      isLoadingGlobal: {
-        ...prev.isLoadingGlobal,
-        [key]: value,
-      },
-    }));
   },
 
   addValidationError: (path, message) => {
@@ -987,48 +789,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   getInitialOptions: (key) => {
     return get().initialStateOptions[key];
   },
-  getNestedState: (key: string, path: string[]) => {
-    const rootState = get().cogsStateStore[key];
 
-    const resolvePath = (obj: any, pathArray: string[]): any => {
-      if (pathArray.length === 0 || obj === undefined) {
-        return obj;
-      }
-
-      const currentSegment = pathArray[0];
-      const remainingPath = pathArray.slice(1);
-
-      // FIX: Handle ID-based array access like 'id:xyz'
-      if (
-        Array.isArray(obj) &&
-        typeof currentSegment === 'string' &&
-        currentSegment.startsWith('id:')
-      ) {
-        const targetId = currentSegment.split(':')[1];
-        const foundItem = obj.find(
-          (item) => item && String(item.id) === targetId
-        );
-        return resolvePath(foundItem, remainingPath);
-      }
-
-      // Handle wildcard array access: '[*]'
-      if (currentSegment === '[*]') {
-        if (!Array.isArray(obj)) {
-          console.warn('Asterisk notation used on non-array value');
-          return undefined;
-        }
-        if (remainingPath.length === 0) return obj;
-        const results = obj.map((item) => resolvePath(item, remainingPath));
-        return Array.isArray(results[0]) ? results.flat() : results;
-      }
-
-      // Handle standard object property access and numeric array indices
-      const nextObj = obj[currentSegment as keyof typeof obj];
-      return resolvePath(nextObj, remainingPath);
-    };
-
-    return resolvePath(rootState, path);
-  },
   setInitialStateOptions: (key, value) => {
     set((prev) => ({
       initialStateOptions: {
@@ -1042,49 +803,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       initialStateGlobal: {
         ...prev.initialStateGlobal,
         [key]: newState,
-      },
-    }));
-  },
-  getUpdaterState: (key) => {
-    return get().updaterState[key];
-  },
-  setUpdaterState: (key, newUpdater) => {
-    const current = get().updaterState;
-
-    if (!key || !newUpdater) return;
-
-    set({ updaterState: { ...(current ?? {}), [key]: newUpdater } });
-  },
-  getKeyState: <StateKey extends StateKeys>(key: StateKey) => {
-    return get().cogsStateStore[key];
-  },
-
-  setState: <StateKey extends StateKeys>(key: StateKey, value: StateValue) => {
-    set((prev) => {
-      return {
-        cogsStateStore: {
-          ...prev.cogsStateStore,
-          [key]:
-            typeof value === 'function'
-              ? value(prev.cogsStateStore[key])
-              : value,
-        },
-      };
-    });
-  },
-  setInitialStates: <StateKey extends StateKeys>(initialState: StateValue) => {
-    set((prev) => ({
-      cogsStateStore: {
-        ...prev.cogsStateStore,
-        ...initialState,
-      },
-    }));
-  },
-  setCreatedState: (initialState: StateValue) => {
-    set((prev) => ({
-      iniitialCreatedState: {
-        ...prev.cogsStateStore,
-        ...initialState,
       },
     }));
   },
