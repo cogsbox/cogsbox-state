@@ -10,8 +10,10 @@ export type TodoItem = {
 
 export type AppState = {
   simpleCounter: number;
+  simpleCounter2: number;
   inputMessage: string;
   isBooleanValue: boolean;
+  isBooleanValue2: boolean;
   todoList: TodoItem[];
   daysOfWeek: number[];
   // Additional form fields
@@ -27,8 +29,10 @@ export type AppState = {
 // --- Initial state ---
 const initialAppState: AppState = {
   simpleCounter: 0,
+  simpleCounter2: 0,
   inputMessage: 'Hello Cogs State!',
   isBooleanValue: false,
+  isBooleanValue2: false,
   todoList: [
     { id: uuidv4(), text: 'Initial Todo 1', done: false },
     { id: uuidv4(), text: 'Initial Todo 2 (Done)', done: true },

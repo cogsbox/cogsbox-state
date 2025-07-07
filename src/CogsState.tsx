@@ -16,8 +16,10 @@ import {
 } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
+  debounce,
   getDifferences,
   getNestedValue,
+  isArray,
   isFunction,
   type GenericObject,
 } from './utility.js';
@@ -25,7 +27,7 @@ import { ValidationWrapper } from './Functions.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod';
+import { array, z } from 'zod';
 
 import {
   formRefStore,
@@ -53,7 +55,7 @@ export type VirtualStateObjectResult<T extends any[]> = {
    * A new, fully-functional StateObject that represents the virtualized slice.
    * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
    */
-  virtualList: StateObject<T>['virtualList'];
+
   virtualState: StateObject<T>;
   /**
    * Props to be spread onto your DOM elements to enable virtualization.
@@ -132,8 +134,27 @@ type ArraySpecificPrototypeKeys =
   | 'filter'
   | 'forEach'
   | 'with';
+export type StreamOptions<T, R = T> = {
+  bufferSize?: number;
+  flushInterval?: number;
+  bufferStrategy?: 'sliding' | 'dropping' | 'accumulate';
+  store?: (buffer: T[]) => R | R[]; // Transform buffer into what gets stored
+  onFlush?: (buffer: T[]) => void;
+};
+
+export type StreamHandle<T> = {
+  write: (data: T) => void;
+  writeMany: (data: T[]) => void;
+  flush: () => void;
+  close: () => void;
+  pause: () => void;
+  resume: () => void;
+};
 
 export type ArrayEndType<TShape extends unknown> = {
+  stream: <T = InferArrayElement<TShape>, R = T>(
+    options?: StreamOptions<T, R>
+  ) => StreamHandle<T>;
   findWith: findWithFuncType<InferArrayElement<TShape>>;
   index: (index: number) => StateObject<InferArrayElement<TShape>> & {
     insert: InsertType<InferArrayElement<TShape>>;
@@ -155,14 +176,7 @@ export type ArrayEndType<TShape extends unknown> = {
   useVirtualView: (
     options: VirtualViewOptions
   ) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
-  virtualList: (
-    callbackfn: (
-      setter: StateObject<InferArrayElement<TShape>>,
-      index: number,
 
-      arraySetter: StateObject<TShape>
-    ) => void
-  ) => any;
   stateList: (
     callbackfn: (
       setter: StateObject<InferArrayElement<TShape>>,
@@ -1000,6 +1014,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
       deps: reactiveDeps
         ? reactiveDeps(getGlobalStore.getState().getShadowValue(thisKey))
         : [],
+      prevDeps: reactiveDeps // Initialize prevDeps with the same initial value
+        ? reactiveDeps(getGlobalStore.getState().getShadowValue(thisKey))
+        : [],
     });
 
     getGlobalStore.getState().setShadowMetadata(thisKey, [], {
@@ -1120,12 +1137,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 'deps',
                 `return (${signal.effect})(state, deps)`
               );
-              console.log(
-                'dsadasdasdasdasdasdasd',
-                signal.deps,
-                updatedShadowValue,
-                effectFn(updatedShadowValue, signal.deps)
-              );
+
               newClasses = effectFn(updatedShadowValue, signal.deps); //updatedShadowValue
 
               // Only touch the DOM if the calculated classes have actually changed
@@ -1506,22 +1518,29 @@ export function useCogsStateFn<TStateObject extends unknown>(
         // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
         if (reactiveTypes.includes('deps')) {
           if (component.depsFunction) {
-            const newDeps = component.depsFunction(newState);
+            const currentState = store.getShadowValue(thisKey);
+            const newDeps = component.depsFunction(currentState);
             let shouldUpdate = false;
-
+            console.log('newDeps', componentId, component, newDeps);
             // Case 1: The function returned `true` explicitly.
             if (newDeps === true) {
               shouldUpdate = true;
             }
             // Case 2: The function returned a dependency array.
             else if (Array.isArray(newDeps)) {
-              if (!isDeepEqual(component.deps, newDeps)) {
+              // Compare against the PREVIOUS deps, not component.deps
+              if (!isDeepEqual(component.prevDeps, newDeps)) {
                 // The dependencies have changed, update the stored value for the next check.
-                component.deps = newDeps;
+                component.prevDeps = newDeps;
                 shouldUpdate = true;
               }
             }
-
+            console.log(
+              'newDeps shouldUpdate',
+              componentId,
+              shouldUpdate,
+              notifiedComponents
+            );
             if (shouldUpdate) {
               component.forceUpdate();
               notifiedComponents.add(componentId);
@@ -1529,6 +1548,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           }
         }
       });
+      notifiedComponents.clear();
       setStateLog(thisKey, (prevLogs) => {
         const logs = [...(prevLogs ?? []), newUpdate];
         const aggregatedLogs = new Map<string, typeof newUpdate>();
@@ -1715,6 +1735,52 @@ const registerComponentDependency = (
     ...pathMeta,
     pathComponents,
   });
+};
+
+const notifySelectionComponents = (
+  stateKey: string,
+  parentPath: string[],
+  currentSelected?: string | undefined
+) => {
+  const store = getGlobalStore.getState();
+  const rootMeta = store.getShadowMetadata(stateKey, []);
+  const notifiedComponents = new Set<string>();
+
+  // Handle "all" reactive components first
+  if (rootMeta?.components) {
+    rootMeta.components.forEach((component, componentId) => {
+      const reactiveTypes = Array.isArray(component.reactiveType)
+        ? component.reactiveType
+        : [component.reactiveType || 'component'];
+
+      if (reactiveTypes.includes('all')) {
+        component.forceUpdate();
+        notifiedComponents.add(componentId);
+      }
+    });
+  }
+
+  store
+    .getShadowMetadata(stateKey, [...parentPath, 'getSelected'])
+    ?.pathComponents?.forEach((componentId) => {
+      const thisComp = rootMeta?.components?.get(componentId);
+      thisComp?.forceUpdate();
+    });
+
+  const parentMeta = store.getShadowMetadata(stateKey, parentPath);
+  for (let arrayKey of parentMeta?.arrayKeys || []) {
+    const key = arrayKey + '.selected';
+    const selectedItem = store.getShadowMetadata(
+      stateKey,
+      key.split('.').slice(1)
+    );
+    if (arrayKey == currentSelected) {
+      selectedItem?.pathComponents?.forEach((componentId) => {
+        const thisComp = rootMeta?.components?.get(componentId);
+        thisComp?.forceUpdate();
+      });
+    }
+  }
 };
 function createProxyHandler<T>(
   stateKey: string,
@@ -1949,8 +2015,11 @@ function createProxyHandler<T>(
             };
           }
           if (prop === 'clearSelected') {
+            notifySelectionComponents(stateKey, path);
             return () => {
-              getGlobalStore.getState().clearSelectedIndex({ stateKey, path });
+              getGlobalStore.getState().clearSelectedIndex({
+                arrayKey: stateKey + '.' + path.join('.'),
+              });
             };
           }
 
@@ -1963,7 +2032,7 @@ function createProxyHandler<T>(
                 overscan = 6,
                 stickToBottom = false,
               } = options;
-
+              const initialScrollRef = useRef(true);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
@@ -1973,7 +2042,7 @@ function createProxyHandler<T>(
               const measurementCache = useRef(
                 new Map<string, { height: number; offset: number }>()
               );
-              const [forceUpdate, setForceUpdate] = useState(0); // This is our trigger
+
               const mutationObserverRef = useRef<MutationObserver | null>(null);
               // Calculate total height based on actual array length
               const arrayKeys =
@@ -2003,12 +2072,13 @@ function createProxyHandler<T>(
                     height: measuredHeight,
                     offset: runningOffset,
                   });
+
                   runningOffset += measuredHeight;
                 });
 
                 measurementCache.current = offsets; // Keep the ref updated
                 return { totalHeight: runningOffset, itemOffsets: offsets };
-              }, [arrayKeys.length, forceUpdate]);
+              }, [arrayKeys]);
 
               // Always show the last N items when stickToBottom is true
               useLayoutEffect(() => {
@@ -2026,9 +2096,9 @@ function createProxyHandler<T>(
                     0,
                     endIndex - visibleCount - overscan
                   );
-                  setRange({ startIndex, endIndex });
+                  //  setRange({ startIndex, endIndex });
                 }
-              }, [arrayKeys.length, stickToBottom]);
+              }, [arrayKeys.length, stickToBottom, totalHeight]);
 
               const userHasScrolledUpCountRef = useRef(0);
               const lastScrollTopRef = useRef(0);
@@ -2054,11 +2124,6 @@ function createProxyHandler<T>(
                     container.scrollHeight - 10 <
                     container.scrollTop + container.clientHeight
                   ) {
-                    console.log(
-                      'sdasdasdsadas',
-                      container.scrollHeight,
-                      container.scrollTop + container.clientHeight
-                    );
                     scrolledFromBottomConfirmed.current = false;
                   }
 
@@ -2109,13 +2174,19 @@ function createProxyHandler<T>(
                     container.scrollHeight + 30 >
                       container.scrollTop + container.clientHeight
                   ) {
-                    container.scrollTop = container.scrollHeight;
+                    container.scrollTo({
+                      top: container.scrollHeight,
+                      behavior: initialScrollRef.current ? 'instant' : 'smooth',
+                    });
                   }
                 };
 
                 // Create observer that watches for any DOM changes
+                const debouncedScrollToBottom = debounce(scrollToBottom, 300);
+
+                // Create observer that calls our debounced function
                 mutationObserverRef.current = new MutationObserver(() => {
-                  scrollToBottom();
+                  debouncedScrollToBottom();
                 });
 
                 // Watch for changes in the container and all its children
@@ -2139,23 +2210,6 @@ function createProxyHandler<T>(
                   container.removeEventListener('load', handleImageLoad, true);
                 };
               }, [stickToBottom]);
-
-              // Subscribe to INSERT events
-              useEffect(() => {
-                if (!stickToBottom) return;
-
-                const unsubscribe = getGlobalStore
-                  .getState()
-                  .subscribeToPath(stateKeyPathKey, (event: any) => {
-                    if (event.type === 'ITEMHEIGHT') {
-                      // A new height was measured. Just trigger a forceUpdate.
-                      // The useMemo will do the rest of the work.
-                      setForceUpdate((c) => c + 1);
-                    }
-                  });
-
-                return unsubscribe;
-              }, [stateKey, path, stickToBottom]);
 
               // Create virtual state
               const virtualState = useMemo(() => {
@@ -2184,7 +2238,6 @@ function createProxyHandler<T>(
               }, [range.startIndex, range.endIndex, arrayKeys.length]);
 
               return {
-                virtualList: virtualState.virtualList,
                 virtualState,
                 virtualizerProps: {
                   outer: {
@@ -2365,71 +2418,114 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === 'virtualList') {
-            return (
-              callbackfn: (
-                setter: any,
-                index: number,
+          // In createProxyHandler, inside the get trap where you have other array methods:
+          if (prop === 'stream') {
+            return function <U = InferArrayElement<T>, R = U>(
+              options: StreamOptions<U, R> = {}
+            ): StreamHandle<U> {
+              const {
+                bufferSize = 100,
+                flushInterval = 100,
+                bufferStrategy = 'accumulate',
+                store,
+                onFlush,
+              } = options;
 
-                arraySetter: any
-              ) => ReactNode
-            ) => {
-              const [render, forceUpdate] = useState(0);
+              let buffer: U[] = [];
+              let isPaused = false;
+              let flushTimer: NodeJS.Timeout | null = null;
 
-              const arrayToMap = getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey, meta?.validIds);
+              const addToBuffer = (item: U) => {
+                if (isPaused) return;
 
-              getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-                forceUpdate((p) => p + 1);
-              });
+                if (
+                  bufferStrategy === 'sliding' &&
+                  buffer.length >= bufferSize
+                ) {
+                  buffer.shift();
+                } else if (
+                  bufferStrategy === 'dropping' &&
+                  buffer.length >= bufferSize
+                ) {
+                  return;
+                }
 
-              if (!Array.isArray(arrayToMap)) {
-                return null;
+                buffer.push(item);
+
+                if (buffer.length >= bufferSize) {
+                  flushBuffer();
+                }
+              };
+
+              const flushBuffer = () => {
+                if (buffer.length === 0) return;
+
+                const toFlush = [...buffer];
+                buffer = [];
+
+                if (store) {
+                  const result = store(toFlush);
+                  if (result !== undefined) {
+                    const items = Array.isArray(result) ? result : [result];
+                    items.forEach((item) => {
+                      effectiveSetState(item as any, path, {
+                        updateType: 'insert',
+                      });
+                    });
+                  }
+                } else {
+                  toFlush.forEach((item) => {
+                    effectiveSetState(item as any, path, {
+                      updateType: 'insert',
+                    });
+                  });
+                }
+
+                onFlush?.(toFlush);
+              };
+
+              if (flushInterval > 0) {
+                flushTimer = setInterval(flushBuffer, flushInterval);
               }
 
-              const itemKeysForCurrentView =
-                meta?.validIds ||
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys ||
-                [];
+              const streamId = uuidv4();
+              const currentMeta =
+                getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                {};
+              const streams = currentMeta.streams || new Map();
+              streams.set(streamId, { buffer, flushTimer });
 
-              const arraySetter = rebuildStateShape({
-                currentState: arrayToMap as any,
-                path,
-                componentId: componentId!,
-                meta,
+              getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+                ...currentMeta,
+                streams,
               });
 
-              return arrayToMap.map((item, localIndex) => {
-                const itemKey = itemKeysForCurrentView[localIndex];
+              return {
+                write: (data: U) => addToBuffer(data),
+                writeMany: (data: U[]) => data.forEach(addToBuffer),
+                flush: () => flushBuffer(),
+                pause: () => {
+                  isPaused = true;
+                },
+                resume: () => {
+                  isPaused = false;
+                  if (buffer.length > 0) flushBuffer();
+                },
+                close: () => {
+                  flushBuffer();
+                  if (flushTimer) clearInterval(flushTimer);
 
-                if (!itemKey) {
-                  return null;
-                }
-                const itemComponentId = uuidv4();
-
-                const itemPath = itemKey.split('.').slice(1);
-                const setter = rebuildStateShape({
-                  currentState: item,
-                  path: itemPath,
-                  componentId: itemComponentId!,
-                  meta,
-                });
-
-                return createElement(MemoizedCogsItemWrapper, {
-                  key: itemKey,
-                  stateKey,
-                  itemComponentId,
-                  itemPath,
-                  localIndex,
-                  arraySetter, // Pass the array's setter
-                  rebuildStateShape, // Pass the function that creates new proxies
-                  renderFn: callbackfn, // Pass the render function itself, not its result
-                });
-              });
+                  const meta = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, path);
+                  if (meta?.streams) {
+                    meta.streams.delete(streamId);
+                  }
+                },
+              };
             };
           }
+
           if (prop === 'stateList') {
             return (
               callbackfn: (
@@ -2441,17 +2537,13 @@ function createProxyHandler<T>(
               const StateListWrapper = () => {
                 const componentIdsRef = useRef<Map<string, string>>(new Map());
 
-                // Compute cache key dynamically for the CURRENT render. This is correct.
                 const cacheKey =
                   meta?.transforms && meta.transforms.length > 0
                     ? `${componentId}-${hashTransforms(meta.transforms)}`
                     : `${componentId}-base`;
 
-                // Force update mechanism. This is correct.
                 const [updateTrigger, forceUpdate] = useState({});
 
-                // This useMemo block is now correct because the useEffect below
-                // guarantees that on a data update, the cache will be empty.
                 const { validIds, arrayValues } = useMemo(() => {
                   const cached = getGlobalStore
                     .getState()
@@ -2461,10 +2553,8 @@ function createProxyHandler<T>(
                   let freshValidIds: string[];
 
                   if (cached && cached.validIds) {
-                    // Cache HIT: This only happens on re-renders NOT caused by a data update.
                     freshValidIds = cached.validIds;
                   } else {
-                    // Cache MISS: Guaranteed to happen after a data update.
                     freshValidIds = applyTransforms(
                       stateKey,
                       path,
@@ -2490,12 +2580,10 @@ function createProxyHandler<T>(
                   };
                 }, [cacheKey, updateTrigger]);
 
-                // --- THIS IS THE CORRECT FIX ---
-                // The subscription now purges ALL cache entries for this component.
                 useEffect(() => {
                   const unsubscribe = getGlobalStore
                     .getState()
-                    .subscribeToPath(stateKeyPathKey, () => {
+                    .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
 
                       const shadowMeta = getGlobalStore
@@ -2956,51 +3044,6 @@ function createProxyHandler<T>(
           }
           return undefined;
         }
-        const notifySelectionComponents = (
-          stateKey: string,
-          parentPath: string[],
-          currentSelected: string | undefined
-        ) => {
-          const store = getGlobalStore.getState();
-          const rootMeta = store.getShadowMetadata(stateKey, []);
-          const notifiedComponents = new Set<string>();
-
-          // Handle "all" reactive components first
-          if (rootMeta?.components) {
-            rootMeta.components.forEach((component, componentId) => {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
-
-              if (reactiveTypes.includes('all')) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
-              }
-            });
-          }
-
-          store
-            .getShadowMetadata(stateKey, [...parentPath, 'getSelected'])
-            ?.pathComponents?.forEach((componentId) => {
-              const thisComp = rootMeta?.components?.get(componentId);
-              thisComp?.forceUpdate();
-            });
-
-          const parentMeta = store.getShadowMetadata(stateKey, parentPath);
-          for (let arrayKey of parentMeta?.arrayKeys || []) {
-            const key = arrayKey + '.selected';
-            const selectedItem = store.getShadowMetadata(
-              stateKey,
-              key.split('.').slice(1)
-            );
-            if (arrayKey == currentSelected) {
-              selectedItem?.pathComponents?.forEach((componentId) => {
-                const thisComp = rootMeta?.components?.get(componentId);
-                thisComp?.forceUpdate();
-              });
-            }
-          }
-        };
 
         // Then use it in both:
         if (prop === 'setSelected') {
@@ -3038,7 +3081,7 @@ function createProxyHandler<T>(
             if (currentSelected === fullItemKey) {
               getGlobalStore
                 .getState()
-                .clearSelectedIndex({ stateKey, path: parentPath });
+                .clearSelectedIndex({ arrayKey: fullParentKey });
             } else {
               getGlobalStore
                 .getState()
@@ -3145,39 +3188,32 @@ function createProxyHandler<T>(
           };
         }
         if (prop === 'toggle') {
-          // Get the *actual* current value at the specific path this proxy represents
           const currentValueAtPath = getGlobalStore
             .getState()
             .getShadowValue([stateKey, ...path].join('.'));
-
-          // Check if the current value is a boolean
-          if (typeof currentValueAtPath === 'boolean') {
-            // Return the function that performs the toggle
-            return () => {
-              // Use effectiveSetState to update the value at the current path
-              // Pass the toggled value (!currentValueAtPath)
-              // Cast to any because effectiveSetState expects a payload matching the root TStateObject type signature,
-              // but here we are passing a boolean payload for a nested path.
-              effectiveSetState(!currentValueAtPath as any, path, {
-                updateType: 'update',
-              });
-            };
-          } else {
-            // If the value is not a boolean, 'toggle' is not applicable.
-            // Returning undefined makes it behave like it doesn't exist on this proxy instance,
-            // matching the `never` type we added conditionally.
-            return undefined;
+          if (typeof currentState != 'boolean') {
+            throw new Error('toggle() can only be used on boolean values');
           }
+          return () => {
+            console.log('toggle', stateKey, componentId, [...path]);
+
+            effectiveSetState(!currentValueAtPath as any, path, {
+              updateType: 'update',
+            });
+          };
         }
         if (prop === 'formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => {
+            if (isArray(currentState)) {
+              //   return <></>;
+            }
             return (
               <ValidationWrapper
                 formOpts={formOpts}
                 path={path}
                 stateKey={stateKey}
               >
-                <PrimitiveItemWrapper
+                <FormElementWrapper
                   stateKey={stateKey}
                   path={path}
                   rebuildStateShape={rebuildStateShape}
@@ -3700,25 +3736,16 @@ function ListItemWrapper({
     [inViewRef]
   );
 
-  // ANNOTATION: This effect now waits for images to be loaded.
   useEffect(() => {
-    // We only want to report the height if:
-    // 1. The item is in view.
-    // 2. All its images have loaded.
-    // 3. We haven't already reported its initial height.
     if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
       return;
     }
 
     const element = elementRef.current;
     if (element && element.offsetHeight > 0) {
-      // Once we report the height, set the flag so we don't do it again
-      // unless the component re-mounts.
       hasReportedInitialHeight.current = true;
-
       const newHeight = element.offsetHeight;
 
-      // Update the shadow metadata with the correct height.
       getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
         virtualizer: {
           itemHeight: newHeight,
@@ -3726,17 +3753,16 @@ function ListItemWrapper({
         },
       });
 
-      // Notify the virtualizer so it can update its layout.
       const arrayPath = itemPath.slice(0, -1);
       const arrayPathKey = [stateKey, ...arrayPath].join('.');
       getGlobalStore.getState().notifyPathSubscribers(arrayPathKey, {
-        type: 'ITEMHEIGHT', // This should trigger the *incremental* update path
+        type: 'ITEMHEIGHT',
         itemKey: itemPath.join('.'),
 
         ref: elementRef.current,
       });
     }
-  }, [inView, imagesLoaded, stateKey, itemPath]); // Effect dependencies
+  }, [inView, imagesLoaded, stateKey, itemPath]);
 
   // ... rest of the component is unchanged ...
   const fullComponentId = `${stateKey}////${itemComponentId}`;
@@ -3770,8 +3796,6 @@ function ListItemWrapper({
   });
   const children = renderFn(itemSetter, localIndex, arraySetter);
 
-  // The key change is that the `setRefs` now correctly wires up our `elementRef`
-  // which the `useImageLoaded` hook is watching.
   return <div ref={setRefs}>{children}</div>;
 }
 const cleanupComponentRegistration = (
@@ -3807,7 +3831,7 @@ const cleanupComponentRegistration = (
     getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
   }
 };
-function PrimitiveItemWrapper({
+function FormElementWrapper({
   stateKey,
   path,
   rebuildStateShape,
@@ -3864,7 +3888,10 @@ function PrimitiveItemWrapper({
 
   // Sync local value with global state when not debouncing
   useEffect(() => {
-    if (!isCurrentlyDebouncing.current && globalStateValue !== localValue) {
+    if (
+      !isCurrentlyDebouncing.current &&
+      !isDeepEqual(globalStateValue, localValue)
+    ) {
       setLocalValue(globalStateValue);
     }
   }, [globalStateValue]);
@@ -3874,7 +3901,7 @@ function PrimitiveItemWrapper({
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
-        forceUpdate({});
+        //   forceUpdate({});
       });
     return () => {
       unsubscribe();

@@ -27,7 +27,7 @@ const generateMessages = (count: number): Message[] => {
       id: i + 1,
       author: faker.helpers.arrayElement(authors),
       text: faker.lorem.sentence({ min: 3, max: 25 }),
-      photo: Math.random() > 0.3 ? faker.image.urlLoremFlickr() : null,
+      photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
 
       timestamp: Date.now() - (count - i) * 60000,
     });
@@ -36,7 +36,7 @@ const generateMessages = (count: number): Message[] => {
 };
 
 const allState = {
-  messages: generateMessages(50),
+  messages: generateMessages(500),
 };
 
 export type ChatState = {
@@ -63,10 +63,7 @@ export default function VirtualizedChatExample() {
         author: faker.person.firstName(),
         text: faker.lorem.sentence({ min: 3, max: 25 }),
         timestamp: Date.now(),
-        photo:
-          Math.random() > 0.3
-            ? faker.image.urlLoremFlickr({ category: 'cat' })
-            : null,
+        photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
       });
     }, 2000 + Math.random() * 2.5); // Send a new message every 3 seconds
 
@@ -111,7 +108,7 @@ function ChatWindow() {
     overscan: 10,
     stickToBottom: true,
   });
-
+  console.log('relaoding');
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">
       <div style={virtualizerProps.inner.style}>
@@ -119,7 +116,7 @@ function ChatWindow() {
           style={virtualizerProps.list.style}
           className="px-4  space-y-4 pb-8"
         >
-          {virtualState.virtualList((setter, index, array) => {
+          {virtualState.stateList((setter, index, array) => {
             return (
               <MessageItem
                 key={setter._path.join('.')}

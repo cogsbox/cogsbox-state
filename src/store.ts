@@ -84,6 +84,7 @@ export type ComponentsType = {
       forceUpdate: () => void;
       paths: Set<string>;
       deps?: any[];
+      prevDeps?: any[];
       depsFunction?: (state: any) => any[] | true;
       reactiveType: ReactivityType[] | ReactivityType;
     }
@@ -137,6 +138,13 @@ export type ShadowMetadata = {
     }
   >;
   pathComponents?: Set<string>;
+  streams?: Map<
+    string,
+    {
+      buffer: any[];
+      flushTimer: NodeJS.Timeout | null;
+    }
+  >;
 } & ComponentsType;
 export type CogsEvent =
   | { type: 'INSERT'; path: string; itemKey: string; index: number }
@@ -189,13 +197,7 @@ export type CogsGlobalState = {
   selectedIndicesMap: Map<string, string>; // stateKey -> (parentPath -> selectedIndex)
   getSelectedIndex: (stateKey: string, validArrayIds?: string[]) => number;
   setSelectedIndex: (key: string, itemKey: string) => void;
-  clearSelectedIndex: ({
-    stateKey,
-    path,
-  }: {
-    stateKey: string;
-    path: string[];
-  }) => void;
+  clearSelectedIndex: ({ arrayKey }: { arrayKey: string }) => void;
   clearSelectedIndexesForState: (stateKey: string) => void;
 
   // --- Core State and Updaters ---
@@ -700,17 +702,15 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       };
     });
   },
-  clearSelectedIndex: ({
-    stateKey,
-    path,
-  }: {
-    stateKey: string;
-    path: string[];
-  }): void => {
+  clearSelectedIndex: ({ arrayKey }: { arrayKey: string }): void => {
     set((state) => {
-      const newMap = new Map(state.selectedIndicesMap);
-      const fullPath = [stateKey, ...path].join('.');
-      newMap.delete(fullPath);
+      console.log('clearSelectedIndex', arrayKey, state.selectedIndicesMap);
+      const newMap = state.selectedIndicesMap;
+
+      newMap.delete(arrayKey);
+      get().notifyPathSubscribers(arrayKey, {
+        type: 'CLEAR_SELECTION',
+      });
       return {
         ...state,
         selectedIndicesMap: newMap,

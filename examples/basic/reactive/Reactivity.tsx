@@ -65,12 +65,14 @@ export default function ReactivityPage() {
           <div className="pl-6">
             {activeTab === 'component' ? (
               <ExampleDisplay
+                key={`root-${activeTab}`}
                 title="Component Reactivity (Default)"
                 description="This is the default. The component re-renders only if the specific state values it calls with .get() are updated."
                 options={{ reactiveType: 'component' }}
               />
             ) : activeTab === 'deps' ? (
               <ExampleDisplay
+                key={`root-${activeTab}`}
                 title="Dependency-Based Reactivity"
                 description="The component re-renders only when the specific values returned by the reactiveDeps function change."
                 options={{
@@ -89,12 +91,14 @@ export default function ReactivityPage() {
               />
             ) : activeTab === 'all' ? (
               <ExampleDisplay
+                key={`root-${activeTab}`}
                 title="Entire State Reactive"
                 description="This component re-renders if *any* part of the 'fooBarObject' state slice changes, even properties it doesn't use."
                 options={{ reactiveType: 'all' }}
               />
             ) : activeTab === 'none' ? (
               <ExampleDisplay
+                key={`root-${activeTab}`}
                 title="Signal-Based Reactivity"
                 description="With reactiveType: 'none', the React component *never* re-renders from state changes. Use signals (.$get()) for fine-grained, direct-to-DOM updates."
                 options={{ reactiveType: 'none' }}
@@ -279,16 +283,16 @@ function NestedFooInstance({
           </SyntaxHighlighter>
         </div>
         {/* CHANGE: Replaced transparent bg-black/20 with solid bg-gray-900, matching NestedFoo. */}
-        <div className="flex gap-2 w-full justify-between items-center p-2 rounded bg-gray-900">
-          {/* CHANGE: Matched the label style from NestedFoo for consistency and readability. */}
-          <div className="p-1 px-2 rounded bg-gray-700 text-gray-200 text-xs uppercase font-semibold">
-            seperateNested.foo
-          </div>
-          <div className="p-1 px-4 text-green-400 font-semibold">
-            {!isSignal
-              ? nestedFooState.seperateNested.foo.get()
-              : nestedFooState.seperateNested.foo.$get()}
-          </div>
+      </div>{' '}
+      <div className="flex gap-2 w-full justify-between items-center p-2 rounded bg-gray-900">
+        {/* CHANGE: Matched the label style from NestedFoo for consistency and readability. */}
+        <div className="p-1 px-2 rounded bg-gray-700 text-gray-200 text-xs uppercase font-semibold">
+          seperateNested.foo
+        </div>
+        <div className="p-1 px-4 text-green-400 font-semibold">
+          {!isSignal
+            ? nestedFooState.seperateNested.foo.get()
+            : nestedFooState.seperateNested.foo.$get()}
         </div>
       </div>
     </FlashWrapper>
