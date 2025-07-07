@@ -929,10 +929,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
             // 4. NOW THIS WILL WORK, BECAUSE `newState` IS CORRECT
             getGlobalStore.getState().initializeShadowState(thisKey, newState);
-            console.log(
-              'thisKey',
-              getGlobalStore.getState().getShadowValue(thisKey)
-            );
+
             // ... rest of your logic ...
             getGlobalStore.getState().setShadowMetadata(thisKey, [], {
               stateSource: source,
@@ -1079,7 +1076,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     // FETCH ONCE at the beginning
     const shadowMeta = store.getShadowMetadata(thisKey, path);
     const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
-    console.log('shadowMeta', shadowMeta, nestedShadowValue);
+
     const payload = (
       updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
         ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
@@ -1099,7 +1096,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       oldValue: nestedShadowValue,
       newValue: payload,
     } satisfies UpdateTypeDetail;
-    console.log('newudpate in useCogsState', newUpdate);
+
     // Perform the update
     switch (updateObj.updateType) {
       case 'insert': {
@@ -1951,21 +1948,48 @@ function createProxyHandler<T>(
                 itemHeight = 50,
                 overscan = 6,
                 stickToBottom = false,
+                scrollStickTolerance = 50,
               } = options;
 
-              const initialScrollRef = useRef(true);
               const containerRef = useRef<HTMLDivElement | null>(null);
               const [range, setRange] = useState({
                 startIndex: 0,
                 endIndex: 10,
               });
               const [rerender, forceUpdate] = useState({});
-              // Inside useVirtualView, near the top
+              const initialScrollRef = useRef(true);
+
+              // Scroll state management
+              const scrollStateRef = useRef({
+                isUserScrolling: false,
+                lastScrollTop: 0,
+                scrollUpCount: 0,
+                isNearBottom: true,
+              });
+
+              // Measurement cache
               const measurementCache = useRef(
                 new Map<string, { height: number; offset: number }>()
               );
-              console.log('range', range);
 
+              // Separate effect for handling rerender updates
+              useLayoutEffect(() => {
+                if (
+                  !stickToBottom ||
+                  !containerRef.current ||
+                  scrollStateRef.current.isUserScrolling
+                )
+                  return;
+
+                const container = containerRef.current;
+                container.scrollTo({
+                  top: container.scrollHeight,
+                  behavior: initialScrollRef.current ? 'instant' : 'smooth',
+                });
+                initialScrollRef.current = false;
+              }, [rerender, stickToBottom]);
+
+              // Subscribe to server state updates
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
@@ -1984,12 +2008,12 @@ function createProxyHandler<T>(
                 return unsubscribe;
               }, []);
 
-              const mutationObserverRef = useRef<MutationObserver | null>(null);
-              // Calculate total height based on actual array length
+              // Get array keys
               const arrayKeys =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys || [];
 
+              // Calculate total height and offsets
               const { totalHeight, itemOffsets } = useMemo(() => {
                 let runningOffset = 0;
                 const offsets = new Map<
@@ -2001,13 +2025,12 @@ function createProxyHandler<T>(
                     ?.arrayKeys || [];
 
                 allItemKeys.forEach((itemKey) => {
-                  // Get the REAL measured height from metadata, or use the prop as an estimate
                   const itemPath = itemKey.split('.').slice(1);
                   const measuredHeight =
                     getGlobalStore
                       .getState()
                       .getShadowMetadata(stateKey, itemPath)?.virtualizer
-                      ?.itemHeight || itemHeight; // Use real height or fallback to estimate
+                      ?.itemHeight || itemHeight;
 
                   offsets.set(itemKey, {
                     height: measuredHeight,
@@ -2017,17 +2040,17 @@ function createProxyHandler<T>(
                   runningOffset += measuredHeight;
                 });
 
-                measurementCache.current = offsets; // Keep the ref updated
+                measurementCache.current = offsets;
                 return { totalHeight: runningOffset, itemOffsets: offsets };
-              }, [arrayKeys]);
+              }, [arrayKeys.length, itemHeight]);
 
-              // Always show the last N items when stickToBottom is true
+              // Initial positioning for stick to bottom
               useLayoutEffect(() => {
                 if (
-                  !scrolledFromBottomConfirmed.current &&
                   stickToBottom &&
                   arrayKeys.length > 0 &&
-                  containerRef.current
+                  containerRef.current &&
+                  !scrollStateRef.current.isUserScrolling
                 ) {
                   const visibleCount = Math.ceil(
                     (containerRef.current.clientHeight || 500) / itemHeight
@@ -2037,120 +2060,145 @@ function createProxyHandler<T>(
                     0,
                     endIndex - visibleCount - overscan
                   );
-                  //  setRange({ startIndex, endIndex });
+                  setRange({ startIndex, endIndex });
                 }
-              }, [arrayKeys.length, stickToBottom, totalHeight]);
+              }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
 
-              const userHasScrolledUpCountRef = useRef(0);
-              const lastScrollTopRef = useRef(0);
-              const scrolledFromBottomConfirmed = useRef(false);
-
-              useEffect(() => {
-                if (!stickToBottom || !containerRef.current) return;
+              // Combined scroll handler
+              const handleScroll = useCallback(() => {
                 const container = containerRef.current;
+                if (!container) return;
 
-                const handleScroll = () => {
-                  const currentScrollTop = container.scrollTop;
-                  let newStartIndex = 0;
-                  // A negative delta means the user scrolled up.
-                  if (currentScrollTop < lastScrollTopRef.current) {
-                    userHasScrolledUpCountRef.current++;
-                  }
-                  if (userHasScrolledUpCountRef.current > 5) {
-                    userHasScrolledUpCountRef.current = 0;
-                    scrolledFromBottomConfirmed.current = true;
-                  }
+                const currentScrollTop = container.scrollTop;
+                const { scrollHeight, clientHeight } = container;
+                const scrollState = scrollStateRef.current;
 
-                  if (
-                    container.scrollHeight - 10 <
-                    container.scrollTop + container.clientHeight
-                  ) {
-                    scrolledFromBottomConfirmed.current = false;
-                  }
+                // Check if user is near bottom
+                const distanceFromBottom =
+                  scrollHeight - (currentScrollTop + clientHeight);
+                const wasNearBottom = scrollState.isNearBottom;
+                scrollState.isNearBottom =
+                  distanceFromBottom <= scrollStickTolerance;
 
-                  // This is a simple linear search. For very long lists, binary search is faster,
-                  // but this is much easier to implement and often fast enough.
-                  for (let i = 0; i < arrayKeys.length; i++) {
-                    const itemKey = arrayKeys[i];
-                    const item = measurementCache.current.get(itemKey!);
-                    if (item && item.offset + item.height > currentScrollTop) {
-                      newStartIndex = i;
-                      break;
-                    }
-                  }
+                // Detect scroll direction
+                if (currentScrollTop < scrollState.lastScrollTop) {
+                  // User scrolled up
+                  scrollState.scrollUpCount++;
 
-                  // Only update state if the range has actually changed
-                  if (newStartIndex !== range.startIndex) {
-                    const visibleCount = Math.ceil(
-                      container.clientHeight / itemHeight
-                    ); // Use estimate for visible count
-                    setRange({
-                      startIndex: Math.max(0, newStartIndex - overscan),
-                      endIndex: Math.min(
-                        arrayKeys.length - 1,
-                        newStartIndex + visibleCount + overscan
-                      ),
-                    });
+                  if (scrollState.scrollUpCount > 3 && wasNearBottom) {
+                    // User has deliberately scrolled away from bottom
+                    scrollState.isUserScrolling = true;
+                    console.log('User scrolled away from bottom');
                   }
+                } else if (scrollState.isNearBottom) {
+                  // Reset if we're back near the bottom
+                  scrollState.isUserScrolling = false;
+                  scrollState.scrollUpCount = 0;
+                }
 
-                  lastScrollTopRef.current = currentScrollTop;
-                };
+                scrollState.lastScrollTop = currentScrollTop;
+
+                // Update visible range
+                let newStartIndex = 0;
+                for (let i = 0; i < arrayKeys.length; i++) {
+                  const itemKey = arrayKeys[i];
+                  const item = measurementCache.current.get(itemKey!);
+                  if (item && item.offset + item.height > currentScrollTop) {
+                    newStartIndex = i;
+                    break;
+                  }
+                }
+
+                // Only update if range actually changed
+                if (newStartIndex !== range.startIndex) {
+                  const visibleCount = Math.ceil(clientHeight / itemHeight);
+                  setRange({
+                    startIndex: Math.max(0, newStartIndex - overscan),
+                    endIndex: Math.min(
+                      arrayKeys.length - 1,
+                      newStartIndex + visibleCount + overscan
+                    ),
+                  });
+                }
+              }, [
+                arrayKeys.length,
+                range.startIndex,
+                itemHeight,
+                overscan,
+                scrollStickTolerance,
+              ]);
+
+              // Set up scroll listener
+              useEffect(() => {
+                const container = containerRef.current;
+                if (!container || !stickToBottom) return;
 
                 container.addEventListener('scroll', handleScroll, {
                   passive: true,
                 });
-                return () =>
-                  container.removeEventListener('scroll', handleScroll);
-              }, [stickToBottom]);
 
+                return () => {
+                  container.removeEventListener('scroll', handleScroll);
+                };
+              }, [handleScroll, stickToBottom]);
+
+              // Auto-scroll to bottom when new content arrives
               useEffect(() => {
                 if (!stickToBottom || !containerRef.current) return;
 
                 const container = containerRef.current;
+                const scrollState = scrollStateRef.current;
 
-                // Function to scroll to bottom
                 const scrollToBottom = () => {
+                  // Only auto-scroll if user hasn't scrolled away
                   if (
-                    !scrolledFromBottomConfirmed.current &&
-                    container.scrollHeight + 30 >
-                      container.scrollTop + container.clientHeight
+                    !scrollState.isUserScrolling &&
+                    scrollState.isNearBottom
                   ) {
                     container.scrollTo({
                       top: container.scrollHeight,
                       behavior: initialScrollRef.current ? 'instant' : 'smooth',
                     });
+
+                    // Set to false after first use
+                    initialScrollRef.current = false;
                   }
                 };
 
-                // Create observer that watches for any DOM changes
-                const debouncedScrollToBottom = debounce(scrollToBottom, 300);
+                // Debounced scroll for DOM changes
+                const debouncedScroll = debounce(scrollToBottom, 100);
 
-                // Create observer that calls our debounced function
-                mutationObserverRef.current = new MutationObserver(() => {
-                  debouncedScrollToBottom();
+                const observer = new MutationObserver(() => {
+                  // Only trigger if we should auto-scroll
+                  if (!scrollState.isUserScrolling) {
+                    debouncedScroll();
+                  }
                 });
 
-                // Watch for changes in the container and all its children
-                mutationObserverRef.current.observe(container, {
+                observer.observe(container, {
                   childList: true,
                   subtree: true,
                   attributes: true,
-                  attributeFilter: ['height', 'src'], // Watch for height changes and image src
+                  attributeFilter: ['height', 'src'],
                 });
 
-                // Also listen for image load events on any images
-                const handleImageLoad = () => scrollToBottom();
+                // Handle image loads
+                const handleImageLoad = () => {
+                  if (!scrollState.isUserScrolling) {
+                    scrollToBottom();
+                  }
+                };
 
-                container.addEventListener('load', handleImageLoad, true); // Use capture to catch all image loads
+                container.addEventListener('load', handleImageLoad, true);
 
                 // Initial scroll
                 scrollToBottom();
 
                 return () => {
-                  mutationObserverRef.current?.disconnect();
+                  observer.disconnect();
                   container.removeEventListener('load', handleImageLoad, true);
                 };
-              }, [stickToBottom, rerender]);
+              }, [stickToBottom, arrayKeys.length, rerender]);
 
               // Create virtual state
               const virtualState = useMemo(() => {
@@ -2207,11 +2255,23 @@ function createProxyHandler<T>(
                 },
                 scrollToBottom: () => {
                   if (containerRef.current) {
+                    scrollStateRef.current.isUserScrolling = false;
+                    scrollStateRef.current.scrollUpCount = 0;
                     containerRef.current.scrollTop =
                       containerRef.current.scrollHeight;
                   }
                 },
-                scrollToIndex: () => {},
+                scrollToIndex: (
+                  index: number,
+                  behavior: ScrollBehavior = 'smooth'
+                ) => {
+                  if (containerRef.current && arrayKeys[index]) {
+                    const offset =
+                      measurementCache.current.get(arrayKeys[index]!)?.offset ||
+                      0;
+                    containerRef.current.scrollTo({ top: offset, behavior });
+                  }
+                },
               };
             };
           }

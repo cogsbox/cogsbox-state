@@ -1,6 +1,6 @@
 export default function DotPattern({
   children,
-  className = "",
+  className = '',
 }: {
   children: React.ReactNode;
   className?: string;
@@ -10,8 +10,8 @@ export default function DotPattern({
       className={`relative ${className} bg-black/20`}
       style={{
         backgroundImage:
-          "radial-gradient(rgba(107, 114, 128, 0.2) 1px, transparent 1px)",
-        backgroundSize: "6px 6px",
+          'radial-gradient(rgba(107, 114, 128, 0.4) 1px, transparent 1px)',
+        backgroundSize: '6px 6px',
       }}
     >
       {/* Optional: Add a subtle vignette effect */}

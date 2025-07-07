@@ -41,7 +41,7 @@ const fetchMessagesFromServer = async (): Promise<{
   timestamp: number;
 }> => {
   // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 1500));
+  await new Promise((resolve) => setTimeout(resolve, 500));
 
   // Generate the data "server-side"
   return {
@@ -120,9 +120,34 @@ export default function VirtualizedChatExample() {
           <h1 className="text-2xl font-bold text-gray-200">
             Virtualized Chat Log
           </h1>
-          <p className="text-sm text-gray-400 max-w-2xl">
-            Correctly rendering thousands of items with a smooth, scrolling
-            layout. Status: <span className="text-green-400">{status}</span>
+          <p className="text-sm text-gray-400 pr-12 leading-relaxed">
+            With just a few lines of code,{' '}
+            <code className="text-blue-400">useVirtualView</code> transforms
+            complex virtualization into something remarkably straightforward.
+            <br />
+            <br />
+            Instead of manually managing scroll positions, calculating visible
+            ranges, or worrying about performance with thousands of messages,
+            you simply call{' '}
+            <code className="text-blue-400">messages.useVirtualView()</code> and
+            spread the returned props.
+            <br />
+            <br />
+            The virtualized list automatically:
+          </p>
+          <ul className="text-sm text-gray-400 mt-2 ml-8 list-disc space-y-1">
+            <li>Stays pinned to the bottom for new messages</li>
+            <li>Handles dynamic item heights</li>
+            <li>Maintains smooth scrolling</li>
+            <li>Renders only visible items plus a small buffer</li>
+          </ul>
+          <p className="text-sm text-gray-400 mt-4 pr-12">
+            What would normally require hundreds of lines of scroll management
+            code is reduced to a clean, declarative API.{' '}
+            <span className="text-gray-500">
+              Status:{' '}
+              <span className="text-green-400 font-medium">{status}</span>
+            </span>
           </p>
         </div>
       </DotPattern>
@@ -192,7 +217,7 @@ function ChatWindow() {
     overscan: 10,
     stickToBottom: true,
   });
-  console.log('virtualState', messages._componentId, virtualState.get());
+
   if (messageCount === 0) {
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">

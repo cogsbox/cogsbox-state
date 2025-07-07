@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef } from 'react';
 
 // The time in milliseconds of inactivity before the storm's energy recharges.
 const STORM_RECHARGE_TIME = 3000;
@@ -19,7 +19,7 @@ export function CloudLayers({
   layers = 4,
   startOffset = 0,
   layerSpacing = 2,
-  className = "",
+  className = '',
   lightningBrightness = 0.1,
 }: CloudLayersProps) {
   const layerRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -78,13 +78,13 @@ export function CloudLayers({
 
         // Use the new `finalIntensity` which decays over time
         layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${finalIntensity}) 0%, transparent 50%)`;
-        layer.style.transition = "none";
+        layer.style.transition = 'none';
 
         setTimeout(() => {
           if (!layer) return;
-          layer.style.transition = "background 0.5s ease-out";
-          layer.style.background = "transparent";
-        }, 100);
+          layer.style.transition = 'background 0.5s ease-out';
+          layer.style.background = 'transparent';
+        }, 300);
       });
 
       // --- NEW: Deplete the storm's energy for the next strike ---
@@ -126,8 +126,8 @@ export function CloudLayers({
                 ref={(el) => (layerRefs.current[index] = el)}
                 className="absolute inset-0 pointer-events-none"
                 style={{
-                  background: "transparent",
-                  mixBlendMode: "screen",
+                  background: 'transparent',
+                  mixBlendMode: 'screen',
                   maskImage: `url("data:image/svg+xml,${encodeURIComponent(
                     `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
                       ...Array(8),
@@ -152,7 +152,7 @@ export function CloudLayers({
                             i * 400
                           },60 Z" fill="white"/>`
                       )
-                      .join("")}</svg>`
+                      .join('')}</svg>`
                   )}`,
                   WebkitMaskImage: `url("data:image/svg+xml,${encodeURIComponent(
                     `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
@@ -178,14 +178,14 @@ export function CloudLayers({
                             i * 400
                           },60 Z" fill="white"/>`
                       )
-                      .join("")}</svg>`
+                      .join('')}</svg>`
                   )}`,
-                  maskSize: "100% 100%",
-                  WebkitMaskSize: "100% 100%",
-                  maskRepeat: "no-repeat",
-                  WebkitMaskRepeat: "no-repeat",
+                  maskSize: '100% 100%',
+                  WebkitMaskSize: '100% 100%',
+                  maskRepeat: 'no-repeat',
+                  WebkitMaskRepeat: 'no-repeat',
                   transform: `rotate(${layer.tilt}deg)`,
-                  transformOrigin: "center",
+                  transformOrigin: 'center',
                 }}
               />
             </div>
@@ -203,7 +203,7 @@ interface CloudTilesProps {
 
 export function CloudTiles({
   tilt = 0,
-  className = "",
+  className = '',
   lightColor,
 }: CloudTilesProps & { lightColor?: string }) {
   return (
@@ -211,7 +211,7 @@ export function CloudTiles({
       className={`flex overflow-hidden ${className}`}
       style={{
         transform: `rotate(${tilt}deg)`,
-        transformOrigin: "center",
+        transformOrigin: 'center',
       }}
     >
       {[...Array(8)].map((_, i) => (
@@ -226,7 +226,7 @@ export function CloudTiles({
         >
           <defs>
             <linearGradient
-              id={`grad${i}${lightColor || ""}`}
+              id={`grad${i}${lightColor || ''}`}
               x1="0%"
               y1="0%"
               x2="0%"
@@ -234,12 +234,12 @@ export function CloudTiles({
             >
               <stop
                 offset="0%"
-                stopColor={lightColor || "#0f0f0f"}
+                stopColor={lightColor || '#0f0f0f'}
                 stopOpacity="1"
               />
               <stop
                 offset="100%"
-                stopColor={lightColor || "#0f0f0f"}
+                stopColor={lightColor || '#0f0f0f'}
                 stopOpacity="0.5"
               />
             </linearGradient>
@@ -256,7 +256,7 @@ export function CloudTiles({
              C75,72.5 65,62.5 40,65
              C20,67.5 15,60 0,60
               Z"
-            fill={`url(#grad${i}${lightColor || ""})`}
+            fill={`url(#grad${i}${lightColor || ''})`}
           />
         </svg>
       ))}
