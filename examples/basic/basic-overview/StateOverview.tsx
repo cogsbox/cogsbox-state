@@ -76,7 +76,7 @@ function CounterExample() {
         <div className="grid gap-2">
           {/* .get() example */}
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
+            <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.update()</div>
               <button
                 onClick={() => {
@@ -96,7 +96,7 @@ function CounterExample() {
             </div>
           </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
+            <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               <button
                 onClick={() => state.isBooleanValue.toggle()}
@@ -114,10 +114,14 @@ function CounterExample() {
             </div>
           </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            Below are the signal versions
+            Below are the{' '}
+            <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
+              .$get()
+            </code>{' '}
+            signal versions
           </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
+            <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.update()</div>
               <button
                 onClick={() => {
@@ -137,7 +141,7 @@ function CounterExample() {
             </div>
           </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
+            <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               <button
                 onClick={() => state.isBooleanValue2.toggle()}
@@ -166,7 +170,7 @@ function CounterExample() {
             </p>
           </div>
           <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[20%_15%_25%_15%_20%] items-center gap-4">
+            <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
               <div className="text-lg font-bold">.toggle()</div>
               {state.isBooleanValue2.formElement((obj) => (
                 <button
@@ -203,10 +207,10 @@ function FormElementsExample() {
   return (
     <div className="grid grid-cols-[70%_30%] gap-6">
       <SectionWrapper>
+        <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
+          Form Bindings
+        </h2>
         <div className="px-12 py-8">
-          <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
-            Form Bindings
-          </h2>
           <div className="prose prose-invert mb-6 max-w-none">
             <p className="text-sm text-gray-300 leading-relaxed">
               The
@@ -257,6 +261,7 @@ state.newsletter.formElement(({state}) => (
 ))
 `}
           />
+          <div className="h-16" />
           <div className="space-y-6">
             {/* Form Grid */}
             <div className="grid grid-cols-2 gap-6">
@@ -405,7 +410,7 @@ state.newsletter.formElement(({state}) => (
 
             {/* Active Numbers Toggle */}
             <div className="border-t border-gray-700 pt-4">
-              <label className="block text-sm font-medium text-gray-300 mb-3">
+              <label className="block text-sm font-medium text-gray-300 mb-3 cursor-pointer">
                 Notification Days
               </label>
               <div className="flex gap-2">
@@ -441,8 +446,6 @@ state.newsletter.formElement(({state}) => (
 // Reactive form display moved to right column
 function ReactiveFormDisplay() {
   const state = useCogsState('appData');
-  const hasFormData =
-    state.firstName.get() || state.lastName.get() || state.email.get();
 
   return (
     <FlashWrapper>
@@ -451,69 +454,63 @@ function ReactiveFormDisplay() {
           Form State
         </h3>
 
-        {hasFormData ? (
-          <div className="space-y-3 text-sm">
-            {(state.firstName.get() || state.lastName.get()) && (
-              <div>
-                <span className="text-gray-500">Name:</span>
-                <div className="text-gray-200">
-                  {state.firstName.$get()} {state.lastName.$get()}
-                </div>
-              </div>
-            )}
-
-            {state.email.get() && (
-              <div>
-                <span className="text-gray-500">Email:</span>
-                <div className="text-gray-200">{state.email.$get()}</div>
-              </div>
-            )}
-
-            {state.phoneNumber.get() && (
-              <div>
-                <span className="text-gray-500">Phone:</span>
-                <div className="text-gray-200">{state.phoneNumber.$get()}</div>
-              </div>
-            )}
-
+        <div className="space-y-3 text-sm">
+          {(state.firstName.get() || state.lastName.get()) && (
             <div>
-              <span className="text-gray-500">Country:</span>
+              <span className="text-gray-500">Name:</span>
               <div className="text-gray-200">
-                {state.country.get() === 'us' && 'United States'}
-                {state.country.get() === 'uk' && 'United Kingdom'}
-                {state.country.get() === 'ca' && 'Canada'}
-                {state.country.get() === 'au' && 'Australia'}
+                {state.firstName.$get()} {state.lastName.$get()}
               </div>
             </div>
+          )}
 
+          {state.email.get() && (
             <div>
-              <span className="text-gray-500">Theme:</span>
-              <div className="text-gray-200">{state.theme.$get()}</div>
+              <span className="text-gray-500">Email:</span>
+              <div className="text-gray-200">{state.email.$get()}</div>
             </div>
+          )}
 
+          {state.phoneNumber.get() && (
             <div>
-              <span className="text-gray-500">Newsletter:</span>
-              <div className="text-gray-200">
-                {state.newsletter.get() ? '✅ Subscribed' : '❌ Not subscribed'}
-              </div>
+              <span className="text-gray-500">Phone:</span>
+              <div className="text-gray-200">{state.phoneNumber.$get()}</div>
             </div>
+          )}
 
-            <div>
-              <span className="text-gray-500">Notification Days:</span>
-              <div className="text-gray-200">
-                {state.daysOfWeek.get().length > 0
-                  ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
-                      .filter((_, i) => state.daysOfWeek.get().includes(i))
-                      .join(', ')
-                  : 'None selected'}
-              </div>
+          <div>
+            <span className="text-gray-500">Country:</span>
+            <div className="text-gray-200">
+              {state.country.get() === 'us' && 'United States'}
+              {state.country.get() === 'uk' && 'United Kingdom'}
+              {state.country.get() === 'ca' && 'Canada'}
+              {state.country.get() === 'au' && 'Australia'}
             </div>
           </div>
-        ) : (
-          <p className="text-gray-500 text-sm">
-            Fill in the form to see reactive updates...
-          </p>
-        )}
+
+          <div>
+            <span className="text-gray-500">Theme:</span>
+            <div className="text-gray-200">{state.theme.$get()}</div>
+          </div>
+
+          <div>
+            <span className="text-gray-500">Newsletter:</span>
+            <div className="text-gray-200">
+              {state.newsletter.get() ? '✅ Subscribed' : '❌ Not subscribed'}
+            </div>
+          </div>
+
+          <div>
+            <span className="text-gray-500">Notification Days:</span>
+            <div className="text-gray-200">
+              {state.daysOfWeek.get().length > 0
+                ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    .filter((_, i) => state.daysOfWeek.get().includes(i))
+                    .join(', ')
+                : 'None selected'}
+            </div>
+          </div>
+        </div>
       </div>
     </FlashWrapper>
   );
@@ -527,204 +524,207 @@ function ArrayManipulationExample() {
   const selectedTodo = todos.getSelected();
 
   return (
-    <SectionWrapper>
-      <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
-        Array Manipulation
-      </h2>
+    <div className="grid grid-cols-[70%_30%] gap-6">
+      <SectionWrapper>
+        <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
+          Array Manipulation
+        </h2>
 
-      <div className="px-12 py-8">
-        <div className="prose prose-invert mb-6 max-w-none">
-          <p className="text-sm text-gray-300 leading-relaxed">
-            Arrays in Cogs State support rich manipulation methods like
-            <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
-              .insert()
-            </code>
-            ,
-            <code className="text-red-400 bg-gray-800 px-1 py-0.5 rounded">
-              .cut()
-            </code>
-            , and
-            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
-              .getSelected()
-            </code>
-            . Items can be selected with
-            <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
-              .toggleSelected()
-            </code>
-            and operations can target selected items directly.
-          </p>
-        </div>
-
-        {/* Condensed Todo List Display */}
-        <div className="bg-black/20 rounded-lg p-2 px-4 mb-6">
-          <div className="text-sm text-gray-400 mb-2">
-            Current Todos ({todos.get().length} items):
+        <div className="px-12 py-8">
+          <div className="prose prose-invert mb-6 max-w-none">
+            <p className="text-sm text-gray-300 leading-relaxed">
+              Arrays in Cogs State support rich manipulation methods like
+              <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
+                .insert()
+              </code>
+              ,
+              <code className="text-red-400 bg-gray-800 px-1 py-0.5 rounded">
+                .cut()
+              </code>
+              , and
+              <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+                .getSelected()
+              </code>
+              . Items can be selected with
+              <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
+                .toggleSelected()
+              </code>
+              and operations can target selected items directly.
+            </p>
           </div>
-          <div className="max-h-32 overflow-y-auto space-y-1">
-            {todos.get().length > 0 ? (
-              todos.stateList((todo, index) => {
-                const isSelected = todo._selected;
-                return (
-                  <div
-                    key={todo.id.get()}
-                    className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-blue-800/50 text-blue-300'
-                        : 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/30'
-                    }`}
-                    onClick={() => todo.toggleSelected()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={todo.done.get()}
-                      onChange={(e) => todo.done.update(e.target.checked)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-3 h-3 accent-green-500"
-                    />
-                    <span className={todo.done.get() ? 'line-through' : ''}>
-                      {todo.text.get()}
-                    </span>
-                  </div>
-                );
-              })
-            ) : (
-              <div className="text-gray-500 text-center py-2 text-xs">
-                Empty list
-              </div>
-            )}
-          </div>
-          {selectedTodo && (
-            <div className="text-xs text-gray-400 mt-2 border-t border-gray-700 pt-2">
-              Selected:
-              <span className="text-blue-400">{selectedTodo.text.get()}</span>
-            </div>
-          )}
-        </div>
 
-        {/* Button Action Rows */}
-        <div className="grid gap-6">
-          {/* Insert Operations */}
-          <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
-              <button
-                onClick={() => {
-                  todos.insert(({ uuid }) => ({
-                    id: uuid,
-                    text: `Todo ${todos.get().length + 1}`,
-                    done: false,
-                  }));
-                }}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 text-sm"
-              >
-                Add Todo
-              </button>
-              <CodeSnippetDisplay
-                code={`todos.insert(({ uuid }) => ({
+          {/* Button Action Rows */}
+          <div className="grid gap-6">
+            {/* Insert Operations */}
+            <div className="bg-black/20 rounded-lg p-2 px-4">
+              <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+                <button
+                  onClick={() => {
+                    todos.insert(({ uuid }) => ({
+                      id: uuid,
+                      text: `Todo ${todos.get().length + 1}`,
+                      done: false,
+                    }));
+                  }}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-500 text-sm"
+                >
+                  Add Todo
+                </button>
+                <CodeSnippetDisplay
+                  code={`todos.insert(({ uuid }) => ({
   id: uuid,
   text: \`Todo \${todos.get().length + 1}\`,
   done: false,
 }));`}
-              />
-              <div className="text-gray-200 font-medium">
-                Count:
-                <span className="text-purple-400">{todos.get().length}</span>
+                />
+                <div className="text-gray-200 font-medium">
+                  Count:
+                  <span className="text-purple-400">{todos.get().length}</span>
+                </div>
+                <CodeSnippetDisplay code={`todos.get().length`} />
               </div>
-              <CodeSnippetDisplay code={`todos.get().length`} />
             </div>
-          </div>
 
-          {/* Cut First */}
-          <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
-              <button
-                onClick={() => todos.cut(0)}
-                disabled={todos.get().length === 0}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
-              >
-                Cut First
-              </button>
-              <CodeSnippetDisplay code={`todos.cut(0);`} />
-              <div className="text-gray-200 font-medium">
-                First:
-                <span className="text-red-400">
-                  {todos.get().length > 0 ? todos.get()[0].text : 'None'}
-                </span>
+            {/* Cut First */}
+            <div className="bg-black/20 rounded-lg p-2 px-4">
+              <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+                <button
+                  onClick={() => todos.cut(0)}
+                  disabled={todos.get().length === 0}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
+                >
+                  Cut First
+                </button>
+                <CodeSnippetDisplay code={`todos.cut(0);`} />
+                <div className="text-gray-200 font-medium">
+                  First:
+                  <span className="text-red-400">
+                    {todos.get().length > 0 ? todos.get()[0].text : 'None'}
+                  </span>
+                </div>
+                <CodeSnippetDisplay code={`todos.get()[0]?.text`} />
               </div>
-              <CodeSnippetDisplay code={`todos.get()[0]?.text`} />
             </div>
-          </div>
 
-          {/* Cut Selected */}
-          <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
-              <button
-                onClick={() => todos.cutSelected()}
-                disabled={!selectedTodo}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
-              >
-                Cut Selected
-              </button>
-              <CodeSnippetDisplay code={`todos.cutSelected();`} />
-              <div className="text-gray-200 font-medium">
-                Selected:
-                <span className="text-red-400">
-                  {selectedTodo ? selectedTodo.text.get() : 'None'}
-                </span>
+            {/* Cut Selected */}
+            <div className="bg-black/20 rounded-lg p-2 px-4">
+              <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+                <button
+                  onClick={() => todos.cutSelected()}
+                  disabled={!selectedTodo}
+                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
+                >
+                  Cut Selected
+                </button>
+                <CodeSnippetDisplay code={`todos.cutSelected();`} />
+                <div className="text-gray-200 font-medium">
+                  Selected:
+                  <span className="text-red-400">
+                    {selectedTodo ? selectedTodo.text.get() : 'None'}
+                  </span>
+                </div>
+                <CodeSnippetDisplay code={`todos.getSelected()?.text`} />
               </div>
-              <CodeSnippetDisplay code={`todos.getSelected()?.text`} />
             </div>
-          </div>
 
-          {/* Toggle Selection */}
-          <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
-              <button
-                onClick={() => {
-                  if (todos.get().length > 0) {
-                    todos.index(0)?.toggleSelected();
-                  }
-                }}
-                disabled={todos.get().length === 0}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
-              >
-                Select First
-              </button>
-              <CodeSnippetDisplay code={`todos.index(0)?.toggleSelected();`} />
-              <div className="text-gray-200 font-medium">
-                Index:
-                <span className="text-blue-400">
-                  {todos.getSelectedIndex() !== -1
-                    ? todos.getSelectedIndex()
-                    : 'None'}
-                </span>
+            {/* Toggle Selection */}
+            <div className="bg-black/20 rounded-lg p-2 px-4">
+              <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+                <button
+                  onClick={() => {
+                    if (todos.get().length > 0) {
+                      todos.index(0)?.toggleSelected();
+                    }
+                  }}
+                  disabled={todos.get().length === 0}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
+                >
+                  Select First
+                </button>
+                <CodeSnippetDisplay
+                  code={`todos.index(0)?.toggleSelected();`}
+                />
+                <div className="text-gray-200 font-medium">
+                  Index:
+                  <span className="text-blue-400">
+                    {todos.getSelectedIndex() !== -1
+                      ? todos.getSelectedIndex()
+                      : 'None'}
+                  </span>
+                </div>
+                <CodeSnippetDisplay code={`todos.getSelectedIndex()`} />
               </div>
-              <CodeSnippetDisplay code={`todos.getSelectedIndex()`} />
             </div>
-          </div>
 
-          {/* Clear Selection */}
-          <div className="bg-black/20 rounded-lg p-2 px-4">
-            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
-              <button
-                onClick={() => todos.clearSelected()}
-                disabled={!selectedTodo}
-                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
-              >
-                Clear Selection
-              </button>
-              <CodeSnippetDisplay code={`todos.clearSelected();`} />
-              <div className="text-gray-200 font-medium">
-                Has Selection:
-                <span className="text-gray-400">
-                  {selectedTodo ? 'Yes' : 'No'}
-                </span>
+            {/* Clear Selection */}
+            <div className="bg-black/20 rounded-lg p-2 px-4">
+              <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+                <button
+                  onClick={() => todos.clearSelected()}
+                  disabled={!selectedTodo}
+                  className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-500 disabled:bg-gray-700 disabled:text-gray-500 text-sm"
+                >
+                  Clear Selection
+                </button>
+                <CodeSnippetDisplay code={`todos.clearSelected();`} />
+                <div className="text-gray-200 font-medium">
+                  Has Selection:
+                  <span className="text-gray-400">
+                    {selectedTodo ? 'Yes' : 'No'}
+                  </span>
+                </div>
+                <CodeSnippetDisplay code={`!!todos.getSelected()`} />
               </div>
-              <CodeSnippetDisplay code={`!!todos.getSelected()`} />
             </div>
           </div>
         </div>
-      </div>
-    </SectionWrapper>
+      </SectionWrapper>{' '}
+      {/* Condensed Todo List Display */}
+      <SectionWrapper>
+        <div className="text-sm  mb-2">
+          Current Todos ({todos.get().length} items):
+        </div>
+        <div className=" overflow-y-auto space-y-1">
+          {todos.get().length > 0 ? (
+            todos.stateList((todo, index) => {
+              const isSelected = todo._selected;
+              return (
+                <div
+                  key={todo.id.get()}
+                  className={`flex items-center gap-2 px-2 py-1 rounded text-xs cursor-pointer transition-colors ${
+                    isSelected
+                      ? 'bg-blue-800/50 text-green-300'
+                      : 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/30'
+                  }`}
+                  onClick={() => todo.toggleSelected()}
+                >
+                  <input
+                    type="checkbox"
+                    checked={todo.done.get()}
+                    onChange={(e) => todo.done.update(e.target.checked)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="w-3 h-3 accent-green-500"
+                  />
+                  <span className={todo.done.get() ? 'line-through' : ''}>
+                    {todo.text.get()}
+                  </span>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-gray-500 text-center py-2 text-xs">
+              Empty list
+            </div>
+          )}
+        </div>
+        {selectedTodo && (
+          <div className="text-xs text-gray-400 mt-2 border-t border-gray-700 pt-2">
+            Selected:
+            <span className="text-blue-400">{selectedTodo.text.get()}</span>
+          </div>
+        )}
+      </SectionWrapper>
+    </div>
   );
 }
 
