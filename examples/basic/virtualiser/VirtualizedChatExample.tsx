@@ -135,25 +135,27 @@ function ChatWindow() {
 
 function MessageItem({ message }: { message: Message }) {
   const isFromYou = message.author === 'You';
+  // 1. Use state to track visibility
+  const [isVisible, setIsVisible] = useState(false);
 
   const containerClasses = `w-full flex items-end gap-2 ${
     isFromYou ? 'justify-end' : 'justify-start'
-  } opacity-0 transition-opacity duration-500 ease-in`;
+  } transition-opacity duration-300 ease-in ${
+    // 2. Apply class based on state
+    isVisible ? 'opacity-100' : 'opacity-20'
+  }`;
 
   const bubbleClasses = `flex flex-col max-w-[75%] px-3 py-2 rounded-lg shadow-md ${
     isFromYou ? 'bg-green-800 rounded-br-none' : 'bg-gray-700 rounded-bl-none'
   }`;
 
   useEffect(() => {
-    const element = document.getElementById(`message-${message.id}`);
-    if (element) {
-      element.classList.remove('opacity-0');
-      element.classList.add('opacity-100');
-    }
+    // We still need a tiny delay to give the browser time to paint the opacity-0 state first.
+    const timeoutId = setTimeout(() => setIsVisible(true), 10);
+    return () => clearTimeout(timeoutId);
   }, []);
-
   return (
-    <div id={`message-${message.id}`} className={containerClasses}>
+    <div className={containerClasses}>
       {!isFromYou && (
         <div className="w-8 h-8 rounded-full bg-gray-600 text-gray-300 flex items-center justify-center font-bold text-sm flex-shrink-0">
           {message.author.charAt(0)}

@@ -64,13 +64,42 @@ export default function ReactivityPage() {
           {/* Tab Content Area */}
           <div className="pl-6">
             {activeTab === 'component' ? (
-              <ComponentReactivityExample />
+              <ExampleDisplay
+                title="Component Reactivity (Default)"
+                description="This is the default. The component re-renders only if the specific state values it calls with .get() are updated."
+                options={{ reactiveType: 'component' }}
+              />
             ) : activeTab === 'deps' ? (
-              <DepsReactivityExample />
+              <ExampleDisplay
+                title="Dependency-Based Reactivity"
+                description="The component re-renders only when the specific values returned by the reactiveDeps function change."
+                options={{
+                  reactiveType: 'deps',
+                  reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
+                    state.foo,
+                    state.nested.foo,
+                  ],
+                }}
+                nestedOptions={{
+                  reactiveType: 'deps',
+                  reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
+                    state.seperateNested.foo,
+                  ],
+                }}
+              />
             ) : activeTab === 'all' ? (
-              <AllReactivityExample />
+              <ExampleDisplay
+                title="Entire State Reactive"
+                description="This component re-renders if *any* part of the 'fooBarObject' state slice changes, even properties it doesn't use."
+                options={{ reactiveType: 'all' }}
+              />
             ) : activeTab === 'none' ? (
-              <SignalReactivityExample />
+              <ExampleDisplay
+                title="Signal-Based Reactivity"
+                description="With reactiveType: 'none', the React component *never* re-renders from state changes. Use signals (.$get()) for fine-grained, direct-to-DOM updates."
+                options={{ reactiveType: 'none' }}
+                isSignal={true}
+              />
             ) : null}
           </div>{' '}
         </div>
@@ -111,61 +140,6 @@ export default function ReactivityPage() {
         </div>
       </div>
     </>
-  );
-}
-
-// --- Example Components for Each Tab ---
-
-function ComponentReactivityExample() {
-  return (
-    <ExampleDisplay
-      title="Component Reactivity (Default)"
-      description="This is the default. The component re-renders only if the specific state values it calls with .get() are updated."
-      options={{ reactiveType: 'component' }}
-    />
-  );
-}
-
-function DepsReactivityExample() {
-  return (
-    <ExampleDisplay
-      title="Dependency-Based Reactivity"
-      description="The component re-renders only when the specific values returned by the reactiveDeps function change."
-      options={{
-        reactiveType: 'deps',
-        reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
-          state.foo,
-          state.nested.foo,
-        ],
-      }}
-      nestedOptions={{
-        reactiveType: 'deps',
-        reactiveDeps: (state: StateExampleObject['fooBarObject']) => [
-          state.seperateNested.foo,
-        ],
-      }}
-    />
-  );
-}
-
-function AllReactivityExample() {
-  return (
-    <ExampleDisplay
-      title="Entire State Reactive"
-      description="This component re-renders if *any* part of the 'fooBarObject' state slice changes, even properties it doesn't use."
-      options={{ reactiveType: 'all' }}
-    />
-  );
-}
-
-function SignalReactivityExample() {
-  return (
-    <ExampleDisplay
-      title="Signal-Based Reactivity"
-      description="With reactiveType: 'none', the React component *never* re-renders from state changes. Use signals (.$get()) for fine-grained, direct-to-DOM updates."
-      options={{ reactiveType: 'none' }}
-      isSignal={true}
-    />
   );
 }
 

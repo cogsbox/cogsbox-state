@@ -1,4 +1,3 @@
-// src/pages/BasicCogsExamplePage.tsx
 'use client';
 
 import { useEffect, useRef, useState, createElement, useMemo } from 'react';
@@ -21,7 +20,15 @@ export type AppState = {
   inputMessage: string;
   isBooleanValue: boolean;
   todoList: TodoItem[];
-  activeNumbers: number[]; // Changed from statusMessage to activeNumbers
+  daysOfWeek: number[];
+  // Additional form fields
+  firstName: string;
+  lastName: string;
+  email: string;
+  phoneNumber: string;
+  country: string;
+  newsletter: boolean;
+  theme: 'light' | 'dark' | 'auto';
 };
 
 // --- Initial state ---
@@ -34,7 +41,14 @@ const initialAppState: AppState = {
     { id: uuidv4(), text: 'Initial Todo 2 (Done)', done: true },
     { id: uuidv4(), text: 'Initial Todo 3', done: false },
   ],
-  activeNumbers: [1, 3, 5], // List of active numbers
+  daysOfWeek: [1, 3, 5],
+  firstName: '',
+  lastName: '',
+  email: '',
+  phoneNumber: '',
+  country: 'us',
+  newsletter: true,
+  theme: 'auto',
 };
 
 // --- Create Cogs State Instance ---
@@ -52,7 +66,7 @@ function SectionWrapper({
 }) {
   return (
     <FlashWrapper>
-      <div className="bg-gray-900/80 border border-gray-700/50 rounded-lg p-5">
+      <div className="bg-[#1a1a1a]  border border-gray-700/50 rounded-lg p-5 text-white">
         <h3 className="font-bold text-lg text-gray-100 mb-4">{title}</h3>
         {children}
       </div>
@@ -64,7 +78,7 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
   return (
     <div className="mt-3">
       {title && (
-        <h4 className="text-gray-400 text-xs font-semibold mb-1 uppercase tracking-wider">
+        <h4 className="text-gray-400 text-xm font-semibold mb-1 uppercase tracking-wider">
           {title}
         </h4>
       )}
@@ -118,135 +132,86 @@ function CounterExample() {
 
   return (
     <SectionWrapper title="Getting & Updating Values">
-      <div className="space-y-6">
-        {/* .get() example */}
-        <div className="bg-black/20 rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => {
-                state.simpleCounter.update((p) => p + 1);
-              }}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm"
-            >
-              Increment
-            </button>
-            <CodeSnippetDisplay
-              code={`set {state.simpleCounter.update((prev) => prev +1) 
-get state.simpleCounter.get()}`}
-            />
-            <GetCounterDisplay />
-          </div>
+      <div className="px-12 py-8">
+        <div className="prose prose-invert mb-6 max-w-none">
+          <p className="text-sm text-gray-300 leading-relaxed">
+            Cogs State provides two ways to read values:{' '}
+            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+              .get()
+            </code>{' '}
+            for reactive reads that trigger re-renders, and{' '}
+            <code className="text-green-400 bg-gray-800 px-1 py-0.5 rounded">
+              .$get()
+            </code>{' '}
+            for signal-based reads that update the DOM directly without
+            re-rendering. Updates are performed with{' '}
+            <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
+              .update()
+            </code>{' '}
+            which accepts either a value or an updater function.
+          </p>
         </div>
-        {/* .$get() example */}
 
-        <div className="bg-black/20 rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => state.simpleCounter.update((prev) => prev * 2)}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm"
-            >
-              Double Counter
-            </button>
-            <CodeSnippetDisplay
-              code={`set {state.simpleCounter.update((prev) => prev * 2) 
-get state.simpleCounter.$get()}`}
-            />
-            <SignalCounterDisplay />
-          </div>
-        </div>
-        <div className="bg-black/20 rounded-lg p-4 space-y-3">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => state.isBooleanValue.toggle()}
-              className={`px-4 py-2  text-white rounded-lg hover:bg-green-200 text-sm  ${
-                state.isBooleanValue.get() ? 'bg-green-500' : 'bg-gray-700'
-              }`}
-            >
-              is Boolean Value
-            </button>
-            <CodeSnippetDisplay
-              code={`//  boolean special method
-{state.isFeatureEnabled.toggle()}`}
-            />
-          </div>
-        </div>
-        {/* Additional operations */}
-        <div className="bg-black/20 rounded-lg p-4 space-y-3 ">
-          <div className="mt-4 space-y-2">
-            <p className="text-sm text-gray-400">
-              Toggle numbers in/out of array:
-            </p>
-            <div className="flex gap-2">
-              {state.activeNumbers.formElement((obj) => (
-                <>
-                  {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
-                    <button
-                      key={num}
-                      onClick={() => obj.toggleByValue(num)}
-                      className={`px-3 py-1.5 rounded text-sm transition-colors ${
-                        obj.get().includes(num)
-                          ? 'bg-green-600 text-white hover:bg-green-500'
-                          : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                      }`}
-                    >
-                      {num}
-                    </button>
-                  ))}
-                </>
-              ))}
-            </div>
-            <div className="text-sm text-gray-300">
-              Active:{' '}
-              <FlashWrapper>
-                [ {state.activeNumbers.$derive((s) => s.join(', '))}]
-              </FlashWrapper>
+        <div className="grid gap-6">
+          {/* .get() example */}
+          <div className="bg-black/20 rounded-lg p-4">
+            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+              {' '}
+              <button
+                onClick={() => {
+                  state.simpleCounter.update((p) => p + 1);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-500 text-sm"
+              >
+                Increment
+              </button>{' '}
+              <CodeSnippetDisplay
+                code={`state.simpleCounter.update((prev) => prev + 1);`}
+              />
+              <GetCounterDisplay />
+              <CodeSnippetDisplay code={`state.simpleCounter.get();`} />
             </div>
           </div>
 
-          <CodeSnippetDisplay
-            code={`// Double using function update
-state.simpleCounter.update(prev => prev * 2);
+          {/* .$get() example */}
+          <div className="bg-black/20 rounded-lg p-4">
+            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+              {' '}
+              <button
+                onClick={() => state.simpleCounter.update((prev) => prev * 2)}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-500 text-sm"
+              >
+                Double Counter
+              </button>
+              <CodeSnippetDisplay
+                code={`state.simpleCounter.update((prev) => prev * 2);`}
+              />
+              <SignalCounterDisplay />
+              <CodeSnippetDisplay code={`state.simpleCounter.$get();`} />
+            </div>
+          </div>
 
-// Toggle array values in/out
-state.activeNumbers.toggleByValue(5); // Adds 5 if not present, removes if present
-
-// Current implementation:
-// If value exists in array -> removes it
-// If value doesn't exist -> adds it`}
-          />
+          <div className="bg-black/20 rounded-lg p-4">
+            <div className="grid grid-cols-[15%_35%_15%_30%] items-center gap-4">
+              {' '}
+              <button
+                onClick={() => state.isBooleanValue.toggle()}
+                className={`px-4 py-2 text-white rounded-lg hover:bg-green-200 text-sm ${
+                  state.isBooleanValue.get() ? 'bg-green-500' : 'bg-gray-700'
+                }`}
+              >
+                is Boolean Value
+              </button>
+              <CodeSnippetDisplay code={`state.isBooleanValue.toggle();`} />
+              <span className="text-green-400">
+                {state.isBooleanValue.get() ? 'true' : 'false'}
+              </span>
+              <CodeSnippetDisplay code={`state.isBooleanValue.get();`} />
+            </div>
+          </div>
         </div>
       </div>
     </SectionWrapper>
-  );
-}
-
-// Separate component to demonstrate reactive .get() calls
-function ReactiveFormDisplay() {
-  const state = useCogsState('appData');
-
-  return (
-    <div className="space-y-3">
-      <div className="bg-black/20 rounded p-3">
-        <span className="text-gray-400 text-xs">Message:</span>
-        <div className="text-gray-100">
-          <FlashWrapper>{state.inputMessage.get()}</FlashWrapper>
-        </div>
-      </div>
-      <div className="bg-black/20 rounded p-3">
-        <span className="text-gray-400 text-xs">Feature:</span>
-        <div className="text-gray-100">
-          <FlashWrapper>
-            {state.isBooleanValue.get() ? '✅ Enabled' : '❌ Disabled'}
-          </FlashWrapper>
-        </div>
-      </div>
-      <div className="bg-black/20 rounded p-3">
-        <span className="text-gray-400 text-xs">Active Numbers:</span>
-        <div className="text-gray-100">
-          <FlashWrapper>[{state.activeNumbers.get().join(', ')}]</FlashWrapper>
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -255,64 +220,300 @@ function FormElementsExample() {
   const state = useCogsState('appData');
 
   return (
-    <div className="grid grid-cols-2 gap-6">
-      {/* Form inputs */}
-      <SectionWrapper title="Form Bindings">
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm text-gray-400 mb-2">Message</label>
-            <FlashWrapper>
-              {state.inputMessage.formElement((obj) => (
-                <input
-                  {...obj.inputProps}
-                  className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded"
-                />
-              ))}
-            </FlashWrapper>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <FlashWrapper>
-              {state.isBooleanValue.formElement((obj) => (
-                <input
-                  type="checkbox"
-                  className="w-5 h-5 accent-green-500"
-                  checked={obj.get()}
-                  onChange={(e) => obj.toggle()}
-                />
-              ))}
-            </FlashWrapper>
-            <label className="text-sm text-gray-300">Enable Feature</label>
-          </div>
+    <div className="grid grid-cols-[70%_30%] gap-6">
+      <SectionWrapper title="User Profile Form">
+        <div className="prose prose-invert mb-6 max-w-none">
+          <p className="text-sm text-gray-300 leading-relaxed">
+            The{' '}
+            <code className="text-purple-400 bg-gray-800 px-1 py-0.5 rounded">
+              .formElement()
+            </code>{' '}
+            method provides automatic two-way binding for form inputs with
+            intelligent debouncing. It returns a fully type-safe state setter
+            that preserves all methods available on the underlying state type -
+            whether it's a primitive value, object with nested properties, or
+            array with methods like{' '}
+            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+              .insert()
+            </code>
+            ,{' '}
+            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+              .cut()
+            </code>
+            , and{' '}
+            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+              .stateMap()
+            </code>
+            . The{' '}
+            <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
+              inputProps
+            </code>{' '}
+            object handles value binding, change events, and form validation
+            while maintaining complete access to the state's API through the
+            same setter instance.
+          </p>
         </div>
-
         <CodeSnippetDisplay
-          title="Form Bindings"
-          code={`// Text input
-state.inputMessage.formElement((obj) => (
-  <input {...obj.inputProps} />
+          code={`// Text input with automatic debouncing
+state.firstName.formElement(({inputProps}) => (
+  <input {...inputProps} />
 ))
 
-// Checkbox
-state.isFeatureEnabled.formElement((obj) => (
-  <input
-    type="checkbox"
-    checked={obj.get()}
-    onChange={(e) => obj.set(e.target.checked)}
-  />
-))`}
-        />
-      </SectionWrapper>
+// Select dropdown
+state.country.formElement(({state}) => (
+  <select value={state.get()} onChange={(e) => state.update(e.target.value)}>
+    <option>...</option>
+  </select>
+))
 
-      {/* Reactive display */}
-      <SectionWrapper title="Reactive Display">
-        <p className="text-sm text-gray-400 mb-4">
-          These values update automatically when you change the form inputs
-          (separate component to show reactivity)
-        </p>
-        <ReactiveFormDisplay />
+// Checkbox with toggle
+state.newsletter.formElement(({state}) => (
+  <input type="checkbox" checked={state.get()} onChange={() => state.toggle()} />
+))
+`}
+        />
+        <div className="space-y-6">
+          {/* Form Grid */}
+          <div className="grid grid-cols-2 gap-6">
+            {/* First Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                First Name
+              </label>
+              <FlashWrapper>
+                {state.firstName.formElement((obj) => (
+                  <input
+                    {...obj.inputProps}
+                    placeholder="John"
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                ))}
+              </FlashWrapper>
+            </div>
+
+            {/* Last Name */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Last Name
+              </label>
+              <FlashWrapper>
+                {state.lastName.formElement((obj) => (
+                  <input
+                    {...obj.inputProps}
+                    placeholder="Doe"
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                ))}
+              </FlashWrapper>
+            </div>
+
+            {/* Email */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Email Address
+              </label>
+              <FlashWrapper>
+                {state.email.formElement((obj) => (
+                  <input
+                    {...obj.inputProps}
+                    type="email"
+                    placeholder="john.doe@example.com"
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                ))}
+              </FlashWrapper>
+            </div>
+
+            {/* Phone */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Phone Number
+              </label>
+              <FlashWrapper>
+                {state.phoneNumber.formElement((obj) => (
+                  <input
+                    {...obj.inputProps}
+                    type="tel"
+                    placeholder="+1 (555) 123-4567"
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  />
+                ))}
+              </FlashWrapper>
+            </div>
+
+            {/* Country */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Country
+              </label>
+              <FlashWrapper>
+                {state.country.formElement((obj) => (
+                  <select
+                    value={obj.get()}
+                    onChange={(e) => obj.update(e.target.value)}
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="us">United States</option>
+                    <option value="uk">United Kingdom</option>
+                    <option value="ca">Canada</option>
+                    <option value="au">Australia</option>
+                  </select>
+                ))}
+              </FlashWrapper>
+            </div>
+
+            {/* Theme */}
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Theme Preference
+              </label>
+              <FlashWrapper>
+                {state.theme.formElement((obj) => (
+                  <select
+                    value={obj.get()}
+                    onChange={(e) => obj.update(e.target.value as any)}
+                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                  >
+                    <option value="light">Light</option>
+                    <option value="dark">Dark</option>
+                    <option value="auto">Auto</option>
+                  </select>
+                ))}
+              </FlashWrapper>
+            </div>
+          </div>
+
+          {/* Checkboxes */}
+          <div className="space-y-3 border-t border-gray-700 pt-4">
+            <div className="flex items-center gap-3">
+              <FlashWrapper>
+                {state.newsletter.formElement((obj) => (
+                  <input
+                    type="checkbox"
+                    className="w-5 h-5 accent-blue-500 rounded"
+                    checked={obj.get()}
+                    onChange={() => obj.toggle()}
+                  />
+                ))}
+              </FlashWrapper>
+              <label className="text-sm text-gray-300">
+                Subscribe to newsletter for updates and special offers
+              </label>
+            </div>
+          </div>
+
+          {/* Active Numbers Toggle */}
+          <div className="border-t border-gray-700 pt-4">
+            <label className="block text-sm font-medium text-gray-300 mb-3">
+              Notification Days
+            </label>
+            <div className="flex gap-2">
+              {state.daysOfWeek.formElement((obj) => (
+                <>
+                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                    (day, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => obj.toggleByValue(idx)}
+                        className={`px-3 py-1.5 rounded text-sm transition-colors ${
+                          obj.get().includes(idx)
+                            ? 'bg-blue-600 text-white hover:bg-blue-500'
+                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                        }`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  )}
+                </>
+              ))}
+            </div>
+          </div>
+        </div>
       </SectionWrapper>
+      <ReactiveFormDisplay />
     </div>
+  );
+}
+
+// Reactive form display moved to right column
+function ReactiveFormDisplay() {
+  const state = useCogsState('appData');
+  const hasFormData =
+    state.firstName.get() || state.lastName.get() || state.email.get();
+
+  return (
+    <FlashWrapper>
+      <div className="bg-gray-900/30 border border-gray-700/50 rounded-lg p-4 ">
+        <h3 className="text-gray-300 text-sm font-semibold mb-3 uppercase tracking-wider">
+          Form State
+        </h3>
+
+        {hasFormData ? (
+          <div className="space-y-3 text-sm">
+            {(state.firstName.get() || state.lastName.get()) && (
+              <div>
+                <span className="text-gray-500">Name:</span>
+                <div className="text-gray-200">
+                  {state.firstName.$get()} {state.lastName.$get()}
+                </div>
+              </div>
+            )}
+
+            {state.email.get() && (
+              <div>
+                <span className="text-gray-500">Email:</span>
+                <div className="text-gray-200">{state.email.$get()}</div>
+              </div>
+            )}
+
+            {state.phoneNumber.get() && (
+              <div>
+                <span className="text-gray-500">Phone:</span>
+                <div className="text-gray-200">{state.phoneNumber.$get()}</div>
+              </div>
+            )}
+
+            <div>
+              <span className="text-gray-500">Country:</span>
+              <div className="text-gray-200">
+                {state.country.get() === 'us' && 'United States'}
+                {state.country.get() === 'uk' && 'United Kingdom'}
+                {state.country.get() === 'ca' && 'Canada'}
+                {state.country.get() === 'au' && 'Australia'}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-gray-500">Theme:</span>
+              <div className="text-gray-200">{state.theme.$get()}</div>
+            </div>
+
+            <div>
+              <span className="text-gray-500">Newsletter:</span>
+              <div className="text-gray-200">
+                {state.newsletter.get() ? '✅ Subscribed' : '❌ Not subscribed'}
+              </div>
+            </div>
+
+            <div>
+              <span className="text-gray-500">Notification Days:</span>
+              <div className="text-gray-200">
+                {state.daysOfWeek.get().length > 0
+                  ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                      .filter((_, i) => state.daysOfWeek.get().includes(i))
+                      .join(', ')
+                  : 'None selected'}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <p className="text-gray-500 text-sm">
+            Fill in the form to see reactive updates...
+          </p>
+        )}
+      </div>
+    </FlashWrapper>
   );
 }
 
@@ -419,15 +620,11 @@ function ArrayManipulationExample() {
         <CodeSnippetDisplay
           title="Array Methods"
           code={`// Add item
-todos.insert(({ uuid }) => ({
-  id: uuid,
-  text: 'New todo',
-  done: false
-}));
+todos.insert(({ uuid }) => ({...}));
 
 // Remove items
-todos.cut(0);  // Remove at index
-todos.cutSelected();  // Remove selected
+todos.cut(0);
+todos.cutSelected();
 
 // Selection
 todo.toggleSelected();
@@ -458,7 +655,7 @@ function ShowFullStateDisplay() {
         <pre
           ref={preRef}
           className="text-xs overflow-auto text-gray-300 font-mono"
-          style={{ maxHeight: '600px' }}
+          style={{ maxHeight: '400px' }}
         >
           {JSON.stringify(state.get(), null, 2)}
         </pre>
@@ -470,28 +667,37 @@ function ShowFullStateDisplay() {
 // --- Main Page ---
 export default function BasicCogsExamplePage() {
   return (
-    <div className="flex gap-6 p-6 ">
-      {/* Left Column */}
-      <div className="flex-1 flex flex-col gap-6">
-        <DotPattern>
-          <div className="px-8 py-6">
-            <h1 className="text-2xl font-bold text-gray-100">
-              Cogs State Overview
-            </h1>
-            <p className="text-sm text-gray-400 max-w-2xl">
-              Core methods and functionality demonstrations
-            </p>
-          </div>
-        </DotPattern>
+    <div className="flex-1 flex flex-col gap-8">
+      <DotPattern>
+        <div className="px-8 py-6">
+          <h1 className="text-2xl font-bold text-gray-100">
+            Cogs State Overview
+          </h1>
+          <p className="text-sm text-gray-400 max-w-2xl">
+            Core methods and functionality demonstrations
+          </p>
+        </div>
+      </DotPattern>
 
+      <div>
+        <h2 className="text-2xl font-semibol</div> text-gray-200 mb-4 tracking-tight">
+          Primitives & Core Methods
+        </h2>
         <CounterExample />
-        <FormElementsExample />
-        <ArrayManipulationExample />
       </div>
 
-      {/* Right Column */}
-      <div className="w-96 sticky top-6">
-        <ShowFullStateDisplay />
+      <div>
+        <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
+          Form Bindings
+        </h2>
+        <FormElementsExample />
+      </div>
+
+      <div>
+        <h2 className="text-2xl font-semibold text-gray-200 mb-4 tracking-tight">
+          Array Manipulation
+        </h2>
+        <ArrayManipulationExample />
       </div>
     </div>
   );
