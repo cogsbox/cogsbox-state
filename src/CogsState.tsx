@@ -3862,14 +3862,22 @@ function PrimitiveItemWrapper({
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Sync local value with global state when not debouncing
   useEffect(() => {
     if (!isCurrentlyDebouncing.current && globalStateValue !== localValue) {
       setLocalValue(globalStateValue);
     }
   }, [globalStateValue]);
 
+  // Cleanup timeout on unmount
   useEffect(() => {
+    const unsubscribe = getGlobalStore
+      .getState()
+      .subscribeToPath(stateKeyPathKey, (newValue) => {
+        forceUpdate({});
+      });
     return () => {
+      unsubscribe();
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
         isCurrentlyDebouncing.current = false;
@@ -3877,63 +3885,57 @@ function PrimitiveItemWrapper({
     };
   }, []);
 
-  const debouncedUpdater = (payload: any) => {
-    setLocalValue(payload);
-    isCurrentlyDebouncing.current = true;
+  // Single debounced update function
+  const debouncedUpdate = useCallback(
+    (newValue: any) => {
+      setLocalValue(newValue);
+      isCurrentlyDebouncing.current = true;
 
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+
+      const debounceTime = formOpts?.debounceTime ?? 200;
+
+      debounceTimeoutRef.current = setTimeout(() => {
+        isCurrentlyDebouncing.current = false;
+        setState(newValue, path, { updateType: 'update' });
+      }, debounceTime);
+    },
+    [setState, path, formOpts?.debounceTime]
+  );
+
+  // Force immediate update (for onBlur)
+  const immediateUpdate = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
-    }
-
-    const debounceTime =
-      formOpts?.debounceTime ??
-      (typeof globalStateValue === 'boolean' ? 20 : 200);
-
-    debounceTimeoutRef.current = setTimeout(() => {
       isCurrentlyDebouncing.current = false;
-      setState(payload, path, { updateType: 'update' });
-    }, debounceTime);
-  };
+      setState(localValue, path, { updateType: 'update' });
+    }
+  }, [setState, path, localValue]);
+
   const baseState = rebuildStateShape({
     currentState: globalStateValue,
     path: path,
     componentId: componentId,
   });
 
-  // Extend it with just inputProps
+  // Extend with inputProps
   const stateWithInputProps = new Proxy(baseState, {
     get(target, prop) {
       if (prop === 'inputProps') {
         return {
           value: localValue ?? '',
           onChange: (e: any) => {
-            const newValue = e.target.value;
-            setLocalValue(newValue);
-            isCurrentlyDebouncing.current = true;
-
-            if (debounceTimeoutRef.current) {
-              clearTimeout(debounceTimeoutRef.current);
-            }
-
-            debounceTimeoutRef.current = setTimeout(() => {
-              isCurrentlyDebouncing.current = false;
-              target.update(newValue); // Use the existing update method
-            }, formOpts?.debounceTime ?? 200);
+            debouncedUpdate(e.target.value);
           },
-          onBlur: () => {
-            if (debounceTimeoutRef.current) {
-              clearTimeout(debounceTimeoutRef.current);
-              isCurrentlyDebouncing.current = false;
-              target.update(localValue);
-            }
-          },
+          onBlur: immediateUpdate,
           ref: formRefStore
             .getState()
             .getFormRef(stateKey + '.' + path.join('.')),
         };
       }
 
-      // Pass through everything else
       return target[prop];
     },
   });

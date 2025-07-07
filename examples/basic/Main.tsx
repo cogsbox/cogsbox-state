@@ -7,7 +7,7 @@ import VirtualizedChatExample from './virtualiser/VirtualizedChatExample';
 import ArrayMethodsPage from './object-example/ObjectExmaple';
 import { catSvg } from './assets/svgs';
 import LCDCatScrollerDemo from './LCDDemo';
-import StateOverview from './StateOverview';
+import StateOverview from './basic-overview/StateOverview';
 
 const sections = [
   { name: 'Reactivity', component: Reactivity },
