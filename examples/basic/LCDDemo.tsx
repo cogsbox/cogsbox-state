@@ -29,7 +29,7 @@ const initialState = {
       initialDelay: 1,
       finalDelay: 0.5,
       repeat: true,
-      stressTest: false,
+      isRandomPixels: false,
       randomPixels: 100,
       color: 'green' as keyof typeof COLOR_PRESETS,
     },
@@ -301,7 +301,7 @@ function LCDCatScrollerStateful({
       // Add stress test random pixels.
       // These are drawn ON TOP of whatever is already in the buffer (cat or faded pixels).
       // These are always full brightness (255).
-      if (controls.stressTest) {
+      if (controls.isRandomPixels) {
         for (let i = 0; i < controls.randomPixels; i++) {
           const randomIndex = Math.floor(Math.random() * TOTAL);
           buffer[randomIndex] = 255;
@@ -568,8 +568,10 @@ export default function LCDCatScrollerDemo({ catSvg }: { catSvg: string }) {
                 <label className="text-sm text-gray-400">Stress Test</label>
                 <input
                   type="checkbox"
-                  checked={controls.stressTest.get()}
-                  onChange={(e) => controls.stressTest.update(e.target.checked)}
+                  checked={controls.isRandomPixels.get()}
+                  onChange={(e) =>
+                    controls.isRandomPixels.update(e.target.checked)
+                  }
                   className="w-4 h-4 bg-gray-800 border-gray-600 accent-green-500"
                 />
               </div>
@@ -579,7 +581,7 @@ export default function LCDCatScrollerDemo({ catSvg }: { catSvg: string }) {
                   Random Pixels: {controls.randomPixels.get()}
                 </label>
                 <input
-                  disabled={!controls.stressTest.get()}
+                  disabled={!controls.isRandomPixels.get()}
                   type="range"
                   value={controls.randomPixels.get()}
                   onChange={(e) =>

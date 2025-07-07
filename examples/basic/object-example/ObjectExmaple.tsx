@@ -219,7 +219,8 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
               <button
                 onClick={() => itemSetter.setSelected(true)}
                 className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
-                  itemSetter._selected
+                  filteredAndSorted.getSelected()?.id.get() ===
+                  itemSetter.id.get()
                     ? teamColors[color].selected
                     : 'bg-gray-800 hover:bg-gray-700/70'
                 }`}

@@ -1,22 +1,22 @@
 import { v4 as uuidv4 } from 'uuid';
 
 import { createCogsState, type StateObject } from '@lib/CogsState';
-import { FlashWrapper } from '../FlashOnUpdate';
+
 export type TodoItem = {
   id: string;
   text: string;
   done: boolean;
 };
 
-export type AppState = {
+export type TestState = {
   simpleCounter: number;
   simpleCounter2: number;
   inputMessage: string;
   isBooleanValue: boolean;
   isBooleanValue2: boolean;
   todoList: TodoItem[];
-  daysOfWeek: number[];
-  // Additional form fields
+};
+export type FormData = {
   firstName: string;
   lastName: string;
   email: string;
@@ -24,10 +24,10 @@ export type AppState = {
   country: string;
   newsletter: boolean;
   theme: 'light' | 'dark' | 'auto';
+  daysOfWeek: number[];
 };
-
 // --- Initial state ---
-const initialAppState: AppState = {
+const initialAppState: TestState = {
   simpleCounter: 0,
   simpleCounter2: 0,
   inputMessage: 'Hello Cogs State!',
@@ -38,6 +38,8 @@ const initialAppState: AppState = {
     { id: uuidv4(), text: 'Initial Todo 2 (Done)', done: true },
     { id: uuidv4(), text: 'Initial Todo 3', done: false },
   ],
+};
+const formData: FormData = {
   daysOfWeek: [1, 3, 5],
   firstName: '',
   lastName: '',
@@ -50,5 +52,6 @@ const initialAppState: AppState = {
 
 // --- Create Cogs State Instance ---
 export const { useCogsState } = createCogsState({
-  appData: initialAppState,
+  testData: initialAppState,
+  formData: formData,
 });

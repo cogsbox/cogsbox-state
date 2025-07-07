@@ -23,7 +23,7 @@ export const FlashWrapper = ({
     overlay.style.left = '0';
     overlay.style.right = '0';
     overlay.style.bottom = '0';
-    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.1)';
+    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.04)';
     overlay.style.pointerEvents = 'none';
     ref.current.appendChild(overlay);
 

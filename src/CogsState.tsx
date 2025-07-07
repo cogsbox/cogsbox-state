@@ -139,75 +139,82 @@ export type StreamHandle<T> = {
   pause: () => void;
   resume: () => void;
 };
-
 export type ArrayEndType<TShape extends unknown> = {
-  stream: <T = InferArrayElement<TShape>, R = T>(
+  // Each instance of InferArrayElement<TShape> is wrapped in Prettify
+  // This forces the 'Message' alias to expand to '{ id: ... }'
+  stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
     options?: StreamOptions<T, R>
   ) => StreamHandle<T>;
-  findWith: findWithFuncType<InferArrayElement<TShape>>;
-  index: (index: number) => StateObject<InferArrayElement<TShape>> & {
-    insert: InsertType<InferArrayElement<TShape>>;
+  findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
+  index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
+    insert: InsertType<Prettify<InferArrayElement<TShape>>>;
     cut: CutFunctionType<TShape>;
     _index: number;
-  } & EndType<InferArrayElement<TShape>>;
-  insert: InsertType<InferArrayElement<TShape>>;
+  } & EndType<Prettify<InferArrayElement<TShape>>>;
+  insert: InsertType<Prettify<InferArrayElement<TShape>>>;
   cut: CutFunctionType<TShape>;
   cutSelected: () => void;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
   stateSort: (
     compareFn: (
-      a: InferArrayElement<TShape>,
-      b: InferArrayElement<TShape>
+      a: Prettify<InferArrayElement<TShape>>,
+      b: Prettify<InferArrayElement<TShape>>
     ) => number,
     deps?: any[]
   ) => ArrayEndType<TShape>;
   useVirtualView: (
     options: VirtualViewOptions
-  ) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
+  ) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
 
   stateList: (
     callbackfn: (
-      setter: StateObject<InferArrayElement<TShape>>,
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
-
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
   stateMap: <U>(
     callbackfn: (
-      setter: StateObject<InferArrayElement<TShape>>,
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
       arraySetter: StateObject<TShape>
     ) => U
   ) => U[];
   $stateMap: (
     callbackfn: (
-      setter: StateObject<InferArrayElement<TShape>>,
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
-
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
-  stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(
+  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(
     field: K
-  ) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
+  ) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
   uniqueInsert: (
-    payload: InsertParams<InferArrayElement<TShape>>,
-    fields?: (keyof InferArrayElement<TShape>)[],
+    payload: InsertParams<Prettify<InferArrayElement<TShape>>>,
+    fields?: (keyof Prettify<InferArrayElement<TShape>>)[],
     onMatch?: (existingItem: any) => any
   ) => void;
   stateFind: (
-    callbackfn: (value: InferArrayElement<TShape>, index: number) => boolean
-  ) => StateObject<InferArrayElement<TShape>> | undefined;
+    callbackfn: (
+      value: Prettify<InferArrayElement<TShape>>,
+      index: number
+    ) => boolean
+  ) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
   stateFilter: (
-    callbackfn: (value: InferArrayElement<TShape>, index: number) => void,
+    callbackfn: (
+      value: Prettify<InferArrayElement<TShape>>,
+      index: number
+    ) => void,
     deps?: any[]
   ) => ArrayEndType<TShape>;
-  getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
+  getSelected: () =>
+    | StateObject<Prettify<InferArrayElement<TShape>>>
+    | undefined;
   clearSelected: () => void;
   getSelectedIndex: () => number;
-  last: () => StateObject<InferArrayElement<TShape>> | undefined;
+  last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
 } & EndType<TShape>;
 
 export type FormOptsType = {
@@ -232,12 +239,6 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => void;
 
 export type InsertType<T> = (payload: InsertParams<T>) => void;
 
-export type ObjectEndType<T> = EndType<T> & {
-  [K in keyof T]-?: ObjectEndType<T[K]>;
-} & {
-  stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
-  delete: () => void;
-};
 export type ValidationError = {
   path: (string | number)[];
   message: string;
@@ -280,9 +281,9 @@ export type EndType<T, IsArrayElement = false> = {
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
   : T extends Record<string, unknown> | object
-    ? { [K in keyof T]-?: StateObject<T[K]> } & ObjectEndType<T>
+    ? { [K in keyof T]-?: StateObject<T[K]> }
     : T extends string | number | boolean | null
-      ? T
+      ? EndType<T, true>
       : never) &
   EndType<T, true> & {
     toggle: T extends boolean ? () => void : never;
@@ -1360,6 +1361,47 @@ export function useCogsStateFn<TStateObject extends unknown>(
         }
       });
     }
+    if (
+      updateObj.updateType === 'update' &&
+      payload &&
+      typeof payload === 'object' &&
+      !isArray(payload) &&
+      nestedShadowValue &&
+      typeof nestedShadowValue === 'object' &&
+      !isArray(nestedShadowValue)
+    ) {
+      // Get a list of dot-separated paths that have changed (e.g., ['name', 'address.city'])
+      const changedSubPaths = getDifferences(payload, nestedShadowValue);
+
+      changedSubPaths.forEach((subPathString) => {
+        const subPath = subPathString.split('.');
+        const fullSubPath = [...path, ...subPath];
+
+        // Get the metadata (and subscribers) for this specific nested path
+        const subPathMeta = store.getShadowMetadata(thisKey, fullSubPath);
+        if (subPathMeta?.pathComponents) {
+          subPathMeta.pathComponents.forEach((componentId) => {
+            // Avoid sending a redundant update if this component was already notified
+            if (notifiedComponents.has(componentId)) {
+              return; // continue
+            }
+            const component = rootMeta.components?.get(componentId);
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || 'component'];
+
+              // Check if the component has reactivity enabled
+              if (!reactiveTypes.includes('none')) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            }
+          });
+        }
+      });
+    }
+
     if (updateObj.updateType === 'insert' || updateObj.updateType === 'cut') {
       // For 'insert', the path is the array path. For 'cut', it's the item path.
       const parentArrayPath =
@@ -1523,7 +1565,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     );
   }, [thisKey, sessionId]);
 
-  return updaterFinal as StateObject<TStateObject>;
+  return updaterFinal;
 }
 
 export type MetaData = {
@@ -1885,12 +1927,12 @@ function createProxyHandler<T>(
         if (Array.isArray(currentState)) {
           if (prop === 'getSelected') {
             return () => {
+              const fullKey = stateKey + '.' + path.join('.');
               registerComponentDependency(stateKey, componentId, [
                 ...path,
                 'getSelected',
               ]);
 
-              const fullKey = stateKey + '.' + path.join('.');
               const selectedIndicesMap =
                 getGlobalStore.getState().selectedIndicesMap;
               if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
@@ -1986,7 +2028,6 @@ function createProxyHandler<T>(
                   top: container.scrollHeight,
                   behavior: initialScrollRef.current ? 'instant' : 'smooth',
                 });
-                initialScrollRef.current = false;
               }, [rerender, stickToBottom]);
 
               // Subscribe to server state updates
@@ -2161,7 +2202,6 @@ function createProxyHandler<T>(
                     });
 
                     // Set to false after first use
-                    initialScrollRef.current = false;
                   }
                 };
 
@@ -2586,7 +2626,7 @@ function createProxyHandler<T>(
                     .getState()
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
-
+                      console.log('e', stateKeyPathKey, e);
                       const shadowMeta = getGlobalStore
                         .getState()
                         .getShadowMetadata(stateKey, path);
@@ -2607,7 +2647,10 @@ function createProxyHandler<T>(
                       forceUpdate({});
                     });
 
-                  return unsubscribe;
+                  return () => {
+                    unsubscribe();
+                  };
+
                   // This effect's logic now depends on the componentId to perform the purge.
                 }, [componentId, stateKeyPathKey]);
 
@@ -2719,7 +2762,6 @@ function createProxyHandler<T>(
             };
           }
           if (prop === 'insert') {
-            console.log('inserting');
             return (
               payload: InsertParams<InferArrayElement<T>>,
               index?: number
@@ -3005,12 +3047,6 @@ function createProxyHandler<T>(
             const fullParentKey = stateKey + '.' + parentPath.join('.');
             const fullItemKey = stateKey + '.' + path.join('.');
 
-            const selectedIndex = getGlobalStore
-              .getState()
-              .selectedIndicesMap.get(fullParentKey);
-
-            notifySelectionComponents(stateKey, parentPath, selectedIndex);
-
             if (value) {
               getGlobalStore
                 .getState()
@@ -3028,8 +3064,6 @@ function createProxyHandler<T>(
             const currentSelected = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
-
-            notifySelectionComponents(stateKey, parentPath, currentSelected);
 
             if (currentSelected === fullItemKey) {
               getGlobalStore
@@ -3143,8 +3177,6 @@ function createProxyHandler<T>(
             throw new Error('toggle() can only be used on boolean values');
           }
           return () => {
-            console.log('toggle', stateKey, componentId, [...path]);
-
             effectiveSetState(!currentValueAtPath as any, path, {
               updateType: 'update',
             });
@@ -3152,9 +3184,6 @@ function createProxyHandler<T>(
         }
         if (prop === 'formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => {
-            if (isArray(currentState)) {
-              //   return <></>;
-            }
             return (
               <ValidationWrapper
                 formOpts={formOpts}
@@ -3167,7 +3196,7 @@ function createProxyHandler<T>(
                   rebuildStateShape={rebuildStateShape}
                   setState={effectiveSetState}
                   formOpts={formOpts}
-                  renderFn={child}
+                  renderFn={child as any}
                 />
               </ValidationWrapper>
             );
@@ -3674,7 +3703,7 @@ function ListItemWrapper({
   // ANNOTATION: The two key hooks for the fix.
   const imagesLoaded = useImageLoaded(elementRef); // Our new hook
   const hasReportedInitialHeight = useRef(false); // A flag to prevent re-reporting
-
+  const fullKey = [stateKey, ...itemPath].join('.');
   // Proper way to merge refs
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
@@ -3683,7 +3712,11 @@ function ListItemWrapper({
     },
     [inViewRef]
   );
-
+  useEffect(() => {
+    getGlobalStore.getState().subscribeToPath(fullKey, (e) => {
+      forceUpdate({});
+    });
+  }, []);
   useEffect(() => {
     if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
       return;

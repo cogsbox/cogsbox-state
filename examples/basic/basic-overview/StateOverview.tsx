@@ -1,10 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, createElement, useMemo } from 'react';
-import { v4 as uuidv4 } from 'uuid';
+
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { createCogsState, type StateObject } from '@lib/CogsState';
+
 import { FlashWrapper } from '../FlashOnUpdate';
 import DotPattern from '../DotWrapper';
 import { useCogsState } from './state';
@@ -46,16 +46,27 @@ function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
 
 // --- Enhanced Counter Example ---
 function CounterExample() {
-  const state = useCogsState('appData');
+  const state = useCogsState('testData');
 
   return (
     <SectionWrapper>
       <h2 className="text-2xl font-semibold text-gray-200 tracking-tight">
         Primitives & Core Methods
       </h2>
-      <div className="px-6 py-12">
-        <div className="prose prose-invert mb-6 max-w-none">
-          <p className="text-sm text-gray-300 leading-relaxed">
+      <div className="px-6 py-8">
+        {' '}
+        <div className="prose prose-invert pb-3 max-w-none">
+          <p className=" text-gray-300 leading-relaxed">
+            This Whole block uses a single call to the useCogsState hook to
+            create a state object. The state object is a proxy that allows you
+            to read and update the state in a reactive way.
+          </p>
+        </div>
+        <CodeSnippetDisplay
+          code={`  const state = useCogsState('testData');`}
+        />
+        <div className="prose prose-invert py-6 max-w-none">
+          <p className=" text-gray-300 leading-relaxed">
             Cogs State provides two ways to read values:
             <code className="text-blue-400 bg-gray-800 px-1 py-0.5 rounded">
               .get()
@@ -72,10 +83,9 @@ function CounterExample() {
             which accepts either a value or an updater function.
           </p>
         </div>
-
         <div className="grid gap-6">
           {/* .get() Reactive Container */}
-          <div className="bg-blue-500/4 border border-blue-500/20 rounded-xl p-6">
+          <div className="bg-blue-500/3 border border-blue-500/20 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-blue-400 mb-4 flex items-center gap-2">
               <span className="text-2xl">⚛️</span>
               Reactive Methods (.get)
@@ -83,7 +93,7 @@ function CounterExample() {
             <div className="space-y-3">
               {/* .update() example */}
               <div className="bg-black/20 rounded-lg p-3">
-                <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
+                <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
                   <div className="text-sm font-bold text-gray-300">
                     .update()
                   </div>
@@ -98,16 +108,16 @@ function CounterExample() {
                   <CodeSnippetDisplay
                     code={`state.simpleCounter.update((prev) => prev + 1);`}
                   />
-                  <span className="text-green-400 font-mono">
+                  <div className="text-green-400 font-mono px-8">
                     {state.simpleCounter.get()}
-                  </span>
+                  </div>
                   <CodeSnippetDisplay code={`state.simpleCounter.get();`} />
                 </div>
               </div>
 
               {/* .toggle() example */}
               <div className="bg-black/20 rounded-lg p-3">
-                <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
+                <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
                   <div className="text-sm font-bold text-gray-300">
                     .toggle()
                   </div>
@@ -122,17 +132,47 @@ function CounterExample() {
                     Toggle State
                   </button>
                   <CodeSnippetDisplay code={`state.isBooleanValue.toggle();`} />
-                  <span className="text-green-400 font-mono">
+                  <div className="text-green-400 font-mono px-8">
                     {state.isBooleanValue.get() ? 'true' : 'false'}
-                  </span>
+                  </div>
                   <CodeSnippetDisplay code={`state.isBooleanValue.get();`} />
                 </div>
+              </div>
+            </div>{' '}
+            <div className="bg-black/20 rounded-lg p-3">
+              <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
+                <div className="text-sm font-bold text-gray-300">
+                  .update() (object)
+                </div>
+                <button
+                  onClick={() => {
+                    state.update((p) => ({
+                      ...p,
+                      simpleCounter: p.simpleCounter + 1,
+                      isBooleanValue: !p.isBooleanValue,
+                    }));
+                  }}
+                  className="px-4 py-2 bg-blue-600 cursor-pointer text-white rounded-lg hover:bg-blue-500 text-sm"
+                >
+                  Object Update
+                </button>
+                <CodeSnippetDisplay
+                  code={`state.update((p) => ({
+    ...p,
+    simpleCounter: p.simpleCounter + 1,
+    isBooleanValue: !p.isBooleanValue,
+  }))`}
+                />
+                <div className="text-green-400 font-mono px-8">
+                  {state.simpleCounter.get()}
+                </div>
+                <CodeSnippetDisplay code={`state.simpleCounter.get();`} />
               </div>
             </div>
           </div>
 
           {/* .$get() Signal Container */}
-          <div className="bg-green-500/4 border border-green-500/20 rounded-xl p-6">
+          <div className="bg-green-500/3 border border-green-500/20 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-green-400 mb-4 flex items-center gap-2">
               <span className="text-2xl">⚡</span>
               Signal Methods (.$get)
@@ -140,7 +180,7 @@ function CounterExample() {
             <div className="space-y-3">
               {/* .update() with signals */}
               <div className="bg-black/20 rounded-lg p-3">
-                <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
+                <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
                   <div className="text-sm font-bold text-gray-300">
                     .update()
                   </div>
@@ -155,16 +195,16 @@ function CounterExample() {
                   <CodeSnippetDisplay
                     code={`state.simpleCounter2.update((prev) => prev + 1);`}
                   />
-                  <span className="text-green-400 font-mono">
+                  <div className="text-green-400 font-mono px-8">
                     {state.simpleCounter2.$get()}
-                  </span>
+                  </div>
                   <CodeSnippetDisplay code={`state.simpleCounter2.$get();`} />
                 </div>
               </div>
 
               {/* .toggle() with signals */}
               <div className="bg-black/20 rounded-lg p-3">
-                <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
+                <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
                   <div className="text-sm font-bold text-gray-300">
                     .toggle()
                   </div>
@@ -177,9 +217,9 @@ function CounterExample() {
                   <CodeSnippetDisplay
                     code={`state.isBooleanValue2.toggle();`}
                   />
-                  <span className="text-green-400 font-mono">
+                  <div className="text-green-400 font-mono px-8">
                     {state.isBooleanValue2.$get().valueOf()}
-                  </span>
+                  </div>
                   <CodeSnippetDisplay code={`state.isBooleanValue2.$get();`} />
                 </div>
               </div>
@@ -198,13 +238,13 @@ function CounterExample() {
           </div>
 
           {/* FormElement example */}
-          <div className="bg-purple-500/4 border border-purple-500/20 rounded-xl p-6">
+          <div className="bg-purple-500/3 border border-purple-500/20 rounded-xl p-6">
             <h3 className="text-lg font-semibold text-purple-400 mb-4 flex items-center gap-2">
               <span className="text-2xl">🎯</span>
               Isolated Form Elements
             </h3>
             <div className="bg-black/20 rounded-lg p-3">
-              <div className="grid grid-cols-[10%_15%_25%_15%_20%] items-center gap-4">
+              <div className="grid grid-cols-[11%_13%_33%_15%_20%] items-center gap-4">
                 <div className="text-sm font-bold text-gray-300">.toggle()</div>
                 {state.isBooleanValue2.formElement((obj) => (
                   <button
@@ -227,9 +267,9 @@ function CounterExample() {
   </button>
 ))`}
                 />
-                <span className="text-green-400 font-mono">
+                <div className="text-green-400 font-mono px-8">
                   {state.isBooleanValue2.$get().valueOf()}
-                </span>
+                </div>
                 <CodeSnippetDisplay code={`state.isBooleanValue2.$get();`} />
               </div>
             </div>
@@ -242,7 +282,7 @@ function CounterExample() {
 
 // --- Enhanced Form Elements Example ---
 function FormElementsExample() {
-  const state = useCogsState('appData');
+  const state = useCogsState('formData');
 
   return (
     <div className="grid grid-cols-[75%_25%] gap-6 ">
@@ -475,7 +515,7 @@ state.newsletter.formElement(({state}) => (
 
 // Reactive form display moved to right column
 function ReactiveFormDisplay() {
-  const state = useCogsState('appData');
+  const state = useCogsState('formData');
 
   return (
     <FlashWrapper>
@@ -549,7 +589,7 @@ function ReactiveFormDisplay() {
 // --- Enhanced Array Example ---
 // --- Enhanced Array Example ---
 function ArrayManipulationExample() {
-  const state = useCogsState('appData');
+  const state = useCogsState('testData');
   const todos = state.todoList;
   const selectedTodo = todos.getSelected();
 
@@ -764,7 +804,7 @@ function ArrayManipulationExample() {
 
 // --- Full State Display ---
 function ShowFullStateDisplay() {
-  const state = useCogsState('appData', { reactiveType: 'all' });
+  const state = useCogsState('testData', { reactiveType: 'all' });
   const preRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {

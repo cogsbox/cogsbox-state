@@ -35,8 +35,8 @@ export default function ReactivityPage() {
                 Reactivity Types
               </h1>
               <p className="text-sm text-gray-200 max-w-2xl">
-                cogsbox-state promotes managing large UI data through a single,
-                monolithic state object. To avoid unnecessary re-renders from
+                cogsbox-state promotes managing large UI data through large
+                monolithic state objects. To avoid unnecessary re-renders from
                 this approach, it provides several strategies for fine-grained
                 control over component updates. Select a tab to explore each
                 strategy in action. Click the "Toggle" buttons to see which

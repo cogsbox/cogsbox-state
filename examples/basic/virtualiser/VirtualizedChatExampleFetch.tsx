@@ -1,6 +1,6 @@
 'use client';
 
-import { createCogsState } from '../../../src/CogsState';
+import { createCogsState, StateObject } from '../../../src/CogsState';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import { FlashWrapper } from '../FlashOnUpdate';
@@ -104,7 +104,10 @@ export default function VirtualizedChatExample() {
         author: faker.person.firstName(),
         text: faker.lorem.sentence({ min: 3, max: 25 }),
         timestamp: Date.now(),
-        photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
+        photo:
+          Math.random() > 0.8
+            ? faker.image.personPortrait({ size: '128' as any })
+            : null,
       }));
     }, 200 + Math.random() * 3000);
 
@@ -235,10 +238,7 @@ function ChatWindow() {
         >
           {virtualState.stateList((setter, index, array) => {
             return (
-              <MessageItem
-                key={setter._path.join('.')}
-                message={setter.get()}
-              />
+              <MessageItem key={setter._path.join('.')} message={setter} />
             );
           })}
         </div>
@@ -248,8 +248,10 @@ function ChatWindow() {
 }
 
 // MessageItem component remains the same...
-function MessageItem({ message }: { message: Message }) {
-  const isFromYou = message.author === 'You';
+function MessageItem({ message }: { message: StateObject<Message> }) {
+  const author = message.author.get();
+  const isFromYou = author === 'You';
+
   const [isVisible, setIsVisible] = useState(false);
 
   const containerClasses = `w-full flex items-end gap-2 ${
@@ -271,29 +273,31 @@ function MessageItem({ message }: { message: Message }) {
     <div className={containerClasses}>
       {!isFromYou && (
         <div className="w-8 h-8 rounded-full bg-gray-600 text-gray-300 flex items-center justify-center font-bold text-sm flex-shrink-0">
-          {message.author.charAt(0)}
+          {author.charAt(0)}
         </div>
       )}
       <div className={bubbleClasses}>
         {!isFromYou && (
-          <p className="font-bold text-green-400 text-xs">{message.author}</p>
+          <p className="font-bold text-green-400 text-xs">{author}</p>
         )}
         <div className="flex items-center gap-2">
-          <p className="text-gray-100 text-sm leading-snug">{message.text}</p>
+          <p className="text-gray-100 text-sm leading-snug">
+            {message.text.get()}
+          </p>
           <p
             className={`text-xs ${
               isFromYou ? 'text-green-200/60' : 'text-gray-400'
             } flex-shrink-0`}
           >
-            {new Date(message.timestamp).toLocaleTimeString([], {
+            {new Date(message.timestamp.get()).toLocaleTimeString([], {
               hour: '2-digit',
               minute: '2-digit',
             })}
           </p>
         </div>
-        {message.photo && (
+        {message.photo.get() && (
           <img
-            src={message.photo}
+            src={message.photo.get()!}
             className="w-full rounded-lg max-h-[300px] object-cover"
           />
         )}

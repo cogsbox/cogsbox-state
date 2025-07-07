@@ -627,11 +627,20 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   setSelectedIndex: (arrayKey: string, itemKey: string | undefined) => {
     set((state) => {
       const newMap = state.selectedIndicesMap;
-
+      console.log(' state.selectedIndicesMap', state.selectedIndicesMap);
       if (itemKey === undefined) {
         newMap.delete(arrayKey);
       } else {
+        if (newMap.has(arrayKey)) {
+          get().notifyPathSubscribers(newMap.get(arrayKey)!, {
+            type: 'THIS_UNSELECTED',
+          });
+        }
         newMap.set(arrayKey, itemKey);
+
+        get().notifyPathSubscribers(itemKey, {
+          type: 'THIS_SELECTED',
+        });
       }
 
       return {

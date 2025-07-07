@@ -33,7 +33,7 @@ type Props = {
   initialDelay?: number;
   finalDelay?: number;
   repeat?: boolean;
-  stressTest?: boolean; // NEW: Enable stress testing
+  isRandomPixels?: boolean; // NEW: Enable stress testing
   randomPixels?: number; // NEW: Number of random pixels to update per frame
 };
 
@@ -47,8 +47,8 @@ export default function LCDCatScroller({
   initialDelay = 2,
   finalDelay = 3,
   repeat = true,
-  stressTest = false, // NEW
-  randomPixels = 100, // NEW
+  isRandomPixels = true, // NEW
+  randomPixels = 20, // NEW
 }: Props) {
   // Use the state manager instead of local state
   const lcdState = useLcdState('lcd');
@@ -185,7 +185,7 @@ export default function LCDCatScroller({
       }
 
       // NEW: Add stress test random pixels AFTER cat drawing
-      if (stressTest) {
+      if (isRandomPixels) {
         for (let i = 0; i < randomPixels; i++) {
           const randomIndex = Math.floor(Math.random() * TOTAL);
           buffer[randomIndex] = 255; // Always max brightness so we can see them
@@ -210,7 +210,7 @@ export default function LCDCatScroller({
     initialDelay,
     finalDelay,
     repeat,
-    stressTest,
+    isRandomPixels,
     randomPixels,
     lcdState,
   ]);
