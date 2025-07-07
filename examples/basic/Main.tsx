@@ -27,10 +27,10 @@ function App() {
     <div className="relative crt">
       <div className="pointer-events-none">
         <PixelRain />
-        {/* <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/50 to-black/00 pointer-events-none z-[1]" />
+        <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/50 to-black/00 pointer-events-none z-[1]" />
         <div className="fixed right-0 w-[16vw] h-[100vh] bg-gradient-to-l from-black/50 to-black/00 pointer-events-none z-[1]" />
         <div className="fixed left-0 bottom-0 w-[100vw] h-[10vh] bg-gradient-to-t from-black/70 to-black/00 pointer-events-none z-[1]" />
-        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_center,rgba(0,255,0,0.04),transparent_70%)] pointer-events-none z-[1]" /> */}
+        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_center,rgba(0,255,0,0.04),transparent_70%)] pointer-events-none z-[1]" />
         <div className="fixed h-screen w-full bg-gradient-to-b from-black via-gray-900 to-gray-900 z-[-999]" />
       </div>
 

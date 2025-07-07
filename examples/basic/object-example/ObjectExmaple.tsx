@@ -168,8 +168,9 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   `;
   const filterAndRenderCode = `dashboardState.players
   .stateFilter(player => player.team === ${color})
-  .stateList(_item, itemSetter) => 
-    <Player onClick={() => itemSetter.setSelected(true)}>
+  .stateList(itemSetter) => 
+    <Player 
+      onClick={() => itemSetter.setSelected(true)}>
       {itemSetter.name.get()}
     </Player>
   )`;

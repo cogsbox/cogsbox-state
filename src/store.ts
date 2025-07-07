@@ -446,10 +446,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const existing = newShadowStore.get(fullKey) || { id: ulid() };
     newShadowStore.set(fullKey, { ...existing, ...metadata });
     set({ shadowStateStore: newShadowStore });
-
-    if (metadata.virtualizer?.itemHeight) {
-      get().notifyPathSubscribers(fullKey, get().getShadowValue(fullKey));
-    }
   },
   setTransformCache: (
     key: string,
@@ -521,6 +517,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     processNewItem(newItem, [...arrayPath, newItemId]);
     set({ shadowStateStore: newShadowStore });
+    console.log('insertShadowArrayElement', arrayKey, fullItemKey, {
+      type: 'INSERT',
+      path: arrayKey,
+      itemKey: fullItemKey,
+    });
     get().notifyPathSubscribers(arrayKey, {
       type: 'INSERT',
       path: arrayKey,
@@ -606,7 +607,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     updateValue(fullKey, newValue);
     set({ shadowStateStore: newShadowStore });
-    get().notifyPathSubscribers(fullKey, newValue);
   },
   selectedIndicesMap: new Map<string, string>(),
   getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {

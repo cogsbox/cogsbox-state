@@ -111,8 +111,10 @@ export default function ReactivityPage() {
         </div>
         {/* --- RIGHT COLUMN (Controls & Global State) --- */}
         <div className="w-2/5 flex flex-col gap-4 sticky top-6 ">
-          <div className="h-28" />
-          <h2 className="text-lg font-bold text-gray-300">Controls</h2>
+          <div className="h-2" />
+          <div className="text-lg font-bold px-4 py-1 text-black bg-gray-700 rounded">
+            Controls
+          </div>
 
           {/* Group 1: Shared useCogsState Hook */}
           <div className="bg-gray-800 border border-gray-200/50 rounded-lg p-4">

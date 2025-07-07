@@ -29,8 +29,8 @@ const initialState = {
       initialDelay: 1,
       finalDelay: 0.5,
       repeat: true,
-      isRandomPixels: false,
-      randomPixels: 100,
+      isRandomPixels: true,
+      randomPixels: 10,
       color: 'green' as keyof typeof COLOR_PRESETS,
     },
     stats: {

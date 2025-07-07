@@ -1160,8 +1160,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     // Update in effectiveSetState for insert handling:
     if (updateObj.updateType === 'insert') {
-      getGlobalStore.getState().notifyPathSubscribers(fullPath, payload);
-
       // Use shadowMeta from beginning if it's an array
       if (shadowMeta?.mapWrappers && shadowMeta.mapWrappers.length > 0) {
         // Get fresh array keys after insert
@@ -1990,7 +1988,7 @@ function createProxyHandler<T>(
                 itemHeight = 50,
                 overscan = 6,
                 stickToBottom = false,
-                scrollStickTolerance = 50,
+                scrollStickTolerance = 75,
               } = options;
 
               const containerRef = useRef<HTMLDivElement | null>(null);
@@ -2182,7 +2180,36 @@ function createProxyHandler<T>(
                   container.removeEventListener('scroll', handleScroll);
                 };
               }, [handleScroll, stickToBottom]);
+              const scrollToBottom = useCallback(
+                (behavior: ScrollBehavior = 'smooth') => {
+                  const container = containerRef.current;
+                  if (!container) return;
 
+                  // Reset scroll state
+                  scrollStateRef.current.isUserScrolling = false;
+                  scrollStateRef.current.isNearBottom = true;
+                  scrollStateRef.current.scrollUpCount = 0;
+
+                  // Force a measurement update first
+                  const doScroll = () => {
+                    // Get the actual scrollHeight from the DOM, not the calculated totalHeight
+                    const actualHeight = container.scrollHeight;
+
+                    container.scrollTo({
+                      top: actualHeight + 1000, // Add buffer to ensure we hit bottom
+                      behavior: behavior,
+                    });
+                  };
+
+                  // Use double rAF to ensure layout is complete
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(() => {
+                      doScroll();
+                    });
+                  });
+                },
+                []
+              );
               // Auto-scroll to bottom when new content arrives
               useEffect(() => {
                 if (!stickToBottom || !containerRef.current) return;
@@ -2293,14 +2320,7 @@ function createProxyHandler<T>(
                     },
                   },
                 },
-                scrollToBottom: () => {
-                  if (containerRef.current) {
-                    scrollStateRef.current.isUserScrolling = false;
-                    scrollStateRef.current.scrollUpCount = 0;
-                    containerRef.current.scrollTop =
-                      containerRef.current.scrollHeight;
-                  }
-                },
+                scrollToBottom,
                 scrollToIndex: (
                   index: number,
                   behavior: ScrollBehavior = 'smooth'
@@ -2626,14 +2646,15 @@ function createProxyHandler<T>(
                     .getState()
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
-                      console.log('e', stateKeyPathKey, e);
+                      console.log('e123123123213', stateKeyPathKey, e);
+
                       if (e.type === 'GET_SELECTED') {
                         return;
                       }
                       const shadowMeta = getGlobalStore
                         .getState()
                         .getShadowMetadata(stateKey, path);
-
+                      console.log('essssssssssssssssssssssssssssssssss');
                       const caches = shadowMeta?.transformCaches;
                       if (caches) {
                         // Iterate over ALL keys in the cache map.
@@ -3023,7 +3044,7 @@ function createProxyHandler<T>(
 
         if (prop === 'isSelected') {
           const parentPath = [stateKey, ...path].slice(0, -1);
-
+          notifySelectionComponents(stateKey, path, undefined);
           if (
             Array.isArray(
               getGlobalStore

@@ -157,18 +157,15 @@ export default function VirtualizedChatExample() {
       <div className="flex gap-4">
         <div className="w-3/5 flex flex-col gap-3">
           <div ref={ref}>
-            <div className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
-              {serverData.status === 'loading' ? (
-                <LoadingState />
-              ) : serverData.status === 'error' ? (
-                <ErrorState />
-              ) : (
-                <>
-                  <ChatWindow />
-                  <MessageInput />
-                </>
-              )}
-            </div>
+            {serverData.status === 'loading' ? (
+              <LoadingState />
+            ) : serverData.status === 'error' ? (
+              <ErrorState />
+            ) : (
+              <>
+                <ChatWindow />
+              </>
+            )}
           </div>
         </div>
 
@@ -215,11 +212,12 @@ function ChatWindow() {
   const messages = useCogsState('messages', { reactiveType: 'none' });
   const messageCount = messages.get().length;
 
-  const { virtualState, virtualizerProps } = messages.useVirtualView({
-    itemHeight: 65,
-    overscan: 10,
-    stickToBottom: true,
-  });
+  const { virtualState, virtualizerProps, scrollToBottom } =
+    messages.useVirtualView({
+      itemHeight: 65,
+      overscan: 10,
+      stickToBottom: true,
+    });
 
   if (messageCount === 0) {
     return (
@@ -230,20 +228,27 @@ function ChatWindow() {
   }
 
   return (
-    <div {...virtualizerProps.outer} className="flex-1 min-h-0">
-      <div style={virtualizerProps.inner.style}>
-        <div
-          style={virtualizerProps.list.style}
-          className="px-4 space-y-4 pb-8"
-        >
-          {virtualState.stateList((setter, index, array) => {
-            return (
-              <MessageItem key={setter._path.join('.')} message={setter} />
-            );
-          })}
-        </div>
+    <>
+      <div
+        {...virtualizerProps.outer}
+        className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden"
+      >
+        1231321
+        <div style={virtualizerProps.inner.style}>
+          <div
+            style={virtualizerProps.list.style}
+            className="px-4 space-y-4 pb-8"
+          >
+            {virtualState.stateList((setter, index, array) => {
+              return (
+                <MessageItem key={setter._path.join('.')} message={setter} />
+              );
+            })}
+          </div>{' '}
+        </div>{' '}
       </div>
-    </div>
+      <MessageInput scrollToBottom={scrollToBottom} />
+    </>
   );
 }
 
@@ -307,7 +312,11 @@ function MessageItem({ message }: { message: StateObject<Message> }) {
 }
 
 // MessageInput remains the same...
-function MessageInput() {
+function MessageInput({
+  scrollToBottom,
+}: {
+  scrollToBottom: (a?: any) => void;
+}) {
   const [text, setText] = useState('');
   const messages = useCogsState('messages', { reactiveType: 'none' });
 
@@ -323,7 +332,7 @@ function MessageInput() {
       timestamp: Date.now(),
       photo: null,
     }));
-
+    scrollToBottom();
     setText('');
   };
 

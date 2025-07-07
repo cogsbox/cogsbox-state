@@ -65,7 +65,7 @@ function MoonGlow({
 
       const subtleX = 16;
       const subtleY = 8;
-      const baseIntensity = 0.7 + Math.random() * 0.02;
+      const baseIntensity = 0.7 + Math.random() * 0.2;
       const steps = 16;
       let gradientSteps = [];
 
