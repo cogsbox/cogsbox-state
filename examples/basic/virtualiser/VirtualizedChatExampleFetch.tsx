@@ -8,6 +8,7 @@ import DotPattern from '../DotWrapper';
 import { faker } from '@faker-js/faker';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
+import { CodeSnippetDisplay } from '../CodeSnippet';
 
 // --- Data Generation & State Definition ---
 
@@ -93,12 +94,11 @@ export default function VirtualizedChatExample() {
   });
 
   const { ref, inView } = useInView();
-  console.log('messagesmessagesmessages', messages.get().length);
+
   useEffect(() => {
     if (!inView || serverData.status !== 'success') return;
 
     const interval = setInterval(() => {
-      console.log('inVissssssssssssssssssssew', inView, messages.get());
       messages.insert(({ uuid }) => ({
         id: uuid,
         author: faker.person.firstName(),
@@ -106,7 +106,7 @@ export default function VirtualizedChatExample() {
         timestamp: Date.now(),
         photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
       }));
-    }, 2000 + Math.random() * 2500);
+    }, 200 + Math.random() * 3000);
 
     return () => clearInterval(interval);
   }, [inView, serverData.status]);
@@ -114,37 +114,39 @@ export default function VirtualizedChatExample() {
   const status = messages.getStatus();
 
   return (
-    <div className="flex gap-4 text-green-400 h-screen p-4">
-      <div className="w-3/5 flex flex-col gap-3">
-        <DotPattern>
-          <div className="px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-200">
-              Virtualized Chat Log
-            </h1>
-            <p className="text-sm text-gray-400 max-w-2xl">
-              Correctly rendering thousands of items with a smooth, scrolling
-              layout. Status: <span className="text-green-400">{status}</span>
-            </p>
-          </div>
-        </DotPattern>
-        <div ref={ref}>
-          <div className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
-            {serverData.status === 'loading' ? (
-              <LoadingState />
-            ) : serverData.status === 'error' ? (
-              <ErrorState />
-            ) : (
-              <>
-                <ChatWindow />
-                <MessageInput />
-              </>
-            )}
+    <div className=" gap-4 text-green-400 h-screen p-4">
+      <DotPattern>
+        <div className="px-8 py-4">
+          <h1 className="text-2xl font-bold text-gray-200">
+            Virtualized Chat Log
+          </h1>
+          <p className="text-sm text-gray-400 max-w-2xl">
+            Correctly rendering thousands of items with a smooth, scrolling
+            layout. Status: <span className="text-green-400">{status}</span>
+          </p>
+        </div>
+      </DotPattern>
+      <div className="flex gap-4">
+        <div className="w-3/5 flex flex-col gap-3">
+          <div ref={ref}>
+            <div className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
+              {serverData.status === 'loading' ? (
+                <LoadingState />
+              ) : serverData.status === 'error' ? (
+                <ErrorState />
+              ) : (
+                <>
+                  <ChatWindow />
+                  <MessageInput />
+                </>
+              )}
+            </div>
           </div>
         </div>
-      </div>
 
-      <div className="w-2/5">
-        <ShowState layout="vertical" serverStatus={serverData.status} />
+        <div className="w-2/5">
+          <ShowState layout="vertical" serverStatus={serverData.status} />
+        </div>
       </div>
     </div>
   );
@@ -342,6 +344,35 @@ function ShowState({
   return (
     <FlashWrapper>
       <div className={containerClasses}>
+        <CodeSnippetDisplay
+          code={`  const messages = useCogsState('messages', { reactiveType: 'none' }));
+        
+          const { virtualState, virtualizerProps } = messages.useVirtualView({
+            itemHeight: 65, 
+            overscan: 10,
+            stickToBottom: true,
+          });
+        
+          <div {...virtualizerProps.outer} className="flex-1 min-h-0">
+              <div style={virtualizerProps.inner.style}>
+                <div
+                  style={virtualizerProps.list.style}
+                  className="px-4  space-y-4 pb-8"
+                >
+                  {virtualState.stateList((setter, index, array) => {
+                    return (
+                      <MessageItem
+                        key={setter._path.join('.')}
+                        message={setter.get()}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          
+          `}
+        />
         <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
           <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
             State Management Info
@@ -376,16 +407,6 @@ const messages = useCogsState('messages', {
               }`}
             </SyntaxHighlighter>
           </div>
-        </div>
-
-        <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
-          <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
-            Live Global State (Last 5 messages)
-          </h3>
-          <pre className="text-xs overflow-auto">
-            {`// Showing last 5 of ${messages.get().length} total messages\n\n`}
-            {JSON.stringify(messages.get().slice(-5), null, 2)}
-          </pre>
         </div>
       </div>
     </FlashWrapper>

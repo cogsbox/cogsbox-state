@@ -8,6 +8,7 @@ import DotPattern from '../DotWrapper';
 import { faker } from '@faker-js/faker';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
+import { CodeSnippetDisplay } from '../CodeSnippet';
 
 // --- Data Generation & State Definition (No Changes Here) ---
 
@@ -83,6 +84,35 @@ export default function VirtualizedChatExample() {
             </p>
           </div>
         </DotPattern>
+        <CodeSnippetDisplay
+          code={`  const messages = useCogsState('messages', { reactiveType: 'none' });
+
+  const { virtualState, virtualizerProps } = messages.useVirtualView({
+    itemHeight: 65, 
+    overscan: 10,
+    stickToBottom: true,
+  });
+
+  <div {...virtualizerProps.outer} className="flex-1 min-h-0">
+      <div style={virtualizerProps.inner.style}>
+        <div
+          style={virtualizerProps.list.style}
+          className="px-4  space-y-4 pb-8"
+        >
+          {virtualState.stateList((setter, index, array) => {
+            return (
+              <MessageItem
+                key={setter._path.join('.')}
+                message={setter.get()}
+              />
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  
+  `}
+        />
         <div ref={ref}>
           <div className="flex flex-col  max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden">
             <ChatWindow />
@@ -104,10 +134,11 @@ function ChatWindow() {
   const messages = useCogsState('messages', { reactiveType: 'none' });
 
   const { virtualState, virtualizerProps } = messages.useVirtualView({
-    itemHeight: 65, // Adjusted estimated height for better spacing
+    itemHeight: 65,
     overscan: 10,
     stickToBottom: true,
   });
+
   console.log('relaoding');
   return (
     <div {...virtualizerProps.outer} className="flex-1 min-h-0">

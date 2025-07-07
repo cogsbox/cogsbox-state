@@ -9,6 +9,7 @@ import { faker } from '@faker-js/faker';
 // --- IMPORTS for syntax highlighting in the main component ---
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+import { CodeSnippetDisplay } from '../CodeSnippet';
 
 // --- State Definition with a Flat Player List ---
 export type Player = {
@@ -366,33 +367,6 @@ function PlayerForm({
 }
 
 // --- Helper Components ---
-
-function CodeSnippetDisplay({ title, code }: { title?: string; code: string }) {
-  return (
-    <div>
-      {title && (
-        <h4 className="text-gray-500 text-xs font-semibold mb-1 ml-1">
-          {title}
-        </h4>
-      )}
-      <div className="bg-gray-950 rounded overflow-hidden">
-        <SyntaxHighlighter
-          language="javascript"
-          style={atomOneDark}
-          customStyle={{
-            backgroundColor: 'transparent',
-            fontSize: '11px',
-            padding: '0.5rem',
-            margin: 0,
-          }}
-          codeTagProps={{ style: { fontFamily: 'inherit' } }}
-        >
-          {code.trim()}
-        </SyntaxHighlighter>
-      </div>
-    </div>
-  );
-}
 
 function ShowFullState() {
   const dashboardState = useCogsState('gameDashboard', { reactiveType: 'all' });
