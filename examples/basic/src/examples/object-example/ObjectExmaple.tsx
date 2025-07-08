@@ -51,7 +51,7 @@ export default function ArrayMethodsPage() {
   return (
     <div className="flex gap-6 p-6 font-mono">
       {/* --- LEFT COLUMN (Master Lists & Controls) --- */}
-      <div className="w-3/5 flex flex-col gap-4">
+      <div className="w-[75%] flex flex-col gap-4">
         <DotPattern>
           <div className="px-8 py-4">
             <h1 className="text-2xl font-bold text-gray-200">
@@ -74,7 +74,7 @@ export default function ArrayMethodsPage() {
       </div>
 
       {/* --- RIGHT COLUMN (Detail Editor & Live State) --- */}
-      <div className="w-2/5 sticky top-6 flex flex-col gap-4">
+      <div className="w-[25%] sticky top-6 flex flex-col gap-4">
         <div className="h-26" />
         <ItemDetailForm />
         <ShowFullState />
@@ -125,21 +125,8 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   const dashboardState = useCogsState('gameDashboard', {
     reactiveType: 'none',
   });
-
   const [sortBy, setSortBy] = useState<'score' | 'name'>('score');
-  // Keep state for sort direction
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
-
-  // --- THIS IS THE KEY SIMPLIFICATION ---
-  const filteredAndSorted = dashboardState.players
-    .stateFilter((player) => player.team === color)
-    .stateSort((a, b) => {
-      const direction = sortDirection === 'asc' ? 1 : -1;
-      // Use a simple ternary to pick the comparison logic
-      return sortBy === 'score'
-        ? (a.score - b.score) * direction
-        : a.name.localeCompare(b.name) * direction;
-    });
 
   const teamColors = {
     red: {
@@ -163,25 +150,19 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   .stateFilter((p) => p.team === "${color}")
   .cutSelected();
   `;
-  const filterAndRenderCode = `
-    const filteredAndSorted = dashboardState.players
-    .stateFilter((player) => player.team === color)
+  const filterAndRenderCode = `dashboardState.players
+    .stateFilter((player) => player.team === "${color}")
     .stateSort(
-      (a, b) => {
-        const direction = sortDirection === 'asc' ? 1 : -1;
-        // Use a simple ternary to pick the comparison logic
-        return sortBy === 'score'
-          ? (a.score - b.score) * direction
-          : a.name.localeCompare(b.name) * direction;
-      },
-      [sortBy, sortDirection]
-    );
-  filteredAndSorted.stateList(itemSetter) => 
-    <Player 
-      onClick={() => itemSetter.setSelected(true)}>
-      {itemSetter.name.get()}
-    </Player>
-  )`;
+      (a, b) =>
+        (${sortBy} === 'score'
+          ? a.score - b.score
+          : a.name.localeCompare(b.name)) * (${sortDirection} === 'asc' ? 1 : -1)
+    .stateList(itemSetter => 
+      <Player 
+        onClick={() => itemSetter.setSelected(true)}>
+        {itemSetter.name.get()}
+      </Player>
+    `;
 
   return (
     <FlashWrapper>
@@ -223,34 +204,43 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
         </div>
         <CodeSnippetDisplay title="" code={filterAndRenderCode} />
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
-          {filteredAndSorted.stateList((itemSetter) => (
-            <FlashWrapper key={itemSetter.id.get()}>
-              <button
-                onClick={() => itemSetter.setSelected(true)}
-                className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
-                  itemSetter.isSelected
-                    ? teamColors[color].selected
-                    : 'bg-gray-800 hover:bg-gray-700/70'
-                }`}
-              >
-                <div>{itemSetter.name.get()}</div>
-                <div>
-                  {itemSetter.score.formElement((obj) => (
-                    <input
-                      {...obj.inputProps}
-                      className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                    />
-                  ))}
-                </div>
-              </button>
-            </FlashWrapper>
-          ))}
+          {dashboardState.players
+            .stateFilter((player) => player.team === color)
+            .stateSort(
+              (a, b) =>
+                (sortBy === 'score'
+                  ? a.score - b.score
+                  : a.name.localeCompare(b.name)) *
+                (sortDirection === 'asc' ? 1 : -1)
+            )
+            .stateList((itemSetter) => (
+              <FlashWrapper key={itemSetter.id.get()}>
+                <button
+                  onClick={() => itemSetter.setSelected(true)}
+                  className={` flex justify-between items-center w-full text-left px-2 py-1 rounded text-sm transition-colors duration-150 text-gray-300 cursor-pointer ${
+                    itemSetter.isSelected
+                      ? teamColors[color].selected
+                      : 'bg-gray-800 hover:bg-gray-700/70'
+                  }`}
+                >
+                  <div>{itemSetter.name.get()}</div>
+                  <div>
+                    {itemSetter.score.formElement((obj) => (
+                      <input
+                        {...obj.inputProps}
+                        className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                      />
+                    ))}
+                  </div>
+                </button>
+              </FlashWrapper>
+            ))}
         </div>
         <div className="pt-2 border-t border-gray-700">
           <div className="flex gap-2">
             <button
               onClick={() =>
-                filteredAndSorted.insert(({ uuid }) => ({
+                dashboardState.players.insert(({ uuid }) => ({
                   name: faker.person.firstName(),
                   score: 0,
                   specialty: 'Support' as const,
@@ -260,15 +250,15 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
               }
               className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
             >
-              Add Player
+              Add Player At selected (or last)
             </button>
             <button
               onClick={() => {
-                filteredAndSorted.cutSelected();
+                dashboardState.players.cutSelected();
               }}
               className="px-2 py-1 text-xs bg-gray-700 text-gray-300 rounded hover:bg-gray-600 cursor-pointer"
             >
-              Cut Team
+              Cut Selected (or last)
             </button>
           </div>
           <div className="mt-4 space-y-3">

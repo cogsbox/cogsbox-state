@@ -147,7 +147,7 @@ export type ArrayEndType<TShape extends unknown> = {
   ) => StreamHandle<T>;
   findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
   index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
-    insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+    insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
     cut: CutFunctionType<TShape>;
     _index: number;
   } & EndType<Prettify<InferArrayElement<TShape>>>;
@@ -235,8 +235,8 @@ export type InsertParams<S> =
   | ((prevState: { state: S; uuid: string }) => S);
 export type UpdateType<T> = (payload: UpdateArg<T>) => void;
 
-export type InsertType<T> = (payload: InsertParams<T>) => void;
-
+export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
+export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 export type ValidationError = {
   path: (string | number)[];
   message: string;
