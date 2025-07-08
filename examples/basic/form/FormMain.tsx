@@ -1,53 +1,53 @@
-import React, { useState } from "react";
-import { useCogsState, type Address } from "./state";
-import { Code, TriangleIcon } from "lucide-react";
-import CodeLine from "../CodeLine";
-import CodeExampleDropdown from "./CodeExamples";
+import React, { useState } from 'react';
+import { useCogsState, type Address } from './state';
+import { Code, TriangleIcon } from 'lucide-react';
+import CodeLine from '../src/CodeLine';
+import CodeExampleDropdown from './CodeExamples';
 
 // Main Form Example Component
 export default function FormsMain() {
-  const [activeTab, setActiveTab] = useState("description");
+  const [activeTab, setActiveTab] = useState('description');
   const [addressTest, setAddressTest] = useState<Address>({
-    street: "",
-    city: "",
-    state: "", //no error
-    zipCode: "",
-    country: "USA",
+    street: '',
+    city: '',
+    state: '', //no error
+    zipCode: '',
+    country: 'USA',
     isDefault: false,
   });
 
   setAddressTest((p) => ({
     ...p,
-    street: "",
-    city: "",
-    sssssstsate: "", //no error
-    zipCode: "",
-    country: "USA",
+    street: '',
+    city: '',
+    sssssstsate: '', //no error
+    zipCode: '',
+    country: 'USA',
     isDefault: false,
   }));
   const [currentAddressIndex, setCurrentAddressIndex] = useState(0);
-  const user = useCogsState("user", {
+  const user = useCogsState('user', {
     reactiveDeps: (state) => [state.addresses],
   });
-  const addresses = useCogsState("addresses");
+  const addresses = useCogsState('addresses');
 
   addresses.index(0).update((p) => ({
     ...p,
-    street: "",
-    city: "",
-    state: "", //no error
-    zipCode: "",
-    country: "USA",
+    street: '',
+    city: '',
+    state: '', //no error
+    zipCode: '',
+    country: 'USA',
     isDefault: false,
   }));
 
   const addNewAddress = () => {
     user.addresses.insert({
-      street: "",
-      city: "",
-      state: "",
-      zipCode: "",
-      country: "USA",
+      street: '',
+      city: '',
+      state: '',
+      zipCode: '',
+      country: 'USA',
       isDefault: false,
     });
     setCurrentAddressIndex(user.addresses.get().length - 1);
@@ -65,28 +65,28 @@ export default function FormsMain() {
             <div className="flex border-b border-gray-200 mb-6">
               <button
                 className={`px-4 py-2 text-sm font-medium cursor-pointer ${
-                  activeTab === "description"
-                    ? "text-blue-600 border-b-2 border-blue-500"
-                    : "text-gray-500 hover:text-gray-700"
+                  activeTab === 'description'
+                    ? 'text-blue-600 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-700'
                 }`}
-                onClick={() => setActiveTab("description")}
+                onClick={() => setActiveTab('description')}
               >
                 FormElement API
               </button>
               <button
                 className={`px-4 py-2 text-sm font-medium cursor-pointer  ${
-                  activeTab === "json"
-                    ? "text-blue-600 border-b-2 border-blue-500"
-                    : "text-gray-500 hover:text-gray-700"
+                  activeTab === 'json'
+                    ? 'text-blue-600 border-b-2 border-blue-500'
+                    : 'text-gray-500 hover:text-gray-700'
                 }`}
-                onClick={() => setActiveTab("json")}
+                onClick={() => setActiveTab('json')}
               >
                 JSON State
               </button>
             </div>
 
             {/* Description Tab Content */}
-            {activeTab === "description" && (
+            {activeTab === 'description' && (
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold mb-4">FormElement API</h2>
 
@@ -199,7 +199,7 @@ export default function FormsMain() {
             )}
 
             {/* JSON State Tab Content */}
-            {activeTab === "json" && (
+            {activeTab === 'json' && (
               <div className="bg-white rounded-lg shadow-md p-6">
                 <h2 className="text-xl font-semibold mb-4">Current State</h2>
                 <pre className="text-xs bg-gray-100 p-4 rounded overflow-auto max-h-[600px]">
@@ -209,7 +209,7 @@ export default function FormsMain() {
             )}
           </div>
           <div className="">
-            {" "}
+            {' '}
             <div className="p-6">
               <div className="flex gap-2 h-12 ">
                 <CodeLine code={`user.revertToInitialState()`} />
@@ -228,13 +228,13 @@ export default function FormsMain() {
                   type="button"
                   className="px-4 py-2 border-2 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[200px] cursor-pointer"
                   onClick={() => {
-                    console.log("validating", user);
+                    console.log('validating', user);
                     user.validateZodSchema();
                   }}
                 >
                   Simulated Save
                 </button>
-              </div>{" "}
+              </div>{' '}
             </div>
             <CodeExampleDropdown />
             <div className="  h-4 " />
@@ -333,7 +333,7 @@ export default function FormsMain() {
                               e.target.value.length == 0 ||
                               isNaN(Number(e.target.value))
                             ) {
-                              params.addValidationError("custom onBlur");
+                              params.addValidationError('custom onBlur');
                             }
                           }}
                           placeholder="(555) 123-4567"
@@ -342,7 +342,7 @@ export default function FormsMain() {
                     ),
                     {
                       validation: {
-                        message: "Please enter a valid phone number",
+                        message: 'Please enter a valid phone number',
                       },
                     }
                   )}
@@ -368,10 +368,10 @@ export default function FormsMain() {
                         className={`w-12 h-8 rounded-lg flex items-center justify-center text-sm cursor-pointer relative
                   ${
                     errorCount > 0
-                      ? "border-2 border-red-500 bg-red-400"
+                      ? 'border-2 border-red-500 bg-red-400'
                       : currentAddressIndex === index
-                      ? "bg-amber-500 text-white"
-                      : "bg-amber-200 text-amber-800 hover:bg-amber-300"
+                        ? 'bg-amber-500 text-white'
+                        : 'bg-amber-200 text-amber-800 hover:bg-amber-300'
                   }`}
                       >
                         {index + 1}
@@ -382,7 +382,7 @@ export default function FormsMain() {
                         )}
                       </button>
                     );
-                  })}{" "}
+                  })}{' '}
                   <button
                     onClick={addNewAddress}
                     className="px-3 py-1 border-2 border-amber-400 text-amber-600 text-sm rounded hover:bg-amber-200 cursor-pointer"
@@ -418,13 +418,13 @@ export default function FormsMain() {
                   type="button"
                   className="px-2 py-0.5 border-1 border-amber-400 bg-amber-500 text-white rounded-md hover:bg-amber-400 min-w-[150px] cursor-pointer"
                   onClick={() => {
-                    console.log("validating", user);
+                    console.log('validating', user);
                     user.validateZodSchema();
                   }}
                 >
                   Simulated Save
                 </button>
-              </div>{" "}
+              </div>{' '}
               {/* Current Address Form */}
               {user.addresses.get().length > 0 && (
                 <div className="space-y-4 bg-amber-50 p-3 rounded-md">
@@ -433,7 +433,7 @@ export default function FormsMain() {
                     demonstrate how to access and update elements in a nested
                     array using the index() method. Notice how validation works
                     correctly for each array element.
-                  </p>{" "}
+                  </p>{' '}
                   <div className="grid grid-cols-1 gap-4">
                     {user.addresses
                       .index(currentAddressIndex)
@@ -453,7 +453,7 @@ export default function FormsMain() {
                         ),
                         {
                           validation: {
-                            message: "Street address is required",
+                            message: 'Street address is required',
                           },
                         }
                       )}
@@ -560,7 +560,7 @@ export default function FormsMain() {
                 </div>
               )}
             </div>
-          </div>{" "}
+          </div>{' '}
         </div>
       </div>
     </div>

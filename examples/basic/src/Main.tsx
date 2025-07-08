@@ -1,14 +1,15 @@
+import '../index.css';
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom/client';
-import './index.css';
-import Reactivity from './reactive/Reactivity';
+
+import Reactivity from './examples/reactive/Reactivity';
 import { PixelRain } from './PixelRain';
-import VirtualizedChatExample from './virtualiser/VirtualizedChatExample';
-import ArrayMethodsPage from './object-example/ObjectExmaple';
-import { catSvg } from './assets/svgs';
+import VirtualizedChatExample from './examples/virtualiser/VirtualizedChatExample';
+import ArrayMethodsPage from './examples/object-example/ObjectExmaple';
+import { catSvg } from '../assets/svgs';
 import LCDCatScrollerDemo from './LCDDemo';
-import StateOverview from './basic-overview/StateOverview';
-import VirtualizedChatExampleFetch from './virtualiser/VirtualizedChatExampleFetch';
+import StateOverview from './examples/basic-overview/StateOverview';
+import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
 
 const sections = [
   { id: 'home', name: 'Home' },
@@ -21,7 +22,7 @@ const sections = [
 ];
 
 function App() {
-  const [activeSection, setActiveSection] = useState(sections[0].id);
+  const [activeSection, setActiveSection] = useState(sections[0]!.id);
 
   return (
     <div className="relative crt">

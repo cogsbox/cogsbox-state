@@ -3,8 +3,8 @@
 import { createCogsState } from '../../../src/CogsState';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FlashWrapper } from '../FlashOnUpdate';
-import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../src/FlashOnUpdate';
+import DotPattern from '../src/DotWrapper';
 
 // State definition with array of objects
 const todoArray = [

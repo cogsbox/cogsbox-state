@@ -1,14 +1,14 @@
 'use client';
 
-import type { OptionsType, StateObject } from '../../../src/CogsState';
+import type { OptionsType, StateObject } from '../../../../../src/CogsState';
 import { type StateExampleObject, useCogsState } from './state';
 
 import React, { useState } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import stringify from 'stringify-object';
-import DotPattern from '../DotWrapper';
-import { FlashWrapper } from '../FlashOnUpdate';
+import DotPattern from '../../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
 
 // Define the structure for our tabs
 const TABS = {

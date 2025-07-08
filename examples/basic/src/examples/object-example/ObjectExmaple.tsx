@@ -1,15 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import type { StateObject } from '../../../src/CogsState';
-import { createCogsState } from '../../../src/CogsState';
-import DotPattern from '../DotWrapper';
-import { FlashWrapper } from '../FlashOnUpdate';
+import type { StateObject } from '../../../../../src/CogsState';
+import { createCogsState } from '../../../../../src/CogsState';
+import DotPattern from '../../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
 import { faker } from '@faker-js/faker';
 // --- IMPORTS for syntax highlighting in the main component ---
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { CodeSnippetDisplay } from '../CodeSnippet';
+import { CodeSnippetDisplay } from '../../CodeSnippet';
 
 // --- State Definition with a Flat Player List ---
 export type Player = {

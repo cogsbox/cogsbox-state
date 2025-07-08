@@ -1,14 +1,17 @@
 'use client';
 
-import { createCogsState, StateObject } from '../../../src/CogsState';
+import {
+  createCogsState,
+  type StateObject,
+} from '../../../../../src/CogsState';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FlashWrapper } from '../FlashOnUpdate';
-import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
+import DotPattern from '../../DotWrapper';
 import { faker } from '@faker-js/faker';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { CodeSnippetDisplay } from '../CodeSnippet';
+import { CodeSnippetDisplay } from '../../CodeSnippet';
 
 // --- Data Generation & State Definition ---
 
@@ -98,18 +101,21 @@ export default function VirtualizedChatExample() {
   useEffect(() => {
     if (!inView || serverData.status !== 'success') return;
 
-    const interval = setInterval(() => {
-      messages.insert(({ uuid }) => ({
-        id: uuid,
-        author: faker.person.firstName(),
-        text: faker.lorem.sentence({ min: 3, max: 25 }),
-        timestamp: Date.now(),
-        photo:
-          Math.random() > 0.8
-            ? faker.image.personPortrait({ size: '128' as any })
-            : null,
-      }));
-    }, 200 + Math.random() * 3000);
+    const interval = setInterval(
+      () => {
+        messages.insert(({ uuid }) => ({
+          id: uuid,
+          author: faker.person.firstName(),
+          text: faker.lorem.sentence({ min: 3, max: 25 }),
+          timestamp: Date.now(),
+          photo:
+            Math.random() > 0.8
+              ? faker.image.personPortrait({ size: '128' as any })
+              : null,
+        }));
+      },
+      200 + Math.random() * 3000
+    );
 
     return () => clearInterval(interval);
   }, [inView, serverData.status]);
@@ -440,8 +446,8 @@ const messages = useCogsState('messages', {
                 status === 'synced'
                   ? 'Server'
                   : status === 'dirty'
-                  ? 'Modified locally'
-                  : 'Default'
+                    ? 'Modified locally'
+                    : 'Default'
               }`}
             </SyntaxHighlighter>
           </div>

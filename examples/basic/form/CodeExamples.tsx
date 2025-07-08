@@ -1,29 +1,29 @@
-import React, { useEffect, useState, useRef } from "react";
-import CodeLine from "../CodeLine";
-import { useCogsState } from "./state";
+import React, { useEffect, useState, useRef } from 'react';
+import CodeLine from '../src/CodeLine';
+import { useCogsState } from './state';
 
 const CodeExampleDropdown = () => {
-  const [selectedExample, setSelectedExample] = useState("global");
+  const [selectedExample, setSelectedExample] = useState('global');
 
-  const user = useCogsState("user");
+  const user = useCogsState('user');
 
   useEffect(() => {
     const formRefs = user.getAllFormRefs();
     if (formRefs) {
       const fieldToExampleMap = {
-        "user.firstName": "firstName",
-        "user.lastName": "lastName",
-        "user.email": "email",
-        "user.phone": "phone",
-        "user.addresses.0.street": "street",
-        "user.addresses.0.isDefault": "isDefault",
+        'user.firstName': 'firstName',
+        'user.lastName': 'lastName',
+        'user.email': 'email',
+        'user.phone': 'phone',
+        'user.addresses.0.street': 'street',
+        'user.addresses.0.isDefault': 'isDefault',
       } as any;
 
       formRefs.forEach((refElement, key) => {
         if (refElement && refElement.current) {
           const mappedExample = fieldToExampleMap[key];
           if (mappedExample) {
-            refElement.current.addEventListener("focus", () => {
+            refElement.current.addEventListener('focus', () => {
               setSelectedExample(mappedExample);
             });
           }
@@ -34,19 +34,19 @@ const CodeExampleDropdown = () => {
 
   // List of available examples
   const exampleOptions = [
-    { id: "global", label: "Global Validation Setup" },
-    { id: "firstName", label: "First Name Field" },
-    { id: "lastName", label: "Last Name Field" },
-    { id: "email", label: "Email Address Field" },
-    { id: "phone", label: "Phone Number Field" },
-    { id: "street", label: "Street Address Field" },
-    { id: "isDefault", label: "Default Checkbox Field" },
+    { id: 'global', label: 'Global Validation Setup' },
+    { id: 'firstName', label: 'First Name Field' },
+    { id: 'lastName', label: 'Last Name Field' },
+    { id: 'email', label: 'Email Address Field' },
+    { id: 'phone', label: 'Phone Number Field' },
+    { id: 'street', label: 'Street Address Field' },
+    { id: 'isDefault', label: 'Default Checkbox Field' },
   ];
 
   const getExampleCode = (exampleId: string) => {
     // Return the appropriate code example based on the example ID
     switch (exampleId) {
-      case "global":
+      case 'global':
         return `setCogsOptions("user", {
   validation: {
     key: "userValidation",
@@ -63,7 +63,7 @@ const CodeExampleDropdown = () => {
     ),
   },
 });`;
-      case "firstName":
+      case 'firstName':
         return `{user.firstName.formElement((params) => (
   <div>
     <label className="block text-sm font-medium text-gray-700">
@@ -83,7 +83,7 @@ const CodeExampleDropdown = () => {
     />
   </div>
 ))}`;
-      case "lastName":
+      case 'lastName':
         return `       
     {user.lastName.formElement(
     (params) => (
@@ -106,7 +106,7 @@ const CodeExampleDropdown = () => {
     }
     )}
     `;
-      case "email":
+      case 'email':
         return `{user.email.formElement(
   (params) => (
     <div>
@@ -131,7 +131,7 @@ const CodeExampleDropdown = () => {
     },
   }
 )}`;
-      case "phone":
+      case 'phone':
         return `{user.phone.formElement(
     (params) => (
       <div>
@@ -160,7 +160,7 @@ const CodeExampleDropdown = () => {
       },
     }
   )}`;
-      case "street":
+      case 'street':
         return `{user.addresses
   .index(currentAddressIndex)
   .street.formElement(
@@ -184,7 +184,7 @@ const CodeExampleDropdown = () => {
       },
     }
   )}`;
-      case "isDefault":
+      case 'isDefault':
         return `{user.addresses
   .index(currentAddressIndex)
   .isDefault.formElement((params) => (
@@ -206,28 +206,28 @@ const CodeExampleDropdown = () => {
     </div>
   ))}`;
       default:
-        return "// Select an example to see its implementation";
+        return '// Select an example to see its implementation';
     }
   };
 
   const getExampleDescription = (exampleId: String) => {
     switch (exampleId) {
-      case "global":
-        return "This is the configuration that enables validation across all form elements";
-      case "firstName":
-        return "Basic form element with manual value and onChange handling. Focus on this field to see this example.";
-      case "lastName":
-        return "Using the inputProps shorthand and custom validation rendering. Focus on this field to see this example.";
-      case "email":
-        return "Form element with custom validation message. Focus on this field to see this example.";
-      case "phone":
-        return "Form element with placeholder and inline validation errors. Focus on this field to see this example.";
-      case "street":
-        return "Nested form element for arrays using index(). Focus on this field to see this example.";
-      case "isDefault":
-        return "Checkbox implementation with label. Focus on this field to see this example.";
+      case 'global':
+        return 'This is the configuration that enables validation across all form elements';
+      case 'firstName':
+        return 'Basic form element with manual value and onChange handling. Focus on this field to see this example.';
+      case 'lastName':
+        return 'Using the inputProps shorthand and custom validation rendering. Focus on this field to see this example.';
+      case 'email':
+        return 'Form element with custom validation message. Focus on this field to see this example.';
+      case 'phone':
+        return 'Form element with placeholder and inline validation errors. Focus on this field to see this example.';
+      case 'street':
+        return 'Nested form element for arrays using index(). Focus on this field to see this example.';
+      case 'isDefault':
+        return 'Checkbox implementation with label. Focus on this field to see this example.';
       default:
-        return "";
+        return '';
     }
   };
 

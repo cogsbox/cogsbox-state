@@ -7,7 +7,7 @@ import BlimpWithSpotlights from './Blimp';
 
 import { CloudLayers } from './CloudTiler';
 import { ShadowSilhouette } from './ShadowSilhouette';
-import { cyberShadow } from './assets/svgs';
+import { cyberShadow } from '../assets/svgs';
 
 // Centralized Z-Index Management System
 const Z_INDICES = {

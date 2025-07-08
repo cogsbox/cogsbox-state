@@ -1,4 +1,4 @@
-import { createCogsState } from '@lib/CogsState';
+import { createCogsState } from '../../../src/CogsState';
 import { useEffect, useRef, useState } from 'react';
 
 // --- Configuration ---
@@ -86,8 +86,9 @@ export default function LCDCatScroller({
       for (let i = 0; i < out.length; i++) {
         const a = imageData[i * 4 + 3];
         const brightness =
-          (imageData[i * 4] + imageData[i * 4 + 1] + imageData[i * 4 + 2]) / 3;
-        if (a > 128 && brightness < 128) {
+          (imageData[i * 4]! + imageData[i * 4 + 1]! + imageData[i * 4 + 2]!) /
+          3;
+        if (a! > 128 && brightness < 128) {
           out[i] = 255;
         }
       }
@@ -139,7 +140,7 @@ export default function LCDCatScroller({
 
       // Apply fade effect
       for (let i = 0; i < TOTAL; i++) {
-        buffer[i] = Math.floor(buffer[i] * fade);
+        buffer[i] = Math.floor(buffer[i]! * fade);
       }
 
       switch (currentState) {

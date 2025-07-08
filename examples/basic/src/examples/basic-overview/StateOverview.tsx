@@ -5,8 +5,8 @@ import { useEffect, useRef, useState, createElement, useMemo } from 'react';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 
-import { FlashWrapper } from '../FlashOnUpdate';
-import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
+import DotPattern from '../../DotWrapper';
 import { useCogsState } from './state';
 function SectionWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -673,7 +673,9 @@ function ArrayManipulationExample() {
                 <div className="text-gray-200 font-medium">
                   First:
                   <span className="text-red-400">
-                    {todos.get().length > 0 ? todos.get()[0].text : 'None'}
+                    {todos.get().length > 0
+                      ? todos.index(0).text.get()
+                      : 'None'}
                   </span>
                 </div>
                 <CodeSnippetDisplay code={`todos.get()[0]?.text`} />

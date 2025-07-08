@@ -1,14 +1,14 @@
 'use client';
 
-import { createCogsState } from '../../../src/CogsState';
+import { createCogsState } from '../../../../../src/CogsState';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FlashWrapper } from '../FlashOnUpdate';
-import DotPattern from '../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
+import DotPattern from '../../DotWrapper';
 import { faker } from '@faker-js/faker';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import { useInView } from 'react-intersection-observer';
-import { CodeSnippetDisplay } from '../CodeSnippet';
+import { CodeSnippetDisplay } from '../../CodeSnippet';
 
 // --- Data Generation & State Definition (No Changes Here) ---
 
@@ -55,18 +55,21 @@ export default function VirtualizedChatExample() {
   const { ref, inView, entry } = useInView();
   useEffect(() => {
     if (!inView) return;
-    const interval = setInterval(() => {
-      const allMessages = messages.get();
-      const newId = Math.max(...allMessages.map((m) => m.id)) + 1;
+    const interval = setInterval(
+      () => {
+        const allMessages = messages.get();
+        const newId = Math.max(...allMessages.map((m) => m.id)) + 1;
 
-      messages.insert({
-        id: newId,
-        author: faker.person.firstName(),
-        text: faker.lorem.sentence({ min: 3, max: 25 }),
-        timestamp: Date.now(),
-        photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
-      });
-    }, 2000 + Math.random() * 2.5); // Send a new message every 3 seconds
+        messages.insert({
+          id: newId,
+          author: faker.person.firstName(),
+          text: faker.lorem.sentence({ min: 3, max: 25 }),
+          timestamp: Date.now(),
+          photo: Math.random() > 0.8 ? faker.image.personPortrait() : null,
+        });
+      },
+      2000 + Math.random() * 2.5
+    ); // Send a new message every 3 seconds
 
     return () => clearInterval(interval);
   }, [inView]);

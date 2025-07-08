@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createCogsState } from '@lib/CogsState';
+import { createCogsState } from '../../../src/CogsState';
 
 // Your existing LCD configuration - Fixed pixel count
 const WIDTH = 88;
@@ -102,10 +102,10 @@ function LCDCatScrollerStateful({
           const b = imageData[imgDataIndex + 2];
 
           // Calculate brightness (simple average as in original)
-          const brightness = (r + g + b) / 3;
+          const brightness = (r! + g! + b!) / 3;
 
           // Treat as "on" pixel if mostly opaque AND relatively dark (as in original)
-          if (a > 128 && brightness < 128) {
+          if (a! > 128 && brightness < 128) {
             out[i] = 255; // Max brightness for "on" pixel
           }
         }
@@ -212,7 +212,7 @@ function LCDCatScrollerStateful({
           // This happens *every frame* while in this state.
           const fadeFactor = controls.fade;
           for (let i = 0; i < TOTAL; i++) {
-            buffer[i] = Math.floor(buffer[i] * fadeFactor);
+            buffer[i] = Math.floor(buffer[i]! * fadeFactor);
           }
 
           // --- FADING_OUT Termination Condition (Time-Based, Dynamic Duration) ---
@@ -316,7 +316,7 @@ function LCDCatScrollerStateful({
       if (currentState !== 'FINISHED') {
         const fadeFactor = controls.fade;
         for (let i = 0; i < TOTAL; i++) {
-          buffer[i] = Math.floor(buffer[i] * fadeFactor);
+          buffer[i] = Math.floor(buffer[i]! * fadeFactor);
         }
       }
 
@@ -327,7 +327,7 @@ function LCDCatScrollerStateful({
       // Update stats
       let litCount = 0;
       for (let i = 0; i < TOTAL; i++) {
-        if (buffer[i] > 0) {
+        if (buffer[i]! > 0) {
           // Count any pixel with brightness > 0
           litCount++;
         }

@@ -58,7 +58,8 @@
     image-rendering: pixelated;
 
     /* Combined animations */
-    animation: pixel-fall var(--duration) linear var(--delay) infinite,
+    animation:
+      pixel-fall var(--duration) linear var(--delay) infinite,
       pixel-stem-fade var(--duration) linear var(--delay) infinite;
   }
 
