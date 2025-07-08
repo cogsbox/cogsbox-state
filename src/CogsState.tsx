@@ -2675,11 +2675,8 @@ function createProxyHandler<T>(
                           }
                         }
                       }
-
-                      // Finally, force the re-render.
-                      forceUpdate({});
                     });
-
+                  forceUpdate({});
                   return () => {
                     unsubscribe();
                   };
@@ -3106,8 +3103,6 @@ function createProxyHandler<T>(
               .getState()
               .selectedIndicesMap.get(fullParentKey);
 
-            notifySelectionComponents(stateKey, parentPath, currentSelected);
-
             if (currentSelected === fullItemKey) {
               getGlobalStore
                 .getState()
@@ -3209,13 +3204,14 @@ function createProxyHandler<T>(
         if (prop === 'update') {
           return (payload: UpdateArg<T>) => {
             effectiveSetState(payload as any, path, { updateType: 'update' });
-            invalidateCachePath(path);
           };
         }
         if (prop === 'toggle') {
           const currentValueAtPath = getGlobalStore
             .getState()
             .getShadowValue([stateKey, ...path].join('.'));
+
+          console.log('currentValueAtPath', currentValueAtPath);
           if (typeof currentState != 'boolean') {
             throw new Error('toggle() can only be used on boolean values');
           }
@@ -3741,7 +3737,7 @@ function ListItemWrapper({
   const imagesLoaded = useImageLoaded(elementRef);
   const hasReportedInitialHeight = useRef(false);
   const fullKey = [stateKey, ...itemPath].join('.');
-
+  useRegisterComponent(stateKey, itemComponentId, forceUpdate);
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
       elementRef.current = element;
@@ -3752,7 +3748,6 @@ function ListItemWrapper({
 
   useEffect(() => {
     getGlobalStore.getState().subscribeToPath(fullKey, (e) => {
-      console.log('e itemList', fullKey, e);
       forceUpdate({});
     });
   }, []);
@@ -3824,7 +3819,7 @@ function FormElementWrapper({
   const [, forceUpdate] = useState({});
 
   const stateKeyPathKey = [stateKey, ...path].join('.');
-
+  useRegisterComponent(stateKey, componentId, forceUpdate);
   const globalStateValue = getGlobalStore
     .getState()
     .getShadowValue(stateKeyPathKey);
@@ -3845,7 +3840,6 @@ function FormElementWrapper({
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
-        console.log('newValue', newValue);
         forceUpdate({});
       });
     return () => {
@@ -3910,4 +3904,36 @@ function FormElementWrapper({
   });
 
   return <>{renderFn(stateWithInputProps)}</>;
+}
+
+function useRegisterComponent(
+  stateKey: string,
+  componentId: string,
+  forceUpdate: (o: object) => void
+) {
+  const fullComponentId = `${stateKey}////${componentId}`;
+
+  // Register in the component system
+  useLayoutEffect(() => {
+    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+    const components = rootMeta?.components || new Map();
+
+    components.set(fullComponentId, {
+      forceUpdate: () => forceUpdate({}),
+      paths: new Set(),
+      reactiveType: ['component'],
+    });
+
+    getGlobalStore.getState().setShadowMetadata(stateKey, [], {
+      ...rootMeta,
+      components,
+    });
+
+    return () => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+      if (meta?.components) {
+        meta.components.delete(fullComponentId);
+      }
+    };
+  }, [stateKey, fullComponentId]);
 }

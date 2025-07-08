@@ -416,6 +416,33 @@ function CoreMethodsDemo() {
                 Current: {state.isBooleanValue.get() ? 'true' : 'false'}
               </div>
             </div>
+            <div className="bg-black/20 rounded-lg p-4">
+              {' '}
+              <div className="flex items-center justify-between mb-3">
+                <div className="text-sm font-bold text-gray-300">
+                  .update() (object)
+                </div>
+                <button
+                  onClick={() => {
+                    state.update((p) => ({
+                      ...p,
+                      simpleCounter: p.simpleCounter + 1,
+                      isBooleanValue: !p.isBooleanValue,
+                    }));
+                  }}
+                  className="px-4 py-2 bg-blue-600 cursor-pointer text-white rounded-lg hover:bg-blue-500 text-sm"
+                >
+                  Object Update
+                </button>
+              </div>
+              <CodeSnippetDisplay
+                code={`state.update((p) => ({
+  ...p,
+  simpleCounter: p.simpleCounter + 1,
+  isBooleanValue: !p.isBooleanValue,
+}))`}
+              />
+            </div>
           </div>
         </div>
 
@@ -455,16 +482,18 @@ function CoreMethodsDemo() {
                   .formElement()
                 </span>
                 {state.isBooleanValue2.formElement((obj) => (
-                  <button
-                    onClick={() => obj.toggle()}
-                    className={`px-3 py-1 text-white rounded text-sm transition-colors ${
-                      obj.get()
-                        ? 'bg-purple-500 hover:bg-purple-400'
-                        : 'bg-gray-700 hover:bg-gray-600'
-                    }`}
-                  >
-                    Isolated Toggle
-                  </button>
+                  <FlashWrapper>
+                    <button
+                      onClick={() => obj.toggle()}
+                      className={`px-3 py-1 text-white rounded text-sm transition-colors ${
+                        obj.get()
+                          ? 'bg-purple-500 hover:bg-purple-400'
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                    >
+                      Isolated Toggle
+                    </button>
+                  </FlashWrapper>
                 ))}
               </div>
               <CodeSnippetDisplay
@@ -488,7 +517,9 @@ function CoreMethodsDemo() {
               <strong>Note:</strong> Signal-based updates don't trigger React
               re-renders. Use{' '}
               <code className="text-yellow-400">.formElement()</code> for
-              isolated components that manage their own updates.
+              isolated components that manage their own updates. Which is
+              important for the above example as the style on the button itself
+              changes and needs to re-render.
             </p>
           </div>
         </div>
@@ -635,26 +666,31 @@ function ArrayOperationsDemo() {
             <div className="mt-4 space-y-2 max-h-40 overflow-y-auto">
               {todos.get().length > 0 ? (
                 todos.stateList((todo, index) => (
-                  <div
-                    key={todo.id.get()}
-                    className={`flex items-center gap-2 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${
-                      todo.isSelected
-                        ? 'bg-blue-800/50 text-blue-300 border border-blue-600/30'
-                        : 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/30'
-                    }`}
-                    onClick={() => todo.toggleSelected()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={todo.done.get()}
-                      onChange={(e) => todo.done.update(e.target.checked)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="w-4 h-4 accent-green-500"
-                    />
-                    <span className={todo.done.get() ? 'line-through' : ''}>
-                      {todo.text.get()}
-                    </span>
-                  </div>
+                  <FlashWrapper key={todo.id.get()}>
+                    <div
+                      className={`flex items-center gap-2 px-3 py-2 rounded text-sm cursor-pointer transition-colors ${
+                        todo.isSelected
+                          ? 'bg-blue-800/50 text-blue-300 border border-blue-600/30'
+                          : 'bg-gray-800/30 text-gray-400 hover:bg-gray-700/30'
+                      }`}
+                      onClick={(e) => {
+                        todo.toggleSelected();
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={todo.done.get()}
+                        onChange={(e) => {
+                          todo.done.update(e.target.checked);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="w-4 h-4 accent-green-500"
+                      />
+                      <span className={todo.done.get() ? 'line-through' : ''}>
+                        {todo.text.get()}
+                      </span>
+                    </div>
+                  </FlashWrapper>
                 ))
               ) : (
                 <div className="text-gray-500 text-center py-4 text-sm">

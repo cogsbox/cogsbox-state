@@ -482,8 +482,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     if (!parentMeta || !parentMeta.arrayKeys) return;
 
-    // Generate the ID if it doesn't have one
-
     const newItemId = `id:${ulid()}`;
     const fullItemKey = arrayKey + '.' + newItemId;
 
@@ -533,7 +531,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // Extract parent path and item ID
     const parentPath = itemPath.slice(0, -1);
     const parentKey = [key, ...parentPath].join('.');
-    const itemIdToRemove = itemPath[itemPath.length - 1];
 
     // Get parent metadata
     const parentMeta = newShadowStore.get(parentKey);
@@ -634,7 +631,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
           });
         }
         newMap.set(arrayKey, itemKey);
-        console.log('ggggggggggggggggggggggggggggggggggg', itemKey);
+
         get().notifyPathSubscribers(itemKey, {
           type: 'THIS_SELECTED',
         });
@@ -650,7 +647,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
   clearSelectedIndex: ({ arrayKey }: { arrayKey: string }): void => {
     set((state) => {
-      console.log('clearSelectedIndex', arrayKey, state.selectedIndicesMap);
       const newMap = state.selectedIndicesMap;
 
       newMap.delete(arrayKey);
@@ -668,9 +664,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       const newOuterMap = new Map(state.selectedIndicesMap);
       const changed = newOuterMap.delete(stateKey);
       if (changed) {
-        console.log(
-          `Cleared selected indices map entry for stateKey: ${stateKey}`
-        );
         return { selectedIndicesMap: newOuterMap };
       } else {
         return {};
@@ -705,7 +698,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   addValidationError: (path, message) => {
-    console.log('addValidationError---');
     set((prev) => {
       const updatedErrors = new Map(prev.validationErrors);
       const existingMessages = updatedErrors.get(path) || [];
