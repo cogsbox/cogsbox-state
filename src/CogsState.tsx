@@ -84,7 +84,7 @@ export type StateKeys = string;
 type findWithFuncType<U> = (
   thisKey: keyof U,
   thisValue: U[keyof U]
-) => StateObject<U>;
+) => EndType<U> & StateObject<U>;
 
 type CutFunctionType<T> = (
   index?: number,
@@ -92,12 +92,42 @@ type CutFunctionType<T> = (
 ) => StateObject<T>;
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
-
+type ArraySpecificPrototypeKeys =
+  | 'concat'
+  | 'copyWithin'
+  | 'fill'
+  | 'find'
+  | 'findIndex'
+  | 'flat'
+  | 'flatMap'
+  | 'includes'
+  | 'indexOf'
+  | 'join'
+  | 'keys'
+  | 'lastIndexOf'
+  | 'map'
+  | 'pop'
+  | 'push'
+  | 'reduce'
+  | 'reduceRight'
+  | 'reverse'
+  | 'shift'
+  | 'slice'
+  | 'some'
+  | 'sort'
+  | 'splice'
+  | 'unshift'
+  | 'values'
+  | 'entries'
+  | 'every'
+  | 'filter'
+  | 'forEach'
+  | 'with';
 export type StreamOptions<T, R = T> = {
   bufferSize?: number;
   flushInterval?: number;
   bufferStrategy?: 'sliding' | 'dropping' | 'accumulate';
-  store?: (buffer: T[]) => R | R[]; // Transform buffer into what gets stored
+  store?: (buffer: T[]) => R | R[];
   onFlush?: (buffer: T[]) => void;
 };
 
@@ -109,189 +139,79 @@ export type StreamHandle<T> = {
   pause: () => void;
   resume: () => void;
 };
-
-// =================================================================
-// 1. A NEW, CLEAR BASE TYPE FOR ALL STATE OBJECTS
-// This combines the old `EndType` and the extra props at the end of StateObject.
-// =================================================================
-type BaseStateObjectProps<T, IsArrayElement = false> = {
-  // Core functionality
-  get: () => T;
-  update: UpdateType<T>;
-
-  // Reactivity & Rendering
-  $get: () => T;
-  $derive: <R>(fn: EffectFunction<T, R>) => R;
-  formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
-
-  // Metadata & Internals
-  _path: string[];
-  _stateKey: string;
-  _componentId: string | null;
-  _initialState: T;
-  _isLoading: boolean;
-  _serverState: T;
-  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-
-  // Methods
-  sync: () => void;
-  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-  revertToInitialState: (obj?: { validationKey?: string }) => T;
-  getDifferences: () => string[];
-  getComponents: () => ComponentsType;
-  getAllFormRefs: () => Map<string, React.RefObject<any>>;
-  getFormRef: () => React.RefObject<any> | undefined;
-  updateInitialState: (newState: T | null) => {
-    fetchId: (field: keyof T) => string | number;
-  };
-
-  // Validation
-  addValidation: (errors: ValidationError[]) => void;
-  showValidationErrors: () => string[];
-  setValidation: (ctx: string) => void;
-  removeValidation: (ctx: string) => void;
-  validateZodSchema: () => void;
-  validationWrapper: ({
-    children,
-    hideMessage,
-  }: {
-    children: React.ReactNode;
-    hideMessage?: boolean;
-  }) => JSX.Element;
-
-  // Storage & Sync
-  lastSynced?: SyncInfo;
-  getLocalStorage: (key: string) => LocalStorageData<T> | null;
-  removeStorage: () => void;
-  applyJsonPatch: (patches: any[]) => void;
-
-  // Middleware & Selection
-  middleware: (
-    middles: ({
-      updateLog,
-      update,
-    }: {
-      updateLog: UpdateTypeDetail[] | undefined;
-      update: UpdateTypeDetail;
-    }) => void
-  ) => void;
-  isSelected: boolean;
-  setSelected: (value: boolean) => void;
-  toggleSelected: () => void;
-  ignoreFields: (fields: string[]) => StateObject<T>;
-} & (IsArrayElement extends true ? { cut: () => void } : {});
-
-// =================================================================
-// 2. A DEDICATED TYPE FOR ARRAY-SPECIFIC METHODS
-// This was previously `ArrayEndType`.
-// =================================================================
-type ArrayStateObjectProps<T extends any[]> = {
-  // Array Manipulation
-  insert: InsertType<Prettify<InferArrayElement<T>>>;
-  uniqueInsert: (
-    payload: InsertParams<Prettify<InferArrayElement<T>>>,
-    fields?: (keyof Prettify<InferArrayElement<T>>)[],
-    onMatch?: (existingItem: any) => any
-  ) => void;
-  cut: CutFunctionType<T>;
+export type ArrayEndType<TShape extends unknown> = {
+  stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
+    options?: StreamOptions<T, R>
+  ) => StreamHandle<T>;
+  findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
+  index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
+    insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
+    cut: CutFunctionType<TShape>;
+    _index: number;
+  } & EndType<Prettify<InferArrayElement<TShape>>>;
+  insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+  cut: CutFunctionType<TShape>;
   cutSelected: () => void;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
+  stateSort: (
+    compareFn: (
+      a: Prettify<InferArrayElement<TShape>>,
+      b: Prettify<InferArrayElement<TShape>>
+    ) => number
+  ) => ArrayEndType<TShape>;
+  useVirtualView: (
+    options: VirtualViewOptions
+  ) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
 
-  // Iteration & Transformation
+  stateList: (
+    callbackfn: (
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
+      index: number,
+      arraySetter: StateObject<TShape>
+    ) => void
+  ) => any;
   stateMap: <U>(
     callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<T>>>,
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
-      arraySetter: StateObject<T>
+      arraySetter: StateObject<TShape>
     ) => U
   ) => U[];
   $stateMap: (
     callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<T>>>,
+      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
-      arraySetter: StateObject<T>
+      arraySetter: StateObject<TShape>
     ) => void
   ) => any;
-  stateList: (
-    callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<T>>>,
-      index: number,
-      arraySetter: StateObject<T>
-    ) => void
-  ) => any;
-  stateFilter: (
-    callbackfn: (
-      value: Prettify<InferArrayElement<T>>,
-      index: number
-    ) => boolean
-  ) => StateObject<T>; // Chaining
-  stateSort: (
-    compareFn: (
-      a: Prettify<InferArrayElement<T>>,
-      b: Prettify<InferArrayElement<T>>
-    ) => number
-  ) => StateObject<T>; // Chaining
-  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<T>>>(
+  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(
     field: K
-  ) => StateObject<InferArrayElement<Prettify<InferArrayElement<T>>[K]>[]>;
-
-  // Accessors
-  index: (index: number) => StateObject<Prettify<InferArrayElement<T>>> & {
-    insert: InsertTypeObj<Prettify<InferArrayElement<T>>>;
-    cut: CutFunctionType<T>;
-    _index: number;
-  };
-  findWith: findWithFuncType<Prettify<InferArrayElement<T>>>;
+  ) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
+  uniqueInsert: (
+    payload: InsertParams<Prettify<InferArrayElement<TShape>>>,
+    fields?: (keyof Prettify<InferArrayElement<TShape>>)[],
+    onMatch?: (existingItem: any) => any
+  ) => void;
   stateFind: (
     callbackfn: (
-      value: Prettify<InferArrayElement<T>>,
+      value: Prettify<InferArrayElement<TShape>>,
       index: number
     ) => boolean
-  ) => StateObject<Prettify<InferArrayElement<T>>> | undefined;
-  last: () => StateObject<Prettify<InferArrayElement<T>>> | undefined;
-
-  // Selection
-  getSelected: () => StateObject<Prettify<InferArrayElement<T>>> | undefined;
-  getSelectedIndex: () => number;
+  ) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+  stateFilter: (
+    callbackfn: (
+      value: Prettify<InferArrayElement<TShape>>,
+      index: number
+    ) => void
+  ) => ArrayEndType<TShape>;
+  getSelected: () =>
+    | StateObject<Prettify<InferArrayElement<TShape>>>
+    | undefined;
   clearSelected: () => void;
-
-  // Advanced Features
-  useVirtualView: (
-    options: VirtualViewOptions
-  ) => VirtualStateObjectResult<Prettify<InferArrayElement<T>>[]>;
-  stream: <StreamIn = Prettify<InferArrayElement<T>>, StreamOut = StreamIn>(
-    options?: StreamOptions<StreamIn, StreamOut>
-  ) => StreamHandle<StreamIn>;
-};
-
-// =================================================================
-// 3. A DEDICATED TYPE FOR OBJECT-SPECIFIC BEHAVIOR (MAPPED KEYS)
-// =================================================================
-type ObjectStateObjectProps<T extends object> = {
-  [K in keyof T]-?: StateObject<T[K]>;
-};
-
-// =================================================================
-// 4. A DEDICATED TYPE FOR BOOLEAN-SPECIFIC BEHAVIOR
-// =================================================================
-type BooleanStateObjectProps = {
-  toggle: () => void;
-};
-
-// =================================================================
-// 5. THE NEW, CLEANED-UP `StateObject` TYPE
-// It combines the modular types using a much clearer conditional.
-// =================================================================
-export type StateObject<T> = BaseStateObjectProps<T, true> &
-  (T extends any[]
-    ? ArrayStateObjectProps<T>
-    : T extends boolean
-      ? BooleanStateObjectProps
-      : // Check for object last, as arrays are also objects.
-        T extends Record<string, unknown> | object
-        ? ObjectStateObjectProps<T>
-        : {}); // Primitives like string/number get no extra props.
+  getSelectedIndex: () => number;
+  last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+} & EndType<TShape>;
 
 export type FormOptsType = {
   validation?: {
@@ -320,6 +240,73 @@ export type ValidationError = {
   message: string;
 };
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
+export type EndType<T, IsArrayElement = false> = {
+  addValidation: (errors: ValidationError[]) => void;
+  applyJsonPatch: (patches: any[]) => void;
+  update: UpdateType<T>;
+  _path: string[];
+  _stateKey: string;
+  formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
+  get: () => T;
+  $get: () => T;
+  $derive: <R>(fn: EffectFunction<T, R>) => R;
+
+  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+
+  showValidationErrors: () => string[];
+  setValidation: (ctx: string) => void;
+  removeValidation: (ctx: string) => void;
+  ignoreFields: (fields: string[]) => StateObject<T>;
+  isSelected: boolean;
+  setSelected: (value: boolean) => void;
+  toggleSelected: () => void;
+  getFormRef: () => React.RefObject<any> | undefined;
+  removeStorage: () => void;
+  sync: () => void;
+  validationWrapper: ({
+    children,
+    hideMessage,
+  }: {
+    children: React.ReactNode;
+    hideMessage?: boolean;
+  }) => JSX.Element;
+  lastSynced?: SyncInfo;
+} & (IsArrayElement extends true ? { cut: () => void } : {});
+
+export type StateObject<T> = (T extends any[]
+  ? ArrayEndType<T>
+  : T extends Record<string, unknown> | object
+    ? { [K in keyof T]-?: StateObject<T[K]> }
+    : T extends string | number | boolean | null
+      ? EndType<T, true>
+      : never) &
+  EndType<T, true> & {
+    toggle: T extends boolean ? () => void : never;
+    getAllFormRefs: () => Map<string, React.RefObject<any>>;
+    _componentId: string | null;
+    getComponents: () => ComponentsType;
+    validateZodSchema: () => void;
+    _initialState: T;
+    updateInitialState: (newState: T | null) => {
+      fetchId: (field: keyof T) => string | number;
+    };
+    _isLoading: boolean;
+    _serverState: T;
+    revertToInitialState: (obj?: { validationKey?: string }) => T;
+    getDifferences: () => string[];
+    middleware: (
+      middles: ({
+        updateLog,
+        update,
+      }: {
+        updateLog: UpdateTypeDetail[] | undefined;
+        update: UpdateTypeDetail;
+      }) => void
+    ) => void;
+
+    getLocalStorage: (key: string) => LocalStorageData<T> | null;
+  };
 
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 type EffectiveSetStateArg<
@@ -331,7 +318,6 @@ type EffectiveSetStateArg<
     : never
   : UpdateArg<T>;
 
-// Then update your EffectiveSetState type
 type EffectiveSetState<TStateObject> = (
   newStateOrFunction:
     | EffectiveSetStateArg<TStateObject, 'update'>
@@ -351,6 +337,7 @@ export type UpdateTypeDetail = {
   newValue: any;
   userId?: number;
 };
+
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType =
   | 'none'
@@ -485,7 +472,6 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
   });
 }
 
-// Fix for the setOptions function
 function setOptions<StateKey, Opt>({
   stateKey,
   options,
@@ -519,8 +505,8 @@ function setOptions<StateKey, Opt>({
         if (
           key == 'defaultState' &&
           options[key] &&
-          mergedOptions[key] !== options[key] && // Different references
-          !isDeepEqual(mergedOptions[key], options[key]) // And different values
+          mergedOptions[key] !== options[key] &&
+          !isDeepEqual(mergedOptions[key], options[key])
         ) {
           needToAdd = true;
           mergedOptions[key] = options[key];
@@ -544,44 +530,35 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
 ) => {
   let newInitialState = initialState;
-  console.log('initialState', initialState);
-  // Extract state parts and options using transformStateFunc
+
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
 
-  // Apply global options to each state key
   Object.keys(statePart).forEach((key) => {
-    // Get existing options for this state key (from addStateOptions pattern)
     let existingOptions = initialOptionsPart[key] || {};
 
-    // Create the merged options object
     const mergedOptions: any = {
-      // Start with existing options (from addStateOptions)
       ...existingOptions,
     };
 
-    // Apply global formElements
     if (opt?.formElements) {
       mergedOptions.formElements = {
-        ...opt.formElements, // Global defaults first
-        ...(existingOptions.formElements || {}), // State-specific overrides
+        ...opt.formElements,
+        ...(existingOptions.formElements || {}),
       };
     }
 
-    // Apply global validation - this is the key fix
     if (opt?.validation) {
       mergedOptions.validation = {
-        ...opt.validation, // Global validation first
-        ...(existingOptions.validation || {}), // State-specific overrides
+        ...opt.validation,
+        ...(existingOptions.validation || {}),
       };
 
-      // If global validation has a key and state doesn't have one, use the state key
       if (opt.validation.key && !existingOptions.validation?.key) {
         mergedOptions.validation.key = `${opt.validation.key}.${key}`;
       }
     }
 
-    // Only set if we have options to set
     if (Object.keys(mergedOptions).length > 0) {
       const existingGlobalOptions = getInitialOptions(key);
 
@@ -958,7 +935,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
               Array.isArray(incomingData)
             ) {
               const keyField = mergeConfig.key || 'id';
-              console.log('keyField', keyField, currentState, incomingData);
+
               const existingIds = new Set(
                 currentState.map((item: any) => item[keyField])
               );
@@ -968,9 +945,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
               });
 
               if (newUniqueItems.length > 0) {
-                // Instead of building a new array, insert each new item into the existing state.
-                // The `path` is `[]` because we are inserting into the root array of this state key.
-
                 newUniqueItems.forEach((item) => {
                   getGlobalStore
                     .getState()
@@ -981,7 +955,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 return;
               }
             } else {
-              // This is the non-merge, full-replacement path (for the initial load).
               getGlobalStore
                 .getState()
                 .initializeShadowState(thisKey, incomingData);
@@ -994,19 +967,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
               ...meta,
               stateSource: 'server',
               lastServerSync: serverStateData.timestamp || Date.now(),
-              isDirty: false, // The state is now synced with the server.
+              isDirty: false,
             });
           }
         }
-        // REPLACEMENT ENDS HERE
       });
 
     return unsubscribe;
   }, [thisKey, resolveInitialState]);
 
   useEffect(() => {
-    // Get the CURRENT metadata. If a source is already set (e.g., from a server update),
-    // it means we've already been initialized. Do nothing.
     const existingMeta = getGlobalStore
       .getState()
       .getShadowMetadata(thisKey, []);
@@ -1026,10 +996,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
-      // Resolve initial state based on current options (which might include localStorage)
       const { value: resolvedState, source, timestamp } = resolveInitialState();
 
-      // Initialize shadow state with the RESOLVED value, not the default.
       getGlobalStore.getState().initializeShadowState(thisKey, resolvedState);
 
       // Set shadow metadata with the correct source info
@@ -1040,12 +1008,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         baseServerState: source === 'server' ? resolvedState : undefined,
       });
 
-      // Notify components of this initial setup
       notifyComponents(thisKey);
     }
-
-    // This effect should only run once on mount for a given component instance.
-    // The dependencies prop is for cases where the user *wants* to force a re-initialization.
   }, [thisKey, ...(dependencies || [])]);
   useLayoutEffect(() => {
     if (noStateKey) {
@@ -2098,7 +2062,6 @@ function createProxyHandler<T>(
                 });
               }, [rerender, stickToBottom]);
 
-              // Get array keys
               const arrayKeys =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys || [];
@@ -3428,8 +3391,6 @@ export function $cogsSignal(proxy: {
   return createElement(SignalRenderer, { proxy });
 }
 
-// in your state manager file...
-
 function SignalMapRenderer({
   proxy,
   rebuildStateShape,
@@ -3726,23 +3687,21 @@ const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
     };
 
     images.forEach((image) => {
-      // If the image is already complete (e.g., cached), count it immediately.
       if (image.complete) {
         handleImageLoad();
       } else {
         image.addEventListener('load', handleImageLoad);
-        image.addEventListener('error', handleImageLoad); // Also count errors as "loaded"
+        image.addEventListener('error', handleImageLoad);
       }
     });
 
-    // Cleanup function
     return () => {
       images.forEach((image) => {
         image.removeEventListener('load', handleImageLoad);
         image.removeEventListener('error', handleImageLoad);
       });
     };
-  }, [ref.current]); // Rerun if the ref's element changes
+  }, [ref.current]);
 
   return loaded;
 };
@@ -3760,7 +3719,7 @@ function ListItemWrapper({
   itemComponentId: string;
   itemPath: string[];
   localIndex: number;
-  arraySetter: any; // The proxy for the whole array
+  arraySetter: any;
 
   rebuildStateShape: (options: {
     currentState: any;
@@ -3776,14 +3735,13 @@ function ListItemWrapper({
   ) => React.ReactNode;
 }) {
   const [, forceUpdate] = useState({});
-  const { ref: inViewRef, inView } = useInView(); // Renamed to avoid conflict
+  const { ref: inViewRef, inView } = useInView();
   const elementRef = useRef<HTMLDivElement | null>(null);
 
-  // ANNOTATION: The two key hooks for the fix.
-  const imagesLoaded = useImageLoaded(elementRef); // Our new hook
-  const hasReportedInitialHeight = useRef(false); // A flag to prevent re-reporting
+  const imagesLoaded = useImageLoaded(elementRef);
+  const hasReportedInitialHeight = useRef(false);
   const fullKey = [stateKey, ...itemPath].join('.');
-  // Proper way to merge refs
+
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
       elementRef.current = element;
@@ -3826,8 +3784,6 @@ function ListItemWrapper({
     }
   }, [inView, imagesLoaded, stateKey, itemPath]);
 
-  // ... rest of the component is unchanged ...
-
   const fullItemPath = [stateKey, ...itemPath].join('.');
   const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
 
@@ -3844,39 +3800,6 @@ function ListItemWrapper({
 
   return <div ref={setRefs}>{children}</div>;
 }
-const cleanupComponentRegistration = (
-  stateKey: string,
-  componentId: string
-) => {
-  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-  const component = rootMeta?.components?.get(componentId);
-
-  // Remove from all registered paths
-  if (component?.paths) {
-    component.paths.forEach((fullPath) => {
-      const pathParts = fullPath.split('.');
-      const path = pathParts.slice(1);
-
-      const pathMeta = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, path);
-
-      if (pathMeta?.pathComponents) {
-        pathMeta.pathComponents.delete(componentId);
-        if (pathMeta.pathComponents.size === 0) {
-          delete pathMeta.pathComponents;
-          getGlobalStore.getState().setShadowMetadata(stateKey, path, pathMeta);
-        }
-      }
-    });
-  }
-
-  // Remove from root components
-  if (rootMeta?.components) {
-    rootMeta.components.delete(componentId);
-    getGlobalStore.getState().setShadowMetadata(stateKey, [], rootMeta);
-  }
-};
 function FormElementWrapper({
   stateKey,
   path,
@@ -3902,9 +3825,6 @@ function FormElementWrapper({
 
   const stateKeyPathKey = [stateKey, ...path].join('.');
 
-  // Register component
-
-  // Form state management
   const globalStateValue = getGlobalStore
     .getState()
     .getShadowValue(stateKeyPathKey);
@@ -3912,7 +3832,6 @@ function FormElementWrapper({
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Sync local value with global state when not debouncing
   useEffect(() => {
     if (
       !isCurrentlyDebouncing.current &&
@@ -3922,7 +3841,6 @@ function FormElementWrapper({
     }
   }, [globalStateValue]);
 
-  // Cleanup timeout on unmount
   useEffect(() => {
     const unsubscribe = getGlobalStore
       .getState()
@@ -3939,7 +3857,6 @@ function FormElementWrapper({
     };
   }, []);
 
-  // Single debounced update function
   const debouncedUpdate = useCallback(
     (newValue: any) => {
       setLocalValue(newValue);
@@ -3959,7 +3876,6 @@ function FormElementWrapper({
     [setState, path, formOpts?.debounceTime]
   );
 
-  // Force immediate update (for onBlur)
   const immediateUpdate = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -3974,7 +3890,6 @@ function FormElementWrapper({
     componentId: componentId,
   });
 
-  // Extend with inputProps
   const stateWithInputProps = new Proxy(baseState, {
     get(target, prop) {
       if (prop === 'inputProps') {

@@ -1,15 +1,15 @@
-import type { InitialStateType, TransformedStateType } from "./CogsState";
-import { getGlobalStore } from "./store";
+import type { InitialStateType, TransformedStateType } from './CogsState';
+import { getGlobalStore } from './store';
 export const isObject = (item: any): item is Record<string, any> => {
   return (
-    item && typeof item === "object" && !Array.isArray(item) && item !== null
+    item && typeof item === 'object' && !Array.isArray(item) && item !== null
   );
 };
 export type GenericObject = Record<string, any>;
 
 export const isFunction = <TStateObject extends unknown>(
   arg: any
-): arg is (prev: TStateObject) => TStateObject => typeof arg === "function";
+): arg is (prev: TStateObject) => TStateObject => typeof arg === 'function';
 
 export const isArray = (item: any): item is Array<any> => {
   return Array.isArray(item);
@@ -93,12 +93,12 @@ export function updateNestedProperty(
         ...state.slice(index + 1),
       ];
     } else {
-      console.log("errorstate", state, path);
+      console.log('errorstate', state, path);
       throw new Error(
-        `Invalid array index "${index}" in path "${path.join(".")}".`
+        `Invalid array index "${index}" in path "${path.join('.')}".`
       );
     }
-  } else if (typeof state === "object" && state !== null) {
+  } else if (typeof state === 'object' && state !== null) {
     if (head && head in state) {
       return {
         ...state,
@@ -107,12 +107,12 @@ export function updateNestedProperty(
     } else {
       console.log(`Invalid property`, head, tail, path);
       throw new Error(
-        `Invalid property "${head}" in path "${path.join(".")}".`
+        `Invalid property "${head}" in path "${path.join('.')}".`
       );
     }
   } else {
     throw new Error(
-      `Cannot update nested property at path "${path.join(".")}". The path does not exist.`
+      `Cannot update nested property at path "${path.join('.')}". The path does not exist.`
     );
   }
 }
@@ -138,10 +138,10 @@ export function deleteNestedProperty(path: string[], state: any): any {
       }
     } else {
       throw new Error(
-        `Invalid array index "${index}" in path "${path.join(".")}".`
+        `Invalid array index "${index}" in path "${path.join('.')}".`
       );
     }
-  } else if (typeof state === "object" && state !== null) {
+  } else if (typeof state === 'object' && state !== null) {
     if (tail.length === 0) {
       // Delete the property and return the new object
       const { [head]: _, ...rest } = state;
@@ -153,12 +153,12 @@ export function deleteNestedProperty(path: string[], state: any): any {
       };
     } else {
       throw new Error(
-        `Invalid property "${head}" in path "${path.join(".")}".`
+        `Invalid property "${head}" in path "${path.join('.')}".`
       );
     }
   } else {
     throw new Error(
-      `Cannot delete nested property at path "${path.join(".")}". The path does not exist.`
+      `Cannot delete nested property at path "${path.join('.')}". The path does not exist.`
     );
   }
 }
@@ -175,7 +175,7 @@ export function getNestedValue<TStateObject extends unknown>(
       return undefined;
     }
 
-    if (typeof key === "string" && key.startsWith("id:")) {
+    if (typeof key === 'string' && key.startsWith('id:')) {
       if (!Array.isArray(value)) {
         console.error("Path segment with 'id:' requires an array.", {
           path: pathArray,
@@ -188,17 +188,17 @@ export function getNestedValue<TStateObject extends unknown>(
 
       // 1. Construct the FULL path of the item we are looking for.
       const parentPath = pathArray.slice(0, i);
-      const fullItemPathToFind = [stateKey, ...parentPath, key].join(".");
+      const fullItemPathToFind = [stateKey, ...parentPath, key].join('.');
 
       // 2. Get the metadata for the PARENT array.
-      const parentShadowKey = [stateKey, ...parentPath].join(".");
+      const parentShadowKey = [stateKey, ...parentPath].join('.');
       const parentShadowMeta = getGlobalStore
         .getState()
         .shadowStateStore.get(parentShadowKey);
 
       if (!parentShadowMeta?.arrayKeys) {
         console.error(
-          "No arrayKeys found in shadow state for parent path:",
+          'No arrayKeys found in shadow state for parent path:',
           parentShadowKey
         );
         return undefined;
@@ -233,11 +233,11 @@ type DifferencePaths = string[];
 export function getDifferences(
   obj1: any,
   obj2: any,
-  currentPath: string = ""
+  currentPath: string = ''
 ): DifferencePaths {
   let differences: DifferencePaths = [];
   // Handling null and undefined cases
-  if (typeof obj1 === "function" && typeof obj2 === "function") {
+  if (typeof obj1 === 'function' && typeof obj2 === 'function') {
     return differences;
   }
   if (
@@ -254,7 +254,7 @@ export function getDifferences(
   }
 
   // Handling primitive types
-  if (typeof obj1 !== "object" || typeof obj2 !== "object") {
+  if (typeof obj1 !== 'object' || typeof obj2 !== 'object') {
     if (obj1 !== obj2) {
       return [currentPath];
     }
@@ -304,12 +304,29 @@ export function getDifferences(
   });
   return differences;
 }
+export function deepMerge(target: any, source: any): any {
+  const output = { ...target };
+  if (isObject(target) && isObject(source)) {
+    Object.keys(source).forEach((key) => {
+      if (isObject(source[key])) {
+        if (!(key in target)) {
+          Object.assign(output, { [key]: source[key] });
+        } else {
+          output[key] = deepMerge(target[key], source[key]);
+        }
+      } else {
+        Object.assign(output, { [key]: source[key] });
+      }
+    });
+  }
+  return output;
+}
 
 export function getDifferencesArray(obj1: any, obj2: any) {
   const convertedDiff = getDifferences(obj1, obj2).map((string) =>
     string
-      .replace(/\[(\w+)\]/g, ".$1")
-      .split(".")
+      .replace(/\[(\w+)\]/g, '.$1')
+      .split('.')
       .filter(Boolean)
   );
 
@@ -318,7 +335,7 @@ export function getDifferencesArray(obj1: any, obj2: any) {
 export function getArrayLengthDifferences(
   obj1: any,
   obj2: any,
-  currentPath: string = ""
+  currentPath: string = ''
 ): string[] {
   let differences: string[] = [];
 
@@ -337,7 +354,7 @@ export function getArrayLengthDifferences(
     if (obj1.length !== obj2.length) {
       differences.push(currentPath);
     }
-  } else if (typeof obj1 === "object" && typeof obj2 === "object") {
+  } else if (typeof obj1 === 'object' && typeof obj2 === 'object') {
     // Recursively check for nested arrays
     const keys = new Set([...Object.keys(obj1), ...Object.keys(obj2)]);
     for (const key of keys) {
@@ -358,8 +375,8 @@ export function getArrayLengthDifferences(
 export function getArrayLengthDifferencesArray(obj1: any, obj2: any) {
   const convertedDiff = getArrayLengthDifferences(obj1, obj2).map((string) =>
     string
-      .replace(/\[(\w+)\]/g, ".$1")
-      .split(".")
+      .replace(/\[(\w+)\]/g, '.$1')
+      .split('.')
       .filter(Boolean)
   );
 
@@ -369,7 +386,7 @@ export function getArrayLengthDifferencesArray(obj1: any, obj2: any) {
 export function transformStateFunc<State extends unknown>(initialState: State) {
   const isInitialStateType = (state: any): state is InitialStateType<State> => {
     return Object.values(state).some((value) =>
-      value?.hasOwnProperty("initialState")
+      value?.hasOwnProperty('initialState')
     );
   };
   let initalOptions: GenericObject = {};

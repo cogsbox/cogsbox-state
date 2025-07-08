@@ -12,15 +12,8 @@ import { faker } from '@faker-js/faker';
 import { useEffect, useState } from 'react';
 
 import { CodeSnippetDisplay } from '../../CodeSnippet';
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQuery,
-  useMutation,
-} from '@tanstack/react-query';
-import { getGlobalStore } from '../../../../../src/store'; // <-- IMPORT THIS
-
-// --- Data Generation & State Definition ---
+import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
+import { getGlobalStore } from '../../../../../src/store';
 
 type Message = {
   id: number | string;
@@ -50,21 +43,44 @@ const generateMessages = (count: number): Message[] => {
   return messages;
 };
 
-// NEW: Get initial messages (one time load)
-const getInitialMessages = async (): Promise<Message[]> => {
-  await new Promise((resolve) =>
-    setTimeout(resolve, 100 + Math.random() * 200)
-  );
-  return [...serverMessages];
-};
+// ========================================================================= //
+// ========= MOCK API REFACTORED FOR CURSOR-BASED PAGINATION =============== //
+// ========================================================================= //
 
-// NEW: Get only messages newer than a timestamp
-const getMessagesSince = async (sinceTimestamp: number): Promise<Message[]> => {
+/**
+ * Mocks an API endpoint for fetching messages.
+ * Works with a timestamp-based cursor for infinite loading.
+ */
+const fetchMessagesWithCursor = async ({
+  pageParam = 0, // pageParam is our timestamp cursor. 0 means initial load.
+}): Promise<{ messages: Message[]; nextCursor: number; pageParam: number }> => {
+  // <-- Update the return type
+  console.log(`Fetching messages with cursor (timestamp): ${pageParam}`);
   await new Promise((resolve) =>
-    setTimeout(resolve, 100 + Math.random() * 100)
+    setTimeout(resolve, 150 + Math.random() * 200)
   );
-  return serverMessages.filter((msg) => msg.timestamp > sinceTimestamp);
+
+  let newMessages: Message[];
+  if (pageParam === 0) {
+    // Initial fetch: return all existing messages.
+    newMessages = [...serverMessages];
+  } else {
+    // Subsequent fetch: return only messages newer than the cursor.
+    newMessages = serverMessages.filter((msg) => msg.timestamp > pageParam);
+  }
+
+  const lastTimestamp =
+    newMessages.length > 0
+      ? Math.max(...newMessages.map((m) => m.timestamp))
+      : pageParam;
+
+  return {
+    messages: newMessages,
+    nextCursor: lastTimestamp,
+    pageParam: pageParam, // <-- ADD THIS. This makes the input cursor available in getNextPageParam
+  };
 };
+// ========================================================================= //
 
 const addMessage = async (
   messageData: Omit<Message, 'id' | 'timestamp'>
@@ -72,13 +88,11 @@ const addMessage = async (
   await new Promise((resolve) =>
     setTimeout(resolve, 200 + Math.random() * 300)
   );
-
   const newMessage: Message = {
     ...messageData,
     id: messageIdCounter++,
     timestamp: Date.now(),
   };
-
   serverMessages.push(newMessage);
   return newMessage;
 };
@@ -105,229 +119,117 @@ const stopAutoMessages = () => {
   }
 };
 
-// Initialize server with some messages
 serverMessages = generateMessages(70);
 
-// Default state - empty or minimal data for instant render
 const defaultState = {
   messages: [] as Message[],
 };
-
 export type ChatState = {
   messages: Message[];
 };
-
 export const { useCogsState } = createCogsState<ChatState>(defaultState, {
   validation: { key: 'chatApp' },
 });
-// --- Invisible Data Fetcher Component ---
-// This component has its own `useCogsState` hook and is completely self-contained.
-// --- Invisible Data Fetcher Component (CORRECTED) ---
-// This component has its own `useCogsState` hook and is completely self-contained.
-
+// ========================================================================= //
+// ============ THE CORRECT, STANDARD HYBRID DATA FETCHER ================== //
+// ========================================================================= //
+const fetchNewMessagesSince = async (timestamp: number): Promise<Message[]> => {
+  // No fake delay needed for this one, it should be fast.
+  return serverMessages.filter((msg) => msg.timestamp > timestamp);
+};
 function DataFetcher() {
+  // This state tracks the timestamp of the newest message we know about.
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
 
-  // QUERY 1: Initial load
-  const { data: initialMessages, isSuccess: isInitialSuccess } = useQuery({
-    queryKey: ['messages', 'initial'],
-    queryFn: getInitialMessages,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-  });
+  // --- JOB 1: Initial Load ---
+  // useInfiniteQuery handles the one-time initial load. It has NO polling.
+  const { data: initialData, isSuccess: isInitialLoadSuccess } =
+    useInfiniteQuery({
+      queryKey: ['messages', 'history'], // A different key to separate it from the poller
+      queryFn: fetchMessagesWithCursor,
+      initialPageParam: 0,
+      // We only need the first page on load. This hook is now dormant.
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      // CRITICAL: We only want this to run ONCE on load.
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+    });
 
-  // QUERY 2: Polling for new messages
+  // --- JOB 2: Live Updates ---
+  // A simple useQuery polls for ONLY new messages. It's lightweight.
   const { data: newMessages } = useQuery({
-    queryKey: ['messages', 'new', lastSyncTimestamp],
-    queryFn: () => getMessagesSince(lastSyncTimestamp),
-    refetchInterval: 1000,
-    enabled: lastSyncTimestamp > 0, // Correct: only poll after initial load
+    queryKey: ['messages', 'updates', lastSyncTimestamp],
+    queryFn: () => fetchNewMessagesSince(lastSyncTimestamp),
+    // Standard polling. This is the correct tool for this job.
+    refetchInterval: 2000,
+    // Only run this query after the initial load has finished and set a timestamp.
+    enabled: isInitialLoadSuccess && lastSyncTimestamp > 0,
     refetchOnWindowFocus: false,
   });
 
-  // EFFECT 1: Set the initial timestamp to enable polling
-  useEffect(() => {
-    // This runs only once after the initial data is successfully fetched.
-    if (isInitialSuccess && initialMessages && lastSyncTimestamp === 0) {
-      const maxTimestamp =
-        initialMessages.length > 0
-          ? Math.max(...initialMessages.map((m) => m.timestamp))
-          : Date.now();
-      setLastSyncTimestamp(maxTimestamp);
-    }
-  }, [initialMessages, isInitialSuccess, lastSyncTimestamp]);
+  // --- STATE SYNCHRONIZATION ---
 
-  // EFFECT 2: Update the timestamp when new messages arrive from polling
+  // Effect 1: Handle the initial data load.
+  // This runs only ONCE after the `useInfiniteQuery` succeeds.
   useEffect(() => {
-    if (newMessages && newMessages.length > 0) {
-      const maxTimestamp = Math.max(...newMessages.map((m) => m.timestamp));
-      // Ensure we only move the timestamp forward
-      if (maxTimestamp > lastSyncTimestamp) {
+    if (isInitialLoadSuccess && initialData) {
+      // Flatten the initial pages into a single array.
+      const allInitialMessages = initialData.pages.flatMap((p) => p.messages);
+
+      if (allInitialMessages.length > 0) {
+        // Update our state with the initial batch.
+        getGlobalStore.getState().setServerStateUpdate('messages', {
+          status: 'success',
+          data: allInitialMessages,
+          merge: { strategy: 'replace', key: 'id' },
+        });
+
+        // IMPORTANT: Set the timestamp of the newest message. This "activates"
+        // the polling `useQuery` to start checking for updates from this point forward.
+        const maxTimestamp = Math.max(
+          ...allInitialMessages.map((m) => m.timestamp)
+        );
         setLastSyncTimestamp(maxTimestamp);
       }
     }
-  }, [newMessages, lastSyncTimestamp]);
+  }, [isInitialLoadSuccess, initialData]);
 
-  useCogsState('messages', {
-    reactiveType: 'none',
-    // Handle the polled updates (incremental merge)
-    serverState: {
-      status: 'success',
-      data: newMessages,
-      merge: { strategy: 'append', key: 'id' }, // Use the library's merge feature
-    },
-  });
+  // Effect 2: Handle appending live updates.
+  // This runs whenever the polling `useQuery` successfully finds new messages.
+  useEffect(() => {
+    if (newMessages && newMessages.length > 0) {
+      // Update our state by APPENDING the new messages.
+      getGlobalStore.getState().setServerStateUpdate('messages', {
+        status: 'success',
+        data: newMessages, // Just the small array of new messages
+        merge: { strategy: 'append', key: 'id' },
+      });
 
-  // This component renders absolutely nothing.
+      // Advance our timestamp so we don't fetch these messages again.
+      const maxTimestamp = Math.max(...newMessages.map((m) => m.timestamp));
+      setLastSyncTimestamp(maxTimestamp);
+    }
+  }, [newMessages]);
+
   return null;
 }
-// --- Controls Panel Component (UNCHANGED) ---
-function ControlsPanel({
-  pollingInterval,
-  setPollingInterval,
-  autoMessagesEnabled,
-  setAutoMessagesEnabled,
-  autoMessageInterval,
-  setAutoMessageInterval,
-  optimisticUpdates,
-  setOptimisticUpdates,
-  status,
-  messageCount,
-  isInitialLoading,
-  isPolling,
-}: {
-  pollingInterval: number;
-  setPollingInterval: (value: number) => void;
-  autoMessagesEnabled: boolean;
-  setAutoMessagesEnabled: (value: boolean) => void;
-  autoMessageInterval: number;
-  setAutoMessageInterval: (value: number) => void;
-  optimisticUpdates: boolean;
-  setOptimisticUpdates: (value: boolean) => void;
-  status: string;
-  messageCount: number;
-  isInitialLoading: boolean;
-  isPolling: boolean;
-}) {
-  return (
-    <div className="bg-gray-800 rounded-lg p-4 border border-gray-700 mb-4">
-      <h3 className="text-lg font-semibold text-gray-200 mb-3">Controls</h3>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Polling Controls */}
-        <div className="space-y-2">
-          <label className="text-sm text-gray-400">
-            Check for new messages: {pollingInterval}ms
-          </label>
-          <input
-            type="range"
-            min="500"
-            max="5000"
-            step="250"
-            value={pollingInterval}
-            onChange={(e) => setPollingInterval(Number(e.target.value))}
-            className="w-full"
-          />
-        </div>
-
-        {/* Auto Messages */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={autoMessagesEnabled}
-              onChange={(e) => setAutoMessagesEnabled(e.target.checked)}
-              className="rounded"
-            />
-            <label className="text-sm text-gray-400">Auto Messages</label>
-          </div>
-          {autoMessagesEnabled && (
-            <div>
-              <label className="text-xs text-gray-500">
-                Interval: {autoMessageInterval}ms
-              </label>
-              <input
-                type="range"
-                min="1000"
-                max="10000"
-                step="500"
-                value={autoMessageInterval}
-                onChange={(e) => setAutoMessageInterval(Number(e.target.value))}
-                className="w-full"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Message Mode */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={optimisticUpdates}
-              onChange={(e) => setOptimisticUpdates(e.target.checked)}
-              className="rounded"
-            />
-            <label className="text-sm text-gray-400">Optimistic Updates</label>
-          </div>
-          <div className="text-xs text-gray-500">
-            {optimisticUpdates
-              ? 'Messages appear immediately'
-              : 'Wait for server confirmation'}
-          </div>
-        </div>
-      </div>
-
-      {/* Status Display */}
-      <div className="mt-4 pt-3 border-t border-gray-700 flex justify-between items-center text-sm">
-        <div className="flex gap-4">
-          <span className="text-gray-400">
-            Status: <span className="text-green-400">{status}</span>
-          </span>
-          <span className="text-gray-400">
-            Messages: <span className="text-blue-400">{messageCount}</span>
-          </span>
-        </div>
-        <div className="flex gap-2">
-          {isInitialLoading && (
-            <span className="text-yellow-400">🔄 Loading initial</span>
-          )}
-          {isPolling && (
-            <span className="text-orange-400">👀 Checking for new</span>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// --- Main Application Component ---
 
 export default function VirtualizedChatExample() {
   // UI controls state
   const [autoMessagesEnabled, setAutoMessagesEnabled] = useState(true);
   const [optimisticUpdates, setOptimisticUpdates] = useState(true);
 
-  // Just get the state object. The DataFetcher populates it.
-  const messages = useCogsState('messages', { reactiveType: 'none' });
-
   // Mutation is a user action, so it stays here.
   const sendMessageMutation = useMutation({ mutationFn: addMessage });
-  console.log('hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh');
+
   // Auto messages for simulation
   useEffect(() => {
     if (autoMessagesEnabled) startAutoMessages(3000);
     return () => stopAutoMessages();
   }, [autoMessagesEnabled]);
 
-  const status = messages.getStatus();
-  const messageCount = messages.get().length;
-
-  // You need a top-level QueryClientProvider to make useQuery work anywhere
-
   return (
     <>
-      {/* The DataFetcher is now just another component, not a parent. It has no UI. */}
       <DataFetcher />
 
       <div className="gap-4 text-green-400 h-screen p-4">
@@ -343,21 +245,6 @@ export default function VirtualizedChatExample() {
             </p>
           </div>
         </DotPattern>
-
-        <ControlsPanel
-          pollingInterval={1000}
-          setPollingInterval={() => {}}
-          autoMessagesEnabled={autoMessagesEnabled}
-          setAutoMessagesEnabled={setAutoMessagesEnabled}
-          autoMessageInterval={3000}
-          setAutoMessageInterval={() => {}}
-          optimisticUpdates={optimisticUpdates}
-          setOptimisticUpdates={setOptimisticUpdates}
-          status={status}
-          messageCount={messageCount}
-          isInitialLoading={messageCount === 0 && status !== 'synced'}
-          isPolling={true}
-        />
 
         <div className="flex gap-4">
           <div className="w-3/5 flex flex-col gap-3">
@@ -375,33 +262,6 @@ export default function VirtualizedChatExample() {
   );
 }
 
-// --- Loading and Error States ---
-function LoadingState() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-400 mx-auto mb-4"></div>
-        <p className="text-gray-400">Loading messages from server...</p>
-      </div>
-    </div>
-  );
-}
-
-function ErrorState() {
-  return (
-    <div className="flex-1 flex items-center justify-center">
-      <div className="text-center">
-        <p className="text-red-400 mb-2">Failed to load messages</p>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-red-800 text-white rounded hover:bg-red-700"
-        >
-          Retry
-        </button>
-      </div>
-    </div>
-  );
-}
 // --- Chat Window Component ---
 function ChatWindow({
   sendMessage,
@@ -412,7 +272,7 @@ function ChatWindow({
 }) {
   const messages = useCogsState('messages', { reactiveType: 'none' });
   const messageCount = messages.get().length;
-  console.log('messages', messages);
+
   const { virtualState, virtualizerProps, scrollToBottom } =
     messages.useVirtualView({
       itemHeight: 65,
@@ -421,7 +281,6 @@ function ChatWindow({
     });
 
   if (messageCount === 0 && !virtualizerProps) {
-    // Added guard for virtualizerProps
     return (
       <div className="flex-1 flex items-center justify-center text-gray-500">
         <p>No messages yet. Start a conversation!</p>
@@ -440,7 +299,7 @@ function ChatWindow({
             style={virtualizerProps.list.style}
             className="px-4 space-y-4 pb-8"
           >
-            {virtualState.stateList((setter, index, array) => {
+            {virtualState.stateList((setter) => {
               return (
                 <FlashWrapper showCounter={true}>
                   <MessageItem key={setter._path.join('.')} message={setter} />
@@ -548,16 +407,6 @@ function MessageInput({
       scrollToBottom('instant');
     }
 
-    // Send to server via React Query mutation
-    try {
-      await sendMessage(messageData);
-      if (!optimisticUpdates) {
-        scrollToBottom('instant');
-      }
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    }
-
     setText('');
   };
 
@@ -616,23 +465,23 @@ function ShowState({
       <div className={containerClasses}>
         <CodeSnippetDisplay
           code={`// Polling for new messages
-const { data: newMessages } = useQuery({
-  queryKey: ['messages', 'new', ${lastSync}],
-  queryFn: () => getMessagesSince(${lastSync}),
-  refetchInterval: ${pollingInterval}
-});
-
-// Fire a global state event with a merge instruction
-if (newMessages) {
-  getGlobalStore.getState().setServerStateUpdate('messages', {
-    status: 'success',
-    data: newMessages, // <-- ONLY the new data
-    merge: {
-      strategy: 'append',
-      key: 'id'
-    }
+  const { data: newMessages } = useQuery({
+    queryKey: ['messages', 'new', ${lastSync}],
+    queryFn: () => getMessagesSince(${lastSync}),
+    refetchInterval: ${pollingInterval}
   });
-}`}
+
+  // Fire a global state event with a merge instruction
+  if (newMessages) {
+    getGlobalStore.getState().setServerStateUpdate('messages', {
+      status: 'success',
+      data: newMessages, // <-- ONLY the new data
+      merge: {
+        strategy: 'append',
+        key: 'id'
+      }
+    });
+  }`}
         />
         <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
           <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
@@ -645,28 +494,28 @@ if (newMessages) {
               customStyle={{ backgroundColor: 'transparent', fontSize: '12px' }}
             >
               {`// Incremental Update Pattern
-const messages = useCogsState('messages');
+  const messages = useCogsState('messages');
 
-// Current Status: ${status}
-// Message Count: ${messages.get().length}
-// Update Mode: ${optimisticMode ? 'OPTIMISTIC' : 'SERVER-FIRST'}
-// Polling Interval: ${pollingInterval}ms
-// Last Sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
+  // Current Status: ${status}
+  // Message Count: ${messages.get().length}
+  // Update Mode: ${optimisticMode ? 'OPTIMISTIC' : 'SERVER-FIRST'}
+  // Polling Interval: ${pollingInterval}ms
+  // Last Sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
 
-// State: ${
-                isInitialLoading
-                  ? 'Loading initial messages...'
-                  : isPolling
-                    ? 'Checking for new messages...'
-                    : 'Idle'
-              }
+  // State: ${
+    isInitialLoading
+      ? 'Loading initial messages...'
+      : isPolling
+        ? 'Checking for new messages...'
+        : 'Idle'
+  }
 
-// How it works:
-// 1. Load all messages once on mount.
-// 2. Poll server for messages newer than lastSync.
-// 3. Dispatch a 'SERVER_STATE_UPDATE' event with a "merge" instruction.
-// 4. CogsState merges new data, avoiding a full re-render.
-// 5. State stays 'synced' - no dirty state!`}
+  // How it works:
+  // 1. Load all messages once on mount.
+  // 2. Poll server for messages newer than lastSync.
+  // 3. Dispatch a 'SERVER_STATE_UPDATE' event with a "merge" instruction.
+  // 4. CogsState merges new data, avoiding a full re-render.
+  // 5. State stays 'synced' - no dirty state!`}
             </SyntaxHighlighter>
           </div>
         </div>
