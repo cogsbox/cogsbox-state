@@ -517,11 +517,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     processNewItem(newItem, [...arrayPath, newItemId]);
     set({ shadowStateStore: newShadowStore });
-    console.log('insertShadowArrayElement', arrayKey, fullItemKey, {
-      type: 'INSERT',
-      path: arrayKey,
-      itemKey: fullItemKey,
-    });
+
     get().notifyPathSubscribers(arrayKey, {
       type: 'INSERT',
       path: arrayKey,

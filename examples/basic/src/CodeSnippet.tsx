@@ -4,9 +4,11 @@ import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 export function CodeSnippetDisplay({
   title,
   code,
+  customStyle,
 }: {
   title?: string;
   code: string;
+  customStyle?: React.CSSProperties | undefined;
 }) {
   return (
     <div className="mt-3">
@@ -20,6 +22,7 @@ export function CodeSnippetDisplay({
           language="typescript"
           style={atomOneDark}
           customStyle={{
+            ...customStyle,
             backgroundColor: 'transparent',
             fontSize: '12px',
             padding: '0.75rem',

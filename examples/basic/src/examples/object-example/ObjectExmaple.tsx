@@ -147,8 +147,7 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   `;
 
   const cutCode = `dashboardState.players
-  .stateFilter((p) => p.team === "${color}")
-  .cutSelected();
+.cutSelected();
   `;
   const filterAndRenderCode = `dashboardState.players
     .stateFilter((player) => player.team === "${color}")
@@ -202,7 +201,11 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
             </button>
           </div>
         </div>
-        <CodeSnippetDisplay title="" code={filterAndRenderCode} />
+        <CodeSnippetDisplay
+          title=""
+          customStyle={{ overflow: 'hidden' }}
+          code={filterAndRenderCode}
+        />
         <div className="flex-grow space-y-1 overflow-y-auto px-2 p-1">
           {dashboardState.players
             .stateFilter((player) => player.team === color)
