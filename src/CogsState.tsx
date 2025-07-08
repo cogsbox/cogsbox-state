@@ -84,7 +84,7 @@ export type StateKeys = string;
 type findWithFuncType<U> = (
   thisKey: keyof U,
   thisValue: U[keyof U]
-) => EndType<U> & StateObject<U>;
+) => StateObject<U>;
 
 type CutFunctionType<T> = (
   index?: number,
@@ -92,37 +92,7 @@ type CutFunctionType<T> = (
 ) => StateObject<T>;
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
-type ArraySpecificPrototypeKeys =
-  | 'concat'
-  | 'copyWithin'
-  | 'fill'
-  | 'find'
-  | 'findIndex'
-  | 'flat'
-  | 'flatMap'
-  | 'includes'
-  | 'indexOf'
-  | 'join'
-  | 'keys'
-  | 'lastIndexOf'
-  | 'map'
-  | 'pop'
-  | 'push'
-  | 'reduce'
-  | 'reduceRight'
-  | 'reverse'
-  | 'shift'
-  | 'slice'
-  | 'some'
-  | 'sort'
-  | 'splice'
-  | 'unshift'
-  | 'values'
-  | 'entries'
-  | 'every'
-  | 'filter'
-  | 'forEach'
-  | 'with';
+
 export type StreamOptions<T, R = T> = {
   bufferSize?: number;
   flushInterval?: number;
@@ -139,81 +109,189 @@ export type StreamHandle<T> = {
   pause: () => void;
   resume: () => void;
 };
-export type ArrayEndType<TShape extends unknown> = {
-  // Each instance of InferArrayElement<TShape> is wrapped in Prettify
-  // This forces the 'Message' alias to expand to '{ id: ... }'
-  stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
-    options?: StreamOptions<T, R>
-  ) => StreamHandle<T>;
-  findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
-  index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
-    insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
-    cut: CutFunctionType<TShape>;
-    _index: number;
-  } & EndType<Prettify<InferArrayElement<TShape>>>;
-  insert: InsertType<Prettify<InferArrayElement<TShape>>>;
-  cut: CutFunctionType<TShape>;
+
+// =================================================================
+// 1. A NEW, CLEAR BASE TYPE FOR ALL STATE OBJECTS
+// This combines the old `EndType` and the extra props at the end of StateObject.
+// =================================================================
+type BaseStateObjectProps<T, IsArrayElement = false> = {
+  // Core functionality
+  get: () => T;
+  update: UpdateType<T>;
+
+  // Reactivity & Rendering
+  $get: () => T;
+  $derive: <R>(fn: EffectFunction<T, R>) => R;
+  formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
+
+  // Metadata & Internals
+  _path: string[];
+  _stateKey: string;
+  _componentId: string | null;
+  _initialState: T;
+  _isLoading: boolean;
+  _serverState: T;
+  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+
+  // Methods
+  sync: () => void;
+  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  revertToInitialState: (obj?: { validationKey?: string }) => T;
+  getDifferences: () => string[];
+  getComponents: () => ComponentsType;
+  getAllFormRefs: () => Map<string, React.RefObject<any>>;
+  getFormRef: () => React.RefObject<any> | undefined;
+  updateInitialState: (newState: T | null) => {
+    fetchId: (field: keyof T) => string | number;
+  };
+
+  // Validation
+  addValidation: (errors: ValidationError[]) => void;
+  showValidationErrors: () => string[];
+  setValidation: (ctx: string) => void;
+  removeValidation: (ctx: string) => void;
+  validateZodSchema: () => void;
+  validationWrapper: ({
+    children,
+    hideMessage,
+  }: {
+    children: React.ReactNode;
+    hideMessage?: boolean;
+  }) => JSX.Element;
+
+  // Storage & Sync
+  lastSynced?: SyncInfo;
+  getLocalStorage: (key: string) => LocalStorageData<T> | null;
+  removeStorage: () => void;
+  applyJsonPatch: (patches: any[]) => void;
+
+  // Middleware & Selection
+  middleware: (
+    middles: ({
+      updateLog,
+      update,
+    }: {
+      updateLog: UpdateTypeDetail[] | undefined;
+      update: UpdateTypeDetail;
+    }) => void
+  ) => void;
+  isSelected: boolean;
+  setSelected: (value: boolean) => void;
+  toggleSelected: () => void;
+  ignoreFields: (fields: string[]) => StateObject<T>;
+} & (IsArrayElement extends true ? { cut: () => void } : {});
+
+// =================================================================
+// 2. A DEDICATED TYPE FOR ARRAY-SPECIFIC METHODS
+// This was previously `ArrayEndType`.
+// =================================================================
+type ArrayStateObjectProps<T extends any[]> = {
+  // Array Manipulation
+  insert: InsertType<Prettify<InferArrayElement<T>>>;
+  uniqueInsert: (
+    payload: InsertParams<Prettify<InferArrayElement<T>>>,
+    fields?: (keyof Prettify<InferArrayElement<T>>)[],
+    onMatch?: (existingItem: any) => any
+  ) => void;
+  cut: CutFunctionType<T>;
   cutSelected: () => void;
   cutByValue: (value: string | number | boolean) => void;
   toggleByValue: (value: string | number | boolean) => void;
-  stateSort: (
-    compareFn: (
-      a: Prettify<InferArrayElement<TShape>>,
-      b: Prettify<InferArrayElement<TShape>>
-    ) => number
-  ) => ArrayEndType<TShape>;
-  useVirtualView: (
-    options: VirtualViewOptions
-  ) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
 
-  stateList: (
-    callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
-      index: number,
-      arraySetter: StateObject<TShape>
-    ) => void
-  ) => any;
+  // Iteration & Transformation
   stateMap: <U>(
     callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
+      setter: StateObject<Prettify<InferArrayElement<T>>>,
       index: number,
-      arraySetter: StateObject<TShape>
+      arraySetter: StateObject<T>
     ) => U
   ) => U[];
   $stateMap: (
     callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
+      setter: StateObject<Prettify<InferArrayElement<T>>>,
       index: number,
-      arraySetter: StateObject<TShape>
+      arraySetter: StateObject<T>
     ) => void
   ) => any;
-  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(
-    field: K
-  ) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
-  uniqueInsert: (
-    payload: InsertParams<Prettify<InferArrayElement<TShape>>>,
-    fields?: (keyof Prettify<InferArrayElement<TShape>>)[],
-    onMatch?: (existingItem: any) => any
-  ) => void;
-  stateFind: (
+  stateList: (
     callbackfn: (
-      value: Prettify<InferArrayElement<TShape>>,
-      index: number
-    ) => boolean
-  ) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+      setter: StateObject<Prettify<InferArrayElement<T>>>,
+      index: number,
+      arraySetter: StateObject<T>
+    ) => void
+  ) => any;
   stateFilter: (
     callbackfn: (
-      value: Prettify<InferArrayElement<TShape>>,
+      value: Prettify<InferArrayElement<T>>,
       index: number
-    ) => void
-  ) => ArrayEndType<TShape>;
-  getSelected: () =>
-    | StateObject<Prettify<InferArrayElement<TShape>>>
-    | undefined;
-  clearSelected: () => void;
+    ) => boolean
+  ) => StateObject<T>; // Chaining
+  stateSort: (
+    compareFn: (
+      a: Prettify<InferArrayElement<T>>,
+      b: Prettify<InferArrayElement<T>>
+    ) => number
+  ) => StateObject<T>; // Chaining
+  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<T>>>(
+    field: K
+  ) => StateObject<InferArrayElement<Prettify<InferArrayElement<T>>[K]>[]>;
+
+  // Accessors
+  index: (index: number) => StateObject<Prettify<InferArrayElement<T>>> & {
+    insert: InsertTypeObj<Prettify<InferArrayElement<T>>>;
+    cut: CutFunctionType<T>;
+    _index: number;
+  };
+  findWith: findWithFuncType<Prettify<InferArrayElement<T>>>;
+  stateFind: (
+    callbackfn: (
+      value: Prettify<InferArrayElement<T>>,
+      index: number
+    ) => boolean
+  ) => StateObject<Prettify<InferArrayElement<T>>> | undefined;
+  last: () => StateObject<Prettify<InferArrayElement<T>>> | undefined;
+
+  // Selection
+  getSelected: () => StateObject<Prettify<InferArrayElement<T>>> | undefined;
   getSelectedIndex: () => number;
-  last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-} & EndType<TShape>;
+  clearSelected: () => void;
+
+  // Advanced Features
+  useVirtualView: (
+    options: VirtualViewOptions
+  ) => VirtualStateObjectResult<Prettify<InferArrayElement<T>>[]>;
+  stream: <StreamIn = Prettify<InferArrayElement<T>>, StreamOut = StreamIn>(
+    options?: StreamOptions<StreamIn, StreamOut>
+  ) => StreamHandle<StreamIn>;
+};
+
+// =================================================================
+// 3. A DEDICATED TYPE FOR OBJECT-SPECIFIC BEHAVIOR (MAPPED KEYS)
+// =================================================================
+type ObjectStateObjectProps<T extends object> = {
+  [K in keyof T]-?: StateObject<T[K]>;
+};
+
+// =================================================================
+// 4. A DEDICATED TYPE FOR BOOLEAN-SPECIFIC BEHAVIOR
+// =================================================================
+type BooleanStateObjectProps = {
+  toggle: () => void;
+};
+
+// =================================================================
+// 5. THE NEW, CLEANED-UP `StateObject` TYPE
+// It combines the modular types using a much clearer conditional.
+// =================================================================
+export type StateObject<T> = BaseStateObjectProps<T, true> &
+  (T extends any[]
+    ? ArrayStateObjectProps<T>
+    : T extends boolean
+      ? BooleanStateObjectProps
+      : // Check for object last, as arrays are also objects.
+        T extends Record<string, unknown> | object
+        ? ObjectStateObjectProps<T>
+        : {}); // Primitives like string/number get no extra props.
 
 export type FormOptsType = {
   validation?: {
@@ -242,73 +320,6 @@ export type ValidationError = {
   message: string;
 };
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
-export type EndType<T, IsArrayElement = false> = {
-  addValidation: (errors: ValidationError[]) => void;
-  applyJsonPatch: (patches: any[]) => void;
-  update: UpdateType<T>;
-  _path: string[];
-  _stateKey: string;
-  formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
-  get: () => T;
-  $get: () => T;
-  $derive: <R>(fn: EffectFunction<T, R>) => R;
-
-  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-
-  showValidationErrors: () => string[];
-  setValidation: (ctx: string) => void;
-  removeValidation: (ctx: string) => void;
-  ignoreFields: (fields: string[]) => StateObject<T>;
-  isSelected: boolean;
-  setSelected: (value: boolean) => void;
-  toggleSelected: () => void;
-  getFormRef: () => React.RefObject<any> | undefined;
-  removeStorage: () => void;
-  sync: () => void;
-  validationWrapper: ({
-    children,
-    hideMessage,
-  }: {
-    children: React.ReactNode;
-    hideMessage?: boolean;
-  }) => JSX.Element;
-  lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cut: () => void } : {});
-
-export type StateObject<T> = (T extends any[]
-  ? ArrayEndType<T>
-  : T extends Record<string, unknown> | object
-    ? { [K in keyof T]-?: StateObject<T[K]> }
-    : T extends string | number | boolean | null
-      ? EndType<T, true>
-      : never) &
-  EndType<T, true> & {
-    toggle: T extends boolean ? () => void : never;
-    getAllFormRefs: () => Map<string, React.RefObject<any>>;
-    _componentId: string | null;
-    getComponents: () => ComponentsType;
-    validateZodSchema: () => void;
-    _initialState: T;
-    updateInitialState: (newState: T | null) => {
-      fetchId: (field: keyof T) => string | number;
-    };
-    _isLoading: boolean;
-    _serverState: T;
-    revertToInitialState: (obj?: { validationKey?: string }) => T;
-    getDifferences: () => string[];
-    middleware: (
-      middles: ({
-        updateLog,
-        update,
-      }: {
-        updateLog: UpdateTypeDetail[] | undefined;
-        update: UpdateTypeDetail;
-      }) => void
-    ) => void;
-
-    getLocalStorage: (key: string) => LocalStorageData<T> | null;
-  };
 
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 type EffectiveSetStateArg<
@@ -340,7 +351,6 @@ export type UpdateTypeDetail = {
   newValue: any;
   userId?: number;
 };
-
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType =
   | 'none'
@@ -366,6 +376,12 @@ export type OptionsType<T extends unknown = unknown> = {
     data?: T;
     status?: 'pending' | 'error' | 'success' | 'loading';
     timestamp?: number;
+    merge?:
+      | boolean
+      | {
+          strategy: 'append' | 'prepend' | 'diff';
+          key?: string; // For diff strategy - which field to use as unique identifier
+        };
   };
   sync?: {
     action: (state: T) => Promise<{
@@ -910,37 +926,79 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(thisKey, (event) => {
+        // REPLACEMENT STARTS HERE
         if (event?.type === 'SERVER_STATE_UPDATE') {
           const serverStateData = event.serverState;
-          if (serverStateData?.status === 'success' && serverStateData?.data) {
-            // 1. Define the new options we want to apply
+
+          if (
+            serverStateData?.status === 'success' &&
+            serverStateData.data !== undefined
+          ) {
             const newOptions = { serverState: serverStateData };
+            setAndMergeOptions(thisKey, newOptions);
 
-            // 2. Update the global store for other components and future renders
-            setAndMergeOptions(thisKey as string, newOptions);
+            // Check for a merge request.
+            const mergeConfig =
+              typeof serverStateData.merge === 'object'
+                ? serverStateData.merge
+                : serverStateData.merge === true
+                  ? { strategy: 'append' }
+                  : null;
 
-            // 3. Re-resolve state by PASSING the new options DIRECTLY
-            const {
-              value: newState,
-              source,
-              timestamp,
-            } = resolveInitialState(newOptions); // <-- FIX: Pass the data in
+            // Get the current array and the new data.
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue(thisKey);
+            const incomingData = serverStateData.data;
 
-            // 4. NOW THIS WILL WORK, BECAUSE `newState` IS CORRECT
-            getGlobalStore.getState().initializeShadowState(thisKey, newState);
+            // *** THE REAL FIX: PERFORM INCREMENTAL INSERTS ***
+            if (
+              mergeConfig &&
+              Array.isArray(currentState) &&
+              Array.isArray(incomingData)
+            ) {
+              const keyField = mergeConfig.key || 'id';
+              console.log('keyField', keyField, currentState, incomingData);
+              const existingIds = new Set(
+                currentState.map((item: any) => item[keyField])
+              );
 
-            // ... rest of your logic ...
+              const newUniqueItems = incomingData.filter((item: any) => {
+                return !existingIds.has(item[keyField]);
+              });
+
+              if (newUniqueItems.length > 0) {
+                // Instead of building a new array, insert each new item into the existing state.
+                // The `path` is `[]` because we are inserting into the root array of this state key.
+
+                newUniqueItems.forEach((item) => {
+                  getGlobalStore
+                    .getState()
+                    .insertShadowArrayElement(thisKey, [], item);
+                });
+              } else {
+                // No new items, no need to do anything.
+                return;
+              }
+            } else {
+              // This is the non-merge, full-replacement path (for the initial load).
+              getGlobalStore
+                .getState()
+                .initializeShadowState(thisKey, incomingData);
+            }
+
+            const meta = getGlobalStore
+              .getState()
+              .getShadowMetadata(thisKey, []);
             getGlobalStore.getState().setShadowMetadata(thisKey, [], {
-              stateSource: source,
-              lastServerSync: source === 'server' ? timestamp : undefined,
-              isDirty: false,
-              baseServerState: source === 'server' ? newState : undefined,
+              ...meta,
+              stateSource: 'server',
+              lastServerSync: serverStateData.timestamp || Date.now(),
+              isDirty: false, // The state is now synced with the server.
             });
-
-            notifyComponents(thisKey);
-            forceUpdate({});
           }
         }
+        // REPLACEMENT ENDS HERE
       });
 
     return unsubscribe;
@@ -2039,25 +2097,6 @@ function createProxyHandler<T>(
                   behavior: initialScrollRef.current ? 'instant' : 'smooth',
                 });
               }, [rerender, stickToBottom]);
-
-              // Subscribe to server state updates
-              useEffect(() => {
-                const unsubscribe = getGlobalStore
-                  .getState()
-                  .subscribeToPath(stateKey, (event) => {
-                    if (event?.type === 'SERVER_STATE_UPDATE') {
-                      const serverStateData = event.serverState;
-                      if (
-                        serverStateData?.status === 'success' &&
-                        serverStateData?.data
-                      ) {
-                        forceUpdate({});
-                      }
-                    }
-                  });
-
-                return unsubscribe;
-              }, []);
 
               // Get array keys
               const arrayKeys =

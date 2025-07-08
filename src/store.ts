@@ -479,7 +479,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     const arrayKey = [key, ...arrayPath].join('.');
     const parentMeta = newShadowStore.get(arrayKey);
-    console.log('parentMetaparentMetaparentMeta', parentMeta);
+
     if (!parentMeta || !parentMeta.arrayKeys) return;
 
     // Generate the ID if it doesn't have one

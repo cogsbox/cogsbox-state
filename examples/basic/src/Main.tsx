@@ -11,6 +11,16 @@ import LCDCatScrollerDemo from './LCDDemo';
 import StateOverview from './examples/basic-overview/StateOverview';
 import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
 import CogsFormBindings from './examples/form-bindings/FormBindings';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+// --- Query Client Setup ---
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 0,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const sections = [
   { id: 'home', name: 'Home' },
@@ -79,7 +89,10 @@ function App() {
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <React.StrictMode>
-    <App />
-  </React.StrictMode>
+  <QueryClientProvider client={queryClient}>
+    {' '}
+    <React.StrictMode>
+      <App />
+    </React.StrictMode>
+  </QueryClientProvider>
 );
