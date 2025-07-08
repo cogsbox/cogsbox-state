@@ -44,11 +44,11 @@ const fetchMessagesFromServer = async (): Promise<{
   timestamp: number;
 }> => {
   // Simulate network delay
-  await new Promise((resolve) => setTimeout(resolve, 500));
+  await new Promise((resolve) => setTimeout(resolve, 0));
 
   // Generate the data "server-side"
   return {
-    data: generateMessages(100),
+    data: generateMessages(70),
     timestamp: Date.now(),
   };
 };
@@ -247,7 +247,9 @@ function ChatWindow() {
           >
             {virtualState.stateList((setter, index, array) => {
               return (
-                <MessageItem key={setter._path.join('.')} message={setter} />
+                <FlashWrapper showCounter={true}>
+                  <MessageItem key={setter._path.join('.')} message={setter} />
+                </FlashWrapper>
               );
             })}
           </div>{' '}
@@ -338,7 +340,7 @@ function MessageInput({
       timestamp: Date.now(),
       photo: null,
     }));
-    scrollToBottom();
+    scrollToBottom('instant');
     setText('');
   };
 

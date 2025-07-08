@@ -1,4 +1,4 @@
-import { useMemo, useEffect, useRef } from 'react';
+import { useMemo, useEffect, useRef, useCallback } from 'react';
 
 // The time in milliseconds of inactivity before the storm's energy recharges.
 const STORM_RECHARGE_TIME = 3000;
@@ -25,10 +25,15 @@ export function CloudLayers({
   const layerRefs = useRef<(HTMLDivElement | null)[]>([]);
   const previousBrightness = useRef(0.1);
 
-  // --- NEW: Refs to manage the storm's state over time ---
-  const stormEnergyRef = useRef(1.0); // 1.0 = full power
+  // Storm state management
+  const stormEnergyRef = useRef(1.0);
   const lastStrikeTimeRef = useRef(0);
 
+  // Animation frame and timeout management
+  const animationFrameRef = useRef<number>();
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  // Memoized layer data to prevent recreating on each render
   const layerData = useMemo(
     () =>
       Array.from({ length: layers }, (_, i) => ({
@@ -37,6 +42,81 @@ export function CloudLayers({
         opacity: 0.5 + Math.random() * 0.1,
         tilt: Math.random() * 0.5 - 0.25,
       })),
+    [layers]
+  );
+
+  // Memoized SVG mask to prevent recreation
+  const cloudMaskSvg = useMemo(() => {
+    const paths = Array.from(
+      { length: 8 },
+      (_, i) =>
+        `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
+          375 + i * 400
+        },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
+          315 + i * 400
+        },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
+          255 + i * 400
+        },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
+          195 + i * 400
+        },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
+          135 + i * 400
+        },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
+          75 + i * 400
+        },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
+          20 + i * 400
+        },67.5 ${15 + i * 400},60 ${i * 400},60 Z" fill="white"/>`
+    ).join('');
+
+    return `url("data:image/svg+xml,${encodeURIComponent(
+      `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${paths}</svg>`
+    )}")`;
+  }, []);
+
+  // Optimized lightning effect with debouncing
+  const triggerLightning = useCallback(
+    (finalIntensity: number) => {
+      // Clear any existing animation frame
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+
+      animationFrameRef.current = requestAnimationFrame(() => {
+        // Select layers to light up
+        const layersToLight = Math.floor(Math.random() * 3) + 2;
+        const selectedLayers = new Set<number>();
+        while (selectedLayers.size < layersToLight) {
+          selectedLayers.add(Math.floor(Math.random() * layers));
+        }
+
+        selectedLayers.forEach((layerIndex) => {
+          const layer = layerRefs.current[layerIndex];
+          if (!layer) return;
+
+          const x = 66 + Math.random() * 34;
+          const y = 50 + (Math.random() - 0.5) * 40;
+          const size = 20 + Math.random() * 40;
+
+          // Use transform instead of background for better performance
+          layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${finalIntensity}) 0%, transparent 50%)`;
+          layer.style.transition = 'none';
+
+          // Clear existing timeout
+          if (timeoutRef.current) {
+            clearTimeout(timeoutRef.current);
+          }
+
+          // Use requestAnimationFrame for smooth fade out
+          timeoutRef.current = setTimeout(() => {
+            if (!layer) return;
+
+            requestAnimationFrame(() => {
+              layer.style.transition = 'background 0.5s ease-out';
+              layer.style.background = 'transparent';
+            });
+          }, 300);
+        });
+      });
+    },
     [layers]
   );
 
@@ -49,57 +129,41 @@ export function CloudLayers({
       const now = Date.now();
       const timeSinceLastStrike = now - lastStrikeTimeRef.current;
 
-      // --- NEW: Recharge storm energy if there's been a long pause ---
+      // Recharge storm energy if there's been a long pause
       if (timeSinceLastStrike > STORM_RECHARGE_TIME) {
-        // It's a new storm, reset to full power.
         stormEnergyRef.current = 1.0;
       }
 
-      // Calculate the potential intensity from the prop value.
+      // Calculate the potential intensity from the prop value
       const baseIntensity = (previousBrightness.current - 0.1) * 0.5;
-
-      // --- NEW: Scale the intensity by the current storm energy ---
       const finalIntensity = baseIntensity * stormEnergyRef.current;
 
-      // Select layers to light up
-      const layersToLight = Math.floor(Math.random() * 3) + 2;
-      const selectedLayers = new Set<number>();
-      while (selectedLayers.size < layersToLight) {
-        selectedLayers.add(Math.floor(Math.random() * layers));
-      }
+      // Trigger lightning effect
+      triggerLightning(finalIntensity);
 
-      selectedLayers.forEach((layerIndex) => {
-        const layer = layerRefs.current[layerIndex];
-        if (!layer) return;
-
-        const x = 66 + Math.random() * 34;
-        const y = 50 + (Math.random() - 0.5) * 40;
-        const size = 20 + Math.random() * 40;
-
-        // Use the new `finalIntensity` which decays over time
-        layer.style.background = `radial-gradient(circle ${size}vh at ${x}% ${y}%, rgba(255, 255, 255, ${finalIntensity}) 0%, transparent 50%)`;
-        layer.style.transition = 'none';
-
-        setTimeout(() => {
-          if (!layer) return;
-          layer.style.transition = 'background 0.5s ease-out';
-          layer.style.background = 'transparent';
-        }, 300);
-      });
-
-      // --- NEW: Deplete the storm's energy for the next strike ---
+      // Deplete the storm's energy for the next strike
       stormEnergyRef.current *= ENERGY_DECAY_FACTOR;
-      // Prevent energy from becoming effectively zero
       if (stormEnergyRef.current < 0.1) {
         stormEnergyRef.current = 0.1;
       }
 
-      // Record the time of this strike.
       lastStrikeTimeRef.current = now;
     }
 
     previousBrightness.current = lightningBrightness;
-  }, [lightningBrightness, layers]);
+  }, [lightningBrightness, triggerLightning]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div
@@ -128,64 +192,16 @@ export function CloudLayers({
                 style={{
                   background: 'transparent',
                   mixBlendMode: 'screen',
-                  maskImage: `url("data:image/svg+xml,${encodeURIComponent(
-                    `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
-                      ...Array(8),
-                    ]
-                      .map(
-                        (_, i) =>
-                          `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
-                            375 + i * 400
-                          },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
-                            315 + i * 400
-                          },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
-                            255 + i * 400
-                          },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
-                            195 + i * 400
-                          },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
-                            135 + i * 400
-                          },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
-                            75 + i * 400
-                          },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
-                            20 + i * 400
-                          },67.5 ${15 + i * 400},60 ${
-                            i * 400
-                          },60 Z" fill="white"/>`
-                      )
-                      .join('')}</svg>`
-                  )}`,
-                  WebkitMaskImage: `url("data:image/svg+xml,${encodeURIComponent(
-                    `<svg width="3200" height="120" viewBox="0 0 3200 120" xmlns="http://www.w3.org/2000/svg">${[
-                      ...Array(8),
-                    ]
-                      .map(
-                        (_, i) =>
-                          `<path d="M${i * 400},0 H${(i + 1) * 400} V60 C${
-                            375 + i * 400
-                          },62.5 ${365 + i * 400},70 ${340 + i * 400},70 C${
-                            315 + i * 400
-                          },70 ${305 + i * 400},62.5 ${280 + i * 400},65 C${
-                            255 + i * 400
-                          },67.5 ${245 + i * 400},77.5 ${220 + i * 400},75 C${
-                            195 + i * 400
-                          },72.5 ${185 + i * 400},65 ${160 + i * 400},67.5 C${
-                            135 + i * 400
-                          },70 ${125 + i * 400},77.5 ${100 + i * 400},75 C${
-                            75 + i * 400
-                          },72.5 ${65 + i * 400},62.5 ${40 + i * 400},65 C${
-                            20 + i * 400
-                          },67.5 ${15 + i * 400},60 ${
-                            i * 400
-                          },60 Z" fill="white"/>`
-                      )
-                      .join('')}</svg>`
-                  )}`,
+                  maskImage: cloudMaskSvg,
+                  WebkitMaskImage: cloudMaskSvg,
                   maskSize: '100% 100%',
                   WebkitMaskSize: '100% 100%',
                   maskRepeat: 'no-repeat',
                   WebkitMaskRepeat: 'no-repeat',
                   transform: `rotate(${layer.tilt}deg)`,
                   transformOrigin: 'center',
+                  // Add will-change for better performance
+                  willChange: 'background',
                 }}
               />
             </div>
@@ -199,22 +215,31 @@ export function CloudLayers({
 interface CloudTilesProps {
   tilt?: number;
   className?: string;
+  lightColor?: string;
 }
 
 export function CloudTiles({
   tilt = 0,
   className = '',
   lightColor,
-}: CloudTilesProps & { lightColor?: string }) {
+}: CloudTilesProps) {
+  // Memoize gradient ID to prevent recreation
+  const gradientId = useMemo(
+    () => `grad-${Math.random().toString(36).substr(2, 9)}`,
+    []
+  );
+
   return (
     <div
       className={`flex overflow-hidden ${className}`}
       style={{
         transform: `rotate(${tilt}deg)`,
         transformOrigin: 'center',
+        // Add will-change for better performance
+        willChange: 'transform',
       }}
     >
-      {[...Array(8)].map((_, i) => (
+      {Array.from({ length: 8 }, (_, i) => (
         <svg
           key={i}
           width="400"
@@ -226,7 +251,7 @@ export function CloudTiles({
         >
           <defs>
             <linearGradient
-              id={`grad${i}${lightColor || ''}`}
+              id={`${gradientId}-${i}`}
               x1="0%"
               y1="0%"
               x2="0%"
@@ -256,7 +281,7 @@ export function CloudTiles({
              C75,72.5 65,62.5 40,65
              C20,67.5 15,60 0,60
               Z"
-            fill={`url(#grad${i}${lightColor || ''})`}
+            fill={`url(#${gradientId}-${i})`}
           />
         </svg>
       ))}

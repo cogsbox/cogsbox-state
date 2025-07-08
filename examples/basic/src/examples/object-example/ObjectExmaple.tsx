@@ -133,16 +133,13 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   // --- THIS IS THE KEY SIMPLIFICATION ---
   const filteredAndSorted = dashboardState.players
     .stateFilter((player) => player.team === color)
-    .stateSort(
-      (a, b) => {
-        const direction = sortDirection === 'asc' ? 1 : -1;
-        // Use a simple ternary to pick the comparison logic
-        return sortBy === 'score'
-          ? (a.score - b.score) * direction
-          : a.name.localeCompare(b.name) * direction;
-      },
-      [sortBy, sortDirection]
-    );
+    .stateSort((a, b) => {
+      const direction = sortDirection === 'asc' ? 1 : -1;
+      // Use a simple ternary to pick the comparison logic
+      return sortBy === 'score'
+        ? (a.score - b.score) * direction
+        : a.name.localeCompare(b.name) * direction;
+    });
 
   const teamColors = {
     red: {
@@ -166,9 +163,20 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
   .stateFilter((p) => p.team === "${color}")
   .cutSelected();
   `;
-  const filterAndRenderCode = `dashboardState.players
-  .stateFilter(player => player.team === ${color})
-  .stateList(itemSetter) => 
+  const filterAndRenderCode = `
+    const filteredAndSorted = dashboardState.players
+    .stateFilter((player) => player.team === color)
+    .stateSort(
+      (a, b) => {
+        const direction = sortDirection === 'asc' ? 1 : -1;
+        // Use a simple ternary to pick the comparison logic
+        return sortBy === 'score'
+          ? (a.score - b.score) * direction
+          : a.name.localeCompare(b.name) * direction;
+      },
+      [sortBy, sortDirection]
+    );
+  filteredAndSorted.stateList(itemSetter) => 
     <Player 
       onClick={() => itemSetter.setSelected(true)}>
       {itemSetter.name.get()}

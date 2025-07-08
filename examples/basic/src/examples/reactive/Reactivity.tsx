@@ -9,6 +9,7 @@ import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import stringify from 'stringify-object';
 import DotPattern from '../../DotWrapper';
 import { FlashWrapper } from '../../FlashOnUpdate';
+import { CodeSnippetDisplay } from '../../CodeSnippet';
 
 // Define the structure for our tabs
 const TABS = {
@@ -206,41 +207,30 @@ function ExampleDisplay({
     return stringify(opts, { indent: '  ', singleQuotes: false });
   };
 
-  const displayString = `const sharedState = useCogsState( "fooBarObject", ${formatOptions(
-    options
-  )} );`;
+  const displayString = `const sharedState = useCogsState( "fooBarObject", 
+  ${formatOptions(options)} );`;
   const getterString = `${
     isSignal ? 'sharedState.foo.$get()' : 'sharedState.foo.get()'
   } `;
 
   return (
-    <FlashWrapper>
+    <FlashWrapper showCounter={true}>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 h-full min-h-[600px]">
         <div>
           <h3 className="font-bold text-gray-200 text-lg">{title}</h3>
           <p className="text-sm text-gray-400 mt-1">{description}</p>
         </div>
         <div className="flex-grow overflow-auto bg-black/30 rounded p-1">
-          <SyntaxHighlighter
-            language="javascript"
-            style={atomOneDark}
-            customStyle={{
-              backgroundColor: 'transparent',
-              fontSize: '12px',
-              padding: '0.5rem',
-            }}
-            codeTagProps={{ style: { fontFamily: 'inherit' } }}
-          >
-            {`${displayString}\n${getterString}`}
-          </SyntaxHighlighter>
+          <CodeSnippetDisplay code={displayString} />
         </div>
         <div className="flex gap-2 items-center w-full mt-1 bg-gray-800 p-2 px-8 justify-between rounded border border-gray-700">
-          <span className="text-gray-400 text-lg">rootValue</span>
-          <span className="text-lg text-blue-300 font-semibold">
+          <span className="text-gray-400 text-lg">rootValue</span>{' '}
+          <CodeSnippetDisplay code={getterString} />
+          <span className="text-xl text-blue-300 font-semibold">
             {!isSignal ? sharedState.foo.get() : sharedState.foo.$get()}
           </span>
         </div>
-        <NestedValue nestedValue={sharedState.nested.foo} isSignal={isSignal} />
+        <NestedValue state={sharedState} isSignal={isSignal} />
         <IsolatedValueInstance
           options={finalIsolatedOptions}
           isSignal={isSignal}
@@ -253,21 +243,26 @@ function ExampleDisplay({
 // --- Helper & Display Components ---
 
 function NestedValue({
-  nestedValue,
+  state,
   isSignal,
 }: {
-  nestedValue: StateObject<StateExampleObject['fooBarObject']['nested']['foo']>;
+  state: StateObject<StateExampleObject['fooBarObject']>;
   isSignal?: boolean;
 }) {
+  const getterString = `${
+    isSignal ? 'props.nested.foo.$get()' : 'props.nested.foo.get()'
+  } `;
+
   return (
-    <FlashWrapper>
-      <div className="flex gap-2 w-full justify-between items-center p-2 rounded bg-gray-900">
-        <div className="p-1 px-2 rounded bg-gray-700 text-gray-200 text-xs uppercase font-semibold">
-          nestedValue
-        </div>
-        <div className="p-1 px-4 text-blue-400 font-semibold">
-          {!isSignal ? nestedValue.get() : nestedValue.$get()}
-        </div>
+    <FlashWrapper showCounter={true}>
+      <div className="flex gap-2 items-center w-full mt-1 bg-gray-800 p-2 px-8 justify-between rounded border border-gray-700">
+        <span className="text-gray-400 text-lg">
+          Nested Component using prop drilling
+        </span>{' '}
+        <CodeSnippetDisplay code={getterString} />
+        <span className="text-xl text-blue-400 font-semibold">
+          {!isSignal ? state.nested.foo.get() : state.nested.foo.$get()}
+        </span>
       </div>
     </FlashWrapper>
   );
@@ -294,10 +289,13 @@ function IsolatedValueInstance({
 
   const displayString = `// In a separate component...\nconst isolatedState = useCogsState(\n  "fooBarObject",\n  ${formatOptions2(
     options
-  )}\n);`;
+  )}\n);
+  
+${!isSignal ? `isolatedState.seperateNested.foo.get()` : `isolatedState.seperateNested.foo.$get()`}
+  `;
 
   return (
-    <FlashWrapper>
+    <FlashWrapper showCounter={true}>
       <div className="flex flex-col gap-3 w-full border-t border-gray-700/50 pt-3">
         <div className="overflow-auto bg-gray-950 rounded p-1 text-xs">
           <SyntaxHighlighter
@@ -306,22 +304,22 @@ function IsolatedValueInstance({
             customStyle={{
               backgroundColor: 'transparent',
               fontSize: '11px',
-              padding: '0.5rem',
+              padding: '1rem',
             }}
             codeTagProps={{ style: { fontFamily: 'inherit' } }}
           >
             {displayString}
           </SyntaxHighlighter>
         </div>
-        <div className="flex gap-2 w-full justify-between items-center p-2 rounded bg-gray-900">
+        <div className="flex gap-2 w-full justify-between items-center px-4 rounded bg-gray-900">
           <div className="p-1 px-2 rounded bg-gray-700 text-gray-200 text-xs uppercase font-semibold">
             isolatedValue
           </div>
-          <div className="p-1 px-4 text-purple-400 font-semibold">
+          <span className="text-xl text-purple-400 font-semibold">
             {!isSignal
               ? isolatedState.seperateNested.foo.get()
               : isolatedState.seperateNested.foo.$get()}
-          </div>
+          </span>
         </div>
       </div>
     </FlashWrapper>
@@ -394,7 +392,7 @@ function ReactivityExplanation() {
 function ShowState() {
   const fullState = useCogsState('fooBarObject', { reactiveType: 'all' });
   return (
-    <FlashWrapper>
+    <FlashWrapper showCounter={true}>
       <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-3 overflow-hidden">
         <h3 className="text-gray-300 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
           Live Global State

@@ -1,10 +1,10 @@
 'use client';
 
-import { createCogsState } from '../../../src/CogsState';
+import { createCogsState, type StateObject } from '@lib/CogsState';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
-import { FlashWrapper } from '../src/FlashOnUpdate';
-import DotPattern from '../src/DotWrapper';
+import DotPattern from '../../DotWrapper';
+import { FlashWrapper } from '../../FlashOnUpdate';
 
 // State definition with array of objects
 const todoArray = [

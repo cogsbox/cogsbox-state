@@ -160,8 +160,7 @@ export type ArrayEndType<TShape extends unknown> = {
     compareFn: (
       a: Prettify<InferArrayElement<TShape>>,
       b: Prettify<InferArrayElement<TShape>>
-    ) => number,
-    deps?: any[]
+    ) => number
   ) => ArrayEndType<TShape>;
   useVirtualView: (
     options: VirtualViewOptions
@@ -206,8 +205,7 @@ export type ArrayEndType<TShape extends unknown> = {
     callbackfn: (
       value: Prettify<InferArrayElement<TShape>>,
       index: number
-    ) => void,
-    deps?: any[]
+    ) => void
   ) => ArrayEndType<TShape>;
   getSelected: () =>
     | StateObject<Prettify<InferArrayElement<TShape>>>
@@ -1334,6 +1332,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       });
     }
     // Assumes `isDeepEqual` is available in this scope.
+    // Assumes `isDeepEqual` is available in this scope.
 
     const newState = store.getShadowValue(thisKey);
     const rootMeta = store.getShadowMetadata(thisKey, []);
@@ -1343,70 +1342,84 @@ export function useCogsStateFn<TStateObject extends unknown>(
       return newState;
     }
 
-    // REUSE shadowMeta from beginning instead of fetching again!
-    if (shadowMeta?.pathComponents) {
-      shadowMeta.pathComponents.forEach((componentId) => {
-        const component = rootMeta.components?.get(componentId);
-        if (component) {
-          const reactiveTypes = Array.isArray(component.reactiveType)
-            ? component.reactiveType
-            : [component.reactiveType || 'component'];
+    // --- PASS 1: Notify specific subscribers based on update type ---
 
-          if (!reactiveTypes.includes('none')) {
-            component.forceUpdate();
-            notifiedComponents.add(componentId);
+    if (updateObj.updateType === 'update') {
+      // ALWAYS notify components subscribed to the exact path being updated.
+      // This is the crucial part that handles primitives, as well as updates
+      // to an object or array treated as a whole.
+      if (shadowMeta?.pathComponents) {
+        shadowMeta.pathComponents.forEach((componentId) => {
+          // If this component was already notified, skip.
+          if (notifiedComponents.has(componentId)) {
+            return;
           }
-        }
-      });
-    }
-    if (
-      updateObj.updateType === 'update' &&
-      payload &&
-      typeof payload === 'object' &&
-      !isArray(payload) &&
-      nestedShadowValue &&
-      typeof nestedShadowValue === 'object' &&
-      !isArray(nestedShadowValue)
-    ) {
-      // Get a list of dot-separated paths that have changed (e.g., ['name', 'address.city'])
-      const changedSubPaths = getDifferences(payload, nestedShadowValue);
+          const component = rootMeta.components?.get(componentId);
+          if (component) {
+            const reactiveTypes = Array.isArray(component.reactiveType)
+              ? component.reactiveType
+              : [component.reactiveType || 'component'];
 
-      changedSubPaths.forEach((subPathString) => {
-        const subPath = subPathString.split('.');
-        const fullSubPath = [...path, ...subPath];
-
-        // Get the metadata (and subscribers) for this specific nested path
-        const subPathMeta = store.getShadowMetadata(thisKey, fullSubPath);
-        if (subPathMeta?.pathComponents) {
-          subPathMeta.pathComponents.forEach((componentId) => {
-            // Avoid sending a redundant update if this component was already notified
-            if (notifiedComponents.has(componentId)) {
-              return; // continue
+            // Check if the component has reactivity enabled
+            if (!reactiveTypes.includes('none')) {
+              component.forceUpdate();
+              notifiedComponents.add(componentId);
             }
-            const component = rootMeta.components?.get(componentId);
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
+          }
+        });
+      }
 
-              // Check if the component has reactivity enabled
-              if (!reactiveTypes.includes('none')) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
+      // ADDITIONALLY, if the payload is an object, perform a deep-check and
+      // notify any components that are subscribed to specific sub-paths that changed.
+      if (
+        payload &&
+        typeof payload === 'object' &&
+        !isArray(payload) &&
+        nestedShadowValue &&
+        typeof nestedShadowValue === 'object' &&
+        !isArray(nestedShadowValue)
+      ) {
+        // Get a list of dot-separated paths that have changed (e.g., ['name', 'address.city'])
+        const changedSubPaths = getDifferences(payload, nestedShadowValue);
+
+        changedSubPaths.forEach((subPathString) => {
+          const subPath = subPathString.split('.');
+          const fullSubPath = [...path, ...subPath];
+
+          // Get the metadata (and subscribers) for this specific nested path
+          const subPathMeta = store.getShadowMetadata(thisKey, fullSubPath);
+          if (subPathMeta?.pathComponents) {
+            subPathMeta.pathComponents.forEach((componentId) => {
+              // Avoid sending a redundant update
+              if (notifiedComponents.has(componentId)) {
+                return;
               }
-            }
-          });
-        }
-      });
-    }
+              const component = rootMeta.components?.get(componentId);
+              if (component) {
+                const reactiveTypes = Array.isArray(component.reactiveType)
+                  ? component.reactiveType
+                  : [component.reactiveType || 'component'];
 
-    if (updateObj.updateType === 'insert' || updateObj.updateType === 'cut') {
-      // For 'insert', the path is the array path. For 'cut', it's the item path.
+                if (!reactiveTypes.includes('none')) {
+                  component.forceUpdate();
+                  notifiedComponents.add(componentId);
+                }
+              }
+            });
+          }
+        });
+      }
+    } else if (
+      updateObj.updateType === 'insert' ||
+      updateObj.updateType === 'cut'
+    ) {
+      // For array structural changes, notify components listening to the parent array.
       const parentArrayPath =
-        updateObj.updateType === 'insert' ? path : path.slice(0, -1); // Get parent path by removing the item ID
+        updateObj.updateType === 'insert' ? path : path.slice(0, -1);
 
       const parentMeta = store.getShadowMetadata(thisKey, parentArrayPath);
 
+      // Handle signal updates for array length, etc.
       if (parentMeta?.signals && parentMeta.signals.length > 0) {
         const parentFullPath = [thisKey, ...parentArrayPath].join('.');
         const parentValue = store.getShadowValue(parentFullPath);
@@ -1445,9 +1458,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
 
+      // Notify components subscribed to the array itself.
       if (parentMeta?.pathComponents) {
         parentMeta.pathComponents.forEach((componentId) => {
-          // Check if we've already notified this component to prevent redundant updates
           if (!notifiedComponents.has(componentId)) {
             const component = rootMeta.components?.get(componentId);
             if (component) {
@@ -1590,7 +1603,6 @@ export type MetaData = {
   transforms?: Array<{
     type: 'filter' | 'sort';
     fn: Function;
-    dependencies?: any[];
   }>;
 };
 
@@ -2404,10 +2416,7 @@ function createProxyHandler<T>(
               });
           }
           if (prop === 'stateFilter') {
-            return (
-              callbackfn: (value: any, index: number) => boolean,
-              deps?: any[]
-            ) => {
+            return (callbackfn: (value: any, index: number) => boolean) => {
               const arrayKeys =
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2440,7 +2449,6 @@ function createProxyHandler<T>(
                     {
                       type: 'filter',
                       fn: callbackfn,
-                      dependencies: deps || [],
                     },
                   ],
                 },
@@ -2448,7 +2456,7 @@ function createProxyHandler<T>(
             };
           }
           if (prop === 'stateSort') {
-            return (compareFn: (a: any, b: any) => number, deps?: any[]) => {
+            return (compareFn: (a: any, b: any) => number) => {
               const arrayKeys =
                 meta?.validIds ??
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
@@ -2473,7 +2481,7 @@ function createProxyHandler<T>(
                   validIds: itemsWithIds.map((i) => i.key) as string[],
                   transforms: [
                     ...(meta?.transforms || []),
-                    { type: 'sort', fn: compareFn, dependencies: deps || [] },
+                    { type: 'sort', fn: compareFn },
                   ],
                 },
               });
@@ -2646,7 +2654,6 @@ function createProxyHandler<T>(
                     .getState()
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
-                      console.log('e123123123213', stateKeyPathKey, e);
 
                       if (e.type === 'GET_SELECTED') {
                         return;
@@ -2654,7 +2661,7 @@ function createProxyHandler<T>(
                       const shadowMeta = getGlobalStore
                         .getState()
                         .getShadowMetadata(stateKey, path);
-                      console.log('essssssssssssssssssssssssssssssssss');
+
                       const caches = shadowMeta?.transformCaches;
                       if (caches) {
                         // Iterate over ALL keys in the cache map.
@@ -3732,7 +3739,6 @@ function ListItemWrapper({
   const [, forceUpdate] = useState({});
   const { ref: inViewRef, inView } = useInView(); // Renamed to avoid conflict
   const elementRef = useRef<HTMLDivElement | null>(null);
-  const lastReportedHeight = useRef<number | null>(null);
 
   // ANNOTATION: The two key hooks for the fix.
   const imagesLoaded = useImageLoaded(elementRef); // Our new hook
@@ -3782,22 +3788,6 @@ function ListItemWrapper({
   }, [inView, imagesLoaded, stateKey, itemPath]);
 
   // ... rest of the component is unchanged ...
-  const fullComponentId = `${stateKey}////${itemComponentId}`;
-  const stateEntry = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-
-  if (!stateEntry?.components?.has(fullComponentId)) {
-    stateEntry?.components?.set(fullComponentId, {
-      forceUpdate: () => forceUpdate({}),
-      paths: new Set(),
-      reactiveType: ['component'],
-    });
-  }
-
-  useLayoutEffect(() => {
-    return () => {
-      cleanupComponentRegistration(stateKey, fullComponentId);
-    };
-  }, [stateKey, itemComponentId]);
 
   const fullItemPath = [stateKey, ...itemPath].join('.');
   const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
@@ -3871,29 +3861,9 @@ function FormElementWrapper({
   const [componentId] = useState(() => uuidv4());
   const [, forceUpdate] = useState({});
 
-  const fullComponentId = `${stateKey}////${componentId}`;
   const stateKeyPathKey = [stateKey, ...path].join('.');
 
   // Register component
-  useLayoutEffect(() => {
-    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-    const components = rootMeta?.components || new Map();
-
-    components.set(fullComponentId, {
-      forceUpdate: () => forceUpdate({}),
-      paths: new Set(),
-      reactiveType: ['component'],
-    });
-
-    getGlobalStore.getState().setShadowMetadata(stateKey, [], {
-      ...rootMeta,
-      components,
-    });
-
-    return () => {
-      cleanupComponentRegistration(stateKey, fullComponentId);
-    };
-  }, [stateKey, componentId]);
 
   // Form state management
   const globalStateValue = getGlobalStore
@@ -3918,6 +3888,7 @@ function FormElementWrapper({
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
+        console.log('newValue', newValue);
         forceUpdate({});
       });
     return () => {

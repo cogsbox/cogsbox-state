@@ -233,7 +233,7 @@ function Lightning({ onBrightnessChange }: LightningProps) {
   );
 }
 
-export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
+export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
   const [skylineBrightness, setSkylineBrightness] = useState(1.0);
   const [moonIntensity, setMoonIntensity] = useState(0);
   const handleBrightnessChange = useCallback((brightness: number) => {
@@ -247,36 +247,13 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
   const rainContainerRef = useRef<HTMLDivElement>(null);
   const splatContainerRef = useRef<HTMLDivElement>(null);
 
-  const steppedGradient = useMemo(() => {
-    const steps = 40;
-    const startColor = { r: 35, g: 35, b: 85 }; // Deep CRT blue
-    const endColor = { r: 10, g: 10, b: 20 };
-    const opacity = 0.85;
-    let gradientSteps = [];
-    const easeOutQuint = (t: number) => Math.pow(t, 8);
-    for (let i = 0; i < steps; i++) {
-      const p = i / (steps - 1);
-      const r = Math.round(startColor.r + (endColor.r - startColor.r) * p);
-      const g = Math.round(startColor.g + (endColor.g - startColor.g) * p);
-      const b = Math.round(startColor.b + (endColor.b - startColor.b) * p);
-      const posStart = i === 0 ? 0 : easeOutQuint(i / steps) * 100;
-      const posEnd =
-        i === steps - 1 ? 100 : easeOutQuint((i + 1) / steps) * 100;
-      gradientSteps.push(
-        `rgba(${r}, ${g}, ${b}, ${opacity}) ${posStart}%`,
-        `rgba(${r}, ${g}, ${b}, ${opacity}) ${posEnd}%`
-      );
-    }
-    return `linear-gradient(180deg, ${gradientSteps.join(', ')})`;
-  }, []);
-
   const drops = useMemo(() => {
     let drops = [];
     for (let i = 0; i < numberOfDrops; i++) {
       const rH = Math.floor(Math.random() * 98) + 1;
       const aD = 0.5 + rH / 100;
 
-      const densityWeight = Math.pow(Math.random(), 4);
+      const densityWeight = Math.pow(Math.random(), 3);
       const eH = 60 + densityWeight * 100;
 
       const sizeModifier = ((eH - 40) / 90) * 2;
@@ -300,18 +277,7 @@ export function PixelRain({ numberOfDrops = 120 }: PixelRainProps) {
       <div
         className="fixed inset-0 background-gradient-masked"
         style={{ zIndex: Z_INDICES.GRADIENT_BACKGROUND }}
-      >
-        <div
-          className="pixel-gradient"
-          style={{
-            background: steppedGradient,
-            imageRendering: 'pixelated',
-            position: 'absolute',
-            inset: -10,
-            opacity: 0.6,
-          }}
-        />
-      </div>
+      ></div>
 
       <MoonGlow onMoonIntensityChange={setMoonIntensity} />
       <Lightning onBrightnessChange={handleBrightnessChange} />

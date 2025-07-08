@@ -606,6 +606,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     };
 
     updateValue(fullKey, newValue);
+    get().notifyPathSubscribers(fullKey, { type: 'UPDATE', newValue });
     set({ shadowStateStore: newShadowStore });
   },
   selectedIndicesMap: new Map<string, string>(),

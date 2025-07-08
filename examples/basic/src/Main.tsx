@@ -10,11 +10,13 @@ import { catSvg } from '../assets/svgs';
 import LCDCatScrollerDemo from './LCDDemo';
 import StateOverview from './examples/basic-overview/StateOverview';
 import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
+import CogsFormBindings from './examples/form-bindings/FormBindings';
 
 const sections = [
   { id: 'home', name: 'Home' },
   { id: 'reactivity', name: 'Reactivity' },
   { id: 'basic', name: 'Basic Overview' },
+  { id: 'form-bindings', name: 'Form Bindings' },
   // { id: 'array-reactivity', name: 'Array Reactivity' },
   { id: 'chat', name: 'Virtualized Chat' },
   { id: 'lcd', name: 'LCD Cat Demo' },
@@ -58,6 +60,8 @@ function App() {
           <Reactivity />
         ) : activeSection === 'basic' ? (
           <StateOverview />
+        ) : activeSection === 'form-bindings' ? (
+          <CogsFormBindings />
         ) : activeSection === 'chat' ? (
           <>
             {/* <VirtualizedChatExample /> */}
