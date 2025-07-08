@@ -10,7 +10,7 @@ import { FlashWrapper } from '../../FlashOnUpdate';
 
 function SectionWrapper({ children }: { children: React.ReactNode }) {
   return (
-    <FlashWrapper>
+    <FlashWrapper showCounter={true}>
       <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 text-white">
         {children}
       </div>
@@ -198,7 +198,7 @@ state.country.formElement(({ get, update }) => (
                 First Name
               </label>
               {state.firstName.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <input
                     {...obj.inputProps}
                     placeholder="John"
@@ -212,7 +212,7 @@ state.country.formElement(({ get, update }) => (
                   Duplicate (shows binding sync)
                 </label>
                 {state.firstName.formElement((obj) => (
-                  <FlashWrapper>
+                  <FlashWrapper showCounter={true}>
                     <input
                       {...obj.inputProps}
                       placeholder="Bound to same state"
@@ -229,7 +229,7 @@ state.country.formElement(({ get, update }) => (
                 Last Name
               </label>
               {state.lastName.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <input
                     {...obj.inputProps}
                     placeholder="Doe"
@@ -245,7 +245,7 @@ state.country.formElement(({ get, update }) => (
                 Email Address
               </label>
               {state.email.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <input
                     {...obj.inputProps}
                     type="email"
@@ -262,7 +262,7 @@ state.country.formElement(({ get, update }) => (
                 Phone Number
               </label>
               {state.phoneNumber.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <input
                     {...obj.inputProps}
                     type="tel"
@@ -279,7 +279,7 @@ state.country.formElement(({ get, update }) => (
                 Country
               </label>
               {state.country.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <select
                     value={obj.get()}
                     onChange={(e) => obj.update(e.target.value)}
@@ -300,7 +300,7 @@ state.country.formElement(({ get, update }) => (
                 Theme Preference
               </label>
               {state.theme.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <select
                     value={obj.get()}
                     onChange={(e) => obj.update(e.target.value as any)}
@@ -319,7 +319,7 @@ state.country.formElement(({ get, update }) => (
           <div className="space-y-3 border-t border-gray-700 pt-6">
             <div className="flex items-center gap-3">
               {state.newsletter.formElement((obj) => (
-                <FlashWrapper>
+                <FlashWrapper showCounter={true}>
                   <input
                     type="checkbox"
                     className="w-5 h-5 accent-blue-500 rounded"
@@ -340,7 +340,7 @@ state.country.formElement(({ get, update }) => (
               Notification Days
             </label>
             {state.daysOfWeek.formElement((obj) => (
-              <FlashWrapper>
+              <FlashWrapper showCounter={true}>
                 <div className="flex gap-2">
                   {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
                     (day, idx) => (
@@ -375,7 +375,7 @@ function ReactiveFormDisplay() {
   const state = useCogsState('formData');
 
   return (
-    <FlashWrapper>
+    <FlashWrapper showCounter={true}>
       <div className="bg-gray-900/50 border border-gray-700/50 rounded-lg p-4 sticky top-6">
         <h3 className="text-gray-300 text-lg font-semibold mb-4">
           🔄 Live State Updates

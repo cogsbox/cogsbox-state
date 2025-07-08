@@ -1494,51 +1494,36 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
 
-    // --- PASS 2: Single Global Loop for 'all' and 'deps' ---
-    // Now iterate just ONCE over all components to handle the global cases.
     rootMeta.components.forEach((component, componentId) => {
-      // CRITICAL: Skip any component that was already updated by the fast path.
       if (notifiedComponents.has(componentId)) {
-        return; // equivalent to 'continue'
+        return;
       }
 
       const reactiveTypes = Array.isArray(component.reactiveType)
         ? component.reactiveType
         : [component.reactiveType || 'component'];
 
-      // Check for 'all' first, as it's the strongest condition and needs no further work.
       if (reactiveTypes.includes('all')) {
         component.forceUpdate();
         notifiedComponents.add(componentId);
-        return; // We're done with this component, no need to check 'deps'.
+        return;
       }
 
-      // If not 'all', check for 'deps'. This is now an `else if` condition in spirit.
       if (reactiveTypes.includes('deps')) {
         if (component.depsFunction) {
           const currentState = store.getShadowValue(thisKey);
           const newDeps = component.depsFunction(currentState);
           let shouldUpdate = false;
-          console.log('newDeps', componentId, component, newDeps);
-          // Case 1: The function returned `true` explicitly.
+
           if (newDeps === true) {
             shouldUpdate = true;
-          }
-          // Case 2: The function returned a dependency array.
-          else if (Array.isArray(newDeps)) {
-            // Compare against the PREVIOUS deps, not component.deps
+          } else if (Array.isArray(newDeps)) {
             if (!isDeepEqual(component.prevDeps, newDeps)) {
-              // The dependencies have changed, update the stored value for the next check.
               component.prevDeps = newDeps;
               shouldUpdate = true;
             }
           }
-          console.log(
-            'newDeps shouldUpdate',
-            componentId,
-            shouldUpdate,
-            notifiedComponents
-          );
+
           if (shouldUpdate) {
             component.forceUpdate();
             notifiedComponents.add(componentId);
@@ -3913,7 +3898,6 @@ function useRegisterComponent(
 ) {
   const fullComponentId = `${stateKey}////${componentId}`;
 
-  // Register in the component system
   useLayoutEffect(() => {
     const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
     const components = rootMeta?.components || new Map();

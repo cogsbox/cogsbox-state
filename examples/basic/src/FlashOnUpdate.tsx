@@ -14,8 +14,8 @@ export const FlashWrapper = ({
 
   useEffect(() => {
     if (!ref.current) return;
-    ref.current.style.boxShadow = `0 0 0 2px ${color}`;
-    ref.current.style.backgroundColor = `rgba(255, 0, 0, 0.1)`;
+    ref.current.style.boxShadow = `0 0 0 1px ${color}`;
+    ref.current.style.backgroundColor = `rgba(255, 0, 0, 0.05)`;
     ref.current.style.position = 'relative';
     ref.current.style.padding = '0';
     // Add overlay
@@ -26,7 +26,7 @@ export const FlashWrapper = ({
     overlay.style.left = '0';
     overlay.style.right = '0';
     overlay.style.bottom = '0';
-    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.04)';
+    overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.02)';
     overlay.style.pointerEvents = 'none';
     if (showCounter) {
       overlay.textContent = (++renderCountRef.current).toString();
