@@ -1,0 +1,17 @@
+<svg width="600" height="300" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg">
+  <!-- Blimp Body -->
+  <ellipse cx="300" cy="150" rx="220" ry="80" fill="#141414" />
+
+  <!-- Cabin -->
+  <rect x="260" y="220" width="80" height="30" rx="8" fill="#141414" />
+
+  <!-- Tail Fin (rectangular) -->  <rect x="60" y="130" width="40" height="60" fill="#141414" />
+
+  <rect x="490" y="130" width="40" height="60" fill="#141414" />
+<!-- Left Spotlight -->
+<polygon points="220,197 200,242 240,242" fill="#141414" transform="rotate(15,220,197)" />
+
+<!-- Right Spotlight -->
+<polygon points="380,197 360,242 400,242" fill="#141414" transform="rotate(-15,380,197)" />
+
+</svg>

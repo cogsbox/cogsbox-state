@@ -69,11 +69,11 @@ function SetupSection() {
         </p>
 
         <div className="grid md:grid-cols-3 gap-3 my-4">
-          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-            <h4 className="font-semibold text-blue-400 mb-1 text-sm">
+          <div className="bg-blue-500/10 border border-blue-500/20 rounded-lg p-6">
+            <h4 className="font-semibold text-blue-400 mb-1 text-lg">
               Primitives
             </h4>
-            <div className="text-xs text-gray-300 space-y-0.5">
+            <div className=" text-gray-300 space-y-0.5">
               <div>
                 <code className="text-blue-400">.get()</code> - read values
               </div>
@@ -91,11 +91,11 @@ function SetupSection() {
             </div>
           </div>
 
-          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-3">
-            <h4 className="font-semibold text-green-400 mb-1 text-sm">
+          <div className="bg-green-500/10 border border-green-500/20 rounded-lg p-6">
+            <h4 className="font-semibold text-green-400 mb-1 text-lg">
               Arrays
             </h4>
-            <div className="text-xs text-gray-300 space-y-0.5">
+            <div className="s text-gray-300 space-y-0.5">
               <div>
                 <code className="text-green-400">.index(n)</code> - access by
                 position
@@ -113,11 +113,11 @@ function SetupSection() {
             </div>
           </div>
 
-          <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3">
-            <h4 className="font-semibold text-purple-400 mb-1 text-sm">
+          <div className="bg-purple-500/10 border border-purple-500/20 rounded-lg p-6">
+            <h4 className="font-semibold text-purple-400 mb-1 text-lg">
               Iterators
             </h4>
-            <div className="text-xs text-gray-300 space-y-0.5">
+            <div className=" text-gray-300 space-y-0.5">
               <div>
                 <code className="text-purple-400">.stateMap()</code> - enriched
                 map
@@ -197,15 +197,6 @@ const { useCogsState } = createCogsState(initialState);`}
   );
 }`}
             />
-          </div>
-
-          <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
-            <p className="text-xs text-yellow-300/80">
-              <strong>Note:</strong> For inputs, use{' '}
-              <code className="text-yellow-400">.formElement()</code> to avoid
-              lag. Direct onChange handlers will cause lag due to React
-              re-renders on every keystroke.
-            </p>
           </div>
         </div>
       </div>
@@ -348,7 +339,7 @@ teams.index(0).name.update("UI Team");
     </SectionWrapper>
   );
 }
-// Core Methods Demo
+// Core Methods Demo// Core Methods Demo
 function CoreMethodsDemo() {
   const state = useCogsState('testData');
 
@@ -378,22 +369,22 @@ function CoreMethodsDemo() {
 
           <div className="space-y-4">
             <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-300">
+              <div className="grid grid-cols-[57%_15%_28%] gap-4">
+                <span className="text-lg font-semibold text-gray-300">
                   .update()
                 </span>
-                <div className="flex items-center gap-4">
-                  <div className="w-28 text-right font-mono text-green-400">
-                    Current: {state.simpleCounter.get()}
-                  </div>
+                <div className="  flex items-center gap-4">
                   <button
                     onClick={() =>
                       state.simpleCounter.update((prev) => prev + 1)
                     }
-                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 text-sm"
+                    className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-500 w-[130px] text-sm"
                   >
                     Increment
                   </button>
+                </div>
+                <div className=" font-mono text-green-400">
+                  simpleCounter: {state.simpleCounter.get()}
                 </div>
               </div>
               <CodeSnippetDisplay
@@ -402,17 +393,14 @@ function CoreMethodsDemo() {
             </div>
 
             <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-300">
+              <div className="grid grid-cols-[57%_15%_28%] gap-4">
+                <span className="text-lg font-semibold text-gray-300">
                   .toggle()
                 </span>
                 <div className="flex items-center gap-4">
-                  <div className="w-28 text-right font-mono text-green-400">
-                    Current: {state.isBooleanValue.get() ? 'true' : 'false'}
-                  </div>
                   <button
                     onClick={() => state.isBooleanValue.toggle()}
-                    className={`px-3 py-1 text-white rounded text-sm transition-colors w-[72px] text-center ${
+                    className={`px-3 py-1 text-white rounded text-sm transition-colors w-[130px] text-center ${
                       state.isBooleanValue.get()
                         ? 'bg-green-500 hover:bg-green-400'
                         : 'bg-gray-600 hover:bg-gray-500'
@@ -420,14 +408,18 @@ function CoreMethodsDemo() {
                   >
                     Toggle
                   </button>
+                </div>{' '}
+                <div className=" font-mono text-green-400">
+                  isBooleanValue:{' '}
+                  {state.isBooleanValue.get() ? 'true' : 'false'}
                 </div>
               </div>
               <CodeSnippetDisplay code={`state.isBooleanValue.toggle()`} />
             </div>
 
             <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-bold text-gray-300">
+              <div className="grid grid-cols-[57%_15%_28%] gap-4">
+                <div className="text-lg font-bold text-gray-300">
                   .update() (object)
                 </div>
                 <button
@@ -438,7 +430,7 @@ function CoreMethodsDemo() {
                       isBooleanValue: !p.isBooleanValue,
                     }));
                   }}
-                  className="px-4 py-1 bg-blue-600 cursor-pointer text-white rounded-lg hover:bg-blue-500 text-sm"
+                  className="px-4 py-1 bg-blue-600 cursor-pointer text-white rounded w-[130px] hover:bg-blue-500 text-sm"
                 >
                   Update Both
                 </button>
@@ -463,22 +455,22 @@ function CoreMethodsDemo() {
 
           <div className="space-y-4">
             <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-300">
+              <div className="grid grid-cols-[57%_15%_28%] gap-4">
+                <span className="text-lg font-semibold text-gray-300">
                   .$get() <em className="text-gray-400">(static)</em>
                 </span>
-                <div className="flex items-center gap-4">
-                  <div className="w-28 text-right font-mono text-gray-400">
-                    Signal: {state.simpleCounter2.$get()}
-                  </div>
-                  <button
-                    onClick={() =>
-                      state.simpleCounter2.update((prev) => prev + 1)
-                    }
-                    className="px-3 py-1 bg-green-600 text-white rounded hover:bg-green-500 text-sm"
-                  >
-                    Increment
-                  </button>
+
+                <button
+                  onClick={() =>
+                    state.simpleCounter2.update((prev) => prev + 1)
+                  }
+                  className="px-3 py-1 bg-green-600 text-white rounded w-[130px] hover:bg-green-500 text-sm"
+                >
+                  Increment
+                </button>
+
+                <div className=" font-mono text-green-400">
+                  simpleCounter2: {state.simpleCounter2.$get()}
                 </div>
               </div>
               <CodeSnippetDisplay
@@ -488,39 +480,35 @@ state.simpleCounter2.update(prev => prev + 1)`}
             </div>
 
             <div className="bg-black/20 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-semibold text-gray-300">
+              <div className="grid grid-cols-[57%_15%_28%] gap-4">
+                <span className="text-lg font-semibold text-gray-300">
                   .formElement()
                 </span>
-                <div className="flex items-center gap-4">
-                  {state.isBooleanValue2.formElement((obj) => (
-                    <FlashWrapper>
-                      <div className="w-28 text-right font-mono text-green-400">
-                        Value: {obj.get() ? 'true' : 'false'}
-                      </div>
-                    </FlashWrapper>
-                  ))}
-                  {state.isBooleanValue2.formElement((obj) => (
-                    <FlashWrapper>
-                      <button
-                        onClick={() => obj.toggle()}
-                        className={`px-3 py-1 text-white rounded text-sm transition-colors w-[72px] text-center ${
-                          obj.get()
-                            ? 'bg-purple-500 hover:bg-purple-400'
-                            : 'bg-gray-700 hover:bg-gray-600'
-                        }`}
-                      >
-                        Toggle
-                      </button>
-                    </FlashWrapper>
-                  ))}
+                {state.isBooleanValue2.formElement((obj) => (
+                  <FlashWrapper>
+                    <button
+                      onClick={() => obj.toggle()}
+                      className={`px-3 py-1 text-white rounded text-sm transition-colors w-[130px] text-center ${
+                        obj.get()
+                          ? 'bg-purple-500 hover:bg-purple-400'
+                          : 'bg-gray-700 hover:bg-gray-600'
+                      }`}
+                    >
+                      Toggle
+                    </button>
+                  </FlashWrapper>
+                ))}{' '}
+                <div className=" font-mono text-green-400">
+                  isBooleanValue2:{' '}
+                  {state.isBooleanValue2.$get() ? 'true' : 'false'}
                 </div>
               </div>
               <CodeSnippetDisplay
                 code={`state.isBooleanValue2.formElement((obj) => (
-  <button onClick={() => obj.toggle()}>
-    Isolated Toggle
-  </button>
+  <>
+    <button onClick={() => obj.toggle()}>Toggle</button>
+    <span>Value: {obj.get()}</span>
+  </>
 ))`}
               />
             </div>
@@ -528,7 +516,7 @@ state.simpleCounter2.update(prev => prev + 1)`}
 
           <div className="mt-4 p-3 bg-yellow-500/5 border border-yellow-500/20 rounded-lg">
             <p className="text-xs text-yellow-300/80">
-              <strong>Note:</strong> Signal-based updates don't trigger React
+              <span>Note:</span> Signal-based updates don't trigger React
               re-renders. Notice how the static `.$get()` value doesn't update.
               Use <code className="text-yellow-400">.formElement()</code> to
               wrap components that need to react to these changes in isolation.
@@ -539,7 +527,6 @@ state.simpleCounter2.update(prev => prev + 1)`}
     </SectionWrapper>
   );
 }
-
 // Array Operations Demo
 function ArrayOperationsDemo() {
   const state = useCogsState('testData');
@@ -583,7 +570,7 @@ function ArrayOperationsDemo() {
                       done: false,
                     }));
                   }}
-                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-500 text-sm"
+                  className="px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-500 text-sm "
                 >
                   Add Todo
                 </button>

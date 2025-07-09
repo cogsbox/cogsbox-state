@@ -943,7 +943,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
               const newUniqueItems = incomingData.filter((item: any) => {
                 return !existingIds.has(item[keyField]);
               });
-
+              console.log('newUniqueItems', newUniqueItems);
               if (newUniqueItems.length > 0) {
                 newUniqueItems.forEach((item) => {
                   getGlobalStore
@@ -2641,7 +2641,7 @@ function createProxyHandler<T>(
                     .getState()
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
-
+                      console.log('statelsit subscribed to path', e);
                       if (e.type === 'GET_SELECTED') {
                         return;
                       }
@@ -2660,8 +2660,9 @@ function createProxyHandler<T>(
                           }
                         }
                       }
+                      forceUpdate({});
                     });
-                  forceUpdate({});
+
                   return () => {
                     unsubscribe();
                   };

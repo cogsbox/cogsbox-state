@@ -424,7 +424,7 @@ function MessageInput({
             }
           }}
           className="flex-grow px-3 py-1.5 bg-gray-800 border border-gray-600 rounded text-sm w-full focus:outline-none focus:ring-1 focus:ring-green-500"
-          placeholder={`Type a message... (${optimisticUpdates ? 'Optimistic' : 'Server-first'} mode)`}
+          placeholder={`Type a message... `}
         />
         <button
           onClick={handleSend}
@@ -434,92 +434,5 @@ function MessageInput({
         </button>
       </div>
     </div>
-  );
-}
-// Updated ShowState to show incremental sync info
-function ShowState({
-  layout = 'horizontal',
-  isInitialLoading,
-  isPolling,
-  pollingInterval,
-  optimisticMode,
-  lastSync,
-}: {
-  layout?: 'horizontal' | 'vertical';
-  isInitialLoading: boolean;
-  isPolling: boolean;
-  pollingInterval: number;
-  optimisticMode: boolean;
-  lastSync: number;
-}) {
-  const messages = useCogsState('messages');
-  const status = messages.getStatus();
-
-  const containerClasses =
-    layout === 'vertical'
-      ? 'flex flex-col h-full gap-4'
-      : 'flex gap-4 items-center';
-
-  return (
-    <FlashWrapper>
-      <div className={containerClasses}>
-        <CodeSnippetDisplay
-          code={`// Polling for new messages
-  const { data: newMessages } = useQuery({
-    queryKey: ['messages', 'new', ${lastSync}],
-    queryFn: () => getMessagesSince(${lastSync}),
-    refetchInterval: ${pollingInterval}
-  });
-
-  // Fire a global state event with a merge instruction
-  if (newMessages) {
-    getGlobalStore.getState().setServerStateUpdate('messages', {
-      status: 'success',
-      data: newMessages, // <-- ONLY the new data
-      merge: {
-        strategy: 'append',
-        key: 'id'
-      }
-    });
-  }`}
-        />
-        <div className="flex-1 flex flex-col bg-[#1a1a1a] border border-gray-700 rounded p-3 overflow-hidden h-full">
-          <h3 className="text-gray-400 uppercase tracking-wider text-xs pb-2 mb-2 border-b border-gray-700">
-            Incremental Sync State
-          </h3>
-          <div className="flex-grow overflow-auto">
-            <SyntaxHighlighter
-              language="javascript"
-              style={atomOneDark}
-              customStyle={{ backgroundColor: 'transparent', fontSize: '12px' }}
-            >
-              {`// Incremental Update Pattern
-  const messages = useCogsState('messages');
-
-  // Current Status: ${status}
-  // Message Count: ${messages.get().length}
-  // Update Mode: ${optimisticMode ? 'OPTIMISTIC' : 'SERVER-FIRST'}
-  // Polling Interval: ${pollingInterval}ms
-  // Last Sync: ${lastSync ? new Date(lastSync).toLocaleTimeString() : 'Never'}
-
-  // State: ${
-    isInitialLoading
-      ? 'Loading initial messages...'
-      : isPolling
-        ? 'Checking for new messages...'
-        : 'Idle'
-  }
-
-  // How it works:
-  // 1. Load all messages once on mount.
-  // 2. Poll server for messages newer than lastSync.
-  // 3. Dispatch a 'SERVER_STATE_UPDATE' event with a "merge" instruction.
-  // 4. CogsState merges new data, avoiding a full re-render.
-  // 5. State stays 'synced' - no dirty state!`}
-            </SyntaxHighlighter>
-          </div>
-        </div>
-      </div>
-    </FlashWrapper>
   );
 }

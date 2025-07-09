@@ -15,9 +15,4 @@ export default defineConfig({
       '@lib': path.resolve(__dirname, '../../src'),
     },
   },
-  build: {
-    rollupOptions: {
-      input: 'src',
-    },
-  },
 });

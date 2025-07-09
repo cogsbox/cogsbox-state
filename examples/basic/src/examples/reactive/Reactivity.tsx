@@ -129,7 +129,7 @@ function ComponentExample() {
 
   return (
     <div className="bg-green-900/20 border-2 border-green-600 rounded-lg p-6">
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start gap-4">
         <div>
           <code className="text-sm text-green-400 bg-gray-800 px-3 py-2 rounded font-bold">
             reactiveType: 'component'
@@ -202,7 +202,7 @@ function DepsCounter1Example() {
 
   return (
     <div className="bg-purple-900/20 border-2 border-purple-600 rounded-lg p-4">
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start gap-4">
         <div className="flex-1">
           <code className="text-sm text-purple-400 bg-gray-800 px-3 py-2 rounded font-bold">
             deps: [counter1]
@@ -224,7 +224,7 @@ function DepsCounter2Example() {
 
   return (
     <div className="bg-blue-900/20 border-2 border-blue-600 rounded-lg p-4">
-      <div className="flex justify-between items-start mb-3">
+      <div className="flex justify-between items-start gap-4">
         <div className="flex-1">
           <code className="text-sm text-blue-400 bg-gray-800 px-3 py-2 rounded font-bold">
             deps: [counter2]
@@ -243,7 +243,7 @@ function AllComponentExample() {
 
   return (
     <div className="bg-orange-900/20 border-2 border-orange-600 rounded-lg p-6">
-      <div className="flex justify-between items-start mb-4">
+      <div className="flex justify-between items-start gap-4">
         <div>
           <code className="text-sm text-orange-400 bg-gray-800 px-3 py-2 rounded font-bold">
             reactiveType: 'all'
