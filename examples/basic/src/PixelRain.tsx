@@ -7,7 +7,7 @@ import BlimpWithSpotlights from './Blimp';
 
 import { CloudLayers } from './CloudTiler';
 import { ShadowSilhouette } from './ShadowSilhouette';
-import { cyberShadow } from '../assets/svgs';
+import { cyberShadow, skyline } from '../assets/svgs';
 
 // Centralized Z-Index Management System
 const Z_INDICES = {
@@ -402,57 +402,43 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
         <BlimpWithSpotlights />
       </div>
       <style>{`@keyframes moveAcross { from { transform: translateX(-100%); } to { transform: translateX(100vw); }}`}</style>
-
       <div
-        ref={skylineRef}
         style={{
           position: 'fixed',
           top: 0,
           left: 0,
           width: '100%',
-          height: '100vh',
+          height: '45vh',
           zIndex: Z_INDICES.SKYLINE_BACKGROUND,
           pointerEvents: 'none',
           imageRendering: 'pixelated',
+          overflow: 'visible',
         }}
       >
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: Z_INDICES.SKYLINE_BACKGROUND,
-            backgroundColor: 'rgba(255, 255, 255, 0.3)',
-            filter: `brightness(${
-              0.5 * skylineBrightness + moonIntensity * 0.02
-            }) contrast(0.97) saturate(0.8)`,
-            maskImage: 'url(/skyline.svg)',
-            maskSize: '100% 100vh',
-            maskPosition: '0 -2vh',
-            maskRepeat: 'no-repeat',
-          }}
-        />
-
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: '100%',
-            height: '100%',
-            zIndex: Z_INDICES.SKYLINE_BACKGROUND,
-            background: 'rgba(0, 0, 0, 0.85)',
-            maskImage: 'url(/skyline.svg)',
-            maskSize: '100% 100vh',
-            maskPosition: '0 -2vh',
-            maskRepeat: 'no-repeat',
-          }}
-        />
+        <div className="flex flex-col items-end justify-center h-full ">
+          <div className="h-[20%] w-full "></div>
+          <div className="h-[80%] w-full text-black">{skyline}</div>
+        </div>
       </div>
-
       <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '50vh',
+          zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
+          pointerEvents: 'none',
+          imageRendering: 'pixelated',
+          overflow: 'visible',
+        }}
+      >
+        <div className="flex flex-col items-end justify-center h-full scale-x-[-1] ">
+          <div className="h-[60%] w-full "></div>
+          <div className="h-[50%] w-full">{skyline}</div>
+        </div>
+      </div>
+      {/* <div
         style={{
           position: 'fixed',
           top: 0,
@@ -473,8 +459,23 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
           maskPosition: '0 20vh',
           maskRepeat: 'no-repeat',
         }}
-      />
-
+      /> */}
+      {/* <div
+        style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          width: '100%',
+          height: '60vh',
+          zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
+          pointerEvents: 'none',
+          transform: 'scaleX(-1)',
+          minWidth: '100%',
+          imageRendering: 'pixelated',
+        }}
+      >
+        {skyline}
+      </div> */}
       <div
         className="fixed top-[26vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[50vh]"
         style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}

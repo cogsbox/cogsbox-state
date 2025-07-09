@@ -25,7 +25,7 @@ const queryClient = new QueryClient({
 
 const sections = [
   { id: 'home', name: 'Home' },
-
+  //everythign below is for cogsbox staet
   { id: 'reactivity', name: 'Reactivity' },
   { id: 'basic', name: 'Basic Overview' },
   { id: 'form-bindings', name: 'Form Bindings' },
@@ -37,55 +37,124 @@ const sections = [
 
 function App() {
   const [activeSection, setActiveSection] = useState(sections[0]!.id);
+  const urlParams = new URLSearchParams(window.location.search);
+  const [bgDisabled, setBgDisabled] = useState(
+    urlParams.get('disablebg') === 'true'
+  );
+  const [contentHidden, setContentHidden] = useState(false);
 
   return (
     <div className="relative crt">
-      <div className="pointer-events-none">
-        <PixelRain />
-        <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/50 to-black/00 pointer-events-none z-[1]" />
-        <div className="fixed right-0 w-[16vw] h-[100vh] bg-gradient-to-l from-black/50 to-black/00 pointer-events-none z-[1]" />
-        <div className="fixed left-0 bottom-0 w-[100vw] h-[10vh] bg-gradient-to-t from-black/70 to-black/00 pointer-events-none z-[1]" />
-        <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_center,rgba(0,255,0,0.04),transparent_70%)] pointer-events-none z-[1]" />
-        <div className="fixed h-screen w-full bg-gradient-to-b from-black via-gray-900 to-gray-900 z-[-999]" />
-      </div>
+      {!bgDisabled && (
+        <div className="pointer-events-none">
+          <PixelRain />
+          <div className="fixed left-0 w-[16vw] h-[100vh] bg-gradient-to-r from-black/50 to-black/00 pointer-events-none z-[1]" />
+          <div className="fixed right-0 w-[16vw] h-[100vh] bg-gradient-to-l from-black/50 to-black/00 pointer-events-none z-[1]" />
+          <div className="fixed left-0 bottom-0 w-[100vw] h-[10vh] bg-gradient-to-t from-black/70 to-black/00 pointer-events-none z-[1]" />
+          <div className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[100vw] h-[100vh] bg-[radial-gradient(ellipse_at_center,rgba(0,255,0,0.04),transparent_70%)] pointer-events-none z-[1]" />
+          <div className="fixed h-screen w-full bg-gradient-to-b from-black via-gray-900 to-gray-900 z-[-999]" />
+        </div>
+      )}
+
+      {/* Simple background when effects are disabled */}
+      {bgDisabled && (
+        <div className="fixed h-screen w-full bg-gray-900 z-[-999]" />
+      )}
 
       <div className="fixed top-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm z-[1000] border-b border-green-500/20">
-        <div className="flex gap-2 px-4 py-2 overflow-x-auto">
-          {sections.map((section) => (
-            <button
-              key={section.id}
-              onClick={() => setActiveSection(section.id)}
-              className={`px-4 py-2 rounded text-sm transition-all cursor-pointer ${
-                activeSection === section.id
-                  ? 'bg-green-500/20 text-green-400 border border-green-500/40'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-gray-200'
-              }`}
-            >
-              {section.name}
-            </button>
-          ))}
+        <div className="flex items-center gap-1 px-4 py-3">
+          {/* Home button - standalone */}
+          <button
+            onClick={() => setActiveSection('home')}
+            className={`px-4 py-2 rounded text-sm font-medium transition-all ${
+              activeSection === 'home'
+                ? 'bg-gray-100 text-gray-900'
+                : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
+            }`}
+          >
+            Home
+          </button>
+
+          {/* Separator */}
+          <div className="mx-3 h-8 w-px bg-gray-700" />
+
+          {/* Cogsbox State section */}
+          <div className="flex items-center gap-1 bg-purple-900/20 rounded-lg p-1 border border-purple-500/20">
+            <span className="text-xs font-mono text-purple-400 px-3 py-1 bg-purple-900/30 rounded">
+              cogsbox-state
+            </span>
+
+            {sections.slice(1).map((section) => (
+              <button
+                key={section.id}
+                onClick={() => setActiveSection(section.id)}
+                className={`px-3 py-1.5 rounded text-sm transition-all ${
+                  activeSection === section.id
+                    ? 'bg-purple-500 text-white font-medium'
+                    : 'text-purple-300 hover:bg-purple-800/50 hover:text-purple-100'
+                }`}
+              >
+                {section.name}
+              </button>
+            ))}
+          </div>
+
+          {/* Coming soon libraries */}
+          <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
+            <span>Coming soon:</span>
+            <span className="text-blue-400">cogs-auth</span>
+            <span className="text-green-400">cogsbox-shape</span>
+            <span className="text-orange-400">cogsbox-sync</span>
+          </div>
         </div>
       </div>
 
+      {/* Background toggle button */}
+      <div className="fixed top-20 right-4 z-[1001] flex items-center gap-2 text-xs text-gray-500">
+        {' '}
+        <button
+          onClick={() => setContentHidden(!contentHidden)}
+          className="  p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
+        >
+          {contentHidden ? 'Show' : 'Hide'} content
+        </button>
+        <button
+          onClick={() => setBgDisabled(!bgDisabled)}
+          className="  p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
+          title={
+            bgDisabled
+              ? 'Enable background effects'
+              : 'Disable background effects'
+          }
+        >
+          Background {bgDisabled ? '🌙' : '✨'}
+        </button>
+      </div>
       <div className="px-[10vw] pt-40 flex flex-col gap-4 relative z-[10]">
-        {activeSection === 'home' ? (
-          <AboutMe />
-        ) : activeSection === 'reactivity' ? (
-          <Reactivity />
-        ) : activeSection === 'basic' ? (
-          <StateOverview />
-        ) : activeSection === 'form-bindings' ? (
-          <CogsFormBindings />
-        ) : activeSection === 'chat' ? (
+        {/* Hide/Show content button */}
+
+        {!contentHidden && (
           <>
-            {/* <VirtualizedChatExample /> */}
-            <VirtualizedChatExampleFetch />
+            {activeSection === 'home' ? (
+              <AboutMe />
+            ) : activeSection === 'reactivity' ? (
+              <Reactivity />
+            ) : activeSection === 'basic' ? (
+              <StateOverview />
+            ) : activeSection === 'form-bindings' ? (
+              <CogsFormBindings />
+            ) : activeSection === 'chat' ? (
+              <>
+                {/* <VirtualizedChatExample /> */}
+                <VirtualizedChatExampleFetch />
+              </>
+            ) : activeSection === 'lcd' ? (
+              <LCDCatScrollerDemo catSvg={catSvg} />
+            ) : activeSection === 'array' ? (
+              <ArrayMethodsPage />
+            ) : null}
           </>
-        ) : activeSection === 'lcd' ? (
-          <LCDCatScrollerDemo catSvg={catSvg} />
-        ) : activeSection === 'array' ? (
-          <ArrayMethodsPage />
-        ) : null}
+        )}
         <div className="h-40" />
       </div>
     </div>

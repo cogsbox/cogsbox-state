@@ -19,9 +19,13 @@ const certificate = fs.readFileSync(certPath, 'utf8');
 
 const app = express();
 app.use(express.static(buildPath));
+
+app.use('/chris', express.static(buildPath));
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });
+
 
 const httpsServer = https.createServer({
     key: privateKey,
