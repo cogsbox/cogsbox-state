@@ -12,6 +12,7 @@ import StateOverview from './examples/basic-overview/StateOverview';
 import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
 import CogsFormBindings from './examples/form-bindings/FormBindings';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import AboutMe from './about-me/AboutM';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ const queryClient = new QueryClient({
 
 const sections = [
   { id: 'home', name: 'Home' },
+
   { id: 'reactivity', name: 'Reactivity' },
   { id: 'basic', name: 'Basic Overview' },
   { id: 'form-bindings', name: 'Form Bindings' },
@@ -66,7 +68,9 @@ function App() {
       </div>
 
       <div className="px-[10vw] pt-40 flex flex-col gap-4 relative z-[10]">
-        {activeSection === 'home' ? null : activeSection === 'reactivity' ? (
+        {activeSection === 'home' ? (
+          <AboutMe />
+        ) : activeSection === 'reactivity' ? (
           <Reactivity />
         ) : activeSection === 'basic' ? (
           <StateOverview />

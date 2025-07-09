@@ -2082,23 +2082,43 @@ function createProxyHandler<T>(
                 return { totalHeight: runningOffset, itemOffsets: offsets };
               }, [arrayKeys.length, itemHeight]);
 
-              // Initial positioning for stick to bottom
+              // Improved initial positioning effect
               useLayoutEffect(() => {
                 if (
                   stickToBottom &&
                   arrayKeys.length > 0 &&
                   containerRef.current &&
-                  !scrollStateRef.current.isUserScrolling
+                  !scrollStateRef.current.isUserScrolling &&
+                  initialScrollRef.current
                 ) {
-                  const visibleCount = Math.ceil(
-                    (containerRef.current.clientHeight || 500) / itemHeight
-                  );
-                  const endIndex = arrayKeys.length - 1;
-                  const startIndex = Math.max(
-                    0,
-                    endIndex - visibleCount - overscan
-                  );
-                  setRange({ startIndex, endIndex });
+                  const container = containerRef.current;
+
+                  // Wait for container to have dimensions
+                  const waitForContainer = () => {
+                    if (container.clientHeight > 0) {
+                      const visibleCount = Math.ceil(
+                        container.clientHeight / itemHeight
+                      );
+                      const endIndex = arrayKeys.length - 1;
+                      const startIndex = Math.max(
+                        0,
+                        endIndex - visibleCount - overscan
+                      );
+
+                      setRange({ startIndex, endIndex });
+
+                      // Ensure scroll after range is set
+                      requestAnimationFrame(() => {
+                        scrollToBottom('instant');
+                        initialScrollRef.current = false; // Mark initial scroll as done
+                      });
+                    } else {
+                      // Container not ready, try again
+                      requestAnimationFrame(waitForContainer);
+                    }
+                  };
+
+                  waitForContainer();
                 }
               }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
 
@@ -2189,55 +2209,83 @@ function createProxyHandler<T>(
                   scrollStateRef.current.isNearBottom = true;
                   scrollStateRef.current.scrollUpCount = 0;
 
-                  // Force a measurement update first
-                  const doScroll = () => {
-                    // Get the actual scrollHeight from the DOM, not the calculated totalHeight
-                    const actualHeight = container.scrollHeight;
+                  const performScroll = () => {
+                    // Multiple attempts to ensure we hit the bottom
+                    const attemptScroll = (attempts = 0) => {
+                      if (attempts > 5) return; // Prevent infinite loops
 
-                    container.scrollTo({
-                      top: actualHeight + 1000, // Add buffer to ensure we hit bottom
-                      behavior: behavior,
-                    });
+                      const currentHeight = container.scrollHeight;
+                      const currentScroll = container.scrollTop;
+                      const clientHeight = container.clientHeight;
+
+                      // Check if we're already at the bottom
+                      if (currentScroll + clientHeight >= currentHeight - 1) {
+                        return;
+                      }
+
+                      container.scrollTo({
+                        top: currentHeight,
+                        behavior: behavior,
+                      });
+
+                      // In slow environments, check again after a short delay
+                      setTimeout(() => {
+                        const newHeight = container.scrollHeight;
+                        const newScroll = container.scrollTop;
+
+                        // If height changed or we're not at bottom, try again
+                        if (
+                          newHeight !== currentHeight ||
+                          newScroll + clientHeight < newHeight - 1
+                        ) {
+                          attemptScroll(attempts + 1);
+                        }
+                      }, 50);
+                    };
+
+                    attemptScroll();
                   };
 
-                  // Use double rAF to ensure layout is complete
-                  requestAnimationFrame(() => {
+                  // Use requestIdleCallback for better performance in slow environments
+                  if ('requestIdleCallback' in window) {
+                    requestIdleCallback(performScroll, { timeout: 100 });
+                  } else {
+                    // Fallback to rAF chain
                     requestAnimationFrame(() => {
-                      doScroll();
+                      requestAnimationFrame(performScroll);
                     });
-                  });
+                  }
                 },
                 []
               );
               // Auto-scroll to bottom when new content arrives
+              // Consolidated auto-scroll effect with debouncing
               useEffect(() => {
                 if (!stickToBottom || !containerRef.current) return;
 
                 const container = containerRef.current;
                 const scrollState = scrollStateRef.current;
 
-                const scrollToBottom = () => {
-                  // Only auto-scroll if user hasn't scrolled away
-                  if (
-                    !scrollState.isUserScrolling &&
-                    scrollState.isNearBottom
-                  ) {
-                    container.scrollTo({
-                      top: container.scrollHeight,
-                      behavior: initialScrollRef.current ? 'instant' : 'smooth',
-                    });
-
-                    // Set to false after first use
-                  }
+                // Debounced scroll function
+                let scrollTimeout: NodeJS.Timeout;
+                const debouncedScrollToBottom = () => {
+                  clearTimeout(scrollTimeout);
+                  scrollTimeout = setTimeout(() => {
+                    if (
+                      !scrollState.isUserScrolling &&
+                      scrollState.isNearBottom
+                    ) {
+                      scrollToBottom(
+                        initialScrollRef.current ? 'instant' : 'smooth'
+                      );
+                    }
+                  }, 100);
                 };
 
-                // Debounced scroll for DOM changes
-                const debouncedScroll = debounce(scrollToBottom, 100);
-
+                // Single MutationObserver for all DOM changes
                 const observer = new MutationObserver(() => {
-                  // Only trigger if we should auto-scroll
                   if (!scrollState.isUserScrolling) {
-                    debouncedScroll();
+                    debouncedScrollToBottom();
                   }
                 });
 
@@ -2245,27 +2293,37 @@ function createProxyHandler<T>(
                   childList: true,
                   subtree: true,
                   attributes: true,
-                  attributeFilter: ['height', 'src'],
+                  attributeFilter: ['style', 'class'], // More specific than just 'height'
                 });
 
-                // Handle image loads
-                const handleImageLoad = () => {
-                  if (!scrollState.isUserScrolling) {
-                    scrollToBottom();
+                // Handle image loads with event delegation
+                const handleImageLoad = (e: Event) => {
+                  if (
+                    e.target instanceof HTMLImageElement &&
+                    !scrollState.isUserScrolling
+                  ) {
+                    debouncedScrollToBottom();
                   }
                 };
 
                 container.addEventListener('load', handleImageLoad, true);
 
-                // Initial scroll
-                scrollToBottom();
+                // Initial scroll with proper timing
+                if (initialScrollRef.current) {
+                  // For initial load, wait for next tick to ensure DOM is ready
+                  setTimeout(() => {
+                    scrollToBottom('instant');
+                  }, 0);
+                } else {
+                  debouncedScrollToBottom();
+                }
 
                 return () => {
+                  clearTimeout(scrollTimeout);
                   observer.disconnect();
                   container.removeEventListener('load', handleImageLoad, true);
                 };
-              }, [stickToBottom, arrayKeys.length, rerender]);
-
+              }, [stickToBottom, arrayKeys.length, scrollToBottom]);
               // Create virtual state
               const virtualState = useMemo(() => {
                 const store = getGlobalStore.getState();
@@ -2660,7 +2718,9 @@ function createProxyHandler<T>(
                           }
                         }
                       }
-                      forceUpdate({});
+                      if (e.type === 'INSERT') {
+                        forceUpdate({});
+                      }
                     });
 
                   return () => {

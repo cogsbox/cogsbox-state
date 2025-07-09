@@ -137,79 +137,101 @@ const fetchNewMessagesSince = async (timestamp: number): Promise<Message[]> => {
   // No fake delay needed for this one, it should be fast.
   return serverMessages.filter((msg) => msg.timestamp > timestamp);
 };
+
 function DataFetcher() {
-  // This state tracks the timestamp of the newest message we know about.
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
-  // --- JOB 1: Initial Load ---
-  // useInfiniteQuery handles the one-time initial load. It has NO polling.
-  const { data: initialData, isSuccess: isInitialLoadSuccess } =
-    useInfiniteQuery({
-      queryKey: ['messages', 'history'], // A different key to separate it from the poller
-      queryFn: fetchMessagesWithCursor,
-      initialPageParam: 0,
-      // We only need the first page on load. This hook is now dormant.
-      getNextPageParam: (lastPage) => lastPage.nextCursor,
-      // CRITICAL: We only want this to run ONCE on load.
-      staleTime: Infinity,
-      refetchOnWindowFocus: false,
-    });
+  // Initial Load
+  const {
+    data: initialData,
+    isSuccess: isInitialLoadSuccess,
+    isLoading: isInitialLoading,
+  } = useInfiniteQuery({
+    queryKey: ['messages', 'history'],
+    queryFn: fetchMessagesWithCursor,
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+  });
 
-  // --- JOB 2: Live Updates ---
-  // A simple useQuery polls for ONLY new messages. It's lightweight.
+  // Live Updates
   const { data: newMessages } = useQuery({
     queryKey: ['messages', 'updates', lastSyncTimestamp],
     queryFn: () => fetchNewMessagesSince(lastSyncTimestamp),
-    // Standard polling. This is the correct tool for this job.
     refetchInterval: 2000,
-    // Only run this query after the initial load has finished and set a timestamp.
     enabled: isInitialLoadSuccess && lastSyncTimestamp > 0,
     refetchOnWindowFocus: false,
   });
 
-  // --- STATE SYNCHRONIZATION ---
+  // Get all messages for initial load
+  const allInitialMessages =
+    initialData?.pages.flatMap((p) => p.messages) || [];
 
-  // Effect 1: Handle the initial data load.
-  // This runs only ONCE after the `useInfiniteQuery` succeeds.
-  useEffect(() => {
-    if (isInitialLoadSuccess && initialData) {
-      // Flatten the initial pages into a single array.
-      const allInitialMessages = initialData.pages.flatMap((p) => p.messages);
-
-      if (allInitialMessages.length > 0) {
-        // Update our state with the initial batch.
-        getGlobalStore.getState().setServerStateUpdate('messages', {
-          status: 'success',
-          data: allInitialMessages,
-          merge: { strategy: 'replace', key: 'id' },
-        });
-
-        // IMPORTANT: Set the timestamp of the newest message. This "activates"
-        // the polling `useQuery` to start checking for updates from this point forward.
-        const maxTimestamp = Math.max(
-          ...allInitialMessages.map((m) => m.timestamp)
-        );
-        setLastSyncTimestamp(maxTimestamp);
+  // Determine server state for initial load
+  let serverState:
+    | {
+        id?: string | number;
+        data?: Message[];
+        status?: 'pending' | 'error' | 'success' | 'loading';
+        timestamp?: number;
+        merge?:
+          | boolean
+          | { strategy: 'append' | 'prepend' | 'diff'; key?: string };
       }
-    }
-  }, [isInitialLoadSuccess, initialData]);
+    | undefined;
 
-  // Effect 2: Handle appending live updates.
-  // This runs whenever the polling `useQuery` successfully finds new messages.
+  if (isInitialLoading) {
+    serverState = { status: 'loading' };
+  } else if (
+    isInitialLoadSuccess &&
+    allInitialMessages.length > 0 &&
+    !hasInitialized
+  ) {
+    serverState = {
+      status: 'success',
+      data: allInitialMessages,
+      timestamp: Date.now(),
+      merge: false, // Don't merge on initial load
+    };
+  }
+
+  // Pass initial data through serverState
+  const messages = useCogsState('messages', {
+    serverState: serverState,
+  });
+
+  // Set timestamp after initial load
   useEffect(() => {
-    if (newMessages && newMessages.length > 0) {
-      // Update our state by APPENDING the new messages.
+    if (
+      isInitialLoadSuccess &&
+      allInitialMessages.length > 0 &&
+      !hasInitialized
+    ) {
+      const maxTimestamp = Math.max(
+        ...allInitialMessages.map((m) => m.timestamp)
+      );
+      setLastSyncTimestamp(maxTimestamp);
+      setHasInitialized(true);
+    }
+  }, [isInitialLoadSuccess, allInitialMessages, hasInitialized]);
+
+  // Handle live updates
+  useEffect(() => {
+    if (newMessages && newMessages.length > 0 && hasInitialized) {
+      // Trigger a server state update for new messages
       getGlobalStore.getState().setServerStateUpdate('messages', {
         status: 'success',
-        data: newMessages, // Just the small array of new messages
+        data: newMessages,
+        timestamp: Date.now(),
         merge: { strategy: 'append', key: 'id' },
       });
 
-      // Advance our timestamp so we don't fetch these messages again.
       const maxTimestamp = Math.max(...newMessages.map((m) => m.timestamp));
       setLastSyncTimestamp(maxTimestamp);
     }
-  }, [newMessages]);
+  }, [newMessages, hasInitialized]);
 
   return null;
 }
@@ -235,26 +257,121 @@ export default function VirtualizedChatExample() {
       <div className="gap-4 text-green-400 h-screen p-4">
         <DotPattern>
           <div className="px-8 py-4">
-            <h1 className="text-2xl font-bold text-gray-200">
-              Isolated Data Fetching Demo
+            <h1 className="text-2xl font-bold text-gray-200 mb-3">
+              Virtual Scrolling with useVirtualView
             </h1>
-            <p className="text-sm text-gray-400 pr-12 leading-relaxed">
-              An invisible `<DataFetcher />` component fetches data and uses the
-              `messages.insert()` method to surgically update the state store
-              without re-rendering the main UI component.
-            </p>
+            <div className="text-sm text-gray-400 pr-12 leading-relaxed grid grid-cols-2 gap-4">
+              <div>
+                <p>
+                  <span className="text-green-400 font-semibold">
+                    useVirtualView
+                  </span>{' '}
+                  is a powerful hook built into CogsState that enables
+                  high-performance virtual scrolling for large lists. Unlike
+                  traditional rendering that creates DOM nodes for every item,
+                  virtual scrolling only renders what's visible in the viewport
+                  plus a small buffer.
+                </p>
+                <p className="mt-2">
+                  This demo showcases a chat application with{' '}
+                  <span className="text-green-400">thousands of messages</span>{' '}
+                  featuring: 15-20 rendered messages at a time, smooth 60fps
+                  scrolling with 10k+ items, smart auto-scrolling, dynamic
+                  heights, and seamless CogsState integration.
+                </p>
+              </div>
+            </div>
           </div>
         </DotPattern>
-
-        <div className="flex gap-4">
+        <div className="flex gap-4 mt-6">
           <div className="w-3/5 flex flex-col gap-3">
             <ChatWindow
               sendMessage={sendMessageMutation.mutate}
               optimisticUpdates={optimisticUpdates}
             />
+
+            {/* Controls */}
+            <div className="flex gap-4 text-sm">
+              <label className="flex items-center gap-2 text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={autoMessagesEnabled}
+                  onChange={(e) => setAutoMessagesEnabled(e.target.checked)}
+                  className="rounded"
+                />
+                Auto-generate messages
+              </label>
+              <label className="flex items-center gap-2 text-gray-400">
+                <input
+                  type="checkbox"
+                  checked={optimisticUpdates}
+                  onChange={(e) => setOptimisticUpdates(e.target.checked)}
+                  className="rounded"
+                />
+                Optimistic updates
+              </label>
+            </div>
           </div>
-          <div className="w-2/5">
-            {/* ShowState or other components go here */}
+
+          <div className="w-2/5 space-y-4">
+            <CodeSnippetDisplay
+              title="Basic Setup"
+              code={`// 1. Create your state with an array
+const { useCogsState } = createCogsState({
+  messages: [] as Message[]
+});
+
+// 2. Use the virtual view hook
+function ChatWindow() {
+  const messages = useCogsState('messages');
+  
+  const { 
+    virtualState,      // Virtual slice of your array
+    virtualizerProps,  // Props for container elements
+    scrollToBottom    // Utility function
+  } = messages.useVirtualView({
+    itemHeight: 65,     // Estimated height per item
+    overscan: 10,       // Buffer items outside viewport
+    stickToBottom: true // Auto-scroll behavior
+  });
+
+  return (
+    <div {...virtualizerProps.outer}>
+      <div {...virtualizerProps.inner}>
+        <div {...virtualizerProps.list}>
+          {virtualState.stateList((message) => (
+            <MessageItem message={message} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}`}
+            />
+
+            <div className="bg-gray-900/50 rounded-lg p-4 border border-gray-800">
+              <h4 className="text-green-400 font-semibold mb-2">
+                Performance Benefits
+              </h4>
+              <div className="text-xs text-gray-400 space-y-1">
+                <p>
+                  • <span className="text-green-400">Memory:</span> Only ~20 DOM
+                  nodes instead of thousands
+                </p>
+                <p>
+                  • <span className="text-green-400">CPU:</span> React only
+                  re-renders visible items
+                </p>
+                <p>
+                  • <span className="text-green-400">Scrolling:</span> Native
+                  browser performance
+                </p>
+                <p>
+                  • <span className="text-green-400">Updates:</span> O(1)
+                  instead of O(n) for new items
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -292,9 +409,9 @@ function ChatWindow({
     <>
       <div
         {...virtualizerProps.outer}
-        className="flex flex-col max-h-[800px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden"
+        className="flex flex-col max-h-[600px] bg-[#1a1a1a] border border-gray-700 rounded overflow-hidden"
       >
-        <div className="min-h-[600px]" style={virtualizerProps.inner.style}>
+        <div className="min-h-[500px]" style={virtualizerProps.inner.style}>
           <div
             style={virtualizerProps.list.style}
             className="px-4 space-y-4 pb-8"
@@ -398,20 +515,21 @@ function MessageInput({
     };
 
     if (optimisticUpdates) {
-      // Add to local state immediately (optimistic update)
       messages.insert(({ uuid }) => ({
         ...messageData,
         id: uuid,
         timestamp: Date.now(),
       }));
       scrollToBottom('instant');
+    } else {
+      sendMessage(messageData);
     }
 
     setText('');
   };
 
   return (
-    <div className="p-3 border-t border-gray-700 bg-black/20">
+    <div className="p-3 border-t border-gray-700 bg-black/70">
       <div className="flex gap-2">
         <input
           type="text"
