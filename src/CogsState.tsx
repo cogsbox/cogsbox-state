@@ -893,9 +893,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   // Effect 1: When this component's serverState prop changes, broadcast it
   useEffect(() => {
-    if (serverState && serverState.status === 'success') {
-      getGlobalStore.getState().setServerStateUpdate(thisKey, serverState);
-    }
+    getGlobalStore.getState().setServerStateUpdate(thisKey, serverState);
   }, [serverState, thisKey]);
 
   // Effect 2: Listen for server state updates from ANY component

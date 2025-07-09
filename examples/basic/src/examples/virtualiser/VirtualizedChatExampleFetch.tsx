@@ -4,8 +4,7 @@ import {
   createCogsState,
   type StateObject,
 } from '../../../../../src/CogsState';
-import SyntaxHighlighter from 'react-syntax-highlighter';
-import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
+
 import { FlashWrapper } from '../../FlashOnUpdate';
 import DotPattern from '../../DotWrapper';
 import { faker } from '@faker-js/faker';
@@ -13,7 +12,6 @@ import { useEffect, useState } from 'react';
 
 import { CodeSnippetDisplay } from '../../CodeSnippet';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
-import { getGlobalStore } from '../../../../../src/store';
 
 type Message = {
   id: number | string;
@@ -139,99 +137,77 @@ const fetchNewMessagesSince = async (timestamp: number): Promise<Message[]> => {
 };
 
 function DataFetcher() {
+  // This state tracks the timestamp of the newest message we know about.
   const [lastSyncTimestamp, setLastSyncTimestamp] = useState(0);
-  const [hasInitialized, setHasInitialized] = useState(false);
+  const [serverState, setServerState] = useState<any>({});
+  // --- JOB 1: Initial Load ---
+  // useInfiniteQuery handles the one-time initial load. It has NO polling.
+  const { data: initialData, isSuccess: isInitialLoadSuccess } =
+    useInfiniteQuery({
+      queryKey: ['messages', 'history'], // A different key to separate it from the poller
+      queryFn: fetchMessagesWithCursor,
+      initialPageParam: 0,
+      // We only need the first page on load. This hook is now dormant.
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+      // CRITICAL: We only want this to run ONCE on load.
+      staleTime: Infinity,
+      refetchOnWindowFocus: false,
+    });
 
-  // Initial Load
-  const {
-    data: initialData,
-    isSuccess: isInitialLoadSuccess,
-    isLoading: isInitialLoading,
-  } = useInfiniteQuery({
-    queryKey: ['messages', 'history'],
-    queryFn: fetchMessagesWithCursor,
-    initialPageParam: 0,
-    getNextPageParam: (lastPage) => lastPage.nextCursor,
-    staleTime: Infinity,
-    refetchOnWindowFocus: false,
-  });
-
-  // Live Updates
+  // --- JOB 2: Live Updates ---
+  // A simple useQuery polls for ONLY new messages. It's lightweight.
   const { data: newMessages } = useQuery({
     queryKey: ['messages', 'updates', lastSyncTimestamp],
     queryFn: () => fetchNewMessagesSince(lastSyncTimestamp),
+    // Standard polling. This is the correct tool for this job.
     refetchInterval: 2000,
+    // Only run this query after the initial load has finished and set a timestamp.
     enabled: isInitialLoadSuccess && lastSyncTimestamp > 0,
     refetchOnWindowFocus: false,
   });
 
-  // Get all messages for initial load
-  const allInitialMessages =
-    initialData?.pages.flatMap((p) => p.messages) || [];
+  // --- STATE SYNCHRONIZATION ---
 
-  // Determine server state for initial load
-  let serverState:
-    | {
-        id?: string | number;
-        data?: Message[];
-        status?: 'pending' | 'error' | 'success' | 'loading';
-        timestamp?: number;
-        merge?:
-          | boolean
-          | { strategy: 'append' | 'prepend' | 'diff'; key?: string };
+  // Effect 1: Handle the initial data load.
+  // This runs only ONCE after the `useInfiniteQuery` succeeds.
+  useEffect(() => {
+    if (isInitialLoadSuccess && initialData) {
+      // Flatten the initial pages into a single array.
+      const allInitialMessages = initialData.pages.flatMap((p) => p.messages);
+
+      if (allInitialMessages.length > 0) {
+        setServerState({
+          status: 'success',
+          data: allInitialMessages,
+          merge: { strategy: 'replace', key: 'id' },
+        });
+
+        const maxTimestamp = Math.max(
+          ...allInitialMessages.map((m) => m.timestamp)
+        );
+        setLastSyncTimestamp(maxTimestamp);
       }
-    | undefined;
-
-  if (isInitialLoading) {
-    serverState = { status: 'loading' };
-  } else if (
-    isInitialLoadSuccess &&
-    allInitialMessages.length > 0 &&
-    !hasInitialized
-  ) {
-    serverState = {
-      status: 'success',
-      data: allInitialMessages,
-      timestamp: Date.now(),
-      merge: false, // Don't merge on initial load
-    };
-  }
-
-  // Pass initial data through serverState
-  const messages = useCogsState('messages', {
-    serverState: serverState,
-  });
-
-  // Set timestamp after initial load
-  useEffect(() => {
-    if (
-      isInitialLoadSuccess &&
-      allInitialMessages.length > 0 &&
-      !hasInitialized
-    ) {
-      const maxTimestamp = Math.max(
-        ...allInitialMessages.map((m) => m.timestamp)
-      );
-      setLastSyncTimestamp(maxTimestamp);
-      setHasInitialized(true);
     }
-  }, [isInitialLoadSuccess, allInitialMessages, hasInitialized]);
+  }, [isInitialLoadSuccess, initialData]);
 
-  // Handle live updates
+  // Effect 2: Handle appending live updates.
+  // This runs whenever the polling `useQuery` successfully finds new messages.
   useEffect(() => {
-    if (newMessages && newMessages.length > 0 && hasInitialized) {
-      // Trigger a server state update for new messages
-      getGlobalStore.getState().setServerStateUpdate('messages', {
+    if (newMessages && newMessages.length > 0) {
+      setServerState({
         status: 'success',
-        data: newMessages,
-        timestamp: Date.now(),
+        data: newMessages, // Just the small array of new messages
         merge: { strategy: 'append', key: 'id' },
       });
-
+      // Advance our timestamp so we don't fetch these messages again.
       const maxTimestamp = Math.max(...newMessages.map((m) => m.timestamp));
       setLastSyncTimestamp(maxTimestamp);
     }
-  }, [newMessages, hasInitialized]);
+  }, [newMessages]);
+
+  useCogsState('messages', {
+    serverState: serverState,
+  });
 
   return null;
 }
@@ -260,29 +236,46 @@ export default function VirtualizedChatExample() {
             <h1 className="text-2xl font-bold text-gray-200 mb-3">
               Virtual Scrolling with useVirtualView
             </h1>
-            <div className="text-sm text-gray-400 pr-12 leading-relaxed grid grid-cols-2 gap-4">
-              <div>
-                <p>
-                  <span className="text-green-400 font-semibold">
-                    useVirtualView
-                  </span>{' '}
-                  is a powerful hook built into CogsState that enables
-                  high-performance virtual scrolling for large lists. Unlike
-                  traditional rendering that creates DOM nodes for every item,
-                  virtual scrolling only renders what's visible in the viewport
-                  plus a small buffer.
-                </p>
-                <p className="mt-2">
-                  This demo showcases a chat application with{' '}
-                  <span className="text-green-400">thousands of messages</span>{' '}
-                  featuring: 15-20 rendered messages at a time, smooth 60fps
-                  scrolling with 10k+ items, smart auto-scrolling, dynamic
-                  heights, and seamless CogsState integration.
-                </p>
-              </div>
+            <div className="text-sm text-gray-400 pr-12 leading-relaxed space-y-3 max-w-4xl">
+              <p>
+                <span className="text-green-400 font-semibold">
+                  useVirtualView
+                </span>{' '}
+                is a powerful hook built into CogsState that enables
+                high-performance virtual scrolling for large lists. Unlike
+                traditional rendering that creates DOM nodes for every item,
+                virtual scrolling only renders what's visible in the viewport
+                plus a small buffer.
+              </p>
+              <p>
+                This demo showcases a chat application with{' '}
+                <span className="text-green-400">thousands of messages</span>{' '}
+                that:
+              </p>
+              <ul className="list-disc list-inside space-y-1 ml-4">
+                <li>
+                  Renders only ~15-20 messages at a time (visible + overscan)
+                </li>
+                <li>
+                  Maintains smooth 60fps scrolling even with 10,000+ items
+                </li>
+                <li>
+                  Auto-scrolls to bottom for new messages (with smart user
+                  scroll detection)
+                </li>
+                <li>Handles dynamic item heights and image loading</li>
+                <li>Works seamlessly with CogsState's reactive system</li>
+              </ul>
+              <p className="text-gray-500">
+                Try sending messages or enabling auto-messages to see the
+                virtualizer in action. Notice how only visible messages flash
+                green when they update, demonstrating the efficiency of virtual
+                rendering.
+              </p>
             </div>
           </div>
         </DotPattern>
+
         <div className="flex gap-4 mt-6">
           <div className="w-3/5 flex flex-col gap-3">
             <ChatWindow
@@ -529,7 +522,7 @@ function MessageInput({
   };
 
   return (
-    <div className="p-3 border-t border-gray-700 bg-black/70">
+    <div className="p-3 border-t border-gray-700 bg-black/20">
       <div className="flex gap-2">
         <input
           type="text"
