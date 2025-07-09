@@ -66,7 +66,7 @@ function App() {
           {/* Home button - standalone */}
           <button
             onClick={() => setActiveSection('home')}
-            className={`px-4 py-2 rounded text-sm font-medium transition-all ${
+            className={`px-4 py-2 rounded text-sm font-medium transition-all  cursor-pointer ${
               activeSection === 'home'
                 ? 'bg-gray-100 text-gray-900'
                 : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
@@ -87,8 +87,11 @@ function App() {
             {sections.slice(1).map((section) => (
               <button
                 key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`px-3 py-1.5 rounded text-sm transition-all ${
+                onClick={() => {
+                  setActiveSection(section.id);
+                  setContentHidden(false);
+                }}
+                className={`px-3 py-1.5 rounded text-sm transition-all  cursor-pointer ${
                   activeSection === section.id
                     ? 'bg-purple-500 text-white font-medium'
                     : 'text-purple-300 hover:bg-purple-800/50 hover:text-purple-100'

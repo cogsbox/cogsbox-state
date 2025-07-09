@@ -61,10 +61,12 @@ export default function AboutMe() {
                 Learning Web Development
               </p>
               <p className="text-lg leading-relaxed">
-                When I joined my previous role, I initially came on board to
-                help the owner with day-to-day operations. As a white label
-                company, we handled hundreds of label designs that required
-                manual batch ID updates - a process that quickly proved
+                My journey into software development was born out of a need to
+                improve th existing systems and that is something that has
+                continued to be the case. in my previous role I was intially
+                employed to help the owner with day-to-day operations. As a
+                white label company, we handled hundreds of label designs that
+                required manual batch ID updates - a process that quickly proved
                 unsustainable. I took it upon myself to develop a solution.
               </p>
               <p className="text-lg leading-relaxed">
@@ -265,7 +267,7 @@ state.warehouse.inventory.items
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* CogsAuth */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur-xl opacity-25 group-hover:opacity-40 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg blur-xl opacity-10 group-hover:opacity-40 transition-opacity" />
                 <div className="relative bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 hover:border-gray-600 transition-colors">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-blue-500/20 rounded-lg flex items-center justify-center">
@@ -327,7 +329,7 @@ state.warehouse.inventory.items
 
               {/* CogsBox Shape */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg blur-xl opacity-25 group-hover:opacity-40 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg blur-xl opacity-10 group-hover:opacity-40 transition-opacity" />
                 <div className="relative bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 hover:border-gray-600 transition-colors">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-green-500/20 rounded-lg flex items-center justify-center">
@@ -383,7 +385,7 @@ state.warehouse.inventory.items
 
               {/* CogsBox State */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg blur-xl opacity-25 group-hover:opacity-40 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-r from-purple-600 to-pink-600 rounded-lg blur-xl opacity-10 group-hover:opacity-40 transition-opacity" />
                 <div className="relative bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 hover:border-gray-600 transition-colors">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-purple-500/20 rounded-lg flex items-center justify-center">
@@ -441,7 +443,7 @@ state.warehouse.inventory.items
 
               {/* CogsBox Sync */}
               <div className="group relative">
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg blur-xl opacity-25 group-hover:opacity-40 transition-opacity" />
+                <div className="absolute inset-0 bg-gradient-to-r from-orange-600 to-red-600 rounded-lg blur-xl opacity-10 group-hover:opacity-40 transition-opacity" />
                 <div className="relative bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 hover:border-gray-600 transition-colors">
                   <div className="flex items-center gap-3 mb-4">
                     <div className="w-12 h-12 bg-orange-500/20 rounded-lg flex items-center justify-center">
