@@ -3,14 +3,15 @@ import { GenericObject } from './utility.js';
 import { z } from 'zod';
 import { ComponentsType } from './store.js';
 
-type Prettify<T> = {
+type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
-} & {};
+} : never;
 export type VirtualViewOptions = {
     itemHeight?: number;
     overscan?: number;
     stickToBottom?: boolean;
     dependencies?: any[];
+    scrollStickTolerance?: number;
 };
 export type VirtualStateObjectResult<T extends any[]> = {
     /**
@@ -36,27 +37,11 @@ export type VirtualStateObjectResult<T extends any[]> = {
     scrollToBottom: (behavior?: ScrollBehavior) => void;
     scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
 };
-export type ServerSyncStatus = {
-    isFresh: boolean;
-    isFreshTime: number;
-    isStale: boolean;
-    isStaleTime: number;
-    isSyncing: boolean;
-    isSyncingTime: number;
-};
 export type SyncInfo = {
     timeStamp: number;
     userId: number;
 };
-export type FormElementParams<T> = {
-    get: () => T;
-    set: UpdateType<T>;
-    syncStatus: (SyncInfo & {
-        date: Date;
-    }) | null;
-    path: string[];
-    validationErrors: () => string[];
-    addValidationError: (message?: string) => void;
+export type FormElementParams<T> = StateObject<T> & {
     inputProps: {
         ref?: React.RefObject<any>;
         value?: T extends boolean ? never : T;
@@ -66,39 +51,51 @@ export type FormElementParams<T> = {
 };
 export type StateKeys = string;
 type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
-export type PushArgs<U, T> = (update: Prettify<U> | ((prevState: NonNullable<Prettify<U>>[]) => NonNullable<Prettify<U>>), opts?: UpdateOpts<U>) => StateObject<T>;
 type CutFunctionType<T> = (index?: number, options?: {
     waitForSync?: boolean;
 }) => StateObject<T>;
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
+export type StreamOptions<T, R = T> = {
+    bufferSize?: number;
+    flushInterval?: number;
+    bufferStrategy?: 'sliding' | 'dropping' | 'accumulate';
+    store?: (buffer: T[]) => R | R[];
+    onFlush?: (buffer: T[]) => void;
+};
+export type StreamHandle<T> = {
+    write: (data: T) => void;
+    writeMany: (data: T[]) => void;
+    flush: () => void;
+    close: () => void;
+    pause: () => void;
+    resume: () => void;
+};
 export type ArrayEndType<TShape extends unknown> = {
-    findWith: findWithFuncType<InferArrayElement<TShape>>;
-    index: (index: number) => StateObject<InferArrayElement<TShape>> & {
-        insert: PushArgs<InferArrayElement<TShape>, TShape>;
+    stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
+    findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
+    index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
+        insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
         cut: CutFunctionType<TShape>;
         _index: number;
-    } & EndType<InferArrayElement<TShape>>;
-    insert: PushArgs<InferArrayElement<TShape>, TShape>;
+    } & EndType<Prettify<InferArrayElement<TShape>>>;
+    insert: InsertType<Prettify<InferArrayElement<TShape>>>;
     cut: CutFunctionType<TShape>;
+    cutSelected: () => void;
     cutByValue: (value: string | number | boolean) => void;
     toggleByValue: (value: string | number | boolean) => void;
-    stateSort: (compareFn: (a: InferArrayElement<TShape>, b: InferArrayElement<TShape>) => number) => ArrayEndType<TShape>;
-    useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<InferArrayElement<TShape>[]>;
-    stateMapNoRender: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
-    stateList: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: {
-        localIndex: number;
-        originalIndex: number;
-    }, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
-    stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
-    $stateMap: (callbackfn: (value: InferArrayElement<TShape>, setter: StateObject<InferArrayElement<TShape>>, index: number, array: TShape, arraySetter: StateObject<TShape>) => void) => any;
-    stateFlattenOn: <K extends keyof InferArrayElement<TShape>>(field: K) => StateObject<InferArrayElement<InferArrayElement<TShape>[K]>[]>;
-    uniqueInsert: (payload: UpdateArg<InferArrayElement<TShape>>, fields?: (keyof InferArrayElement<TShape>)[], onMatch?: (existingItem: any) => any) => void;
-    stateFind: (callbackfn: (value: InferArrayElement<TShape>, index: number) => boolean) => StateObject<InferArrayElement<TShape>> | undefined;
-    stateFilter: (callbackfn: (value: InferArrayElement<TShape>, index: number) => void) => ArrayEndType<TShape>;
-    getSelected: () => StateObject<InferArrayElement<TShape>> | undefined;
+    stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape>;
+    useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
+    stateList: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
+    stateMap: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
+    $stateMap: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
+    stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
+    uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
+    stateFind: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+    stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape>;
+    getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
     clearSelected: () => void;
     getSelectedIndex: () => number;
-    last: () => StateObject<InferArrayElement<TShape>> | undefined;
+    last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
 } & EndType<TShape>;
 export type FormOptsType = {
     validation?: {
@@ -112,22 +109,18 @@ export type FormOptsType = {
 };
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
-export type UpdateType<T> = (payload: UpdateArg<T>, opts?: UpdateOpts<T>) => void;
-export type UpdateOpts<T> = {
-    afterUpdate?: (state: T) => void;
-    debounce?: number;
-};
-export type ObjectEndType<T> = EndType<T> & {
-    [K in keyof T]-?: ObjectEndType<T[K]>;
-} & {
-    stateObject: (callbackfn: (value: T, setter: StateObject<T>) => void) => any;
-    delete: () => void;
-};
+export type InsertParams<S> = S | ((prevState: {
+    state: S;
+    uuid: string;
+}) => S);
+export type UpdateType<T> = (payload: UpdateArg<T>) => void;
+export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
+export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 export type ValidationError = {
     path: (string | number)[];
     message: string;
 };
-type EffectFunction<T, R> = (state: T) => R;
+type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
     addValidation: (errors: ValidationError[]) => void;
     applyJsonPatch: (patches: any[]) => void;
@@ -138,13 +131,13 @@ export type EndType<T, IsArrayElement = false> = {
     get: () => T;
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
-    _status: "fresh" | "stale" | "synced";
-    getStatus: () => "fresh" | "stale";
+    _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+    getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
     showValidationErrors: () => string[];
     setValidation: (ctx: string) => void;
     removeValidation: (ctx: string) => void;
     ignoreFields: (fields: string[]) => StateObject<T>;
-    _selected: boolean;
+    isSelected: boolean;
     setSelected: (value: boolean) => void;
     toggleSelected: () => void;
     getFormRef: () => React.RefObject<any> | undefined;
@@ -160,7 +153,8 @@ export type EndType<T, IsArrayElement = false> = {
 } : {});
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
-} & ObjectEndType<T> : T extends string | number | boolean | null ? T : never) & EndType<T, true> & {
+} : T extends string | number | boolean | null ? EndType<T, true> : never) & EndType<T, true> & {
+    toggle: T extends boolean ? () => void : never;
     getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
@@ -179,40 +173,21 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;
     }) => void) => void;
-    _isServerSynced: () => boolean;
     getLocalStorage: (key: string) => LocalStorageData<T> | null;
 };
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
-export type EffectiveSetState<TStateObject> = (newStateOrFunction: UpdateArg<TStateObject>, path: string[], updateObj: {
-    updateType: "update" | "insert" | "cut";
-}, validationKey?: string, opts?: UpdateOpts<TStateObject>) => void;
 export type UpdateTypeDetail = {
     timeStamp: number;
     stateKey: string;
-    updateType: "update" | "insert" | "cut";
+    updateType: 'update' | 'insert' | 'cut';
     path: string[];
-    status: "new" | "sent" | "synced";
+    status: 'new' | 'sent' | 'synced';
     oldValue: any;
     newValue: any;
     userId?: number;
 };
-export type ActionsType<T> = {
-    type: "onChange";
-    action: ({ state, actionType }: {
-        state: T;
-        actionType: string;
-    }) => void;
-    debounce?: number;
-}[];
-type ArrayToObject<T extends string[]> = Record<T[number], string>;
-type CookieType<T> = {
-    timeStamp: number;
-    value: T;
-    cookieName: string;
-    OnUnMountCookie?: Boolean;
-};
-export type CogsCookiesType<T extends string[] = string[]> = CookieType<ArrayToObject<T>>;
-export type ReactivityType = "none" | "component" | "deps" | "all";
+export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
+export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
 type ValidationOptionsType = {
     key?: string;
     zodSchema?: z.ZodTypeAny;
@@ -223,11 +198,15 @@ export type OptionsType<T extends unknown = unknown> = {
     componentId?: string;
     serverSync?: ServerSyncType<T>;
     validation?: ValidationOptionsType;
-    enableServerState?: boolean;
     serverState?: {
         id?: string | number;
         data?: T;
-        status?: "pending" | "error" | "success";
+        status?: 'pending' | 'error' | 'success' | 'loading';
+        timestamp?: number;
+        merge?: boolean | {
+            strategy: 'append' | 'prepend' | 'diff';
+            key?: string;
+        };
     };
     sync?: {
         action: (state: T) => Promise<{
@@ -252,11 +231,10 @@ export type OptionsType<T extends unknown = unknown> = {
         onChange?: (state: T) => void;
     };
     formElements?: FormsElementsType;
-    enabledSync?: (state: T) => boolean;
     reactiveDeps?: (state: T) => any[] | true;
-    reactiveType?: ReactivityType[] | ReactivityType;
+    reactiveType?: ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
-    initialState?: T;
+    defaultState?: T;
     dependencies?: any[];
 };
 export type ServerSyncType<T> = {
@@ -272,19 +250,6 @@ export type ServerSyncType<T> = {
         name: (({ state }: {
             state: T;
         }) => string) | string;
-        stateKeys: StateKeys[];
-        currentUrl: string;
-        currentParams?: URLSearchParams;
-    };
-};
-export type SyncActionsType<T> = {
-    syncKey: string;
-    rollBackState?: T;
-    actionTimeStamp: number;
-    retryCount?: number;
-    status: "success" | "waiting" | "rolledBack" | "error" | "cancelled" | "failed";
-    snapshot?: {
-        name: string;
         stateKeys: StateKeys[];
         currentUrl: string;
         currentParams?: URLSearchParams;
@@ -336,26 +301,50 @@ type LocalStorageData<T> = {
     lastUpdated: number;
     lastSyncedWithServer?: number;
     baseServerState?: T;
+    stateSource?: 'default' | 'server' | 'localStorage';
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, reactiveDeps, reactiveType, componentId, initialState, syncUpdate, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
-    initialState?: TStateObject;
-} & OptionsType<TStateObject>): [TStateObject, StateObject<TStateObject>];
+    defaultState?: TStateObject;
+} & OptionsType<TStateObject>): StateObject<TStateObject>;
+export type MetaData = {
+    /**
+     * An array of the full, unique string IDs (e.g., `"stateKey.arrayName.id:123"`)
+     * of the items that belong to the current derived "view" of an array.
+     * This is the primary mechanism for tracking the state of filtered or sorted lists.
+     *
+     * - `stateFilter` populates this with only the IDs of items that passed the filter.
+     * - `stateSort` reorders this list to match the new sort order.
+     * - All subsequent chained operations (like `.get()`, `.index()`, or `.cut()`)
+     *   MUST consult this list first to know which items they apply to and in what order.
+     */
+    validIds?: string[];
+    /**
+     * An array of the actual filter functions that have been applied in a chain.
+     * This is primarily used by reactive renderers like `$stateMap` to make predictions.
+     *
+     * For example, when a new item is inserted into the original source array, a
+     * `$stateMap` renderer on a filtered view can use these functions to test if the
+     * newly inserted item should be dynamically rendered in its view.
+     */
+    transforms?: Array<{
+        type: 'filter' | 'sort';
+        fn: Function;
+    }>;
+};
 export declare function $cogsSignal(proxy: {
     _path: string[];
     _stateKey: string;
     _effect?: string;
+    _meta?: MetaData;
 }): import('react').FunctionComponentElement<{
     proxy: {
         _path: string[];
         _stateKey: string;
         _effect?: string;
+        _meta?: MetaData;
     };
 }>;
-export declare function $cogsSignalStore(proxy: {
-    _path: string[];
-    _stateKey: string;
-}): import('react').ReactSVGElement;
 export {};

@@ -9,10 +9,10 @@ export declare const isDeepEqual: (object1?: Record<string, any>, object2?: Reco
 }, currentPath?: string[]) => boolean;
 export declare function updateNestedProperty(path: string[], state: any, update: any): any;
 export declare function deleteNestedProperty(path: string[], state: any): any;
-export declare function getNestedValue<TStateObject extends unknown>(obj: TStateObject, pathArray: string[]): any;
-export declare function updateNestedPropertyIds(path: string[], state: any, newValue: any): any;
+export declare function getNestedValue<TStateObject extends unknown>(obj: TStateObject, pathArray: string[], stateKey: string): any;
 type DifferencePaths = string[];
 export declare function getDifferences(obj1: any, obj2: any, currentPath?: string): DifferencePaths;
+export declare function deepMerge(target: any, source: any): any;
 export declare function getDifferencesArray(obj1: any, obj2: any): string[][];
 export declare function getArrayLengthDifferences(obj1: any, obj2: any, currentPath?: string): string[];
 export declare function getArrayLengthDifferencesArray(obj1: any, obj2: any): string[][];
