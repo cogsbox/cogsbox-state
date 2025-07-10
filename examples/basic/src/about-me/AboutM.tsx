@@ -46,37 +46,43 @@ export default function AboutMe() {
         {/* Main Content */}
         <div className="px-12  mx-auto space-y-12">
           {/* Origin Story */}
-          <section className="relative">
-            <div className="absolute -top-3 left-6 bg-[#1a1a1a] px-4 z-10">
-              <span className="text-blue-400 font-mono text-xl">
-                // How I Got Here
-              </span>
-            </div>
-            <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-8 pt-10">
-              <div className="space-y-4 text-gray-300 text-lg leading-relaxed">
-                <p>
-                  In 2018, I was hired to help with day-to-day operations at a
-                  day-to-day operations at a company handling hundreds of
-                  e-liquid label designs. Every batch needed manual ID updates -
-                  a mind-numbing process that was clearly unsustainable.
-                </p>
-                <p>
-                  With just basic PHP knowledge, I built a simple batch ID
-                  overlay system. But like most "simple" solutions, it grew.
-                  What started as a label updater evolved into a full CRM, stock
-                  picking and manufacturing system. Along the way, I picked up
-                  JavaScript, Node.js, and kept modernizing our stack.
-                </p>
-                <p>
-                  The real eye-opener came when talking to other businesses in
-                  the industry. They were either bleeding money on ill-fitting
-                  enterprise solutions or limping along with Excel spreadsheets.
-                  This realization led us to rebuild the system from the ground
-                  up using modern technologies, aiming to create a solution that
-                  can be tailored to any business's needs in the manufacturing
-                  sector.
-                </p>
+          <section className="relative grid grid-cols-[3fr_1fr] gap-4">
+            <div>
+              <div className="absolute -top-3 left-6 bg-[#1a1a1a] px-4 z-10">
+                <span className="text-blue-400 font-mono text-xl">
+                  // How I Got Here
+                </span>
               </div>
+              <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-8 pt-10">
+                <div className="space-y-4 text-gray-300 text-lg leading-relaxed">
+                  <p>
+                    In 2018, I was hired to help with day-to-day operations at a
+                    company handling hundreds of e-liquid label designs. Every
+                    batch needed manual ID updates - a mind-numbing process that
+                    was clearly unsustainable.
+                  </p>
+                  <p>
+                    With just basic PHP knowledge, I built a simple batch ID
+                    overlay system. But like most "simple" solutions, it grew.
+                    What started as a label updater evolved into a full CRM,
+                    stock picking and manufacturing system. Along the way, I
+                    picked up JavaScript, Node.js, and kept modernizing our
+                    stack.
+                  </p>
+                  <p>
+                    The real eye-opener came when talking to other businesses in
+                    the industry. They were either bleeding money on ill-fitting
+                    enterprise solutions or limping along with Excel
+                    spreadsheets. This realization led us to rebuild the system
+                    from the ground up using modern technologies, aiming to
+                    create a solution that can be tailored to any business's
+                    needs in the manufacturing sector.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="flex flex-col  border rounded-xl border-gray-700/50 bg-black/10 ">
+              dsad
             </div>
           </section>
 
@@ -147,10 +153,10 @@ export default function AboutMe() {
                     Too Many Schemas For One Data Shape
                   </h3>
                   <p>
-                    Now the large schemas themselves are not really an issue but
-                    when you have your DB SQL migrations, your ORM schema, your
-                    Types and your default client state you end up with multipel
-                    palces describing the same data.
+                    Now the large schemas themselves are not really an issue,
+                    but when you have your DB SQL migrations, your ORM schema,
+                    your Types and your default client state you end up with
+                    multiple places describing the same data.
                   </p>
                 </div>
               </div>
@@ -332,11 +338,11 @@ state.warehouse.inventory.items
                     <h4 className="text-sm font-semibold text-gray-500 uppercase mb-3">
                       The Problem
                     </h4>
-                    <p className="text-gray-300">
+                    <p className="text-gray-300 mt-3">
                       Multi-tenant SaaS needed complex, dynamic permissions that
                       existing solutions couldn't handle without enterprise
-                      pricing. We needed shareable acoutn sfor warehouse staff
-                      with quick pincode access as well as granular permisisons.
+                      pricing. We needed shareable accounts for warehouse staff
+                      with quick pincode access as well as granular permissions.
                     </p>
                     <p className="text-gray-300 mt-3">
                       Plus, we needed real-time activity tracking across tabs

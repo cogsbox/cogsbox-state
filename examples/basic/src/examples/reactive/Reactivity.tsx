@@ -5,6 +5,7 @@ import { type StateExampleObject, useCogsState } from './state';
 
 import React, { useEffect, useRef, useState } from 'react';
 import DotPattern from '../../DotWrapper';
+import { CodeSnippetDisplay } from '../../CodeSnippet';
 
 // Simple render counter that flashes red on updates
 function RenderBadge() {
@@ -277,6 +278,10 @@ function ReactivityGuide() {
             </div>
           </div>
         </div>
+        <CodeSnippetDisplay
+          title=""
+          code={` useCogsState('fooBarObject', { reactiveType: 'component' })`}
+        />
         <div className="flex gap-3">
           <div className="w-3 h-3 bg-purple-500 rounded-full mt-1"></div>
           <div>
@@ -286,6 +291,13 @@ function ReactivityGuide() {
             </div>
           </div>
         </div>
+        <CodeSnippetDisplay
+          title=""
+          code={` useCogsState('fooBarObject', { 
+    reactiveType: 'deps', 
+    reactiveDeps: (state) => [state.counter1] 
+    })`}
+        />
         <div className="flex gap-3">
           <div className="w-3 h-3 bg-orange-500 rounded-full mt-1"></div>
           <div>
@@ -294,7 +306,11 @@ function ReactivityGuide() {
               Brute force - re-renders on any change
             </div>
           </div>
-        </div>
+        </div>{' '}
+        <CodeSnippetDisplay
+          title=""
+          code={` useCogsState('fooBarObject', { reactiveType: 'all' })`}
+        />
         <div className="flex gap-3">
           <div className="w-3 h-3 bg-gray-500 rounded-full mt-1"></div>
           <div>
@@ -304,7 +320,11 @@ function ReactivityGuide() {
             </div>
           </div>
         </div>
-      </div>
+      </div>{' '}
+      <CodeSnippetDisplay
+        title=""
+        code={` useCogsState('fooBarObject', { reactiveType: 'none' })`}
+      />
     </div>
   );
 }

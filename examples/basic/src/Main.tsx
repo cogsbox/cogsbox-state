@@ -101,7 +101,7 @@ function App() {
 
           {/* Coming soon libraries */}
           <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
-            <span>Coming soon:</span>
+            <span>Examples coming soon:</span>
             <span className="text-blue-400">cogs-auth</span>
             <span className="text-green-400">cogsbox-shape</span>
             <span className="text-orange-400">cogsbox-sync</span>
