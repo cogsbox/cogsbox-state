@@ -31,7 +31,7 @@ const sections = [
   { id: 'form-bindings', name: 'Form Bindings' },
   // { id: 'array-reactivity', name: 'Array Reactivity' },
   { id: 'chat', name: 'Virtualized Chat' },
-  { id: 'lcd', name: 'LCD Cat Demo' },
+  // { id: 'lcd', name: 'LCD Cat Demo' },
   { id: 'array', name: 'Array Methods' },
 ];
 
@@ -79,7 +79,7 @@ function App() {
           <div className="mx-3 h-8 w-px bg-gray-700" />
 
           {/* Cogsbox State section */}
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1 bg-purple-500/10 rounded-l-full">
             <span className="text-[12px] font-mono text-purple-400 px-2 py-1 bg-purple-900/30 rounded-full border border-purple-500/20">
               cogsbox-state
             </span>

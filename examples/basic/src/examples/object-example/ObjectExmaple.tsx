@@ -226,13 +226,16 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
                       : 'bg-gray-800 hover:bg-gray-700/70'
                   }`}
                 >
-                  <div>{itemSetter.name.get()}</div>
+                  <div>{itemSetter.name.$get()}</div>
                   <div>
                     {itemSetter.score.formElement((obj) => (
-                      <input
-                        {...obj.inputProps}
-                        className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
-                      />
+                      <FlashWrapper>
+                        {' '}
+                        <input
+                          {...obj.inputProps}
+                          className="w-20 px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none"
+                        />{' '}
+                      </FlashWrapper>
                     ))}
                   </div>
                 </button>
