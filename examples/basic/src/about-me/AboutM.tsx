@@ -18,19 +18,33 @@ export default function AboutMe() {
           backgroundSize: '10px 10px',
         }}
       />
-      <div className="relative z-10 py-16 px-2">
+      <div className="relative z-10 py-8 px-12">
         {/* Clean Header */}
-        <header className="mb-16 px-24">
-          <h1 className="text-5xl font-bold text-gray-100 mb-4">
-            Christopher Murphy
-          </h1>
-          <p className="text-xl text-gray-400">
-            Fullstack TypeScript developer and systems architect
-          </p>
-        </header>
+        <div className="mb-20 flex items-center gap-12">
+          {/* Stacked squares - smaller and refined */}
+          <div className="relative w-[320px] h-[160px] flex-shrink-0">
+            <div className="absolute top-6 left-6 w-full h-full bg-gradient-to-br from-red-600/40 to-orange-600/40 rounded-lg" />
+            <div className="absolute top-3 left-3 w-full h-full bg-gradient-to-br from-blue-600/40 to-purple-600/40 rounded-lg" />
+            <div className="absolute top-0 left-0 w-full h-full bg-[#1a1a1a] border border-gray-700/50 rounded-lg flex items-center justify-center shadow-2xl backdrop-blur-sm">
+              <h1 className="text-gray-200 text-4xl font-bold tracking-wider">
+                About Me
+              </h1>
+            </div>
+          </div>
+
+          {/* Quick intro blurb */}
+          <div className="flex-1 max-w-2xl">
+            <h2 className="text-3xl font-bold text-gray-100 mb-3">
+              Christopher Murphy
+            </h2>
+            <p className="text-gray-400 text-lg leading-relaxed">
+              Fullstack TypeScript developer and systems architect
+            </p>
+          </div>
+        </div>
 
         {/* Main Content */}
-        <div className="px-24  mx-auto space-y-12">
+        <div className="px-12  mx-auto space-y-12">
           {/* Origin Story */}
           <section className="relative">
             <div className="absolute -top-3 left-6 bg-[#1a1a1a] px-4 z-10">
@@ -57,9 +71,10 @@ export default function AboutMe() {
                   The real eye-opener came when talking to other businesses in
                   the industry. They were either bleeding money on ill-fitting
                   enterprise solutions or limping along with Excel spreadsheets.
-                  That's when we decided to rebuild everything from scratch -
-                  creating something that could adapt to any manufacturing
-                  business.
+                  This realization led us to rebuild the system from the ground
+                  up using modern technologies, aiming to create a solution that
+                  can be tailored to any business's needs in the manufacturing
+                  sector.
                 </p>
               </div>
             </div>
@@ -78,19 +93,33 @@ export default function AboutMe() {
                   <h3 className="text-xl font-semibold text-gray-200 mb-2">
                     The Data Structure Problem
                   </h3>
-                  <p>
-                    Building a generic ERP meant dealing with deeply nested,
-                    interconnected data. Stock items linked to categories,
-                    properties tied to units of measure, everything carrying
-                    logs and user interactions. Our MySQL structure looked like
-                    a massive tree - similar to a DOM.
+                  <p className="text-lg leading-relaxed">
+                    Building a generic ERP system presented unique challenges in
+                    data management. Our MySQL database structure grew into an
+                    intricate web of relationships - stock items connected to
+                    their respective categories which in turn had nested data,
+                    properties linked to units of measure with complex
+                    hierarchical relationships between them. Every item carried
+                    its own stock records, activity logs, and user interactions.
                   </p>
-                  <p className="mt-2">
-                    While Objection.js handled graph fetching beautifully and
-                    tRPC made API calls efficient, client-side state mutations
-                    were a nightmare. Even with TypeScript, updating deeply
-                    nested fields meant writing increasingly complex and
-                    error-prone update logic.
+                  <p className="text-lg leading-relaxed">
+                    The data structure naturally evolved into large, tree-like
+                    structures, mirroring how DOM nodes represent HTML. These
+                    data trees became the foundation for our UI components,
+                    forms, displays, and notification systems. While fetching
+                    and managing this data was streamlined using Objection.js
+                    for graph fetching and tRPC for efficient, cached API calls,
+                    a new challenge emerged.
+                  </p>
+                  <p className="text-lg leading-relaxed">
+                    The real complexity lay in client-state mutations. Each form
+                    element nested deep within our state tree required
+                    increasingly complex mutation paths. Even with TypeScript
+                    providing errors in VS-code, managing these deep state
+                    updates became error-prone and cumbersome. While you could
+                    send partial data to components and manage it independently,
+                    this monolithic approach was wasteful in terms of
+                    re-rendering that occurred during any field mutation.
                   </p>
                 </div>
 
@@ -115,14 +144,13 @@ export default function AboutMe() {
 
                 <div>
                   <h3 className="text-xl font-semibold text-gray-200 mb-2">
-                    The Schema Transformation Hell
+                    Too Many Schemas For One Data Shape
                   </h3>
                   <p>
-                    Data in our system lived in multiple forms: integers in
-                    MySQL, different types during creation (like UUID strings
-                    for temporary IDs), transformed values for the client (cents
-                    to dollars), and validation rules for user input. Keeping
-                    these synchronized was a constant source of bugs.
+                    Now the large schemas themselves are not really an issue but
+                    when you have your DB SQL migrations, your ORM schema, your
+                    Types and your default client state you end up with multipel
+                    palces describing the same data.
                   </p>
                 </div>
               </div>

@@ -279,15 +279,19 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newShadowStore = new Map(get().shadowStateStore);
     let changed = false;
 
-    // This function marks a single path as dirty if it was previously synced.
     const setDirty = (currentPath: string[]) => {
       const fullKey = [key, ...currentPath].join('.');
       const meta = newShadowStore.get(fullKey);
 
-      // We only mark something as dirty if it was previously synced from the server.
-      // We also check `isDirty !== true` to avoid redundant updates.
-      if (meta && meta.stateSource === 'server' && meta.isDirty !== true) {
+      // We mark something as dirty if it isn't already.
+      // The original data source doesn't matter.
+      if (meta && meta.isDirty !== true) {
         newShadowStore.set(fullKey, { ...meta, isDirty: true });
+        changed = true;
+      } else if (!meta) {
+        // If there's no metadata, create it and mark it as dirty.
+        // This handles newly created fields within an object.
+        newShadowStore.set(fullKey, { isDirty: true });
         changed = true;
       }
     };
@@ -304,7 +308,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       }
     }
 
-    // Only update the global state if something actually changed.
     if (changed) {
       set({ shadowStateStore: newShadowStore });
     }

@@ -231,7 +231,7 @@ export type UpdateArg<S> = S | ((prevState: S) => S);
 export type InsertParams<S> =
   | S
   | ((prevState: { state: S; uuid: string }) => S);
-export type UpdateType<T> = (payload: UpdateArg<T>) => void;
+export type UpdateType<T> = (payload: UpdateArg<T>) => { synced: () => void };
 
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
@@ -782,7 +782,50 @@ export const notifyComponent = (stateKey: string, componentId: string) => {
     }
   }
 };
+function markEntireStateAsServerSynced(
+  stateKey: string,
+  path: string[],
+  data: any,
+  timestamp: number
+) {
+  const store = getGlobalStore.getState();
 
+  // Mark current path as synced
+  const currentMeta = store.getShadowMetadata(stateKey, path);
+  store.setShadowMetadata(stateKey, path, {
+    ...currentMeta,
+    isDirty: false,
+    stateSource: 'server',
+    lastServerSync: timestamp || Date.now(),
+  });
+
+  // If it's an array, mark each item as synced
+  if (Array.isArray(data)) {
+    const arrayMeta = store.getShadowMetadata(stateKey, path);
+    if (arrayMeta?.arrayKeys) {
+      arrayMeta.arrayKeys.forEach((itemKey, index) => {
+        const itemPath = itemKey.split('.').slice(1);
+        const itemData = data[index];
+        if (itemData !== undefined) {
+          markEntireStateAsServerSynced(
+            stateKey,
+            itemPath,
+            itemData,
+            timestamp
+          );
+        }
+      });
+    }
+  }
+  // If it's an object, mark each field as synced
+  else if (data && typeof data === 'object' && data.constructor === Object) {
+    Object.keys(data).forEach((key) => {
+      const fieldPath = [...path, key];
+      const fieldData = data[key];
+      markEntireStateAsServerSynced(stateKey, fieldPath, fieldData, timestamp);
+    });
+  }
+}
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -901,7 +944,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(thisKey, (event) => {
-        // REPLACEMENT STARTS HERE
         if (event?.type === 'SERVER_STATE_UPDATE') {
           const serverStateData = event.serverState;
 
@@ -912,7 +954,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
             const newOptions = { serverState: serverStateData };
             setAndMergeOptions(thisKey, newOptions);
 
-            // Check for a merge request.
             const mergeConfig =
               typeof serverStateData.merge === 'object'
                 ? serverStateData.merge
@@ -920,20 +961,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
                   ? { strategy: 'append' }
                   : null;
 
-            // Get the current array and the new data.
             const currentState = getGlobalStore
               .getState()
               .getShadowValue(thisKey);
             const incomingData = serverStateData.data;
 
-            // *** THE REAL FIX: PERFORM INCREMENTAL INSERTS ***
             if (
               mergeConfig &&
               Array.isArray(currentState) &&
               Array.isArray(incomingData)
             ) {
               const keyField = mergeConfig.key || 'id';
-
               const existingIds = new Set(
                 currentState.map((item: any) => item[keyField])
               );
@@ -941,21 +979,72 @@ export function useCogsStateFn<TStateObject extends unknown>(
               const newUniqueItems = incomingData.filter((item: any) => {
                 return !existingIds.has(item[keyField]);
               });
-              console.log('newUniqueItems', newUniqueItems);
+
               if (newUniqueItems.length > 0) {
                 newUniqueItems.forEach((item) => {
                   getGlobalStore
                     .getState()
                     .insertShadowArrayElement(thisKey, [], item);
+
+                  // MARK NEW SERVER ITEMS AS SYNCED
+                  const arrayMeta = getGlobalStore
+                    .getState()
+                    .getShadowMetadata(thisKey, []);
+
+                  if (arrayMeta?.arrayKeys) {
+                    const newItemKey =
+                      arrayMeta.arrayKeys[arrayMeta.arrayKeys.length - 1];
+                    if (newItemKey) {
+                      const newItemPath = newItemKey.split('.').slice(1);
+
+                      // Mark the new server item as synced, not dirty
+                      getGlobalStore
+                        .getState()
+                        .setShadowMetadata(thisKey, newItemPath, {
+                          isDirty: false,
+                          stateSource: 'server',
+                          lastServerSync:
+                            serverStateData.timestamp || Date.now(),
+                        });
+
+                      // Also mark all its child fields as synced if it's an object
+                      const itemValue = getGlobalStore
+                        .getState()
+                        .getShadowValue(newItemKey);
+                      if (
+                        itemValue &&
+                        typeof itemValue === 'object' &&
+                        !Array.isArray(itemValue)
+                      ) {
+                        Object.keys(itemValue).forEach((fieldKey) => {
+                          const fieldPath = [...newItemPath, fieldKey];
+                          getGlobalStore
+                            .getState()
+                            .setShadowMetadata(thisKey, fieldPath, {
+                              isDirty: false,
+                              stateSource: 'server',
+                              lastServerSync:
+                                serverStateData.timestamp || Date.now(),
+                            });
+                        });
+                      }
+                    }
+                  }
                 });
-              } else {
-                // No new items, no need to do anything.
-                return;
               }
             } else {
+              // For replace strategy or initial load
               getGlobalStore
                 .getState()
                 .initializeShadowState(thisKey, incomingData);
+
+              // Mark the entire state tree as synced from server
+              markEntireStateAsServerSynced(
+                thisKey,
+                [],
+                incomingData,
+                serverStateData.timestamp
+              );
             }
 
             const meta = getGlobalStore
@@ -1122,19 +1211,28 @@ export function useCogsStateFn<TStateObject extends unknown>(
         store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
         // The array at `path` has been modified. Mark it AND all its parents as dirty.
         store.markAsDirty(thisKey, path, { bubble: true });
+
+        // ALSO mark the newly inserted item itself as dirty
+        // Get the new item's path and mark it as dirty
+        const arrayMeta = store.getShadowMetadata(thisKey, path);
+        if (arrayMeta?.arrayKeys) {
+          const newItemKey =
+            arrayMeta.arrayKeys[arrayMeta.arrayKeys.length - 1];
+          if (newItemKey) {
+            const newItemPath = newItemKey.split('.').slice(1); // Remove stateKey
+            store.markAsDirty(thisKey, newItemPath, { bubble: false });
+          }
+        }
         break;
       }
       case 'cut': {
-        // The item is at `path`, so the parent array is at `path.slice(0, -1)`
         const parentArrayPath = path.slice(0, -1);
         store.removeShadowArrayElement(thisKey, path);
-        // The parent array has been modified. Mark it AND all its parents as dirty.
         store.markAsDirty(thisKey, parentArrayPath, { bubble: true });
         break;
       }
       case 'update': {
         store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
-        // The item at `path` was updated. Mark it AND all its parents as dirty.
         store.markAsDirty(thisKey, path, { bubble: true });
         break;
       }
@@ -1896,21 +1994,56 @@ function createProxyHandler<T>(
             }
           };
         }
+        // Fixed getStatus function in createProxyHandler
         if (prop === '_status' || prop === 'getStatus') {
           const getStatusFunc = () => {
             const shadowMeta = getGlobalStore
               .getState()
-              .getShadowMetadata(stateKey, []);
+              .getShadowMetadata(stateKey, path);
+            const value = getGlobalStore
+              .getState()
+              .getShadowValue(stateKeyPathKey);
 
-            if (shadowMeta?.stateSource === 'server' && !shadowMeta.isDirty) {
-              return 'synced';
-            } else if (shadowMeta?.isDirty) {
+            // Priority 1: Explicitly dirty items
+            if (shadowMeta?.isDirty === true) {
               return 'dirty';
-            } else if (shadowMeta?.stateSource === 'localStorage') {
+            }
+
+            // Priority 2: Explicitly synced items (isDirty: false)
+            if (shadowMeta?.isDirty === false) {
+              return 'synced';
+            }
+
+            // Priority 3: Items from server source (should be synced even without explicit isDirty flag)
+            if (shadowMeta?.stateSource === 'server') {
+              return 'synced';
+            }
+
+            // Priority 4: Items restored from localStorage
+            if (shadowMeta?.stateSource === 'localStorage') {
               return 'restored';
-            } else if (shadowMeta?.stateSource === 'default') {
+            }
+
+            // Priority 5: Items from default/initial state
+            if (shadowMeta?.stateSource === 'default') {
               return 'fresh';
             }
+
+            // Priority 6: Check if this is part of initial server load
+            // Look up the tree to see if parent has server source
+            const rootMeta = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, []);
+            if (rootMeta?.stateSource === 'server' && !shadowMeta?.isDirty) {
+              return 'synced';
+            }
+
+            // Priority 7: If no metadata exists but value exists, it's probably fresh
+            if (value !== undefined && !shadowMeta) {
+              return 'fresh';
+            }
+
+            // Fallback
             return 'unknown';
           };
 
@@ -2457,6 +2590,49 @@ function createProxyHandler<T>(
                 },
                 rebuildStateShape,
               });
+          } // In createProxyHandler -> handler -> get -> if (Array.isArray(currentState))
+
+          if (prop === 'stateFind') {
+            return (
+              callbackfn: (value: any, index: number) => boolean
+            ): StateObject<any> | undefined => {
+              // 1. Use the correct set of keys: filtered/sorted from meta, or all keys from the store.
+              const arrayKeys =
+                meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys;
+
+              if (!arrayKeys) {
+                return undefined;
+              }
+
+              // 2. Iterate through the keys, get the value for each, and run the callback.
+              for (let i = 0; i < arrayKeys.length; i++) {
+                const itemKey = arrayKeys[i];
+                if (!itemKey) continue; // Safety check
+
+                const itemValue = getGlobalStore
+                  .getState()
+                  .getShadowValue(itemKey);
+
+                // 3. If the callback returns true, we've found our item.
+                if (callbackfn(itemValue, i)) {
+                  // Get the item's path relative to the stateKey (e.g., ['messages', '42'] -> ['42'])
+                  const itemPath = itemKey.split('.').slice(1);
+
+                  // 4. Rebuild a new, fully functional StateObject for just that item and return it.
+                  return rebuildStateShape({
+                    currentState: itemValue,
+                    path: itemPath,
+                    componentId: componentId,
+                    meta, // Pass along meta for potential further chaining
+                  });
+                }
+              }
+
+              // 5. If the loop finishes without finding anything, return undefined.
+              return undefined;
+            };
           }
           if (prop === 'stateFilter') {
             return (callbackfn: (value: any, index: number) => boolean) => {
@@ -2697,7 +2873,7 @@ function createProxyHandler<T>(
                     .getState()
                     .subscribeToPath(stateKeyPathKey, (e) => {
                       // A data change has occurred for the source array.
-                      console.log('statelsit subscribed to path', e);
+
                       if (e.type === 'GET_SELECTED') {
                         return;
                       }
@@ -3247,9 +3423,38 @@ function createProxyHandler<T>(
         if (prop === '_path') return path;
         if (prop === 'update') {
           return (payload: UpdateArg<T>) => {
+            // Step 1: This is the same. It performs the data update.
             effectiveSetState(payload as any, path, { updateType: 'update' });
+
+            return {
+              /**
+               * Marks this specific item, which was just updated, as 'synced' (not dirty).
+               */
+              synced: () => {
+                // This function "remembers" the path of the item that was just updated.
+                const shadowMeta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+
+                // It updates ONLY the metadata for that specific item.
+                getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+                  ...shadowMeta,
+                  isDirty: false, // EXPLICITLY set to false, not just undefined
+                  stateSource: 'server', // Mark as coming from server
+                  lastServerSync: Date.now(), // Add timestamp
+                });
+
+                // Force a re-render for components watching this path
+                const fullPath = [stateKey, ...path].join('.');
+                getGlobalStore.getState().notifyPathSubscribers(fullPath, {
+                  type: 'SYNC_STATUS_CHANGE',
+                  isDirty: false,
+                });
+              },
+            };
           };
         }
+
         if (prop === 'toggle') {
           const currentValueAtPath = getGlobalStore
             .getState()
@@ -3782,6 +3987,7 @@ function ListItemWrapper({
   const hasReportedInitialHeight = useRef(false);
   const fullKey = [stateKey, ...itemPath].join('.');
   useRegisterComponent(stateKey, itemComponentId, forceUpdate);
+
   const setRefs = useCallback(
     (element: HTMLDivElement | null) => {
       elementRef.current = element;

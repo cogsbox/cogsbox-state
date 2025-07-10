@@ -416,7 +416,7 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
         }}
       >
         <div className="flex flex-col items-end justify-center h-full ">
-          <div className="h-[20%] w-full "></div>
+          <div className="h-[10%] w-full "></div>
           <div className="h-[80%] w-full text-black">{skyline}</div>
         </div>
       </div>
@@ -438,44 +438,7 @@ export function PixelRain({ numberOfDrops = 100 }: PixelRainProps) {
           <div className="h-[50%] w-full">{skyline}</div>
         </div>
       </div>
-      {/* <div
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100vh',
-          zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
-          pointerEvents: 'none',
-          filter: `brightness(${
-            1 + (1 - skylineBrightness + moonIntensity * 0.02)
-          }) contrast(0.93) saturate(0.88)`,
-          background: 'black',
-          backgroundAttachment: 'fixed',
-          imageRendering: 'pixelated',
-          transform: 'scaleX(-1)',
-          maskImage: 'url(/skyline.svg)',
-          maskSize: '100% 60vh',
-          maskPosition: '0 20vh',
-          maskRepeat: 'no-repeat',
-        }}
-      /> */}
-      {/* <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          width: '100%',
-          height: '60vh',
-          zIndex: Z_INDICES.SKYLINE_SILHOUETTE,
-          pointerEvents: 'none',
-          transform: 'scaleX(-1)',
-          minWidth: '100%',
-          imageRendering: 'pixelated',
-        }}
-      >
-        {skyline}
-      </div> */}
+
       <div
         className="fixed top-[26vh] inset-0 bg-gradient-to-b from-black/05 via-black to-black/05 w-full h-[50vh]"
         style={{ zIndex: Z_INDICES.SKYLINE_SILHOUETTE + 10 }}

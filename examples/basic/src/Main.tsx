@@ -44,7 +44,7 @@ function App() {
   const [contentHidden, setContentHidden] = useState(false);
 
   return (
-    <div className="relative crt">
+    <div className="relative h-[100vh] crt">
       {!bgDisabled && (
         <div className="pointer-events-none">
           <PixelRain />
@@ -68,7 +68,7 @@ function App() {
             onClick={() => setActiveSection('home')}
             className={`px-4 py-2 rounded text-sm font-medium transition-all  cursor-pointer ${
               activeSection === 'home'
-                ? 'bg-gray-100 text-gray-900'
+                ? 'bg-gray-300 text-gray-900'
                 : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
             }`}
           >
@@ -79,22 +79,19 @@ function App() {
           <div className="mx-3 h-8 w-px bg-gray-700" />
 
           {/* Cogsbox State section */}
-          <div className="flex items-center gap-1 bg-purple-900/20 rounded-lg p-1 border border-purple-500/20">
-            <span className="text-xs font-mono text-purple-400 px-3 py-1 bg-purple-900/30 rounded">
+          <div className="flex items-center gap-1">
+            <span className="text-[12px] font-mono text-purple-400 px-2 py-1 bg-purple-900/30 rounded-full border border-purple-500/20">
               cogsbox-state
             </span>
-
+            <div className="w-1" />
             {sections.slice(1).map((section) => (
               <button
                 key={section.id}
-                onClick={() => {
-                  setActiveSection(section.id);
-                  setContentHidden(false);
-                }}
-                className={`px-3 py-1.5 rounded text-sm transition-all  cursor-pointer ${
+                onClick={() => setActiveSection(section.id)}
+                className={`px-3 py-1.5 rounded text-sm transition-all cursor-pointer ${
                   activeSection === section.id
-                    ? 'bg-purple-500 text-white font-medium'
-                    : 'text-purple-300 hover:bg-purple-800/50 hover:text-purple-100'
+                    ? 'bg-purple-500 text-white '
+                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
                 }`}
               >
                 {section.name}
