@@ -1,361 +1,719 @@
-# Cogsbox State: A Practical Guide
+# Cogsbox State: A Comprehensive Guide
 
 > **🚨 DANGER: DO NOT USE - UNSTABLE & EXPERIMENTAL 🚨**
 >
 > This library is in extremely early development and constantly changing.
-> Everything will break. Nothing works properly.
-> **DO NOT USE IN ANY PROJECT.**
+>
+> **DO NOT USE IN ANY PROJECT YET - ONLY FOR TESTING AND PROVIDING FEEDBACK.**
+
+## What is Cogsbox State?
+
+Cogsbox State is a React state management library that creates a **nested state builder** - a type-safe proxy that mimics your initial state structure. Every property in your state becomes a powerful state object with built-in methods for updates, arrays, forms, and more.
+
+**Key Philosophy**: Instead of complex useState drilling and manual mapping, you directly access nested properties and use built-in methods.
 
 ## Getting Started
 
-Cogsbox State is a React state management library that provides a fluent, chainable interface for managing complex state. It's designed to make deep updates and form management intuitive and simple.
-
 ### Basic Setup
 
-1.  **Define your initial state configuration.**
-    It's best practice to structure each state slice with its own `initialState` and `options`.
-
 ```typescript
-// 1. Define your initial state
-const InitialState = {
-  // A simple slice for app settings
+import { createCogsState } from 'cogsbox-state';
+
+// 1. Define your initial state structure
+const initialState = {
+  user: {
+    name: "John",
+    stats: {
+      counter: 0,
+      lastUpdated: null
+    },
+    age: 30,
+    online:false
+  },
+  todos: [],
   settings: {
-    initialState: {
-      darkMode: false,
-      notifications: true,
-      username: "Guest",
-    },
-  },
-  // A more complex slice for a shopping cart
-  cart: {
-    initialState: {
-      items: [], // Array of { id, name, price, quantity }
-      total: 0,
-      status: "active",
-    },
-  },
+    darkMode: false,
+    notifications: true
+  }
 };
 
-// 2. Create the state hook
-export const { useCogsState } = createCogsState(InitialState);
-```
+// 2. Create your state manager
+const { useCogsState } = createCogsState(initialState);
 
-2.  **Use the hook in your components.**
+// 3. Use in components - access specific state slices by their keys
+function UserComponent() {
+  const user = useCogsState('user'); // Access the 'user' slice
 
-```typescript
-// 3. Use in your component
-function SettingsPanel() {
-// Access the "settings" state slice
-const settings = useCogsState("settings");
-
-// Read a value
-const isDarkMode = settings.darkMode.get();
-
-// Update a value
-const toggleDarkMode = () => {
-settings.darkMode.update(prev => !prev);
-};
-
-// Update another value
-const handleUsernameChange = (e) => {
-settings.username.update(e.target.value);
+  return (
+    <div>
+      <p>Name: {user.name.get()}</p>
+      <p>Counter: {user.stats.counter.get()}</p>
+      <button onClick={() => user.stats.counter.update(prev => prev + 1)}>
+        Increment Counter
+      </button>
+    </div>
+  );
 }
 
-return (
-<div>
-<p>User: {settings.username.get()}</p>
-<button onClick={toggleDarkMode}>
-Toggle Dark Mode ({isDarkMode ? "On" : "Off"})
-</button>
-</div>
-);
+function TodoComponent() {
+  const todos = useCogsState('todos'); // Access the 'todos' slice
+
+  return (
+    <div>
+      <p>Todo count: {todos.get().length}</p>
+      <button onClick={() => todos.insert({ id: Date.now(), text: 'New todo', done: false })}>
+        Add Todo
+      </button>
+    </div>
+  );
 }
 ```
 
 ## Core Concepts
 
-### Accessing State
+### State Access Patterns
 
-Reading state is always done by calling `.get()` at the end of a chain.
+Every state property gets these core methods:
+
+#### Primitives (strings, numbers, booleans)
+
+- `.get()` - read values reactively
+- `.update()` - set values
+- `.toggle()` - flip booleans
+- `.$get()` - non-reactive read (signals)
+- `.$derive()` - computed signals
+
+#### Objects
+
+- All primitive methods plus access to nested properties
+- `.update()` can do partial updates
+
+#### Arrays
+
+- All core methods plus array-specific operations
+- Built-in selection tracking and metadata
+
+### Reading State
 
 ```typescript
-const settings = useCogsState("settings");
+const user = useCogsState('user');
+const todos = useCogsState('todos');
+const settings = useCogsState('settings');
 
-// Get the entire 'settings' object
-const allSettings = settings.get();
-
-// Access a specific property
+// Reactive reads (triggers re-renders)
+const userName = user.name.get();
+const allTodos = todos.get();
 const isDarkMode = settings.darkMode.get();
 
-// For arrays, access elements by index
-const firstItem = cart.items.index(0).get();
+// Access nested properties
+const counterValue = user.stats.counter.get();
+const firstTodo = todos.index(0)?.get();
 
-// Chain deeper for nested properties
-const firstItemPrice = cart.items.index(0).price.get();
+// Non-reactive reads (no re-renders, for signals)
+const userNameStatic = user.name.$get();
+
+// Computed signals (transforms value without re-renders)
+const todoCount = todos.$derive((todos) => todos.length);
 ```
 
 ### Updating State
 
-Updating state is done with methods like `.update()`, `.insert()`, and `.cut()`.
-
 ```typescript
-// Direct update
-settings.darkMode.update(true);
+const user = useCogsState('user');
+const settings = useCogsState('settings');
+const todos = useCogsState('todos');
 
-// Functional update (based on previous value)
-cart.total.update((prevTotal) => prevTotal + 10);
+// Direct updates
+user.name.update('Jane');
+settings.darkMode.toggle();
 
-// Deep update on an object within an array
-cart.items.findWith("id", "123").name.update("New Product Name");
+// Functional updates
+user.stats.counter.update((prev) => prev + 1);
+
+// Object updates
+user.update((prev) => ({ ...prev, name: 'Jane', age: 30 }));
+
+// Deep nested updates
+todos.index(0).text.update('Updated todo text');
 ```
 
 ## Working with Arrays
 
-Cogsbox provides powerful, chainable methods for array manipulation.
+Arrays are first-class citizens with powerful built-in operations:
 
 ### Basic Array Operations
 
 ```typescript
-const cart = useCogsState("cart");
+const todos = useCogsState('todos');
 
-// Add an item to the end of the array
-cart.items.insert({
-  id: "prod1",
-  name: "Product 1",
-  price: 29.99,
-  quantity: 1,
-});
+// Add items
+todos.insert({ id: 'uuid', text: 'New todo', done: false });
+todos.insert(({ uuid }) => ({
+  id: uuid,
+  text: 'Auto-generated ID',
+  done: false,
+}));
 
-// Remove the item at index 2
-cart.items.cut(2);
+// Remove items
+todos.cut(2); // Remove at index 2
+todos.cutSelected(); // Remove currently selected item
 
-// Update an item at a specific index
-cart.items.index(0).price.update(19.99);
+// Access items
+const firstTodo = todos.index(0);
+const lastTodo = todos.last();
 ```
 
-### Finding and Updating Items
+### Array Iteration and Rendering
+
+#### `stateMap()` - Enhanced Array Mapping
 
 ```typescript
-// Find an item by a property's value and update it
-cart.items.findWith("id", "prod1").quantity.update((q) => q + 1);
+const todos = useCogsState('todos');
 
-// Find an item using a callback function (like array.find)
-const firstInStock = cart.items.stateFind((item) => item.stock > 0);
-if (firstInStock) {
-  // `firstInStock` is a state object, so you can chain updates
-  firstInStock.name.update((name) => `${name} (First Available!)`);
-}
+// Returns transformed array, each item is a full state object
+const todoElements = todos.stateMap((todoState, index, arrayState) => (
+  <TodoItem
+    key={todoState.id.get()}
+    todo={todoState}
+    onToggle={() => todoState.done.toggle()}
+    onDelete={() => arrayState.cut(index)}
+  />
+));
 ```
 
-### Handling Selection
-
-Cogsbox has built-in support for managing a "selected" item within an array, perfect for lists.
+#### `stateList()` - JSX List Rendering
 
 ```typescript
-function ProductList() {
-const cart = useCogsState("cart");
+const todos = useCogsState('todos');
 
-// Get the fully selected item's state object to use elsewhere
-const selectedProduct = cart.items.getSelected();
-
-return (
-<div>
-<h3>Products</h3>
-{cart.items.stateMap((item, itemUpdater) => (
-<div
-key={item.id}
-// Use `_selected` to apply styling
-className={itemUpdater.\_selected ? "product selected" : "product"}
-// Use `toggleSelected` to handle clicks
-onClick={() => itemUpdater.toggleSelected()} >
-{item.name}
-</div>
+// Renders directly in place with automatic key management
+{todos.stateList((todoState, index, arrayState) => (
+  <div key={todoState.id.get()}>
+    <span>{todoState.text.get()}</span>
+    <button onClick={() => todoState.done.toggle()}>Toggle</button>
+    <button onClick={() => arrayState.cut(index)}>Delete</button>
+  </div>
 ))}
+```
 
-      {selectedProduct && (
-        <div className="details">
-          <h4>Selected Details:</h4>
-          <p>Name: {selectedProduct.name.get()}</p>
-          <button onClick={() => selectedProduct.quantity.update(q => q + 1)}>
-            Add one more
-          </button>
-        </div>
-      )}
-    </div>
+#### `$stateMap()` - Signal-Based Rendering
 
-);
-}
+```typescript
+const todos = useCogsState('todos');
+
+// Most efficient - updates only changed items, no React re-renders
+{todos.$stateMap((todoState, index, arrayState) => (
+  <TodoItem todo={todoState} />
+))}
 ```
 
 ### Advanced Array Methods
 
+#### Filtering and Sorting
+
 ```typescript
-// Map over items with full access to each item's updater
-cart.items.stateMap((item, itemUpdater, index) => (
-<CartItem
-key={item.id}
-item={item}
-// Pass the updater down to the child component
-onQuantityChange={newQty => itemUpdater.quantity.update(newQty)}
-onRemove={() => cart.items.cut(index)}
-/>
-));
+const todos = useCogsState('todos');
 
-// Filter items while keeping them as state objects
-const inStockItems = cart.products.stateFilter(product => product.stock > 0);
+// Filter items (returns new state object with filtered view)
+const completedTodos = todos.stateFilter((todo) => todo.done);
+const incompleteTodos = todos.stateFilter((todo) => !todo.done);
 
-// Insert an item only if it's not already in the array
-cart.items.uniqueInsert(
-{ id: "prod1", name: "Product 1", quantity: 1 },
-["id"] // Fields to check for uniqueness
+// Sort items (returns new state object with sorted view)
+const sortedTodos = todos.stateSort((a, b) => a.text.localeCompare(b.text));
+
+// Chain operations
+const sortedCompletedTodos = todos
+  .stateFilter((todo) => todo.done)
+  .stateSort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+```
+
+#### Finding and Searching
+
+```typescript
+const todos = useCogsState('todos');
+
+// Find by property value
+const todoById = todos.findWith('id', 'some-id');
+if (todoById) {
+  todoById.text.update('Updated text');
+}
+
+// Find with custom function
+const firstIncompleteTodo = todos.stateFind((todo) => !todo.done);
+```
+
+#### Unique Operations
+
+```typescript
+const todos = useCogsState('todos');
+
+// Insert only if unique (prevents duplicates)
+todos.uniqueInsert(
+  { id: 'new-id', text: 'New todo', done: false },
+  ['id'], // Fields to check for uniqueness
+  (existingItem) => {
+    // Optional: callback if match found
+    return { ...existingItem, text: 'Updated existing' };
+  }
 );
 
-// Flatten an array of nested arrays by a property name
-const allProductVariants = cart.products.stateFlattenOn("variants");
+// Toggle presence (insert if missing, remove if present)
+todos.toggleByValue('some-id');
+```
+
+#### Selection Management
+
+```typescript
+const todos = useCogsState('todos');
+
+// Built-in selection tracking
+const selectedTodo = todos.getSelected();
+const selectedIndex = todos.getSelectedIndex();
+
+// Set selection on individual items
+todos.index(0).setSelected(true);
+todos.index(0).toggleSelected();
+
+// Clear all selections
+todos.clearSelected();
+
+// Check if item is selected
+const isSelected = todos.index(0).isSelected;
+```
+
+### Virtualization for Large Lists
+
+For performance with large datasets:
+
+```typescript
+function MessageList() {
+  const messages = useCogsState('messages', { reactiveType: 'none' });
+
+  const { virtualState, virtualizerProps, scrollToBottom } =
+    messages.useVirtualView({
+      itemHeight: 65,        // Height per item
+      overscan: 10,         // Items to render outside viewport
+      stickToBottom: true,  // Auto-scroll to bottom
+      scrollStickTolerance: 75 // Distance tolerance for bottom detection
+    });
+
+  return (
+    <div {...virtualizerProps.outer} className="h-96 overflow-auto">
+      <div style={virtualizerProps.inner.style}>
+        <div style={virtualizerProps.list.style}>
+          {virtualState.stateList((messageState, index) => (
+            <MessageItem key={messageState.id.get()} message={messageState} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Streaming for Real-time Data
+
+```typescript
+const messages = useCogsState('messages');
+
+// Create a stream for efficient batch operations
+const messageStream = messages.stream({
+  bufferSize: 100, // Buffer size before auto-flush
+  flushInterval: 100, // Auto-flush interval (ms)
+  bufferStrategy: 'sliding', // 'sliding' | 'dropping' | 'accumulate'
+  store: (buffer) => buffer, // Transform buffered items before insertion
+  onFlush: (buffer) => console.log('Flushed', buffer.length, 'items'),
+});
+
+// Write individual items
+messageStream.write(newMessage);
+
+// Write multiple items
+messageStream.writeMany([msg1, msg2, msg3]);
+
+// Manual flush
+messageStream.flush();
+
+// Pause/resume
+messageStream.pause();
+messageStream.resume();
+
+// Close stream
+messageStream.close();
 ```
 
 ## Reactivity Control
 
-Cogsbox offers different ways to control when components re-render for performance optimization.
+Cogsbox offers different reactivity modes for performance optimization:
 
 ### Component Reactivity (Default)
 
-The component re-renders whenever any state value accessed within it (using `.get()`) changes.
-
 ```typescript
-// Default behavior - re-renders when cart.items or cart.total changes
-const cart = useCogsState("cart");
-
-return (
-
-  <div>
-    <div>Items: {cart.items.get().length}</div>
-    <div>Total: {cart.total.get()}</div>
-  </div>
-);
+// Re-renders when any accessed state changes
+const user = useCogsState('user');
+// or explicitly:
+const user = useCogsState('user', { reactiveType: 'component' });
 ```
 
 ### Dependency-Based Reactivity
 
-The component re-renders _only_ when the values returned by `reactiveDeps` change.
-
 ```typescript
-// Only re-renders when the items array or status string changes
-const cart = useCogsState("cart", {
-  reactiveType: ["deps"],
-  reactiveDeps: (state) => [state.items, state.status],
+// Only re-renders when specified dependencies change
+const user = useCogsState('user', {
+  reactiveType: 'deps',
+  reactiveDeps: (state) => [state.name, state.stats.counter],
 });
 ```
 
 ### Full Reactivity
 
-The component re-renders on _any_ change to the state slice, even for properties not accessed in the component. Use with caution.
+```typescript
+// Re-renders on ANY change to the state slice
+const user = useCogsState('user', { reactiveType: 'all' });
+```
+
+### No Reactivity
 
 ```typescript
-// Re-renders on any change to the 'cart' state
-const cart = useCogsState("cart", {
-  reactiveType: ["all"],
+// Never re-renders (useful with signals)
+const todos = useCogsState('todos', { reactiveType: 'none' });
+```
+
+### Multiple Reactivity Types
+
+```typescript
+// Combine multiple reactivity modes
+const user = useCogsState('user', {
+  reactiveType: ['component', 'deps'],
+  reactiveDeps: (state) => [state.online],
 });
 ```
 
-### Signal-Based Reactivity (`$get` and `$derive`)
+## Signal-Based Updates
 
-This is the most efficient method. It bypasses React's rendering entirely and updates only the specific DOM text nodes that depend on a value.
+The most efficient rendering method - bypasses React entirely:
 
 ```typescript
-// Most efficient - updates just the specific text in the DOM
-return (
+function PerformantComponent() {
+  const user = useCogsState('user', { reactiveType: 'none' });
+  const todos = useCogsState('todos', { reactiveType: 'none' });
 
-  <div>
-    {/* $derive transforms the value before rendering */}
-    <div>Items: {cart.items.$derive(items => items.length)}</div>
+  return (
+    <div>
+      {/* These update DOM directly, no React re-renders */}
+      <div>Name: {user.name.$get()}</div>
+      <div>Counter: {user.stats.counter.$get()}</div>
+      <div>Todo Count: {todos.$derive(todos => todos.length)}</div>
 
-    {/* $get renders the value directly */}
-    <div>Total: {cart.total.$get()}</div>
+      {/* Signal-based list rendering */}
+      {todos.$stateMap((todo, index) => (
+        <div key={todo.id.$get()}>
+          <span>{todo.text.$get()}</span>
+          <button onClick={() => todo.done.toggle()}>Toggle</button>
+        </div>
+      ))}
 
-  </div>
-);
+      {/* Wrap with formElement for isolated reactivity */}
+      {user.stats.counter.formElement((obj) => (
+        <button onClick={() => obj.update(prev => prev + 1)}>
+          Increment: {obj.get()}
+        </button>
+      ))}
+    </div>
+  );
+}
 ```
 
-## Simple Forms with `formElement`
+## Form Management
 
-Cogsbox shines at form handling. The `formElement` method combined with `inputProps` removes nearly all boilerplate.
+Cogsbox excels at form handling with automatic debouncing and validation:
+
+### Basic Form Elements
 
 ```typescript
 import { z } from 'zod';
-import { createCogsState } from 'cogsbox-state';
 
-// Define a Zod schema for validation
+// Define validation schema
 const userSchema = z.object({
-name: z.string().min(1, "Name is required"),
-email: z.string().email("A valid email is required"),
-age: z.number().min(18, "You must be at least 18")
+  name: z.string().min(1, "Name is required"),
+  email: z.string().email("Invalid email"),
+  age: z.number().min(18, "Must be 18+")
 });
 
-// Create state with validation and a custom error wrapper
-export const { useCogsState } = createCogsState({
-userForm: {
-initialState: {
-name: "",
-email: "",
-age: 18
-},
-validation: {
-key: "userValidation", // A unique key for this form's errors
-zodSchema: userSchema
-},
-// Optional: A custom component to wrap fields and display errors
-formElements: {
-validation: ({ children, active, message }) => (
-<div className="form-field">
-{children}
-{active && <p className="error-message">{message}</p>}
-</div>
-)
-}
-}
+// Create state with validation
+const { useCogsState } = createCogsState({
+  userForm: {
+    initialState: { name: "", email: "", age: 18 },
+    validation: {
+      key: "userValidation",
+      zodSchema: userSchema,
+      onBlur: true // Validate on blur
+    },
+    formElements: {
+      validation: ({ children, active, message }) => (
+        <div className="form-field">
+          {children}
+          {active && <span className="error">{message}</span>}
+        </div>
+      )
+    }
+  }
 });
 
 function UserForm() {
-const user = useCogsState("userForm");
+  const userForm = useCogsState('userForm');
 
-const handleSubmit = (e) => {
-e.preventDefault();
-// Run all validations
-if (user.validateZodSchema()) {
-console.log("Form is valid!", user.get());
-} else {
-console.log("Form has errors.");
-}
-};
+  return (
+    <form>
+      {/* Auto-debounced input with validation wrapper */}
+      {userForm.name.formElement(({ inputProps }) => (
+        <>
+          <label>Name</label>
+          <input {...inputProps} />
+        </>
+      ))}
 
-return (
-<form onSubmit={handleSubmit}>
-{user.name.formElement((params) => (
-<>
-<label>Name</label>
-{/_ That's it! Spread inputProps to connect the input. _/}
-<input type="text" {...params.inputProps} />
-</>
-))}
-
-      {user.email.formElement((params) => (
+      {/* Custom debounce time */}
+      {userForm.email.formElement(({ inputProps, get, update }) => (
         <>
           <label>Email</label>
-          <input type="email" {...params.inputProps} />
+          <input {...inputProps} />
+          <small>Current: {get()}</small>
         </>
-      ))}
+      ), { debounceTime: 500 })}
 
-      {user.age.formElement((params) => (
+      {/* Custom form control */}
+      {userForm.age.formElement(({ get, update }) => (
         <>
           <label>Age</label>
-          <input type="number" {...params.inputProps} />
+          <input
+            type="number"
+            value={get()}
+            onChange={e => update(parseInt(e.target.value))}
+          />
         </>
       ))}
 
-      <button type="submit">Submit</button>
+      <button onClick={() => {
+        if (userForm.validateZodSchema()) {
+          console.log('Valid!', userForm.get());
+        }
+      }}>
+        Submit
+      </button>
     </form>
-
-);
+  );
 }
 ```
+
+## Advanced Features
+
+### Server Synchronization
+
+```typescript
+const { useCogsState } = createCogsState({
+  userProfile: {
+    initialState: { name: "", email: "" },
+    sync: {
+      action: async (state) => {
+        const response = await fetch('/api/user', {
+          method: 'PUT',
+          body: JSON.stringify(state)
+        });
+        return response.ok
+          ? { success: true, data: await response.json() }
+          : { success: false, error: 'Failed to save' };
+      },
+      onSuccess: (data) => console.log('Saved!', data),
+      onError: (error) => console.error('Save failed:', error)
+    }
+  }
+});
+
+function UserProfile() {
+  const userProfile = useCogsState('userProfile');
+
+  return (
+    <div>
+      <div>Status: {userProfile.getStatus()}</div> {/* 'fresh' | 'dirty' | 'synced' | 'restored' */}
+      <input
+        value={userProfile.name.get()}
+        onChange={e => userProfile.name.update(e.target.value)}
+      />
+      <button onClick={() => userProfile.sync()}>Save to Server</button>
+    </div>
+  );
+}
+```
+
+### Local Storage Integration
+
+```typescript
+const { useCogsState } = createCogsState({
+  userPrefs: {
+    initialState: { theme: 'dark', language: 'en' },
+    localStorage: {
+      key: 'user-preferences',
+      onChange: (state) => console.log('Saved to localStorage:', state),
+    },
+  },
+});
+
+function PreferencesComponent() {
+  const userPrefs = useCogsState('userPrefs');
+
+  return (
+    <div>
+      <select
+        value={userPrefs.theme.get()}
+        onChange={e => userPrefs.theme.update(e.target.value)}
+      >
+        <option value="dark">Dark</option>
+        <option value="light">Light</option>
+      </select>
+    </div>
+  );
+}
+```
+
+### State Status and History
+
+```typescript
+const user = useCogsState('user');
+
+// Check what changed from initial state
+const differences = user.getDifferences();
+
+// Get current status
+const status = user.getStatus(); // 'fresh' | 'dirty' | 'synced' | 'restored'
+
+// Revert to initial state
+user.revertToInitialState();
+
+// Update initial state (useful for findign diffs and server-synced data)
+const newServerData = {
+  name: 'Jane Doe',
+  age: 31,
+  stats: { counter: 100, lastUpdated: new Date() },
+};
+user.updateInitialState(newServerData);
+```
+
+### Component Isolation
+
+```typescript
+// Each component can have its own reactive settings
+function ComponentA() {
+  const user = useCogsState('user', {
+    reactiveType: 'deps',
+    reactiveDeps: (state) => [state.name],
+  });
+  // Only re-renders when user.name changes
+}
+
+function ComponentB() {
+  const user = useCogsState('user', {
+    reactiveType: 'all',
+  });
+  // Re-renders on any change to 'user' state
+}
+```
+
+## Performance Tips
+
+1. **Use signals for high-frequency updates**: `.$get()` and `.$derive()` don't trigger React re-renders
+2. **Use `reactiveType: 'none'` with signals**: Maximum performance for signal-heavy components
+3. **Use virtualization for large lists**: `useVirtualView()` handles thousands of items efficiently
+4. **Use streaming for real-time data**: Batch operations with `stream()` for better performance
+5. **Chain filter/sort operations**: `stateFilter().stateSort()` creates efficient views
+6. **Use `formElement` for forms**: Automatic debouncing and validation handling
+
+## Common Patterns
+
+### Master-Detail Interface
+
+```typescript
+function TodoApp() {
+  const todos = useCogsState('todos');
+  const selectedTodo = todos.getSelected();
+
+  return (
+    <div className="flex">
+      <div className="list">
+        {todos.stateList((todo, index) => (
+          <div
+            key={todo.id.get()}
+            className={todo.isSelected ? 'selected' : ''}
+            onClick={() => todo.toggleSelected()}
+          >
+            {todo.text.get()}
+          </div>
+        ))}
+      </div>
+
+      <div className="detail">
+        {selectedTodo ? (
+          <TodoDetail todo={selectedTodo} />
+        ) : (
+          <p>Select a todo</p>
+        )}
+      </div>
+    </div>
+  );
+}
+```
+
+### Real-time Chat with Virtualization
+
+```typescript
+function ChatRoom() {
+  const messages = useCogsState('messages', { reactiveType: 'none' });
+
+  const { virtualState, virtualizerProps, scrollToBottom } =
+    messages.useVirtualView({
+      itemHeight: 65,
+      overscan: 10,
+      stickToBottom: true,
+    });
+
+  return (
+    <div {...virtualizerProps.outer} className="chat-container">
+      <div style={virtualizerProps.inner.style}>
+        <div style={virtualizerProps.list.style}>
+          {virtualState.stateList((message) => (
+            <MessageItem key={message.id.$get()} message={message} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+```
+
+### Multiple State Slices in One Component
+
+```typescript
+function Dashboard() {
+  const user = useCogsState('user');
+  const todos = useCogsState('todos');
+  const settings = useCogsState('settings');
+
+  return (
+    <div>
+      <header>
+        <h1>Welcome, {user.name.get()}</h1>
+        <button onClick={() => settings.darkMode.toggle()}>
+          Toggle Theme
+        </button>
+      </header>
+
+      <main>
+        <p>You have {todos.get().length} todos</p>
+        <p>Counter: {user.stats.counter.get()}</p>
+      </main>
+    </div>
+  );
+}
+```
+
+This library provides a unique approach to React state management by creating a proxy that mirrors your data structure while adding powerful methods for manipulation, rendering, and performance optimization.
