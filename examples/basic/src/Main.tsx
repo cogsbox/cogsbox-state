@@ -4,7 +4,7 @@ import ReactDOM from 'react-dom/client';
 
 import Reactivity from './examples/reactive/Reactivity';
 import { PixelRain } from './PixelRain';
-import VirtualizedChatExample from './examples/virtualiser/VirtualizedChatExample';
+
 import ArrayMethodsPage from './examples/object-example/ObjectExmaple';
 import { catSvg } from '../assets/svgs';
 import LCDCatScrollerDemo from './LCDDemo';

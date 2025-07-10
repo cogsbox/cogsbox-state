@@ -10,7 +10,14 @@ export default function AboutMe() {
           backgroundSize: '20px 20px',
         }}
       />
-
+      <div
+        className="absolute top-0 left-0 right-0 h-[500px] opacity-10"
+        style={{
+          backgroundImage:
+            'radial-gradient(circle at 1px 1px, #6366f1 1px, transparent 1px)',
+          backgroundSize: '10px 10px',
+        }}
+      />
       <div className="relative z-10 py-16 px-2">
         {/* Clean Header */}
         <header className="mb-16 px-24">

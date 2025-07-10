@@ -18,13 +18,14 @@
 */
 .flying-car {
   position: absolute;
-  width: 12px;
+  width: 10px;
   height: 4px;
-  background-color: rgb(29, 29, 29);
-  border-radius: 1px; /* Slightly rounded edges */
+  background-color: rgb(20, 20, 20);
+  border-radius: 2px; /* Slightly rounded edges */
 
   /* Set up the animation to be infinite and run at a constant speed */
   animation-name: fly-across-screen;
+
   animation-timing-function: linear;
   animation-iteration-count: infinite;
 }
