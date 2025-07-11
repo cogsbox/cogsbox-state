@@ -81,9 +81,7 @@ export default function AboutMe() {
                 </div>
               </div>
             </div>
-            <div className="flex flex-col  border rounded-xl border-gray-700/50 bg-black/10 ">
-              dsad
-            </div>
+            <div className="flex flex-col  border rounded-xl border-gray-700/50 bg-black/10 "></div>
           </section>
 
           {/* Technical Challenges */}

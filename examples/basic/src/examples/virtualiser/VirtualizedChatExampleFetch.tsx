@@ -327,7 +327,7 @@ function MessageItem({ message }: { message: StateObject<Message> }) {
   const bubbleClasses = `flex flex-col max-w-[75%] px-3 py-2 rounded-lg shadow-md ${
     isFromYou
       ? message.getStatus() === 'dirty'
-        ? 'bg-yellow-500 rounded-br-none'
+        ? 'bg-orange-800 rounded-br-none'
         : 'bg-green-800 rounded-br-none'
       : 'bg-gray-700 rounded-bl-none'
   }`;
@@ -397,10 +397,15 @@ export default function VirtualizedChatExample() {
               </h1>
               <div className="text-sm text-gray-200 pr-12 leading-relaxed space-y-2 max-w-4xl">
                 <p>
-                  This demo showcases efficient rendering by isolating stateful
-                  logic. When you send a message, only the input area re-renders
-                  to show a "Sending..." state. The main chat component does not
-                  re-render, preventing lag and ensuring a smooth experience.
+                  This demonstration shows virtual scrolling that renders only
+                  visible items from a slice of the full array, enabling smooth
+                  performance with thousands of messages. The demo simulates
+                  normal database operations using React Query using it's
+                  optimisitic update pattern - new messages appear immediately
+                  with temporary IDs, then get replaced when the server
+                  responds. This approach maintains responsive UI interaction
+                  while handling network latency. Using Cogsbox-sync would make
+                  this process even easier.
                 </p>
               </div>
             </div>
