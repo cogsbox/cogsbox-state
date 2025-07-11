@@ -1,42 +1,44 @@
-// SyncProviderSPA.tsx
 'use client';
 
 import SyncProvider from './SyncProvider';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
+import { getSyncToken } from './vite/getSyncInfo';
+import { refreshSyncToken } from './vite/getRefreshtoken';
 
-export function SyncProviderSPA({
-  children,
-  getInitialAuth, // Function to get auth on client
-  syncServerUrl,
-  syncApiUrl,
-}: {
-  children: React.ReactNode;
-  getInitialAuth: () => Promise<{
-    token: string;
-    refreshToken: string;
-    clientId: string;
-  } | null>;
-  syncServerUrl: string;
-  syncApiUrl: string;
-}) {
-  const [auth, setAuth] = useState<{
-    token: string;
-    refreshToken: string;
-    clientId: string;
-  } | null>(null);
+export function SyncProviderSPA({ children }: { children: ReactNode }) {
+  const [tokens, setTokens] = useState<{
+    sessionToken?: string;
+    refreshToken?: string;
+    serverUrl?: string;
+  } | null>();
 
   useEffect(() => {
-    getInitialAuth().then(setAuth);
+    const fetchTokens = async () => {
+      try {
+        const result = await getSyncToken({
+          clientId: '1',
+          boundaryId: '1',
+          ctx: { userId: '1' },
+        });
+        setTokens(result);
+      } catch (error) {
+        console.error('Failed to fetch tokens:', error);
+      }
+    };
+
+    fetchTokens();
   }, []);
 
-  if (!auth) return <div>Loading...</div>;
-
+  if (!tokens) {
+    return null; // or a loading spinner
+  }
+  const syncApiUrl = `http://localhost:4000/api/sync`;
   return (
     <SyncProvider
-      token={auth.token}
-      refreshToken={auth.refreshToken}
-      socketUrl={syncServerUrl}
-      clientId={auth.clientId}
+      token={tokens.sessionToken}
+      refreshToken={tokens.refreshToken}
+      socketUrl={tokens.serverUrl!}
+      clientId={'1'}
       syncApiUrl={syncApiUrl}
     >
       {children}

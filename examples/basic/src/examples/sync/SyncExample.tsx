@@ -1,9 +1,8 @@
-import { useWebSocketConnection } from './useWebsocketConnection';
+import { useSync } from './SyncProvider';
+import { SyncProviderSPA } from './SyncProviderSpa';
+
 
 export default function SyncExample() {
-  const ws = useWebSocketConnection({
-    url: 'ws://localhost:3000/ws',
-    connect: true,
-  });
-  return <>Sync Example</>;
+
+  return <SyncProviderSPA>Sync Example</SyncProviderSPA>;
 }

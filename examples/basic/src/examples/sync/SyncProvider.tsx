@@ -7,6 +7,7 @@ import {
   isFunction,
 } from 'cogsbox-shape';
 import {
+  type ReactNode,
   createContext,
   useCallback,
   useContext,
@@ -18,6 +19,7 @@ import {
 
 import type z from 'zod';
 import { refreshSyncToken } from './vite/getRefreshtoken';
+import { applyPatch, compare, Operation } from 'fast-json-patch';
 type UpdateTypeDetail = any;
 type StateObject<T> = any;
 
@@ -66,9 +68,9 @@ export default function SyncProvider({
   clientId,
   syncApiUrl,
 }: {
-  children: React.ReactNode;
-  token: string | null;
-  refreshToken: string | null;
+  children: ReactNode;
+  token?: string | null;
+  refreshToken?: string | null;
   socketUrl: string | null;
   clientId: string;
   syncApiUrl: string;
@@ -159,12 +161,14 @@ export default function SyncProvider({
     }),
     [subscribe, isNotificationConnected]
   );
-
+  if (!token || !socketUrl || !syncApiUrl) {
+    return <>{children}</>;
+  }
   return (
     <SyncContext.Provider
       value={{
-        token: currentToken,
-        refreshToken,
+        token: currentToken!,
+        refreshToken: refreshToken!,
         socketUrl,
         clientId,
         syncApiUrl,
@@ -362,10 +366,6 @@ export function useSync<
     updateState: (data: UpdateTypeDetail) => {
       const messagePayload = {
         operation: data,
-        tempIds:
-          data.updateType === 'insert' && data.newValue.id
-            ? [data.newValue.id]
-            : [],
       };
 
       console.log('messagePayload', messagePayload);
@@ -402,4 +402,150 @@ export function useNotificationChannel(
   }, [channel, onNotification, subscribe]);
 
   return { isConnected: isNotificationConnected };
+}
+export function useSyncReact<TStateType>(
+  stateAndSetter: [
+    TStateType,
+    React.Dispatch<React.SetStateAction<TStateType>>,
+  ],
+  options: {
+    syncId:
+      | number
+      | string
+      | (({ clientId }: { clientId: string }) => string | null);
+    connect: boolean;
+    syncKey: string;
+  }
+) {
+  const {
+    token,
+    socketUrl,
+    clientId,
+    syncApiUrl,
+    sessionId,
+    refreshAccessToken,
+  } = useContext(SyncContext);
+
+  const [state, setState] = stateAndSetter;
+  const [validationErrors, setValidationErrors] = useState<any[]>([]);
+  const currentToken = useRef(token);
+
+  useEffect(() => {
+    currentToken.current = token;
+  }, [token]);
+
+  const { syncId, connect, syncKey } = options;
+  const isArray = Array.isArray(state);
+
+  const determinedSyncId: string = (
+    isFunction(syncId) ? syncId({ clientId: clientId ?? '' }) : syncId
+  ) as string;
+  const syncIdString = `${syncKey}-${determinedSyncId}`;
+
+  const syndIdRef = useRef(syncIdString);
+  syndIdRef.current = syncIdString;
+
+  const subScribers = useRef<string[]>([]);
+  const isInitialised = useRef(false);
+
+  const { connection, sendMessage } = useWebSocketConnection({
+    url: `${socketUrl}/sync/${syndIdRef.current}?token=${currentToken.current}&sessionId=${sessionId}`,
+    connect: connect,
+    onDisconnect() {
+      console.log('useSyncReact WebSocket disconnected');
+    },
+    onConnect: async () => {
+      sendMessage({
+        type: 'initialSend',
+        syncKey: syncIdString,
+        isArray: isArray,
+        syncApiUrl,
+      });
+    },
+    onMessage: async (data) => {
+      // This onMessage logic is correct and remains the same
+      switch (data.type) {
+        case 'auth_failed':
+          const newToken = await refreshAccessToken();
+          if (newToken) {
+            currentToken.current = newToken;
+          }
+          break;
+        case 'updateState':
+          if (data.syncKey === syndIdRef.current) {
+            isInitialised.current = true;
+            setState(data.data as TStateType);
+          }
+          break;
+        case 'subscribers':
+          if (data.syncKey === syndIdRef.current) {
+            subScribers.current = data.subscribers;
+          }
+          break;
+        case 'applyPatch':
+          if (data.syncKey === syndIdRef.current) {
+            setState(
+              (prevState) =>
+                applyPatch(prevState, data.data as Operation[]).newDocument
+            );
+          }
+          break;
+        case 'syncReady':
+          console.log('Sync ready for syncKey:', data.syncKey);
+          break;
+        case 'fetchStateFromDb':
+          if (determinedSyncId) {
+            sendMessage({
+              type: 'initialSend',
+              syncKey: syncIdString,
+              isArray: isArray,
+              syncApiUrl,
+            });
+          }
+          break;
+        case 'validationError':
+          setValidationErrors((prevErrors) => [...prevErrors, data.details]);
+          console.log('Sync validation error:', data.details, data.message);
+          break;
+        case 'error':
+          console.error('Sync error:', data.message);
+          break;
+      }
+    },
+  });
+
+  /**
+   * The intelligent updater function. It sends only the difference to the server.
+   */
+  const syncedUpdater = useCallback(
+    (valueOrFn: React.SetStateAction<TStateType>) => {
+      const oldState = state;
+      const newState = isFunction(valueOrFn) ? valueOrFn(oldState) : valueOrFn;
+
+      const patch = compare(oldState as any, newState as any);
+
+      if (patch.length === 0) {
+        return;
+      }
+
+      setState(newState);
+
+      sendMessage({
+        type: 'queueUpdate',
+        data: {
+          operation: patch,
+        },
+      });
+    },
+    [state, setState, sendMessage]
+  );
+
+  const details = {
+    connected: connection.connected,
+    clientId,
+    subscribers: subScribers.current,
+    validationErrors,
+  };
+
+  return [state, syncedUpdater, details] as const;
 }
