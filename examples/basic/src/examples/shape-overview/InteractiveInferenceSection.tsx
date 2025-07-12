@@ -3,8 +3,8 @@
 import { Sandpack } from '@codesandbox/sandpack-react';
 import { atomDark } from '@codesandbox/sandpack-themes';
 
-// Helper component (can be moved to a shared file)
-function SectionWrapper({ children }) {
+// Helper component
+function SectionWrapper({ children }: { children: React.ReactNode }) {
   return (
     <div className="bg-[#1a1a1a] border border-gray-700/50 rounded-lg p-6 text-white">
       {children}
@@ -12,8 +12,8 @@ function SectionWrapper({ children }) {
   );
 }
 
-// Define the example code that will run in the sandbox.
-// It now imports directly from "cogsbox-shape".
+// The code is now a simple React component inside a .tsx file.
+// This gives us the full power of TypeScript's language server.
 const exampleCode = `
 import { z } from "zod";
 import { schema, s, createSchema, schemaRelations, InferFromSchema } from "cogsbox-shape";
@@ -42,7 +42,6 @@ const postSchema = schema({
 const postSchemaWithRels = schemaRelations(postSchema, (s) => ({
   authorId: s.reference(() => userSchema.id),
 }));
-
 const userSchemaWithRels = schemaRelations(userSchema, (s) => ({
   posts: s.hasMany({
     fromKey: "id",
@@ -57,60 +56,74 @@ const finalUserSchema = createSchema(userSchema, userSchemaWithRels);
 // --- 4. INFER ALL TYPES! ---
 type UserTypes = InferFromSchema<typeof finalUserSchema>;
 
-// HOVER OVER THE VARIABLES BELOW TO SEE THE INFERRED TYPES!
-
-// This \`newUser\` object is fully typed based on your schema.
-const newUser: UserTypes['Client'] = finalUserSchema.defaultValues;
-
-// This is the type for a raw database record.
-const dbUser: UserTypes['Sql'] = {
-  id: 123,
-  name: 'John Doe',
-  status: 1,
-  posts: [] // 'posts' would be loaded separately
+export default function App() {
+  type UserTypes = InferFromSchema<typeof finalUserSchema>;
+  const newUser: UserTypes['Client'] = finalUserSchema.defaultValues;
+  return <h1>Hover over 'newUser' to test!</h1>
 }
-
-console.log('Client-side default user object:', newUser);
 `;
+
+const sandboxPackageJson = JSON.stringify(
+  {
+    name: 'cogsbox-demo-environment',
+    scripts: {
+      start: 'vite', // The UNAMBIGUOUS command for this sandbox.
+    },
+    dependencies: {
+      react: '^18.2.0',
+      'react-dom': '^18.2.0',
+      vite: '^4.3.9',
+      'cogsbox-shape': 'latest', // Your REAL library as a dependency
+      zod: 'latest',
+    },
+    devDependencies: {
+      '@vitejs/plugin-react': '^4.0.0',
+      typescript: '^5.0.4',
+    },
+  },
+  null,
+  2
+);
 
 export default function InteractiveInferenceSection() {
   return (
     <SectionWrapper>
       <h2 className="text-3xl font-bold text-gray-100 mb-2">
-        🔮 The Payoff: Live Type Inference
+        🔮 Live Type Inference
       </h2>
       <div className="prose prose-invert max-w-none mb-6">
         <p className="text-gray-300 leading-relaxed">
-          The ultimate goal of `cogsbox-shape` is to do the work for you. The editor below fetches the live <code className="text-orange-400">cogsbox-shape</code> package from NPM and runs it in a sandboxed environment.
+          The editor below fetches the live{' '}
+          <code className="text-orange-400">cogsbox-shape</code> package from
+          NPM and runs it in a fully-featured TypeScript environment.
         </p>
         <p className="font-semibold text-orange-400">
-          Instructions: Inside the editor, hover your mouse over the `newUser` or `dbUser` variables to see TypeScript's fully inferred types in action.
+          Instructions: Hover your mouse over the `newUser` variable in the code
+          to see its complete, inferred type.
         </p>
       </div>
 
       <Sandpack
-        template="react-ts"
+        template="react-ts" // This template uses Vite under the hood
         theme={atomDark}
         files={{
-          // The code that uses your library
-          '/index.js': {
+          // Provide our App code as the main file
+          '/App.tsx': {
             code: exampleCode,
             active: true,
           },
-        }}
-        customSetup={{
-          // --- THIS IS THE CRITICAL PART ---
-          // Sandpack will now run `npm install` for these packages.
-          dependencies: {
-            'cogsbox-shape': 'latest', // Or a specific version e.g., "0.1.2"
-            'zod': 'latest',
+          // Provide our own package.json to override any defaults
+          '/package.json': {
+            code: sandboxPackageJson,
+            hidden: true, // Hide it from the user
           },
         }}
+        // We no longer need customSetup.dependencies because they are in our package.json
         options={{
-          editorHeight: '600px',
+          editorHeight: '650px',
           showTabs: true,
           showLineNumbers: true,
-          editorWidthPercentage: 60, // Give more room to the code
+          editorWidthPercentage: 60,
         }}
       />
     </SectionWrapper>

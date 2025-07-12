@@ -1,6 +1,7 @@
-import SyncExample from '../examples/sync/SyncExample';
 import { useRef } from 'react';
 import { useNavigate } from 'react-router';
+import { SyncProviderSPA } from '../../src/examples/sync/SyncProviderSpa';
+import SyncUser from '../../src/examples/user-sync/SyncUser';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function Sync() {
@@ -46,7 +47,9 @@ export default function Sync() {
         </button>
       </div>
       <div className="bg-gray-800 rounded-lg p-6">
-        <SyncExample />
+        <SyncProviderSPA>
+          <SyncUser />
+        </SyncProviderSPA>
       </div>
     </div>
   );
