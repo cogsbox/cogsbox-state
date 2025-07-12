@@ -107,30 +107,30 @@ export default function SyncProvider({
     }
   }, [clientId]);
   // Single notification WebSocket connection
-  const { connection: notificationConnection } = useWebSocketConnection({
-    url:
-      clientId && token
-        ? `${socketUrl}/user-presence/${clientId}?token=${currentToken}&sessionId=${sessionId}`
-        : '',
-    connect: Boolean(clientId && currentToken),
-    onConnect: () => setIsNotificationConnected(true),
-    onDisconnect: () => setIsNotificationConnected(false),
-    onMessage: (data) => {
-      if (data.type === 'notification') {
-        // Get all callbacks for this channel
-        const callbacks = subscriptions.current.get(data.channel);
-        if (callbacks) {
-          callbacks.forEach((callback) => {
-            callback({
-              syncKey: data.syncKey,
-              matches: data.matches,
-              timestamp: data.timestamp,
-            });
-          });
-        }
-      }
-    },
-  });
+  // const { connection: notificationConnection } = useWebSocketConnection({
+  //   url:
+  //     clientId && token
+  //       ? `${socketUrl}/user-presence/${clientId}?token=${currentToken}&sessionId=${sessionId}`
+  //       : '',
+  //   connect: Boolean(clientId && currentToken),
+  //   onConnect: () => setIsNotificationConnected(true),
+  //   onDisconnect: () => setIsNotificationConnected(false),
+  //   onMessage: (data) => {
+  //     if (data.type === 'notification') {
+  //       // Get all callbacks for this channel
+  //       const callbacks = subscriptions.current.get(data.channel);
+  //       if (callbacks) {
+  //         callbacks.forEach((callback) => {
+  //           callback({
+  //             syncKey: data.syncKey,
+  //             matches: data.matches,
+  //             timestamp: data.timestamp,
+  //           });
+  //         });
+  //       }
+  //     }
+  //   },
+  // });
 
   const subscribe = useCallback(
     (channel: string, callback: NotificationCallback) => {
@@ -403,6 +403,7 @@ export function useNotificationChannel(
 
   return { isConnected: isNotificationConnected };
 }
+
 export function useSyncReact<TStateType>(
   stateAndSetter: [
     TStateType,
@@ -415,6 +416,7 @@ export function useSyncReact<TStateType>(
       | (({ clientId }: { clientId: string }) => string | null);
     connect: boolean;
     syncKey: string;
+    inMemoryState?: boolean;
   }
 ) {
   const {
@@ -425,7 +427,7 @@ export function useSyncReact<TStateType>(
     sessionId,
     refreshAccessToken,
   } = useContext(SyncContext);
-
+  console.log('useSyncReact', token, socketUrl, syncApiUrl);
   const [state, setState] = stateAndSetter;
   const [validationErrors, setValidationErrors] = useState<any[]>([]);
   const currentToken = useRef(token);
@@ -447,10 +449,12 @@ export function useSyncReact<TStateType>(
 
   const subScribers = useRef<string[]>([]);
   const isInitialised = useRef(false);
-
+  const isReadyToConnect = Boolean(
+    token && socketUrl && determinedSyncId && connect
+  );
   const { connection, sendMessage } = useWebSocketConnection({
     url: `${socketUrl}/sync/${syndIdRef.current}?token=${currentToken.current}&sessionId=${sessionId}`,
-    connect: connect,
+    connect: isReadyToConnect,
     onDisconnect() {
       console.log('useSyncReact WebSocket disconnected');
     },
@@ -459,11 +463,11 @@ export function useSyncReact<TStateType>(
         type: 'initialSend',
         syncKey: syncIdString,
         isArray: isArray,
-        syncApiUrl,
+        syncApiUrl: syncApiUrl || null, // Send null if no syncApiUrl
+        inMemoryState: options?.inMemoryState,
       });
     },
     onMessage: async (data) => {
-      // This onMessage logic is correct and remains the same
       switch (data.type) {
         case 'auth_failed':
           const newToken = await refreshAccessToken();
@@ -474,9 +478,28 @@ export function useSyncReact<TStateType>(
         case 'updateState':
           if (data.syncKey === syndIdRef.current) {
             isInitialised.current = true;
+
             setState(data.data as TStateType);
           }
           break;
+        case 'requestInitialState':
+          if (data.syncKey === syndIdRef.current) {
+            console.log(
+              '[useSyncReact] Server requested initial state. Providing it now.'
+            );
+
+            console.log(
+              'data.sssssssssssssssssssssssssssssssssdata',
+              data.data
+            );
+            sendMessage({
+              type: 'provideInitialState',
+              syncKey: syncIdString,
+              state: state,
+            });
+          }
+          break;
+
         case 'subscribers':
           if (data.syncKey === syndIdRef.current) {
             subScribers.current = data.subscribers;
@@ -499,13 +522,20 @@ export function useSyncReact<TStateType>(
               type: 'initialSend',
               syncKey: syncIdString,
               isArray: isArray,
-              syncApiUrl,
+              syncApiUrl: syncApiUrl || null,
             });
           }
           break;
         case 'validationError':
           setValidationErrors((prevErrors) => [...prevErrors, data.details]);
           console.log('Sync validation error:', data.details, data.message);
+          break;
+        case 'schemaWarning':
+          if (data.syncKey === syndIdRef.current) {
+            console.warn(
+              `[useSyncReact] Schema Warning for ${data.syncKey}: ${data.message}`
+            );
+          }
           break;
         case 'error':
           console.error('Sync error:', data.message);
@@ -514,9 +544,19 @@ export function useSyncReact<TStateType>(
     },
   });
 
-  /**
-   * The intelligent updater function. It sends only the difference to the server.
-   */
+  useEffect(() => {
+    // When hook becomes active and socket is connected
+    if (determinedSyncId && connection.connected && isInitialised.current) {
+      console.log(
+        `[useSyncReact] Activating subscription for ${syncIdString}. Requesting state.`
+      );
+      sendMessage({
+        type: 'requestState',
+        syncKey: syncIdString,
+      });
+    }
+  }, [determinedSyncId, connection.connected, sendMessage, syncIdString]);
+
   const syncedUpdater = useCallback(
     (valueOrFn: React.SetStateAction<TStateType>) => {
       const oldState = state;
@@ -539,6 +579,20 @@ export function useSyncReact<TStateType>(
     },
     [state, setState, sendMessage]
   );
+
+  if (!currentToken || !socketUrl) {
+    console.warn('SyncProvider not ready', socketUrl, currentToken);
+    return [
+      state,
+      setState, // Fall back to regular setState
+      {
+        connected: false,
+        clientId,
+        subscribers: [],
+        validationErrors,
+      },
+    ] as const;
+  }
 
   const details = {
     connected: connection.connected,

@@ -13,6 +13,7 @@ import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatE
 import CogsFormBindings from './examples/form-bindings/FormBindings';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AboutMe from './about-me/AboutM';
+import SyncExample from './examples/sync/SyncExample';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -33,6 +34,7 @@ const sections = [
   { id: 'chat', name: 'Virtualized Chat' },
   // { id: 'lcd', name: 'LCD Cat Demo' },
   { id: 'array', name: 'Array Methods' },
+  { id: 'sync', name: 'Sync' },
 ];
 
 function App() {
@@ -152,6 +154,8 @@ function App() {
               <LCDCatScrollerDemo catSvg={catSvg} />
             ) : activeSection === 'array' ? (
               <ArrayMethodsPage />
+            ) : activeSection === 'sync' ? (
+              <SyncExample />
             ) : null}
           </>
         )}

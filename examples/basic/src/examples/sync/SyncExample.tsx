@@ -1,8 +1,11 @@
 import { useSync } from './SyncProvider';
 import { SyncProviderSPA } from './SyncProviderSpa';
-
+import SyncUser from './SyncUser';
 
 export default function SyncExample() {
-
-  return <SyncProviderSPA>Sync Example</SyncProviderSPA>;
+  return (
+    <SyncProviderSPA>
+      <SyncUser />
+    </SyncProviderSPA>
+  );
 }
