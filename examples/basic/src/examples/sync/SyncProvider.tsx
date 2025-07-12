@@ -596,7 +596,7 @@ export function useSyncReact<TStateType>(
       }
 
       console.log('[useSyncReact] Sending patch:', patch);
-
+      setState(newState);
       try {
         sendMessage({
           type: 'queueUpdate',

@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid';
 
-import { createCogsState, type StateObject } from '@lib/CogsState';
+import { createCogsState, type StateObject } from 'cogsbox-state';
 
 export type TodoItem = {
   id: string;

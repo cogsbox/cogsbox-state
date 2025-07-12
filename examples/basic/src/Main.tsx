@@ -1,19 +1,25 @@
-import '../index.css';
-import React, { useState } from 'react';
+// src/main.jsx
+
+import React, { useRef, useState } from 'react';
 import ReactDOM from 'react-dom/client';
+import { createBrowserRouter, RouterProvider } from 'react-router';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import Reactivity from './examples/reactive/Reactivity';
-import { PixelRain } from './PixelRain';
-
-import ArrayMethodsPage from './examples/object-example/ObjectExmaple';
-import { catSvg } from '../assets/svgs';
-import LCDCatScrollerDemo from './LCDDemo';
 import StateOverview from './examples/basic-overview/StateOverview';
-import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
 import CogsFormBindings from './examples/form-bindings/FormBindings';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import VirtualizedChatExampleFetch from './examples/virtualiser/VirtualizedChatExampleFetch';
+import ArrayMethodsPage from './examples/object-example/ObjectExmaple';
+
+import '../index.css';
+import { PixelRain } from './PixelRain';
+import { NavLink, Outlet } from 'react-router';
 import AboutMe from './about-me/AboutM';
-import SyncExample from './examples/sync/SyncExample';
+import State from './pages/State';
+import Sync from './pages/Sync';
+import { v4 as uuidv4 } from 'uuid';
+import Shape from './pages/Shape';
+import ShapeOverview from './examples/shape-overview/ShapeOverview';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,27 +30,64 @@ const queryClient = new QueryClient({
   },
 });
 
-const sections = [
-  { id: 'home', name: 'Home' },
-  //everythign below is for cogsbox staet
-  { id: 'reactivity', name: 'Reactivity' },
-  { id: 'basic', name: 'Basic Overview' },
-  { id: 'form-bindings', name: 'Form Bindings' },
-  // { id: 'array-reactivity', name: 'Array Reactivity' },
-  { id: 'chat', name: 'Virtualized Chat' },
-  // { id: 'lcd', name: 'LCD Cat Demo' },
-  { id: 'array', name: 'Array Methods' },
-  { id: 'sync', name: 'Sync' },
-];
+const router = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <App />, // This is your main layout component
+      children: [
+        {
+          index: true, // This makes it the default child route
+          element: <AboutMe />,
+        },
+        {
+          path: 'state',
+          element: <State />, // Layout for state examples with its own navigation
+          children: [
+            // Default child for /state
+            { index: true, element: <Reactivity /> },
+            { path: 'reactivity', element: <Reactivity /> },
+            { path: 'basic-overview', element: <StateOverview /> },
+            { path: 'form-bindings', element: <CogsFormBindings /> },
+            {
+              path: 'virtualized-chat',
+              element: <VirtualizedChatExampleFetch />,
+            },
+            { path: 'array-methods', element: <ArrayMethodsPage /> },
+          ],
+        },
+        {
+          path: 'shape',
+          element: <Shape />, // The layout for the Shape section
+          children: [
+            {
+              index: true, // Default page for /shape
+              element: <ShapeOverview />,
+            },
+            // You can add more pages like 'shape/relations' here later
+          ],
+        },
+        {
+          path: 'sync',
+          element: <Sync />,
+        },
+      ],
+    },
+  ],
+  {
+    // Add this basename option
+    basename: '/chris/',
+  }
+);
+// src/App.jsx
 
 function App() {
-  const [activeSection, setActiveSection] = useState(sections[0]!.id);
   const urlParams = new URLSearchParams(window.location.search);
   const [bgDisabled, setBgDisabled] = useState(
     urlParams.get('disablebg') === 'true'
   );
   const [contentHidden, setContentHidden] = useState(false);
-
+  const syncKey = useRef<string>(uuidv4());
   return (
     <div className="relative h-[100vh] crt">
       {!bgDisabled && (
@@ -58,50 +101,60 @@ function App() {
         </div>
       )}
 
-      {/* Simple background when effects are disabled */}
       {bgDisabled && (
         <div className="fixed h-screen w-full bg-gray-900 z-[-999]" />
       )}
 
       <div className="fixed top-0 left-0 right-0 bg-gray-900/80 backdrop-blur-sm z-[1000] border-b border-green-500/20">
         <div className="flex items-center gap-1 px-4 py-3">
-          {/* Home button - standalone */}
-          <button
-            onClick={() => setActiveSection('home')}
-            className={`px-4 py-2 rounded text-sm font-medium transition-all  cursor-pointer ${
-              activeSection === 'home'
-                ? 'bg-gray-300 text-gray-900'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
-            }`}
+          <NavLink
+            to="/"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-gray-300 text-gray-900'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
+              }`
+            }
           >
             Home
-          </button>
-
-          {/* Separator */}
-          <div className="mx-3 h-8 w-px bg-gray-700" />
-
-          {/* Cogsbox State section */}
-          <div className="flex items-center gap-1 bg-purple-500/10 rounded-l-full">
-            <span className="text-[12px] font-mono text-purple-400 px-2 py-1 bg-purple-900/30 rounded-full border border-purple-500/20">
-              cogsbox-state
-            </span>
-            <div className="w-1" />
-            {sections.slice(1).map((section) => (
-              <button
-                key={section.id}
-                onClick={() => setActiveSection(section.id)}
-                className={`px-3 py-1.5 rounded text-sm transition-all cursor-pointer ${
-                  activeSection === section.id
-                    ? 'bg-purple-500 text-white '
-                    : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-                }`}
-              >
-                {section.name}
-              </button>
-            ))}
-          </div>
-
-          {/* Coming soon libraries */}
+          </NavLink>
+          <NavLink
+            to="/state"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-purple-500 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
+              }`
+            }
+          >
+            State
+          </NavLink>{' '}
+          <NavLink
+            to="/shape"
+            className={({ isActive }) =>
+              `px-4 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-orange-500 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
+              }`
+            }
+          >
+            Shape
+          </NavLink>
+          <NavLink
+            to={`/sync?syncKey=${syncKey.current}`}
+            className={({ isActive }) =>
+              `px-4 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white border border-transparent'
+              }`
+            }
+          >
+            Sync
+          </NavLink>
           <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
             <span>Examples coming soon:</span>
             <span className="text-blue-400">cogs-auth</span>
@@ -111,18 +164,16 @@ function App() {
         </div>
       </div>
 
-      {/* Background toggle button */}
       <div className="fixed top-20 right-4 z-[1001] flex items-center gap-2 text-xs text-gray-500">
-        {' '}
         <button
           onClick={() => setContentHidden(!contentHidden)}
-          className="  p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
+          className="p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
         >
           {contentHidden ? 'Show' : 'Hide'} content
         </button>
         <button
           onClick={() => setBgDisabled(!bgDisabled)}
-          className="  p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
+          className="p-2 rounded bg-gray-800/80 hover:bg-gray-700/80 text-gray-400 hover:text-gray-200 transition-all text-xs backdrop-blur-sm border border-gray-700/50"
           title={
             bgDisabled
               ? 'Enable background effects'
@@ -132,44 +183,19 @@ function App() {
           Background {bgDisabled ? '🌙' : '✨'}
         </button>
       </div>
-      <div className="px-[10vw] pt-40 flex flex-col gap-4 relative z-[10]">
-        {/* Hide/Show content button */}
 
-        {!contentHidden && (
-          <>
-            {activeSection === 'home' ? (
-              <AboutMe />
-            ) : activeSection === 'reactivity' ? (
-              <Reactivity />
-            ) : activeSection === 'basic' ? (
-              <StateOverview />
-            ) : activeSection === 'form-bindings' ? (
-              <CogsFormBindings />
-            ) : activeSection === 'chat' ? (
-              <>
-                {/* <VirtualizedChatExample /> */}
-                <VirtualizedChatExampleFetch />
-              </>
-            ) : activeSection === 'lcd' ? (
-              <LCDCatScrollerDemo catSvg={catSvg} />
-            ) : activeSection === 'array' ? (
-              <ArrayMethodsPage />
-            ) : activeSection === 'sync' ? (
-              <SyncExample />
-            ) : null}
-          </>
-        )}
+      <main className="px-[10vw] pt-20 flex flex-col gap-4 relative z-[10]">
+        {!contentHidden && <Outlet />}
         <div className="h-40" />
-      </div>
+      </main>
     </div>
   );
 }
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
-  <QueryClientProvider client={queryClient}>
-    {' '}
-    <React.StrictMode>
-      <App />
-    </React.StrictMode>
-  </QueryClientProvider>
+  <React.StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} />
+    </QueryClientProvider>
+  </React.StrictMode>
 );

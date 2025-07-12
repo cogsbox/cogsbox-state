@@ -14,6 +14,7 @@
         "prettier-plugin-tailwindcss": "^0.6.11",
         "react": "^18.2.0",
         "react-dom": "^18.2.0",
+        "react-router": "^7.6.3",
         "react-syntax-highlighter": "^15.6.1",
         "stringify-object": "^5.0.0",
         "tailwindcss": "^4.1.11",
