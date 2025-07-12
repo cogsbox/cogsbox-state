@@ -28,19 +28,20 @@ const allSchemas = {
 const { useCogsState } = createCogsState(allSchemas);
 
 export default function SyncUser() {
-  // const state = useCogsState('user');
+  const [state, setState] = useState(userState);
 
-  const [state, update, details] = useSyncReact(useState(userState), {
+  const [syncState, update, details] = useSyncReact(state, setState, {
     syncKey: 'user',
     syncId: 'teset-chat',
     connect: true,
     inMemoryState: true,
   });
 
+  console.log('SyncUser state', syncState);
+
   return (
     <>
       <div>
-        {' '}
         Sync Example -
         <input
           className="bg-white border border-gray-700/50 rounded-lg p-4 flex flex-col gap-4 text-gray-200"
@@ -52,7 +53,7 @@ export default function SyncUser() {
           }}
         />
       </div>
-      <div className="bg-blue text-white">{state.name}</div>
+      <div className="bg-blue text-white">{syncState.name}</div>
     </>
   );
 }

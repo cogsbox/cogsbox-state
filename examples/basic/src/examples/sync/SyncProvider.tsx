@@ -13,6 +13,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -405,10 +406,8 @@ export function useNotificationChannel(
 }
 
 export function useSyncReact<TStateType>(
-  stateAndSetter: [
-    TStateType,
-    React.Dispatch<React.SetStateAction<TStateType>>,
-  ],
+  state: TStateType,
+  setState: React.Dispatch<React.SetStateAction<TStateType>>,
   options: {
     syncId:
       | number
@@ -427,11 +426,14 @@ export function useSyncReact<TStateType>(
     sessionId,
     refreshAccessToken,
   } = useContext(SyncContext);
-  console.log('useSyncReact', token, socketUrl, syncApiUrl);
-  const [state, setState] = stateAndSetter;
+  const setStateRef = useRef(setState);
+  useEffect(() => {
+    setStateRef.current = setState;
+  }, [setState]);
+
   const [validationErrors, setValidationErrors] = useState<any[]>([]);
   const currentToken = useRef(token);
-
+  console.log('state yyyyyyyyyyyyyyyyyyyyy', state);
   useEffect(() => {
     currentToken.current = token;
   }, [token]);
@@ -452,24 +454,32 @@ export function useSyncReact<TStateType>(
   const isReadyToConnect = Boolean(
     token && socketUrl && determinedSyncId && connect
   );
+
+  const [, forceUpdate] = useReducer((x) => x + 1, 0);
   const { connection, sendMessage } = useWebSocketConnection({
     url: `${socketUrl}/sync/${syndIdRef.current}?token=${currentToken.current}&sessionId=${sessionId}`,
     connect: isReadyToConnect,
     onDisconnect() {
       console.log('useSyncReact WebSocket disconnected');
+      // Clear initialized state to trigger re-sync on reconnect
+      isInitialised.current = false;
     },
     onConnect: async () => {
+      console.log('[useSyncReact] WebSocket connected, sending initial setup');
       sendMessage({
         type: 'initialSend',
         syncKey: syncIdString,
         isArray: isArray,
-        syncApiUrl: syncApiUrl || null, // Send null if no syncApiUrl
+        syncApiUrl: syncApiUrl || null,
         inMemoryState: options?.inMemoryState,
       });
     },
     onMessage: async (data) => {
+      console.log('[useSyncReact] Received message:', data.type);
+
       switch (data.type) {
         case 'auth_failed':
+          console.error('[useSyncReact] Authentication failed');
           const newToken = await refreshAccessToken();
           if (newToken) {
             currentToken.current = newToken;
@@ -478,19 +488,15 @@ export function useSyncReact<TStateType>(
         case 'updateState':
           if (data.syncKey === syndIdRef.current) {
             isInitialised.current = true;
-
-            setState(data.data as TStateType);
+            console.log('[useSyncReact] Received state update:', data.data);
+            setStateRef.current(data.data as TStateType);
           }
           break;
         case 'requestInitialState':
           if (data.syncKey === syndIdRef.current) {
             console.log(
-              '[useSyncReact] Server requested initial state. Providing it now.'
-            );
-
-            console.log(
-              'data.sssssssssssssssssssssssssssssssssdata',
-              data.data
+              '[useSyncReact] Server requested initial state. Providing current state:',
+              state
             );
             sendMessage({
               type: 'provideInitialState',
@@ -499,18 +505,31 @@ export function useSyncReact<TStateType>(
             });
           }
           break;
-
         case 'subscribers':
           if (data.syncKey === syndIdRef.current) {
+            console.log(
+              '[useSyncReact] Updated subscribers:',
+              data.subscribers
+            );
             subScribers.current = data.subscribers;
           }
           break;
         case 'applyPatch':
           if (data.syncKey === syndIdRef.current) {
-            setState(
-              (prevState) =>
-                applyPatch(prevState, data.data as Operation[]).newDocument
-            );
+            console.log('[useSyncReact] Applying patch:', data.data);
+            try {
+              setStateRef.current((prevState) => {
+                const result = applyPatch(prevState, data.data as Operation[]);
+                console.log(
+                  '[useSyncReact] Applying patch result.newDocument:',
+                  result.newDocument
+                );
+                return result.newDocument;
+              });
+              forceUpdate();
+            } catch (error) {
+              console.error('[useSyncReact] Failed to apply patch:', error);
+            }
           }
           break;
         case 'syncReady':
@@ -559,25 +578,37 @@ export function useSyncReact<TStateType>(
 
   const syncedUpdater = useCallback(
     (valueOrFn: React.SetStateAction<TStateType>) => {
+      // Ensure we have a connection before sending updates
+      if (!connection.connected) {
+        console.warn('[useSyncReact] Cannot update: WebSocket not connected');
+        // Optionally, queue the update or retry connection
+        return;
+      }
+
       const oldState = state;
       const newState = isFunction(valueOrFn) ? valueOrFn(oldState) : valueOrFn;
 
       const patch = compare(oldState as any, newState as any);
 
       if (patch.length === 0) {
+        console.log('[useSyncReact] No changes detected, skipping update');
         return;
       }
 
-      setState(newState);
+      console.log('[useSyncReact] Sending patch:', patch);
 
-      sendMessage({
-        type: 'queueUpdate',
-        data: {
-          operation: patch,
-        },
-      });
+      try {
+        sendMessage({
+          type: 'queueUpdate',
+          data: {
+            operation: patch,
+          },
+        });
+      } catch (error) {
+        console.error('[useSyncReact] Failed to send update:', error);
+      }
     },
-    [state, setState, sendMessage]
+    [state, connection.connected, sendMessage]
   );
 
   if (!currentToken || !socketUrl) {
@@ -600,6 +631,5 @@ export function useSyncReact<TStateType>(
     subscribers: subScribers.current,
     validationErrors,
   };
-
   return [state, syncedUpdater, details] as const;
 }
