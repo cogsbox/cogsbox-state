@@ -19,7 +19,7 @@ import State from './pages/State';
 import Sync from './pages/Sync';
 import { v4 as uuidv4 } from 'uuid';
 import Shape from './pages/Shape';
-import ShapeOverview from './examples/shape-overview/ShapeOverview';
+import ShapeOverview from './examples/shape-overview.tsx/ShapeOverview';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {

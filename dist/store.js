@@ -24,7 +24,7 @@ const g = u((a, f) => ({
     let n = !1;
     const o = (i) => {
       const d = [r, ...i].join("."), c = e.get(d);
-      c && c.stateSource === "server" && c.isDirty !== !0 && (e.set(d, { ...c, isDirty: !0 }), n = !0);
+      c && c.isDirty !== !0 ? (e.set(d, { ...c, isDirty: !0 }), n = !0) : c || (e.set(d, { isDirty: !0 }), n = !0);
     };
     if (o(s), t.bubble) {
       let i = [...s];
@@ -62,11 +62,11 @@ const g = u((a, f) => ({
       if (Array.isArray(n)) {
         const d = [];
         n.forEach((c) => {
-          const l = `id:${w()}`;
-          d.push(i + "." + l);
-        }), t.set(i, { arrayKeys: d }), n.forEach((c, l) => {
-          const S = d[l].split(".").pop();
-          e(c, [...o, S]);
+          const S = `id:${w()}`;
+          d.push(i + "." + S);
+        }), t.set(i, { arrayKeys: d }), n.forEach((c, S) => {
+          const l = d[S].split(".").pop();
+          e(c, [...o, l]);
         });
       } else if (b(n)) {
         const d = Object.fromEntries(
@@ -112,19 +112,19 @@ const g = u((a, f) => ({
     if (!o || !o.arrayKeys) return;
     const i = `id:${w()}`, d = n + "." + i, c = [...o.arrayKeys];
     c.push(d), e.set(n, { ...o, arrayKeys: c });
-    const l = (S, y) => {
+    const S = (l, y) => {
       const h = [r, ...y].join(".");
-      if (!Array.isArray(S)) if (typeof S == "object" && S !== null) {
+      if (!Array.isArray(l)) if (typeof l == "object" && l !== null) {
         const m = Object.fromEntries(
-          Object.keys(S).map((p) => [p, h + "." + p])
+          Object.keys(l).map((p) => [p, h + "." + p])
         );
-        e.set(h, { fields: m }), Object.entries(S).forEach(([p, E]) => {
-          l(E, [...y, p]);
+        e.set(h, { fields: m }), Object.entries(l).forEach(([p, E]) => {
+          S(E, [...y, p]);
         });
       } else
-        e.set(h, { value: S });
+        e.set(h, { value: l });
     };
-    l(t, [...s, i]), a({ shadowStateStore: e }), f().notifyPathSubscribers(n, {
+    S(t, [...s, i]), a({ shadowStateStore: e }), f().notifyPathSubscribers(n, {
       type: "INSERT",
       path: n,
       itemKey: d
@@ -136,15 +136,15 @@ const g = u((a, f) => ({
       (c) => c === e
     ) !== -1) {
       const c = i.arrayKeys.filter(
-        (S) => S !== e
+        (l) => l !== e
       );
       t.set(o, {
         ...i,
         arrayKeys: c
       });
-      const l = e + ".";
-      for (const S of Array.from(t.keys()))
-        (S === e || S.startsWith(l)) && t.delete(S);
+      const S = e + ".";
+      for (const l of Array.from(t.keys()))
+        (l === e || l.startsWith(S)) && t.delete(l);
     }
     a({ shadowStateStore: t }), f().notifyPathSubscribers(o, {
       type: "REMOVE",
@@ -157,14 +157,14 @@ const g = u((a, f) => ({
     const e = new Map(f().shadowStateStore), n = [r, ...s].join("."), o = (i, d) => {
       const c = e.get(i);
       if (b(d) && c && c.fields) {
-        for (const l in d)
-          if (Object.prototype.hasOwnProperty.call(d, l)) {
-            const S = c.fields[l], y = d[l];
-            S && o(S, y);
+        for (const S in d)
+          if (Object.prototype.hasOwnProperty.call(d, S)) {
+            const l = c.fields[S], y = d[S];
+            l && o(l, y);
           }
       } else {
-        const l = e.get(i) || {};
-        e.set(i, { ...l, value: d });
+        const S = e.get(i) || {};
+        e.set(i, { ...S, value: d });
       }
     };
     o(n, t), f().notifyPathSubscribers(n, { type: "UPDATE", newValue: t }), a({ shadowStateStore: e });
@@ -257,18 +257,18 @@ const g = u((a, f) => ({
       if (i.length >= e.length) {
         let d = !0;
         for (let c = 0; c < e.length; c++) {
-          const l = e[c], S = i[c];
-          if (l === "[*]" || Array.isArray(l)) {
-            const y = parseInt(S);
+          const S = e[c], l = i[c];
+          if (S === "[*]" || Array.isArray(S)) {
+            const y = parseInt(l);
             if (isNaN(y)) {
               d = !1;
               break;
             }
-            if (!n(l, S)) {
+            if (!n(S, l)) {
               d = !1;
               break;
             }
-          } else if (l !== S) {
+          } else if (S !== l) {
             d = !1;
             break;
           }

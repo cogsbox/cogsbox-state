@@ -113,7 +113,9 @@ export type InsertParams<S> = S | ((prevState: {
     state: S;
     uuid: string;
 }) => S);
-export type UpdateType<T> = (payload: UpdateArg<T>) => void;
+export type UpdateType<T> = (payload: UpdateArg<T>) => {
+    synced: () => void;
+};
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 export type ValidationError = {
@@ -193,10 +195,18 @@ type ValidationOptionsType = {
     zodSchema?: z.ZodTypeAny;
     onBlur?: boolean;
 };
+type SyncApi = {
+    updateState: (data: {
+        operation: any[];
+    }) => void;
+    connected: boolean;
+    clientId: string | null;
+    subscribers: string[];
+};
 export type OptionsType<T extends unknown = unknown> = {
     log?: boolean;
     componentId?: string;
-    serverSync?: ServerSyncType<T>;
+    cogsSync?: (stateObject: StateObject<T>) => SyncApi;
     validation?: ValidationOptionsType;
     serverState?: {
         id?: string | number;
@@ -236,24 +246,6 @@ export type OptionsType<T extends unknown = unknown> = {
     syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
     dependencies?: any[];
-};
-export type ServerSyncType<T> = {
-    testKey?: string;
-    syncKey: (({ state }: {
-        state: T;
-    }) => string) | string;
-    syncFunction: ({ state }: {
-        state: T;
-    }) => void;
-    debounce?: number;
-    snapshot?: {
-        name: (({ state }: {
-            state: T;
-        }) => string) | string;
-        stateKeys: StateKeys[];
-        currentUrl: string;
-        currentParams?: URLSearchParams;
-    };
 };
 export type ValidationWrapperOptions<T extends unknown = unknown> = {
     children: React.ReactNode;
@@ -304,7 +296,7 @@ type LocalStorageData<T> = {
     stateSource?: 'default' | 'server' | 'localStorage';
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, serverSync, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;

@@ -1,54 +1,53 @@
 import { jsx as m, Fragment as S } from "react/jsx-runtime";
-import "./CogsState.jsx";
 import d, { useState as v, useRef as f, useEffect as b } from "react";
 import { getGlobalStore as l } from "./store.js";
-const p = (t, e, r = (n, o) => JSON.stringify(n) === JSON.stringify(o)) => {
+const E = (t, e, r = (n, o) => JSON.stringify(n) === JSON.stringify(o)) => {
   const [n, o] = v(
     () => e(l.getState(), t)
-  ), a = f(n), i = f(t);
+  ), a = f(n), s = f(t);
   return b(() => {
-    i.current = t, o(e(l.getState(), t));
+    s.current = t, o(e(l.getState(), t));
     const g = (c) => {
-      const s = e(c, i.current);
-      r(a.current, s) || (a.current = s, o(s));
+      const i = e(c, s.current);
+      r(a.current, i) || (a.current = i, o(i));
     }, u = l.subscribe(g);
     return () => {
       u();
     };
   }, [t]), n;
-}, E = (t, e, r) => {
+}, V = (t, e, r) => {
   const n = t + "." + (e.length > 0 ? [e.join(".")] : []) + (r && r.length > 0 ? "." + r : "");
-  return p(
+  return E(
     n,
-    (a, i) => a.getValidationErrors(i) || []
+    (a, s) => a.getValidationErrors(s) || []
   );
 };
-function F({
+function y({
   formOpts: t,
   path: e,
   stateKey: r,
   children: n,
   validIndices: o
 }) {
-  const { getInitialOptions: a } = l.getState(), i = a(r), g = i?.validation?.key ?? r, u = E(
+  const { getInitialOptions: a } = l.getState(), s = a(r), g = s?.validation?.key ?? r, u = V(
     g,
     e,
     o
   ), c = [];
   if (u) {
-    const s = u.join(", ");
-    c.includes(s) || c.push(s);
+    const i = u.join(", ");
+    c.includes(i) || c.push(i);
   }
-  return /* @__PURE__ */ m(S, { children: i?.formElements?.validation && !t?.validation?.disable ? i.formElements.validation({
+  return /* @__PURE__ */ m(S, { children: s?.formElements?.validation && !t?.validation?.disable ? s.formElements.validation({
     children: /* @__PURE__ */ m(d.Fragment, { children: n }, e.toString()),
     active: u.length > 0,
-    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : c.map((s) => s).join(", "),
+    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : c.map((i) => i).join(", "),
     path: e
   }) : /* @__PURE__ */ m(d.Fragment, { children: n }, e.toString()) });
 }
 export {
-  F as ValidationWrapper,
-  E as useGetValidationErrors,
-  p as useStoreSubscription
+  y as ValidationWrapper,
+  V as useGetValidationErrors,
+  E as useStoreSubscription
 };
 //# sourceMappingURL=Functions.jsx.map

@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { useNavigate } from 'react-router';
-import { SyncProviderSPA } from '../../src/examples/sync/SyncProviderSpa';
+import { SyncProviderSPA } from '../examples/sync/SyncProviderSpa';
 import SyncUser from '../../src/examples/user-sync/SyncUser';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -11,6 +11,10 @@ export default function Sync() {
 
   const updateUrl = () => {
     navigate(`?syncKey=${newSyncKey.current}`);
+  };
+
+  const openNewWindow = () => {
+    window.open(window.location.href, '_blank', 'width=800,height=600');
   };
 
   return (
@@ -44,6 +48,12 @@ export default function Sync() {
           className="bg-blue-600 text-white px-6 py-2 rounded hover:bg-blue-700 transition-colors mt-6"
         >
           Update URL
+        </button>
+        <button
+          onClick={openNewWindow}
+          className="bg-green-600 text-white px-6 py-2 rounded hover:bg-green-700 transition-colors mt-6"
+        >
+          Open New Window
         </button>
       </div>
       <div className="bg-gray-800 rounded-lg p-6">

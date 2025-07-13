@@ -25,6 +25,6 @@
     }
   },
 
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/examples/sync/vite", "src/examples/sync/createSyncSchema.ts", "src/examples/sync/notificationBuilder.ts", "src/examples/sync/SyncProvider.tsx", "src/examples/sync/SyncProviderSpa.tsx", "src/examples/sync/useWebsocketConnection.ts"],
   "exclude": ["node_modules", "dist"]
 }

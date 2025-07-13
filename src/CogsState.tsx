@@ -351,11 +351,17 @@ type ValidationOptionsType = {
   zodSchema?: z.ZodTypeAny;
   onBlur?: boolean;
 };
-
+// Define the return type of the sync hook locally
+type SyncApi = {
+  updateState: (data: { operation: any[] }) => void;
+  connected: boolean;
+  clientId: string | null;
+  subscribers: string[];
+};
 export type OptionsType<T extends unknown = unknown> = {
   log?: boolean;
   componentId?: string;
-  serverSync?: ServerSyncType<T>;
+  cogsSync?: (stateObject: StateObject<T>) => SyncApi;
   validation?: ValidationOptionsType;
 
   serverState?: {
@@ -404,19 +410,6 @@ export type OptionsType<T extends unknown = unknown> = {
 
   defaultState?: T;
   dependencies?: any[];
-};
-export type ServerSyncType<T> = {
-  testKey?: string;
-  syncKey: (({ state }: { state: T }) => string) | string;
-  syncFunction: ({ state }: { state: T }) => void;
-  debounce?: number;
-
-  snapshot?: {
-    name: (({ state }: { state: T }) => string) | string;
-    stateKeys: StateKeys[];
-    currentUrl: string;
-    currentParams?: URLSearchParams;
-  };
 };
 
 export type ValidationWrapperOptions<T extends unknown = unknown> = {
@@ -830,7 +823,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
     stateKey,
-    serverSync,
+
     localStorage,
     formElements,
     reactiveDeps,
@@ -1101,7 +1094,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
-        serverSync,
         formElements,
         defaultState,
         localStorage,
@@ -1678,6 +1670,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
       sessionId
     );
   }, [thisKey, sessionId]);
+
+  const cogsSyncFn = latestInitialOptionsRef.current?.cogsSync;
+  if (cogsSyncFn) {
+    const syncApi = cogsSyncFn(updaterFinal);
+  }
 
   return updaterFinal;
 }
@@ -4186,106 +4183,3 @@ function useRegisterComponent(
     };
   }, [stateKey, fullComponentId]);
 }
-// Add this entire block to your main CogsState.ts file.
-// It should go before the `useCogsStateFn` function.
-
-export type CogsSyncOptions<T extends any> = {
-  syncId:
-    | string
-    | number
-    | (({ clientId }: { clientId: string }) => string | null);
-  connect: boolean;
-  shape: T;
-  _isCogsSync: true; // Internal flag to verify this object was created correctly.
-};
-
-/**
- * A type-safe helper function for configuring Cogs sync.
- * Your users will import this function from 'cogs-state' to create the config object.
- * e.g., `import { useCogsState, cogsSync } from 'cogs-state'`
- */
-export function cogsSync<T extends any>(
-  options: Omit<CogsSyncOptions<T>, '_isCogsSync'>
-): CogsSyncOptions<T> {
-  return {
-    ...options,
-    _isCogsSync: true,
-  };
-}
-
-type UseSyncHookReturnType = {
-  updateState: (data: { operation: Operation[] }) => void;
-  connected: boolean;
-  clientId: string | null;
-  subscribers: string[];
-};
-
-type UseSyncHookType = (
-  cogsState: StateObject<any>,
-  options: CogsSyncOptions<any>
-) => UseSyncHookReturnType;
-
-// function useCogsSyncAdapter<T extends undefined>(
-//   cogsStateObject: StateObject<T>,
-//   syncOptions?: CogsSyncOptions<any>
-// ) {
-
-//   const [useSync, setUseSync] = useState<UseSyncHookType | null>(null);
-//   const middlewareAttached = useRef(false);
-
-//   useEffect(() => {
-
-//     if (syncOptions && syncOptions._isCogsSync) {
-//       import('cogsbox-sync')
-//         .then((module) => {
-//           if (module.useSync) {
-
-//             setUseSync(() => module.useSync);
-//           } else {
-//             console.error(
-//               "[Cogs-State] Error: a 'cogs-sync' package was found, but it does not export a 'useSync' hook. Syncing is disabled."
-//             );
-//           }
-//         })
-//         .catch((error) => {
-//           console.error(
-//             "[Cogs-State] Error: Failed to load the 'cogs-sync' package. Please install it (`npm install cogs-sync`) to enable sync features.",
-//             error
-//           );
-//         });
-//     }
-//   }, [syncOptions]);
-
-//   const syncApi = useSync ? useSync(cogsStateObject, syncOptions!) : null;
-
-//   useEffect(() => {
-
-//     if (syncApi && cogsStateObject && !middlewareAttached.current) {
-//       console.log(
-//         '[Cogs-State] Sync adapter is now active. Attaching middleware.'
-//       );
-
-//       // Tap into the state object's built-in middleware system.
-//       cogsStateObject.middleware(({ update }) => {
-
-//         const patch = compare(update.oldValue, update.newValue);
-
-//         // Don't send empty updates to the server.
-//         if (patch.length > 0) {
-//           // Your `useSync` hook's `updateState` function takes a specific payload shape.
-//           // We construct that exact shape here.
-//           const messagePayload = {
-//             operation: patch,
-//           };
-
-//           // Call the `updateState` function provided by the `cogs-sync` hook,
-//           // which sends the message over its WebSocket.
-//           syncApi.updateState(messagePayload);
-//         }
-//       });
-
-//       // Mark the middleware as attached to prevent this effect from running again.
-//       middlewareAttached.current = true;
-//     }
-//   }, [syncApi, cogsStateObject]);
-// }

@@ -204,10 +204,12 @@ export function useSync<
     : InferSchemaTypes<TBaseSchema>,
 >(
   cogsState: StateObject<TStateType>,
-  options: { syncId: TSyncId; connect: boolean } & (
-    | { shape: T; state?: never }
-    | { state: T; shape?: never }
-  )
+  options: {
+    syncId: TSyncId;
+    connect: boolean;
+
+    inMemoryState?: boolean;
+  }
 ) {
   const {
     token,
@@ -222,9 +224,10 @@ export function useSync<
     console.log('useSync currentToken', currentToken);
     currentToken.current = token;
   }, [token]);
-  const shape = options.shape;
+  const state = cogsState.get();
+
   const syncId = options.syncId;
-  const isArray = Array.isArray(shape);
+  const isArray = Array.isArray(state);
   //const notArrayShape = isArray ? shape[0] : (shape as Schema<TInnershape>);
   //const createdSchema = createSchema(notArrayShape);
   const syncKey = (cogsState as StateObject<any>)._stateKey as string;
@@ -271,7 +274,7 @@ export function useSync<
         syncKey: syncIdString,
         isArray: isArray,
         syncApiUrl,
-        // Include the serialized notification rules
+        inMemoryState: options?.inMemoryState,
       });
     },
     onMessage: async (data) => {
