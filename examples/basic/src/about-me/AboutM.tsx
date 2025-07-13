@@ -1,3 +1,5 @@
+import { NavLink } from 'react-router';
+
 export default function AboutMe() {
   return (
     <div className="w-full min-h-screen bg-[#1a1a1a]/70 relative overflow-hidden">
@@ -186,6 +188,13 @@ export default function AboutMe() {
                       </p>
                     </div>
                     <div className="flex gap-3">
+                      <NavLink
+                        to="/state"
+                        onClick={() => window.scrollTo(0, 0)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded text-gray-300 text-sm transition-colors"
+                      >
+                        See Examples
+                      </NavLink>
                       <a
                         href="https://github.com/cogsbox/cogsbox-state"
                         target="_blank"
@@ -402,6 +411,14 @@ state.warehouse.inventory.items
                       </p>
                     </div>
                     <div className="flex gap-3">
+                      {' '}
+                      <NavLink
+                        to="/shape"
+                        onClick={() => window.scrollTo(0, 0)}
+                        className="flex items-center gap-2 px-3 py-1.5 bg-gray-800 hover:bg-gray-700 border border-gray-600 rounded text-gray-300 text-sm transition-colors"
+                      >
+                        See Examples
+                      </NavLink>
                       <a
                         href="https://github.com/cogsbox/cogsbox-shape"
                         target="_blank"

@@ -130,7 +130,7 @@ function App() {
             }
           >
             State
-          </NavLink>{' '}
+          </NavLink>
           <NavLink
             to="/shape"
             className={({ isActive }) =>
@@ -143,7 +143,7 @@ function App() {
           >
             Shape
           </NavLink>
-          <NavLink
+          {/* <NavLink
             to={`/sync?syncKey=${syncKey.current}`}
             className={({ isActive }) =>
               `px-4 py-2 rounded text-sm font-medium transition-all cursor-pointer ${
@@ -154,11 +154,10 @@ function App() {
             }
           >
             Sync
-          </NavLink>
+          </NavLink> */}
           <div className="ml-auto flex items-center gap-2 text-xs text-gray-500">
             <span>Examples coming soon:</span>
             <span className="text-blue-400">cogs-auth</span>
-            <span className="text-green-400">cogsbox-shape</span>
             <span className="text-orange-400">cogsbox-sync</span>
           </div>
         </div>
