@@ -32,7 +32,7 @@ export function SyncProviderSPA({ children }: { children: ReactNode }) {
   if (!tokens) {
     return null; // or a loading spinner
   }
-  console.log('tokens', tokens);
+
   const syncApiUrl = `http://localhost:4000/api/sync`;
   return (
     <SyncProvider

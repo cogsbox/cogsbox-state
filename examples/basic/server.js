@@ -22,6 +22,11 @@ app.use(express.static(buildPath));
 
 app.use('/chris', express.static(buildPath));
 
+app.get(/^\/chris\//, (req, res) => {
+    console.log(`Route matched by RegExp: ${req.path}. Sending index.html.`);
+    res.sendFile(path.join(buildPath, 'index.html'));
+});
+
 app.get('/', (req, res) => {
     res.sendFile(path.join(buildPath, 'index.html'));
 });

@@ -248,6 +248,7 @@ export type EndType<T, IsArrayElement = false> = {
   _stateKey: string;
   formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
   get: () => T;
+  getState: () => T;
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
 
@@ -1242,8 +1243,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       components,
     });
 
-    forceUpdate({});
-
     return () => {
       const meta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
       const component = meta?.components?.get(componentKey);
@@ -1350,7 +1349,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
 
-    console.log('sdadasdasd', syncApiRef.current, newUpdate);
     if (syncApiRef.current && syncApiRef.current.connected) {
       syncApiRef.current.updateState({ operation: newUpdate });
     }
@@ -3371,6 +3369,14 @@ function createProxyHandler<T>(
               .getShadowValue(stateKeyPathKey, meta?.validIds);
           };
         }
+        if (prop === 'getState') {
+          return () => {
+            return getGlobalStore
+              .getState()
+              .getShadowValue(stateKeyPathKey, meta?.validIds);
+          };
+        }
+
         if (prop === '$derive') {
           return (fn: any) =>
             $cogsSignal({
@@ -3481,8 +3487,9 @@ function createProxyHandler<T>(
           }
           if (prop === 'applyJsonPatch') {
             return (patches: Operation[]) => {
-              // 1. Get the current state object that the proxy points to.
               const store = getGlobalStore.getState();
+              const rootMeta = store.getShadowMetadata(stateKey, []);
+              if (!rootMeta?.components) return;
 
               const convertPath = (jsonPath: string): string[] => {
                 if (!jsonPath || jsonPath === '/') return [];
@@ -3491,6 +3498,8 @@ function createProxyHandler<T>(
                   .slice(1)
                   .map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
               };
+
+              const notifiedComponents = new Set<string>();
 
               for (const patch of patches) {
                 const relativePath = convertPath(patch.path);
@@ -3504,18 +3513,64 @@ function createProxyHandler<T>(
                       value: any;
                     };
                     store.updateShadowAtPath(stateKey, relativePath, value);
-                    store.markAsDirty(stateKey, relativePath, { bubble: true }); // Or handle status differently for server patches
+                    store.markAsDirty(stateKey, relativePath, { bubble: true });
+
+                    // Bubble up - notify components at this path and all parent paths
+                    let currentPath = [...relativePath];
+                    while (true) {
+                      const pathMeta = store.getShadowMetadata(
+                        stateKey,
+                        currentPath
+                      );
+                      console.log('pathMeta', pathMeta);
+                      if (pathMeta?.pathComponents) {
+                        pathMeta.pathComponents.forEach((componentId) => {
+                          if (!notifiedComponents.has(componentId)) {
+                            const component =
+                              rootMeta.components?.get(componentId);
+                            if (component) {
+                              component.forceUpdate();
+                              notifiedComponents.add(componentId);
+                            }
+                          }
+                        });
+                      }
+
+                      if (currentPath.length === 0) break;
+                      currentPath.pop(); // Go up one level
+                    }
                     break;
                   }
                   case 'remove': {
-                    store.removeShadowArrayElement(stateKey, relativePath);
                     const parentPath = relativePath.slice(0, -1);
+                    store.removeShadowArrayElement(stateKey, relativePath);
                     store.markAsDirty(stateKey, parentPath, { bubble: true });
+
+                    // Bubble up from parent path
+                    let currentPath = [...parentPath];
+                    while (true) {
+                      const pathMeta = store.getShadowMetadata(
+                        stateKey,
+                        currentPath
+                      );
+                      if (pathMeta?.pathComponents) {
+                        pathMeta.pathComponents.forEach((componentId) => {
+                          if (!notifiedComponents.has(componentId)) {
+                            const component =
+                              rootMeta.components?.get(componentId);
+                            if (component) {
+                              component.forceUpdate();
+                              notifiedComponents.add(componentId);
+                            }
+                          }
+                        });
+                      }
+
+                      if (currentPath.length === 0) break;
+                      currentPath.pop();
+                    }
                     break;
                   }
-                  // NOTE: 'move' and 'copy' operations should be deconstructed into 'remove' and 'add'
-                  // by the server before broadcasting for maximum compatibility. Your server's use
-                  // of `compare()` already does this, so we don't need to handle them here.
                 }
               }
             };

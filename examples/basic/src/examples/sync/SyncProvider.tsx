@@ -221,13 +221,11 @@ export function useSync<
   } = useContext(SyncContext);
   const currentToken = useRef(token);
   useEffect(() => {
-    console.log('useSync currentToken', currentToken);
     currentToken.current = token;
   }, [token]);
-  const state = cogsState.get();
-  console.log('state 2132123213213213', state);
+
   const syncId = options.syncId;
-  const isArray = Array.isArray(state);
+  const isArray = false;
   //const notArrayShape = isArray ? shape[0] : (shape as Schema<TInnershape>);
   //const createdSchema = createSchema(notArrayShape);
   const syncKey = (cogsState as StateObject<any>)._stateKey as string;
@@ -278,7 +276,6 @@ export function useSync<
       });
     },
     onMessage: async (data) => {
-      console.log('[datadatadatadatadata:', data);
       switch (data.type) {
         case 'auth_failed':
           console.log('auth_failed', data);
@@ -297,6 +294,7 @@ export function useSync<
           break;
         case 'requestInitialState':
           if (data.syncKey === syndIdRef.current) {
+            const state = cogsState.getState();
             sendMessage({
               type: 'provideInitialState',
               syncKey: syncIdString,
@@ -312,8 +310,6 @@ export function useSync<
           break;
         case 'applyPatch':
           if (data.syncKey === syndIdRef.current) {
-            console.log('data.data 123123', data.data);
-
             cogsState.applyJsonPatch(data.data);
           }
           break;
@@ -358,6 +354,7 @@ export function useSync<
       });
     }
   }, [determinedSyncId, connection.connected, sendMessage, syncIdString]);
+
   if (!currentToken || !socketUrl || !syncIdString) {
     return {
       state: isArray ? [] : null,
