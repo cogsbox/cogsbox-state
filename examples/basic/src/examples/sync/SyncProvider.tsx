@@ -289,7 +289,7 @@ export function useSync<
           if (data.syncKey === syndIdRef.current) {
             isInitialised.current = true;
 
-            //  cogsState.updateInitialState(data.data as TStateType);
+            cogsState.updateInitialState(data.data as TStateType);
           }
           break;
         case 'requestInitialState':
@@ -432,23 +432,21 @@ export function useSyncReact<TStateType>(
   const setStateRef = useRef(setState);
   useEffect(() => {
     setStateRef.current = setState;
-  }, [setState]);
+  }, [setState, state]);
 
   const [validationErrors, setValidationErrors] = useState<any[]>([]);
   const currentToken = useRef(token);
-  console.log('state yyyyyyyyyyyyyyyyyyyyy', state);
+
   useEffect(() => {
     currentToken.current = token;
   }, [token]);
 
   const { syncId, connect, syncKey } = options;
   const isArray = Array.isArray(state);
-
   const determinedSyncId: string = (
     isFunction(syncId) ? syncId({ clientId: clientId ?? '' }) : syncId
   ) as string;
   const syncIdString = `${syncKey}-${determinedSyncId}`;
-
   const syndIdRef = useRef(syncIdString);
   syndIdRef.current = syncIdString;
 
@@ -468,7 +466,6 @@ export function useSyncReact<TStateType>(
       isInitialised.current = false;
     },
     onConnect: async () => {
-      console.log('[useSyncReact] WebSocket connected, sending initial setup');
       sendMessage({
         type: 'initialSend',
         syncKey: syncIdString,
@@ -478,8 +475,6 @@ export function useSyncReact<TStateType>(
       });
     },
     onMessage: async (data) => {
-      console.log('[useSyncReact] Received message:', data.type);
-
       switch (data.type) {
         case 'auth_failed':
           console.error('[useSyncReact] Authentication failed');
@@ -497,10 +492,6 @@ export function useSyncReact<TStateType>(
           break;
         case 'requestInitialState':
           if (data.syncKey === syndIdRef.current) {
-            console.log(
-              '[useSyncReact] Server requested initial state. Providing current state:',
-              state
-            );
             sendMessage({
               type: 'provideInitialState',
               syncKey: syncIdString,
@@ -510,23 +501,15 @@ export function useSyncReact<TStateType>(
           break;
         case 'subscribers':
           if (data.syncKey === syndIdRef.current) {
-            console.log(
-              '[useSyncReact] Updated subscribers:',
-              data.subscribers
-            );
             subScribers.current = data.subscribers;
           }
           break;
         case 'applyPatch':
           if (data.syncKey === syndIdRef.current) {
-            console.log('[useSyncReact] Applying patch:', data.data);
             try {
               setStateRef.current((prevState) => {
                 const result = applyPatch(prevState, data.data as Operation[]);
-                console.log(
-                  '[useSyncReact] Applying patch result.newDocument:',
-                  result.newDocument
-                );
+
                 return result.newDocument;
               });
               forceUpdate();
@@ -550,7 +533,7 @@ export function useSyncReact<TStateType>(
           break;
         case 'validationError':
           setValidationErrors((prevErrors) => [...prevErrors, data.details]);
-          console.log('Sync validation error:', data.details, data.message);
+
           break;
         case 'schemaWarning':
           if (data.syncKey === syndIdRef.current) {
@@ -569,9 +552,6 @@ export function useSyncReact<TStateType>(
   useEffect(() => {
     // When hook becomes active and socket is connected
     if (determinedSyncId && connection.connected && isInitialised.current) {
-      console.log(
-        `[useSyncReact] Activating subscription for ${syncIdString}. Requesting state.`
-      );
       sendMessage({
         type: 'requestState',
         syncKey: syncIdString,

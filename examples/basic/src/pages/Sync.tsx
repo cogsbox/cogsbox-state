@@ -5,12 +5,11 @@ import SyncUser from '../../src/examples/user-sync/SyncUser';
 import { v4 as uuidv4 } from 'uuid';
 
 export default function Sync() {
-  const navigate = useNavigate();
   const syncKeyGet = window.location.search.split('syncKey=')[1];
   const newSyncKey = useRef<string>(syncKeyGet ?? uuidv4());
 
   const updateUrl = () => {
-    navigate(`?syncKey=${newSyncKey.current}`);
+    window.location.href = `${window.location.pathname}?syncKey=${newSyncKey.current}`;
   };
 
   const openNewWindow = () => {
@@ -36,7 +35,7 @@ export default function Sync() {
           <input
             id="syncKey"
             className="w-full bg-gray-800 border border-gray-600 rounded px-4 py-2 text-white focus:border-blue-500 focus:ring-1 focus:ring-blue-500 outline-none"
-            value={newSyncKey.current ?? syncKeyGet}
+            defaultValue={newSyncKey.current ?? syncKeyGet}
             onChange={(e) => {
               newSyncKey.current = e.target.value;
             }}

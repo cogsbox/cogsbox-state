@@ -32,6 +32,7 @@ import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { applyPatch, compare, Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
+import { get } from 'http';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -1242,7 +1243,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       ...rootMeta,
       components,
     });
-
+    forceUpdate({});
     return () => {
       const meta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
       const component = meta?.components?.get(componentKey);
@@ -1566,10 +1567,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
     // Assumes `isDeepEqual` is available in this scope.
     // Assumes `isDeepEqual` is available in this scope.
 
-    const newState = store.getShadowValue(thisKey);
-    const rootMeta = store.getShadowMetadata(thisKey, []);
+    const newState = getGlobalStore.getState().getShadowValue(thisKey);
+    const rootMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
     const notifiedComponents = new Set<string>();
-
+    console.log(
+      'rootMeta',
+      thisKey,
+      getGlobalStore.getState().shadowStateStore
+    );
     if (!rootMeta?.components) {
       return newState;
     }
@@ -1577,28 +1582,39 @@ export function useCogsStateFn<TStateObject extends unknown>(
     // --- PASS 1: Notify specific subscribers based on update type ---
 
     if (updateObj.updateType === 'update') {
-      // ALWAYS notify components subscribed to the exact path being updated.
-      // This is the crucial part that handles primitives, as well as updates
-      // to an object or array treated as a whole.
-      if (shadowMeta?.pathComponents) {
-        shadowMeta.pathComponents.forEach((componentId) => {
-          // If this component was already notified, skip.
-          if (notifiedComponents.has(componentId)) {
-            return;
-          }
-          const component = rootMeta.components?.get(componentId);
-          if (component) {
-            const reactiveTypes = Array.isArray(component.reactiveType)
-              ? component.reactiveType
-              : [component.reactiveType || 'component'];
+      // --- Bubble-up Notification ---
+      // When a nested property changes, notify components listening at that exact path,
+      // and also "bubble up" to notify components listening on parent paths.
+      // e.g., an update to `user.address.street` notifies listeners of `street`, `address`, and `user`.
+      let currentPath = [...path]; // Create a mutable copy of the path
 
-            // Check if the component has reactivity enabled
-            if (!reactiveTypes.includes('none')) {
-              component.forceUpdate();
-              notifiedComponents.add(componentId);
+      while (true) {
+        const currentPathMeta = store.getShadowMetadata(thisKey, currentPath);
+
+        if (currentPathMeta?.pathComponents) {
+          currentPathMeta.pathComponents.forEach((componentId) => {
+            if (notifiedComponents.has(componentId)) {
+              return; // Avoid sending redundant notifications
             }
-          }
-        });
+            const component = rootMeta.components?.get(componentId);
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || 'component'];
+
+              // This notification logic applies to components that depend on object structures.
+              if (!reactiveTypes.includes('none')) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            }
+          });
+        }
+
+        if (currentPath.length === 0) {
+          break; // We've reached the root, stop bubbling.
+        }
+        currentPath.pop(); // Go up one level for the next iteration.
       }
 
       // ADDITIONALLY, if the payload is an object, perform a deep-check and
@@ -1878,12 +1894,16 @@ const registerComponentDependency = (
   dependencyPath: string[]
 ) => {
   const fullComponentId = `${stateKey}////${componentId}`;
-  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+  const { addPathComponent, getShadowMetadata } = getGlobalStore.getState();
+
+  // First, check if the component should even be registered.
+  // This check is safe to do outside the setter.
+  const rootMeta = getShadowMetadata(stateKey, []);
   const component = rootMeta?.components?.get(fullComponentId);
 
   if (
     !component ||
-    component.reactiveType == 'none' ||
+    component.reactiveType === 'none' ||
     !(
       Array.isArray(component.reactiveType)
         ? component.reactiveType
@@ -1893,23 +1913,9 @@ const registerComponentDependency = (
     return;
   }
 
-  const pathKey = [stateKey, ...dependencyPath].join('.');
-
-  // Add to component's paths (existing logic)
-  component.paths.add(pathKey);
-
-  // NEW: Also store componentId at the path level
-  const pathMeta =
-    getGlobalStore.getState().getShadowMetadata(stateKey, dependencyPath) || {};
-  const pathComponents = pathMeta.pathComponents || new Set<string>();
-  pathComponents.add(fullComponentId);
-
-  getGlobalStore.getState().setShadowMetadata(stateKey, dependencyPath, {
-    ...pathMeta,
-    pathComponents,
-  });
+  // Now, call the single, safe, atomic function to perform the update.
+  addPathComponent(stateKey, dependencyPath, fullComponentId);
 };
-
 const notifySelectionComponents = (
   stateKey: string,
   parentPath: string[],
@@ -3017,7 +3023,6 @@ function createProxyHandler<T>(
                         e.type === 'REMOVE' ||
                         e.type === 'CLEAR_SELECTION'
                       ) {
-                        console.log('sssssssssssssssssssssssssssss', e);
                         forceUpdate({});
                       }
                     });
@@ -4303,7 +4308,9 @@ function FormElementWrapper({
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
-        forceUpdate({});
+        if (!isCurrentlyDebouncing.current && localValue !== newValue) {
+          forceUpdate({});
+        }
       });
     return () => {
       unsubscribe();
@@ -4368,7 +4375,6 @@ function FormElementWrapper({
 
   return <>{renderFn(stateWithInputProps)}</>;
 }
-
 function useRegisterComponent(
   stateKey: string,
   componentId: string,
@@ -4377,25 +4383,19 @@ function useRegisterComponent(
   const fullComponentId = `${stateKey}////${componentId}`;
 
   useLayoutEffect(() => {
-    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-    const components = rootMeta?.components || new Map();
+    const { registerComponent, unregisterComponent } =
+      getGlobalStore.getState();
 
-    components.set(fullComponentId, {
+    // Call the safe, centralized function to register
+    registerComponent(stateKey, fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(),
       reactiveType: ['component'],
     });
 
-    getGlobalStore.getState().setShadowMetadata(stateKey, [], {
-      ...rootMeta,
-      components,
-    });
-
+    // The cleanup now calls the safe, centralized unregister function
     return () => {
-      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-      if (meta?.components) {
-        meta.components.delete(fullComponentId);
-      }
+      unregisterComponent(stateKey, fullComponentId);
     };
-  }, [stateKey, fullComponentId]);
+  }, [stateKey, fullComponentId]); // Dependencies are stable and correct
 }

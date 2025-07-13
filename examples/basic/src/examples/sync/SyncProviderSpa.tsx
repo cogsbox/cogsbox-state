@@ -3,7 +3,6 @@
 import SyncProvider from './SyncProvider';
 import { useState, useEffect, type ReactNode } from 'react';
 import { getSyncToken } from './vite/getSyncInfo';
-import { refreshSyncToken } from './vite/getRefreshtoken';
 
 export function SyncProviderSPA({ children }: { children: ReactNode }) {
   const [tokens, setTokens] = useState<{

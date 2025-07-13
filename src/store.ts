@@ -159,6 +159,17 @@ export type CogsEvent =
   | { type: 'RELOAD'; path: string }; // For full re-initializations
 export type CogsGlobalState = {
   // --- Shadow State and Subscription System ---
+  registerComponent: (
+    stateKey: string,
+    componentId: string,
+    registration: any
+  ) => void;
+  unregisterComponent: (stateKey: string, componentId: string) => void;
+  addPathComponent: (
+    stateKey: string,
+    dependencyPath: string[],
+    fullComponentId: string
+  ) => void;
   shadowStateStore: Map<string, ShadowMetadata>;
   markAsDirty: (
     key: string,
@@ -275,6 +286,85 @@ const isSimpleObject = (value: any): boolean => {
   return Array.isArray(value) || value.constructor === Object;
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  addPathComponent: (stateKey, dependencyPath, fullComponentId) => {
+    set((state) => {
+      const newShadowStore = new Map(state.shadowStateStore);
+      const dependencyKey = [stateKey, ...dependencyPath].join('.');
+
+      // --- Part 1: Update the path's own metadata ---
+      const pathMeta = newShadowStore.get(dependencyKey) || {};
+      // Create a *new* Set to ensure immutability
+      const pathComponents = new Set(pathMeta.pathComponents);
+      pathComponents.add(fullComponentId);
+      // Update the metadata for the specific path
+      newShadowStore.set(dependencyKey, { ...pathMeta, pathComponents });
+
+      // --- Part 2: Update the component's own list of paths ---
+      const rootMeta = newShadowStore.get(stateKey) || {};
+      const component = rootMeta.components?.get(fullComponentId);
+
+      // If the component exists, update its `paths` set immutably
+      if (component) {
+        const newPaths = new Set(component.paths);
+        newPaths.add(dependencyKey);
+
+        const newComponentRegistration = { ...component, paths: newPaths };
+        const newComponentsMap = new Map(rootMeta.components);
+        newComponentsMap.set(fullComponentId, newComponentRegistration);
+
+        // Update the root metadata with the new components map
+        newShadowStore.set(stateKey, {
+          ...rootMeta,
+          components: newComponentsMap,
+        });
+      }
+
+      // Return the final, updated state
+      return { shadowStateStore: newShadowStore };
+    });
+  },
+  registerComponent: (stateKey, fullComponentId, registration) => {
+    set((state) => {
+      // Create a new Map to ensure Zustand detects the change
+      const newShadowStore = new Map(state.shadowStateStore);
+
+      // Get the metadata for the ROOT of the state (where the components map lives)
+      const rootMeta = newShadowStore.get(stateKey) || {};
+
+      // Also clone the components map to avoid direct mutation
+      const components = new Map(rootMeta.components);
+      components.set(fullComponentId, registration);
+
+      // Update the root metadata with the new components map
+      newShadowStore.set(stateKey, { ...rootMeta, components });
+
+      // Return the updated state
+      return { shadowStateStore: newShadowStore };
+    });
+  },
+
+  unregisterComponent: (stateKey, fullComponentId) => {
+    set((state) => {
+      const newShadowStore = new Map(state.shadowStateStore);
+      const rootMeta = newShadowStore.get(stateKey);
+
+      // If there's no metadata or no components map, do nothing
+      if (!rootMeta?.components) {
+        return state; // Return original state, no change needed
+      }
+
+      const components = new Map(rootMeta.components);
+      const wasDeleted = components.delete(fullComponentId);
+
+      // Only update state if something was actually deleted
+      if (wasDeleted) {
+        newShadowStore.set(stateKey, { ...rootMeta, components });
+        return { shadowStateStore: newShadowStore };
+      }
+
+      return state; // Nothing changed
+    });
+  },
   markAsDirty: (key: string, path: string[], options = { bubble: true }) => {
     const newShadowStore = new Map(get().shadowStateStore);
     let changed = false;
@@ -347,54 +437,72 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   notifyPathSubscribers: (updatedPath, newValue) => {
-    // <-- Now accepts newValue
     const subscribers = get().pathSubscribers;
     const subs = subscribers.get(updatedPath);
 
     if (subs) {
-      // Pass the newValue to every callback
       subs.forEach((callback) => callback(newValue));
     }
   },
+
   initializeShadowState: (key: string, initialState: any) => {
-    const existingShadowStore = new Map(get().shadowStateStore);
+    set((state) => {
+      // 1. Make a copy of the current store to modify it
+      const newShadowStore = new Map(state.shadowStateStore);
 
-    const processValue = (value: any, path: string[]) => {
-      const nodeKey = [key, ...path].join('.');
+      // 2. PRESERVE the existing components map before doing anything else
+      const existingRootMeta = newShadowStore.get(key);
+      const preservedComponents = existingRootMeta?.components;
 
-      if (Array.isArray(value)) {
-        // Handle arrays as before
-        const childIds: string[] = [];
-
-        value.forEach((item) => {
-          const itemId = `id:${ulid()}`;
-          childIds.push(nodeKey + '.' + itemId);
-        });
-
-        existingShadowStore.set(nodeKey, { arrayKeys: childIds });
-
-        value.forEach((item, index) => {
-          const itemId = childIds[index]!.split('.').pop();
-          processValue(item, [...path!, itemId!]);
-        });
-      } else if (isSimpleObject(value)) {
-        // Only create field mappings for simple objects
-        const fields = Object.fromEntries(
-          Object.keys(value).map((k) => [k, nodeKey + '.' + k])
-        );
-        existingShadowStore.set(nodeKey, { fields });
-
-        Object.keys(value).forEach((k) => {
-          processValue(value[k], [...path, k]);
-        });
-      } else {
-        // Treat everything else (including Uint8Array) as primitive values
-        existingShadowStore.set(nodeKey, { value });
+      // 3. Wipe all old shadow entries for this state key
+      const prefixToDelete = key + '.';
+      for (const k of Array.from(newShadowStore.keys())) {
+        if (k === key || k.startsWith(prefixToDelete)) {
+          newShadowStore.delete(k);
+        }
       }
-    };
 
-    processValue(initialState, []);
-    set({ shadowStateStore: existingShadowStore });
+      // 4. Run your original logic to rebuild the state tree from scratch
+      const processValue = (value: any, path: string[]) => {
+        const nodeKey = [key, ...path].join('.');
+
+        if (Array.isArray(value)) {
+          const childIds: string[] = [];
+          value.forEach(() => {
+            const itemId = `id:${ulid()}`;
+            childIds.push(nodeKey + '.' + itemId);
+          });
+          newShadowStore.set(nodeKey, { arrayKeys: childIds });
+          value.forEach((item, index) => {
+            const itemId = childIds[index]!.split('.').pop();
+            processValue(item, [...path!, itemId!]);
+          });
+        } else if (isSimpleObject(value)) {
+          const fields = Object.fromEntries(
+            Object.keys(value).map((k) => [k, nodeKey + '.' + k])
+          );
+          newShadowStore.set(nodeKey, { fields });
+          Object.keys(value).forEach((k) => {
+            processValue(value[k], [...path, k]);
+          });
+        } else {
+          newShadowStore.set(nodeKey, { value });
+        }
+      };
+      processValue(initialState, []);
+
+      // 5. RESTORE the preserved components map onto the new root metadata
+      if (preservedComponents) {
+        const newRootMeta = newShadowStore.get(key) || {};
+        newShadowStore.set(key, {
+          ...newRootMeta,
+          components: preservedComponents,
+        });
+      }
+
+      // 6. Return the completely updated state
+      return { shadowStateStore: newShadowStore };
+    });
   },
 
   getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
@@ -443,11 +551,41 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     return get().shadowStateStore.get(fullKey);
   },
 
-  setShadowMetadata: (key: string, path: string[], metadata: any) => {
+  setShadowMetadata: (key, path, metadata) => {
     const fullKey = [key, ...path].join('.');
+    const existingMeta = get().shadowStateStore.get(fullKey);
+
+    // --- THIS IS THE TRAP ---
+    // If the existing metadata HAS a components map, but the NEW metadata DOES NOT,
+    // it means we are about to wipe it out. This is the bug.
+    if (existingMeta?.components && !metadata.components) {
+      console.group(
+        '%c🚨 RACE CONDITION DETECTED! 🚨',
+        'color: red; font-size: 18px; font-weight: bold;'
+      );
+      console.error(
+        `An overwrite is about to happen on stateKey: "${key}" at path: [${path.join(', ')}]`
+      );
+      console.log(
+        'The EXISTING metadata had a components map:',
+        existingMeta.components
+      );
+      console.log(
+        'The NEW metadata is trying to save WITHOUT a components map:',
+        metadata
+      );
+      console.log(
+        '%cStack trace to the function that caused this overwrite:',
+        'font-weight: bold;'
+      );
+      console.trace(); // This prints the call stack, leading you to the bad code.
+      console.groupEnd();
+    }
+    // --- END OF TRAP ---
+
     const newShadowStore = new Map(get().shadowStateStore);
-    const existing = newShadowStore.get(fullKey) || { id: ulid() };
-    newShadowStore.set(fullKey, { ...existing, ...metadata });
+    const finalMeta = { ...(existingMeta || {}), ...metadata };
+    newShadowStore.set(fullKey, finalMeta);
     set({ shadowStateStore: newShadowStore });
   },
   setTransformCache: (

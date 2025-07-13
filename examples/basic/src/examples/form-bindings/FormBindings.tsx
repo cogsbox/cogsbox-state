@@ -150,26 +150,27 @@ function LiveFormDemo() {
   const state = useCogsState('formData');
 
   return (
-    <div className="grid grid-cols-[70%_30%] gap-6">
-      <SectionWrapper>
-        <h2 className="text-3xl font-bold text-gray-100 mb-6">
-          🚀 Live Form Example
-        </h2>
+    <FlashWrapper showCounter={true}>
+      <div className="grid grid-cols-[70%_30%] gap-6">
+        <SectionWrapper>
+          <h2 className="text-3xl font-bold text-gray-100 mb-6">
+            🚀 Live Form Example
+          </h2>
 
-        <div className="prose prose-invert max-w-none mb-6">
-          <p className="text-gray-300 leading-relaxed">
-            A complete form with multiple input types, all using{' '}
-            <code className="text-purple-400 bg-gray-800 px-2 py-1 rounded">
-              .formElement()
-            </code>
-            for automatic binding. Notice the duplicated first name field to
-            demonstrate binding synchronization.
-          </p>
-        </div>
+          <div className="prose prose-invert max-w-none mb-6">
+            <p className="text-gray-300 leading-relaxed">
+              A complete form with multiple input types, all using{' '}
+              <code className="text-purple-400 bg-gray-800 px-2 py-1 rounded">
+                .formElement()
+              </code>
+              for automatic binding. Notice the duplicated first name field to
+              demonstrate binding synchronization.
+            </p>
+          </div>
 
-        <CodeSnippetDisplay
-          title="Form Setup"
-          code={`const state = useCogsState('formData');
+          <CodeSnippetDisplay
+            title="Form Setup"
+            code={`const state = useCogsState('formData');
 
 // Each field automatically syncs
 state.firstName.formElement(({ inputProps }) => (
@@ -187,186 +188,187 @@ state.country.formElement(({ get, update }) => (
     <option value="us">United States</option>
   </select>
 ))`}
-        />
+          />
 
-        <div className="mt-8 space-y-6">
-          {/* Form Grid */}
-          <div className="grid grid-cols-2 gap-6">
-            {/* First Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                First Name
-              </label>
-              {state.firstName.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <input
-                    {...obj.inputProps}
-                    placeholder="John"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  />
-                </FlashWrapper>
-              ))}
-
-              <div className="mt-2">
-                <label className="block text-xs text-gray-500 mb-1">
-                  Duplicate (shows binding sync)
+          <div className="mt-8 space-y-6">
+            {/* Form Grid */}
+            <div className="grid grid-cols-2 gap-6">
+              {/* First Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  First Name
                 </label>
                 {state.firstName.formElement((obj) => (
                   <FlashWrapper showCounter={true}>
                     <input
                       {...obj.inputProps}
-                      placeholder="Bound to same state"
-                      className="w-full px-3 py-2 bg-gray-700 text-gray-100 border border-gray-500 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                      placeholder="John"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
                     />
+                  </FlashWrapper>
+                ))}
+
+                <div className="mt-2">
+                  <label className="block text-xs text-gray-500 mb-1">
+                    Duplicate (shows binding sync)
+                  </label>
+                  {state.firstName.formElement((obj) => (
+                    <FlashWrapper showCounter={true}>
+                      <input
+                        {...obj.inputProps}
+                        placeholder="Bound to same state"
+                        className="w-full px-3 py-2 bg-gray-700 text-gray-100 border border-gray-500 rounded focus:border-purple-500 focus:outline-none transition-colors text-sm"
+                      />
+                    </FlashWrapper>
+                  ))}
+                </div>
+              </div>
+
+              {/* Last Name */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Last Name
+                </label>
+                {state.lastName.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <input
+                      {...obj.inputProps}
+                      placeholder="Doe"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Email Address
+                </label>
+                {state.email.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <input
+                      {...obj.inputProps}
+                      type="email"
+                      placeholder="john.doe@example.com"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Phone Number
+                </label>
+                {state.phoneNumber.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <input
+                      {...obj.inputProps}
+                      type="tel"
+                      placeholder="+1 (555) 123-4567"
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
+                    />
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Country */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Country
+                </label>
+                {state.country.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <select
+                      value={obj.get()}
+                      onChange={(e) => obj.update(e.target.value)}
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
+                    >
+                      <option value="us">United States</option>
+                      <option value="uk">United Kingdom</option>
+                      <option value="ca">Canada</option>
+                      <option value="au">Australia</option>
+                    </select>
+                  </FlashWrapper>
+                ))}
+              </div>
+
+              {/* Theme */}
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">
+                  Theme Preference
+                </label>
+                {state.theme.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <select
+                      value={obj.get()}
+                      onChange={(e) => obj.update(e.target.value as any)}
+                      className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
+                    >
+                      <option value="light">Light</option>
+                      <option value="dark">Dark</option>
+                      <option value="auto">Auto</option>
+                    </select>
                   </FlashWrapper>
                 ))}
               </div>
             </div>
 
-            {/* Last Name */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Last Name
-              </label>
-              {state.lastName.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <input
-                    {...obj.inputProps}
-                    placeholder="Doe"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  />
-                </FlashWrapper>
-              ))}
+            {/* Checkboxes */}
+            <div className="space-y-3 border-t border-gray-700 pt-6">
+              <div className="flex items-center gap-3">
+                {state.newsletter.formElement((obj) => (
+                  <FlashWrapper showCounter={true}>
+                    <input
+                      type="checkbox"
+                      className="w-5 h-5 accent-blue-500 rounded"
+                      checked={obj.get()}
+                      onChange={() => obj.toggle()}
+                    />
+                  </FlashWrapper>
+                ))}
+                <label className="text-sm text-gray-300">
+                  Subscribe to newsletter for updates and special offers
+                </label>
+              </div>
             </div>
 
-            {/* Email */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Email Address
+            {/* Days of Week Toggle */}
+            <div className="border-t border-gray-700 pt-6">
+              <label className="block text-sm font-medium text-gray-300 mb-3">
+                Notification Days
               </label>
-              {state.email.formElement((obj) => (
+              {state.daysOfWeek.formElement((obj) => (
                 <FlashWrapper showCounter={true}>
-                  <input
-                    {...obj.inputProps}
-                    type="email"
-                    placeholder="john.doe@example.com"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  />
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Phone Number
-              </label>
-              {state.phoneNumber.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <input
-                    {...obj.inputProps}
-                    type="tel"
-                    placeholder="+1 (555) 123-4567"
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  />
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Country */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Country
-              </label>
-              {state.country.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <select
-                    value={obj.get()}
-                    onChange={(e) => obj.update(e.target.value)}
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  >
-                    <option value="us">United States</option>
-                    <option value="uk">United Kingdom</option>
-                    <option value="ca">Canada</option>
-                    <option value="au">Australia</option>
-                  </select>
-                </FlashWrapper>
-              ))}
-            </div>
-
-            {/* Theme */}
-            <div>
-              <label className="block text-sm font-medium text-gray-300 mb-2">
-                Theme Preference
-              </label>
-              {state.theme.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <select
-                    value={obj.get()}
-                    onChange={(e) => obj.update(e.target.value as any)}
-                    className="w-full px-3 py-2 bg-gray-800 text-gray-100 border border-gray-600 rounded focus:border-blue-500 focus:outline-none transition-colors"
-                  >
-                    <option value="light">Light</option>
-                    <option value="dark">Dark</option>
-                    <option value="auto">Auto</option>
-                  </select>
+                  <div className="flex gap-2">
+                    {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
+                      (day, idx) => (
+                        <button
+                          key={idx}
+                          onClick={() => obj.toggleByValue(idx)}
+                          className={`px-3 py-2 rounded text-sm transition-colors ${
+                            obj.get().includes(idx)
+                              ? 'bg-blue-600 text-white hover:bg-blue-500'
+                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      )
+                    )}
+                  </div>
                 </FlashWrapper>
               ))}
             </div>
           </div>
+        </SectionWrapper>
 
-          {/* Checkboxes */}
-          <div className="space-y-3 border-t border-gray-700 pt-6">
-            <div className="flex items-center gap-3">
-              {state.newsletter.formElement((obj) => (
-                <FlashWrapper showCounter={true}>
-                  <input
-                    type="checkbox"
-                    className="w-5 h-5 accent-blue-500 rounded"
-                    checked={obj.get()}
-                    onChange={() => obj.toggle()}
-                  />
-                </FlashWrapper>
-              ))}
-              <label className="text-sm text-gray-300">
-                Subscribe to newsletter for updates and special offers
-              </label>
-            </div>
-          </div>
-
-          {/* Days of Week Toggle */}
-          <div className="border-t border-gray-700 pt-6">
-            <label className="block text-sm font-medium text-gray-300 mb-3">
-              Notification Days
-            </label>
-            {state.daysOfWeek.formElement((obj) => (
-              <FlashWrapper showCounter={true}>
-                <div className="flex gap-2">
-                  {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(
-                    (day, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => obj.toggleByValue(idx)}
-                        className={`px-3 py-2 rounded text-sm transition-colors ${
-                          obj.get().includes(idx)
-                            ? 'bg-blue-600 text-white hover:bg-blue-500'
-                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                        }`}
-                      >
-                        {day}
-                      </button>
-                    )
-                  )}
-                </div>
-              </FlashWrapper>
-            ))}
-          </div>
-        </div>
-      </SectionWrapper>
-
-      {/* Live State Display */}
-      <ReactiveFormDisplay />
-    </div>
+        {/* Live State Display */}
+        <ReactiveFormDisplay />
+      </div>
+    </FlashWrapper>
   );
 }
 

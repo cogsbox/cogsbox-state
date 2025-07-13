@@ -1,4 +1,7 @@
-import { createCogsState, type StateObject } from '@lib/CogsState';
+import {
+  createCogsState,
+  type StateObject,
+} from '../../../../../src/CogsState';
 // Form data state
 const formDataState = {
   firstName: '',
