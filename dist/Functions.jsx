@@ -1,52 +1,60 @@
-import { jsx as m, Fragment as S } from "react/jsx-runtime";
-import d, { useState as v, useRef as f, useEffect as b } from "react";
-import { getGlobalStore as l } from "./store.js";
-const E = (t, e, r = (n, o) => JSON.stringify(n) === JSON.stringify(o)) => {
-  const [n, o] = v(
-    () => e(l.getState(), t)
-  ), a = f(n), s = f(t);
+import { jsx as d, Fragment as S } from "react/jsx-runtime";
+import m, { useState as v, useRef as f, useEffect as b } from "react";
+import { getGlobalStore as g } from "./store.js";
+const E = (t, e, n = (r, s) => JSON.stringify(r) === JSON.stringify(s)) => {
+  const [r, s] = v(
+    () => e(g.getState(), t)
+  ), a = f(r), i = f(t);
   return b(() => {
-    s.current = t, o(e(l.getState(), t));
-    const g = (c) => {
-      const i = e(c, s.current);
-      r(a.current, i) || (a.current = i, o(i));
-    }, u = l.subscribe(g);
+    i.current = t, s(e(g.getState(), t));
+    const u = (l) => {
+      const o = e(l, i.current);
+      n(a.current, o) || (a.current = o, s(o));
+    }, c = g.subscribe(u);
     return () => {
-      u();
+      c();
     };
-  }, [t]), n;
-}, V = (t, e, r) => {
-  const n = t + "." + (e.length > 0 ? [e.join(".")] : []) + (r && r.length > 0 ? "." + r : "");
+  }, [t]), r;
+}, V = (t, e, n) => {
+  const r = t + "." + (e.length > 0 ? [e.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
   return E(
-    n,
-    (a, s) => a.getValidationErrors(s) || []
+    r,
+    (a, i) => a.getValidationErrors(i) || []
   );
 };
-function y({
+function F({
   formOpts: t,
   path: e,
-  stateKey: r,
-  children: n,
-  validIndices: o
+  stateKey: n,
+  children: r,
+  validIndices: s
 }) {
-  const { getInitialOptions: a } = l.getState(), s = a(r), g = s?.validation?.key ?? r, u = V(
-    g,
+  const { getInitialOptions: a } = g.getState(), i = a(n), u = i?.validation?.key ?? n, c = V(
+    u,
     e,
-    o
-  ), c = [];
-  if (u) {
-    const i = u.join(", ");
-    c.includes(i) || c.push(i);
+    s
+  );
+  console.log(
+    "validationErrors ValidationWrapper",
+    n,
+    u,
+    e,
+    c
+  );
+  const l = [];
+  if (c) {
+    const o = c.join(", ");
+    l.includes(o) || l.push(o);
   }
-  return /* @__PURE__ */ m(S, { children: s?.formElements?.validation && !t?.validation?.disable ? s.formElements.validation({
-    children: /* @__PURE__ */ m(d.Fragment, { children: n }, e.toString()),
-    active: u.length > 0,
-    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : c.map((i) => i).join(", "),
+  return /* @__PURE__ */ d(S, { children: i?.formElements?.validation && !t?.validation?.disable ? i.formElements.validation({
+    children: /* @__PURE__ */ d(m.Fragment, { children: r }, e.toString()),
+    active: c.length > 0,
+    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : l.map((o) => o).join(", "),
     path: e
-  }) : /* @__PURE__ */ m(d.Fragment, { children: n }, e.toString()) });
+  }) : /* @__PURE__ */ d(m.Fragment, { children: r }, e.toString()) });
 }
 export {
-  y as ValidationWrapper,
+  F as ValidationWrapper,
   V as useGetValidationErrors,
   E as useStoreSubscription
 };

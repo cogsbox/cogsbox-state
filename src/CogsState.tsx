@@ -26,13 +26,13 @@ import { ValidationWrapper } from './Functions.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
-import { z, ZodTypeAny } from 'zod';
 
 import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { applyPatch, compare, Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
-import { get } from 'http';
+import * as z3 from 'zod/v3';
+import * as z4 from 'zod/v4';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -348,17 +348,19 @@ export type ReactivityType =
   | 'all'
   | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
 
-type ValidationOptionsType = {
-  key?: string;
-  zodSchema?: ZodTypeAny;
-  onBlur?: boolean;
-};
 // Define the return type of the sync hook locally
 type SyncApi = {
   updateState: (data: { operation: any }) => void;
   connected: boolean;
   clientId: string | null;
   subscribers: string[];
+};
+type ValidationOptionsType = {
+  key?: string;
+  zodSchemaV3?: z3.ZodType<any, any, any>;
+  zodSchemaV4?: z4.ZodType<any, any, any>;
+
+  onBlur?: boolean;
 };
 export type OptionsType<T extends unknown = unknown> = {
   log?: boolean;
@@ -404,7 +406,7 @@ export type OptionsType<T extends unknown = unknown> = {
     key: string | ((state: T) => string);
     onChange?: (state: T) => void;
   };
-  formElements?: FormsElementsType;
+  formElements?: FormsElementsType<T>;
 
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType;
@@ -414,15 +416,6 @@ export type OptionsType<T extends unknown = unknown> = {
   dependencies?: any[];
 };
 
-export type ValidationWrapperOptions<T extends unknown = unknown> = {
-  children: React.ReactNode;
-  active: boolean;
-  stretch?: boolean;
-  path: string[];
-  message?: string;
-  data?: T;
-  key?: string;
-};
 export type SyncRenderOptions<T extends unknown = unknown> = {
   children: React.ReactNode;
   time: number;
@@ -430,8 +423,16 @@ export type SyncRenderOptions<T extends unknown = unknown> = {
   key?: string;
 };
 
-type FormsElementsType<T extends unknown = unknown> = {
-  validation?: (options: ValidationWrapperOptions<T>) => React.ReactNode;
+type FormsElementsType<T> = {
+  validation?: (options: {
+    children: React.ReactNode;
+    active: boolean;
+    stretch?: boolean;
+    path: string[];
+    message?: string;
+    data?: T;
+    key?: string;
+  }) => React.ReactNode;
   syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
 };
 
@@ -520,9 +521,32 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
+type UseCogsStateHook<T extends Record<string, any>> = <
+  StateKey extends keyof TransformedStateType<T>,
+>(
+  stateKey: StateKey,
+  options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
+) => StateObject<TransformedStateType<T>[StateKey]>;
+
+// Define the type for the options setter using the Transformed state
+type SetCogsOptionsFunc<T extends Record<string, any>> = <
+  StateKey extends keyof TransformedStateType<T>,
+>(
+  stateKey: StateKey,
+  options: OptionsType<TransformedStateType<T>[StateKey]>
+) => void;
+
+// Define the final API object shape
+type CogsApi<T extends Record<string, any>> = {
+  useCogsState: UseCogsStateHook<T>;
+  setCogsOptions: SetCogsOptionsFunc<T>;
+};
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
-  opt?: { formElements?: FormsElementsType; validation?: ValidationOptionsType }
+  opt?: {
+    formElements?: FormsElementsType<State>;
+    validation?: ValidationOptionsType;
+  }
 ) => {
   let newInitialState = initialState;
 
@@ -577,12 +601,12 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: OptionsType<(typeof statePart)[StateKey]>
+    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
     setOptions({
       stateKey,
-      options,
+      options: options as any,
       initialOptionsPart,
     });
 
@@ -623,7 +647,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     notifyComponents(stateKey as string);
   }
 
-  return { useCogsState, setCogsOptions };
+  return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
 
 const {
@@ -3585,20 +3609,40 @@ function createProxyHandler<T>(
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
-              if (!init?.zodSchema || !init?.key)
-                throw new Error('Zod schema or validation key not found');
+
+              // UPDATED: Select v4 schema, with a fallback to v3
+              const zodSchema = init?.zodSchemaV4 || init?.zodSchemaV3;
+
+              if (!zodSchema || !init?.key) {
+                throw new Error(
+                  'Zod schema (v3 or v4) or validation key not found'
+                );
+              }
 
               removeValidationError(init.key);
               const thisObject = getGlobalStore
                 .getState()
                 .getShadowValue(stateKey);
-              const result = init.zodSchema.safeParse(thisObject);
+
+              // Use the selected schema for parsing
+              const result = zodSchema.safeParse(thisObject);
 
               if (!result.success) {
-                result.error.errors.forEach((error) => {
-                  const fullErrorPath = [init.key, ...error.path].join('.');
-                  addValidationError(fullErrorPath, error.message);
-                });
+                // This logic already handles both v3 and v4 error types correctly
+                if ('issues' in result.error) {
+                  // Zod v4 error
+                  result.error.issues.forEach((error) => {
+                    const fullErrorPath = [init.key, ...error.path].join('.');
+                    addValidationError(fullErrorPath, error.message);
+                  });
+                } else {
+                  // Zod v3 error
+                  (result.error as any).errors.forEach((error: any) => {
+                    const fullErrorPath = [init.key, ...error.path].join('.');
+                    addValidationError(fullErrorPath, error.message);
+                  });
+                }
+
                 notifyComponents(stateKey);
                 return false;
               }
@@ -4344,6 +4388,7 @@ function FormElementWrapper({
   // --- NEW onBlur HANDLER ---
   // This replaces the old commented-out method with a modern approach.
   const handleBlur = useCallback(async () => {
+    console.log('handleBlurhandleBlurhandleBlur');
     // Ensure the latest value is committed to the global state before validating.
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
@@ -4356,9 +4401,13 @@ function FormElementWrapper({
       getGlobalStore.getState();
     const initialOptions = getInitialOptions(stateKey);
     const validationOptions = initialOptions?.validation;
-
+    console.log('validationOptions', validationOptions);
+    // UPDATED: Select v4 schema, with a fallback to v3
+    const zodSchema =
+      validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
+    console.log('zodSchema', zodSchema);
     // Proceed only if onBlur validation with a Zod schema is configured.
-    if (!validationOptions?.zodSchema || !validationOptions?.onBlur) {
+    if (!zodSchema) {
       return;
     }
 
@@ -4366,17 +4415,24 @@ function FormElementWrapper({
     if (!validationKey) return;
 
     const fullFieldPath = [validationKey, ...path].join('.');
-
+    console.log('fullFieldPath', fullFieldPath);
     // 1. Clear any previous validation errors for this specific field.
     removeValidationError(fullFieldPath);
 
     // 2. Validate the entire state object to get contextually correct errors.
     const fullState = getGlobalStore.getState().getShadowValue(stateKey);
-    const result = validationOptions.zodSchema.safeParse(fullState);
 
+    // Use the selected schema for parsing
+    const result = zodSchema.safeParse(fullState);
+    console.log('result', fullState, result);
     // 3. If validation fails, find the error for the current field and store it.
     if (!result.success) {
-      result.error.errors.forEach((error) => {
+      const errorList =
+        'issues' in result.error
+          ? result.error.issues
+          : (result.error as any).errors;
+
+      errorList.forEach((error: any) => {
         // Check if the error's path matches this form element's path.
         if (JSON.stringify(error.path) === JSON.stringify(path)) {
           const errorKey = [validationKey, ...error.path].join('.');

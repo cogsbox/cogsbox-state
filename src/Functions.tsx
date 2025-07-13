@@ -239,13 +239,13 @@ export function ValidationWrapper({
     path,
     validIndices
   );
-  // console.log(
-  //   "validationErrors ValidationWrapper",
-  //   stateKey,
-  //   validationKey,
-  //   path,
-  //   validationErrors
-  // );
+  console.log(
+    'validationErrors ValidationWrapper',
+    stateKey,
+    validationKey,
+    path,
+    validationErrors
+  );
   const thesMessages: string[] = [];
 
   if (validationErrors) {

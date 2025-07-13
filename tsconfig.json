@@ -23,5 +23,8 @@
     "lib": ["dom", "dom.iterable", "esnext"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist","examples/**/*","tests"]
+  "exclude": ["node_modules", "dist","examples/**/*","tests"],
+    "watchOptions": {
+    "excludeDirectories": ["examples", "node_modules", "dist"]
+  }
 }

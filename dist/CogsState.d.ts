@@ -1,8 +1,9 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
-import { z } from 'zod';
 import { ComponentsType } from './store.js';
 
+import * as z3 from 'zod/v3';
+import * as z4 from 'zod/v4';
 type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
@@ -191,11 +192,6 @@ export type UpdateTypeDetail = {
 };
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
-type ValidationOptionsType = {
-    key?: string;
-    zodSchema?: z.ZodTypeAny;
-    onBlur?: boolean;
-};
 type SyncApi = {
     updateState: (data: {
         operation: any;
@@ -203,6 +199,12 @@ type SyncApi = {
     connected: boolean;
     clientId: string | null;
     subscribers: string[];
+};
+type ValidationOptionsType = {
+    key?: string;
+    zodSchemaV3?: z3.ZodType<any, any, any>;
+    zodSchemaV4?: z4.ZodType<any, any, any>;
+    onBlur?: boolean;
 };
 export type OptionsType<T extends unknown = unknown> = {
     log?: boolean;
@@ -241,21 +243,12 @@ export type OptionsType<T extends unknown = unknown> = {
         key: string | ((state: T) => string);
         onChange?: (state: T) => void;
     };
-    formElements?: FormsElementsType;
+    formElements?: FormsElementsType<T>;
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
     dependencies?: any[];
-};
-export type ValidationWrapperOptions<T extends unknown = unknown> = {
-    children: React.ReactNode;
-    active: boolean;
-    stretch?: boolean;
-    path: string[];
-    message?: string;
-    data?: T;
-    key?: string;
 };
 export type SyncRenderOptions<T extends unknown = unknown> = {
     children: React.ReactNode;
@@ -263,8 +256,16 @@ export type SyncRenderOptions<T extends unknown = unknown> = {
     data?: T;
     key?: string;
 };
-type FormsElementsType<T extends unknown = unknown> = {
-    validation?: (options: ValidationWrapperOptions<T>) => React.ReactNode;
+type FormsElementsType<T> = {
+    validation?: (options: {
+        children: React.ReactNode;
+        active: boolean;
+        stretch?: boolean;
+        path: string[];
+        message?: string;
+        data?: T;
+        key?: string;
+    }) => React.ReactNode;
     syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
 };
 export type InitialStateInnerType<T extends unknown = unknown> = {
@@ -282,13 +283,16 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
-    formElements?: FormsElementsType;
-    validation?: ValidationOptionsType;
-}) => {
-    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: OptionsType<TransformedStateType<State>[StateKey]>) => StateObject<TransformedStateType<State>[StateKey]>;
-    setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
+type UseCogsStateHook<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>) => StateObject<TransformedStateType<T>[StateKey]>;
+type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
+type CogsApi<T extends Record<string, any>> = {
+    useCogsState: UseCogsStateHook<T>;
+    setCogsOptions: SetCogsOptionsFunc<T>;
 };
+export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
+    formElements?: FormsElementsType<State>;
+    validation?: ValidationOptionsType;
+}) => CogsApi<State>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
