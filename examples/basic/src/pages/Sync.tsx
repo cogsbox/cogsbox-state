@@ -1,8 +1,13 @@
 import { useRef } from 'react';
-import { useNavigate } from 'react-router';
+
 import { SyncProviderSPA } from '../examples/sync/SyncProviderSpa';
 import SyncUser from '../../src/examples/user-sync/SyncUser';
 import { v4 as uuidv4 } from 'uuid';
+import { NavLink, Outlet } from 'react-router';
+const stateSections = [
+  { id: 'usestate sync', name: 'useState Sync', path: 'useState-sync' },
+  { id: 'form sync', name: 'Cogsbox-state Sync ', path: 'form-state' },
+];
 
 export default function Sync() {
   const syncKeyGet = window.location.search.split('syncKey=')[1];
@@ -18,13 +23,13 @@ export default function Sync() {
 
   return (
     <div className="p-6">
-      <div className="mb-6">
+      <div className="mb-3">
         <h1 className="text-2xl font-bold text-white mb-2">
           Sync Configuration
         </h1>
         <p className="text-gray-300 mb-4">
-          Enter a sync key to connect multiple instances. Share the URL with
-          others to sync together.
+          Enter a sync key to connect multiple instances. Open a new window or
+          share the URL with others to sync together.
         </p>
       </div>
       <div className="flex items-center gap-4 mb-8">
@@ -54,12 +59,33 @@ export default function Sync() {
         >
           Open New Window
         </button>
+      </div>{' '}
+      <div className="flex items-center gap-1 bg-blue-500/10 rounded-full mb-6">
+        <span className="text-[12px] font-mono text-blue-400 px-2 py-1 bg-blue-900/30 rounded-full border border-blue-500/20">
+          cogsbox-sync
+        </span>
+        <div className="w-1" />
+        {stateSections.map((section) => (
+          <NavLink
+            key={section.id}
+            to={section.path}
+            className={({ isActive }) =>
+              `px-3 py-1.5 rounded text-sm transition-all cursor-pointer ${
+                isActive
+                  ? 'bg-blue-500 text-white'
+                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+              }`
+            }
+          >
+            {section.name}
+          </NavLink>
+        ))}{' '}
       </div>
       <div className="bg-gray-800 rounded-lg p-6">
         <SyncProviderSPA>
-          <SyncUser />
+          <Outlet />
         </SyncProviderSPA>
-      </div>
+      </div>{' '}
     </div>
   );
 }

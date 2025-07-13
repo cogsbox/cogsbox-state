@@ -20,6 +20,8 @@ import Sync from './pages/Sync';
 import { v4 as uuidv4 } from 'uuid';
 import Shape from './pages/Shape';
 import ShapeOverview from './examples/shape-overview.tsx/ShapeOverview';
+import SyncUser from './examples/user-sync/CogsboxSync';
+import CogsboxSync from './examples/user-sync/CogsboxSync';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -70,6 +72,14 @@ const router = createBrowserRouter(
         {
           path: 'sync',
           element: <Sync />,
+          children: [
+            {
+              index: true, // Default page for /shape
+              element: <SyncUser />,
+            },
+            { path: 'useState-sync', element: <SyncUser /> },
+            { path: 'form-state', element: <CogsboxSync /> },
+          ],
         },
       ],
     },

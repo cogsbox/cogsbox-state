@@ -1,14 +1,14 @@
-// src/pages/TraditionalSyncPage.tsx
+// src/pages/CogsStateSyncPage.tsx
 'use client';
-import { useState, useEffect, useRef } from 'react';
-import { useSyncReact } from '../sync/SyncProvider';
-import { userState } from './state';
+import { useEffect, useRef } from 'react';
+import { useSync } from '../sync/SyncProvider';
+import { useCogsState } from './state';
 import { FlashWrapper } from '../../FlashOnUpdate';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import DotPattern from '../../DotWrapper';
 
-// --- Reusable Utility Components ---
+// --- Reusable Utility Components (same as above) ---
 
 function SectionWrapper({ children }: { children: React.ReactNode }) {
   return (
@@ -74,94 +74,95 @@ function RenderCounter({
   );
 }
 
-// --- Main Form Component ---
+// --- Main Form Components ---
 
-function TraditionalReactForm() {
-  const [state, setState] = useState(userState);
+function CogsStateForm() {
   const syncKeyGet = window.location.search.split('syncKey=')[1];
-  const [syncState, update] = useSyncReact(state, setState, {
-    syncKey: 'userUseState',
-    syncId: syncKeyGet ?? 'test-form',
-    connect: true,
-    inMemoryState: true,
+  const syncState = useCogsState('user', {
+    cogsSync: (stateObject) =>
+      useSync(stateObject, {
+        syncId: syncKeyGet!,
+        connect: true,
+        inMemoryState: true,
+      }),
   });
 
   return (
     <SectionWrapper>
       <div className="flex justify-between items-start mb-4">
         <div>
-          <h3 className="text-xl font-bold text-red-400">
-            Form with `useState`
+          <h3 className="text-xl font-bold text-green-400">
+            Form with `CogsState`
           </h3>
-          <p className="text-sm text-red-400/70 mt-1">
-            Powered by `useSyncReact`
+          <p className="text-sm text-green-400/70 mt-1">
+            Optimized, Granular Syncing
           </p>
         </div>
-        <RenderCounter label="Total Form Renders" color="bg-red-500" />
+        <RenderCounter label="Total Form Renders" color="bg-green-500" />
       </div>
+
       <FlashWrapper>
         <div className="space-y-4">
           {[
-            { label: 'Name', value: syncState.name, type: 'text', key: 'name' },
-            { label: 'Age', value: syncState.age, type: 'number', key: 'age' },
-            {
-              label: 'Email',
-              value: syncState.email,
-              type: 'email',
-              key: 'email',
-            },
-          ].map(({ label, value, type, key }) => (
-            <div className="flex flex-col gap-2" key={key}>
-              <div className="flex justify-between items-center">
-                <label className="font-medium text-gray-300">{label}:</label>
-                <RenderCounter
-                  label={`${label} Field Renders`}
-                  color="bg-orange-500"
-                />
-              </div>
-              <input
-                type={type}
-                className="bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                value={value}
-                onChange={(e) => {
-                  update((s) => ({
-                    ...s,
-                    [key]:
-                      type === 'number'
-                        ? parseInt(e.target.value) || 0
-                        : e.target.value,
-                  }));
-                }}
-              />
+            { label: 'Name', state: syncState.name, type: 'text' },
+            { label: 'Age', state: syncState.age, type: 'number' },
+            { label: 'Email', state: syncState.email, type: 'email' },
+          ].map(({ label, state, type }) => (
+            <div className="flex flex-col gap-2" key={label}>
+              <label className="font-medium text-gray-300">{label}:</label>
+              {state.formElement((obj) => (
+                <div className="flex items-center gap-2">
+                  <FlashWrapper>
+                    <input
+                      type={type}
+                      {...obj.inputProps}
+                      className="flex-1 bg-gray-900/50 border border-gray-700 rounded px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-green-500"
+                    />
+                  </FlashWrapper>
+                  <RenderCounter
+                    label={`${label} Input Renders`}
+                    color="bg-blue-500"
+                  />
+                </div>
+              ))}
             </div>
           ))}
         </div>
-        <div className="mt-6">
-          <h4 className="text-md font-semibold text-gray-300 mb-2">
-            Live State Object:
-          </h4>
-          <pre className="bg-gray-950 border border-gray-800 p-3 rounded text-sm overflow-auto text-gray-300">
-            {JSON.stringify(syncState, null, 2)}
-          </pre>
-        </div>
+        <CogsStateDisplay />
       </FlashWrapper>
     </SectionWrapper>
   );
 }
 
+function CogsStateDisplay() {
+  const syncState = useCogsState('user');
+  return (
+    <FlashWrapper>
+      <div className="mt-6">
+        <h4 className="text-md font-semibold text-gray-300 mb-2">
+          Live State Object:
+        </h4>
+        <pre className="bg-gray-950 border border-gray-800 p-3 rounded text-sm overflow-auto text-gray-300">
+          {JSON.stringify(syncState.get(), null, 2)}
+        </pre>
+      </div>
+    </FlashWrapper>
+  );
+}
+
 // --- Page Component ---
 
-export default function TraditionalSyncPage() {
+export default function CogsStateSyncPage() {
   return (
     <div className="flex-1 flex flex-col gap-8 p-4 md:p-8">
       <DotPattern>
         <div className="py-6">
           <h1 className="text-4xl font-bold text-gray-100 mb-2">
-            Sync Engine with React `useState`
+            Sync Engine with `CogsState`
           </h1>
           <p className="text-xl text-gray-400 max-w-4xl">
-            This demonstrates real-time state synchronization using a standard
-            React `useState` hook, augmented by our `useSyncReact` utility.
+            This demonstrates real-time synchronization using `CogsState`, a
+            library designed for performant, granular state management.
           </p>
         </div>
       </DotPattern>
@@ -170,14 +171,14 @@ export default function TraditionalSyncPage() {
         <h3 className="font-bold text-blue-300">How to Test Real-Time Sync</h3>
         <p className="text-blue-300/80">
           Use the 'Open New Window' button in the top configuration panel.
-          Arrange both windows side-by-side. Any change you make here will be
-          reflected in the other window instantly.
+          Notice how changes from the other window update individual fields here
+          without re-rendering the entire form.
         </p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="lg:col-span-1">
-          <TraditionalReactForm />
+          <CogsStateForm />
         </div>
         <div className="lg:col-span-1">
           <SectionWrapper>
@@ -185,27 +186,27 @@ export default function TraditionalSyncPage() {
               Implementation
             </h3>
             <p className="text-gray-400 mb-4 text-sm">
-              The entire form component state is managed by a single `useState`
-              object. `useSyncReact` wraps this state to broadcast and receive
-              changes.
+              `useCogsState` creates a proxy where each property is its own
+              state-aware object. The `.formElement()` method creates isolated
+              components that update independently.
             </p>
             <CodeSnippetDisplay
-              code={`function TraditionalReactForm() {
-  const [state, setState] = useState(initialState);
-  
-  // This hook syncs the state object and triggers re-renders
-  const [syncState, update] = useSyncReact(state, setState, {
-    syncKey: 'userUseState',
-    // ...other config
+              code={`function CogsStateForm() {
+  const syncState = useCogsState('user', {
+    // Add sync middleware
+    cogsSync: (stateObject) => useSync(stateObject, ...),
   });
 
   return (
     <div>
-      <input
-        value={syncState.name}
-        onChange={(e) => update(s => ({ ...s, name: e.target.value }))}
-      />
-      {/* ...other inputs */}
+      {/* .formElement() creates a performant, self-contained input */}
+      {syncState.name.formElement((obj) => (
+        <input {...obj.inputProps} />
+      ))}
+      
+      {syncState.age.formElement((obj) => (
+        <input type="number" {...obj.inputProps} />
+      ))}
     </div>
   );
 }`}
