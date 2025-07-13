@@ -416,11 +416,16 @@ export function useSyncReact<TStateType>(
       | number
       | string
       | (({ clientId }: { clientId: string }) => string | null);
-    connect: boolean;
+    connect?: boolean;
     syncKey: string;
     inMemoryState?: boolean;
   }
 ) {
+  const mergedOptions = {
+    ...options,
+    connect: typeof options?.connect === 'undefined' ? true : options?.connect,
+  };
+  console.log('mergedOptions', mergedOptions);
   const {
     token,
     socketUrl,
@@ -441,7 +446,7 @@ export function useSyncReact<TStateType>(
     currentToken.current = token;
   }, [token]);
 
-  const { syncId, connect, syncKey } = options;
+  const { syncId, connect, syncKey } = mergedOptions;
   const isArray = Array.isArray(state);
   const determinedSyncId: string = (
     isFunction(syncId) ? syncId({ clientId: clientId ?? '' }) : syncId
@@ -471,7 +476,7 @@ export function useSyncReact<TStateType>(
         syncKey: syncIdString,
         isArray: isArray,
         syncApiUrl: syncApiUrl || null,
-        inMemoryState: options?.inMemoryState,
+        inMemoryState: mergedOptions?.inMemoryState,
       });
     },
     onMessage: async (data) => {

@@ -68,7 +68,7 @@ export default function Sync() {
         {stateSections.map((section) => (
           <NavLink
             key={section.id}
-            to={section.path}
+            to={`${section.path}?syncKey=${syncKeyGet ?? newSyncKey.current}`}
             className={({ isActive }) =>
               `px-3 py-1.5 rounded text-sm transition-all cursor-pointer ${
                 isActive

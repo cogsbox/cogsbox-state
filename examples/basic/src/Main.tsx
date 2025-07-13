@@ -22,6 +22,7 @@ import Shape from './pages/Shape';
 import ShapeOverview from './examples/shape-overview.tsx/ShapeOverview';
 import SyncUser from './examples/user-sync/CogsboxSync';
 import CogsboxSync from './examples/user-sync/CogsboxSync';
+import TraditionalSyncPage from './examples/user-sync/SyncUser';
 // --- Query Client Setup ---
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -75,9 +76,9 @@ const router = createBrowserRouter(
           children: [
             {
               index: true, // Default page for /shape
-              element: <SyncUser />,
+              element: <TraditionalSyncPage />,
             },
-            { path: 'useState-sync', element: <SyncUser /> },
+            { path: 'useState-sync', element: <TraditionalSyncPage /> },
             { path: 'form-state', element: <CogsboxSync /> },
           ],
         },

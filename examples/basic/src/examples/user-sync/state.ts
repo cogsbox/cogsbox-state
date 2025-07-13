@@ -21,4 +21,8 @@ export const userState: UserType = {
 const allSchemas = {
   user: userState,
 };
-export const { useCogsState } = createCogsState(allSchemas);
+type AllSchemas = typeof allSchemas;
+const cogsStateHooks = createCogsState(allSchemas);
+
+// Re-export as const to break the type chain
+export const useCogsState = cogsStateHooks.useCogsState;

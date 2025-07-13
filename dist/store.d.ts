@@ -104,6 +104,9 @@ export type CogsEvent = {
     path: string;
 };
 export type CogsGlobalState = {
+    registerComponent: (stateKey: string, componentId: string, registration: any) => void;
+    unregisterComponent: (stateKey: string, componentId: string) => void;
+    addPathComponent: (stateKey: string, dependencyPath: string[], fullComponentId: string) => void;
     shadowStateStore: Map<string, ShadowMetadata>;
     markAsDirty: (key: string, path: string[], options: {
         bubble: boolean;

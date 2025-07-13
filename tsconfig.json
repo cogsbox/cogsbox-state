@@ -17,12 +17,11 @@
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
 
-
  
     "noErrorTruncation": true,
     "noUncheckedIndexedAccess": true,
     "lib": ["dom", "dom.iterable", "esnext"]
   },
   "include": ["src"],
-  "exclude": ["node_modules", "dist","examples/sync/worker/**/*","tests"]
+  "exclude": ["node_modules", "dist","examples/**/*","tests"]
 }

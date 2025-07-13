@@ -131,6 +131,7 @@ export type EndType<T, IsArrayElement = false> = {
     _stateKey: string;
     formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
+    getState: () => T;
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
     _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';

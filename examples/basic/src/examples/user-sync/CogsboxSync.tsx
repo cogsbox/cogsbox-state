@@ -7,6 +7,7 @@ import { FlashWrapper } from '../../FlashOnUpdate';
 import SyntaxHighlighter from 'react-syntax-highlighter';
 import { atomOneDark } from 'react-syntax-highlighter/dist/esm/styles/hljs';
 import DotPattern from '../../DotWrapper';
+import z from 'zod';
 
 // --- Reusable Utility Components (same as above) ---
 
@@ -75,16 +76,18 @@ function RenderCounter({
 }
 
 // --- Main Form Components ---
-
+const zodschema = z.object({
+  name: z.string().min(1),
+  age: z.number().min(1),
+  email: z.string().email(),
+});
 function CogsStateForm() {
   const syncKeyGet = window.location.search.split('syncKey=')[1];
   const syncState = useCogsState('user', {
-    cogsSync: (stateObject) =>
-      useSync(stateObject, {
-        syncId: syncKeyGet!,
-        connect: true,
-        inMemoryState: true,
-      }),
+    validation: {
+      key: 'user.name',
+      zodSchema: zodschema,
+    },
   });
 
   return (
@@ -156,7 +159,7 @@ export default function CogsStateSyncPage() {
   return (
     <div className="flex-1 flex flex-col gap-8 p-4 md:p-8">
       <DotPattern>
-        <div className="py-6">
+        <div className="p-6">
           <h1 className="text-4xl font-bold text-gray-100 mb-2">
             Sync Engine with `CogsState`
           </h1>

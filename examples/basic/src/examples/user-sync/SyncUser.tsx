@@ -78,11 +78,11 @@ function RenderCounter({
 
 function TraditionalReactForm() {
   const [state, setState] = useState(userState);
-  const syncKeyGet = window.location.search.split('syncKey=')[1];
+  const syncKey = window.location.search.split('syncKey=')[1]!;
+
   const [syncState, update] = useSyncReact(state, setState, {
     syncKey: 'userUseState',
-    syncId: syncKeyGet ?? 'test-form',
-    connect: true,
+    syncId: syncKey,
     inMemoryState: true,
   });
 
@@ -155,7 +155,7 @@ export default function TraditionalSyncPage() {
   return (
     <div className="flex-1 flex flex-col gap-8 p-4 md:p-8">
       <DotPattern>
-        <div className="py-6">
+        <div className="p-6">
           <h1 className="text-4xl font-bold text-gray-100 mb-2">
             Sync Engine with React `useState`
           </h1>
@@ -196,8 +196,9 @@ export default function TraditionalSyncPage() {
   // This hook syncs the state object and triggers re-renders
   const [syncState, update] = useSyncReact(state, setState, {
     syncKey: 'userUseState',
-    // ...other config
-  });
+    syncId: syncKey,   
+    inMemoryState: true,
+  };
 
   return (
     <div>

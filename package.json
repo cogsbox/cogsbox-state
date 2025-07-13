@@ -6,6 +6,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
+ 
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -37,14 +38,15 @@
     "superjson": "^2.2.2",
     "ulid": "^3.0.1",
     "uuid": "^9.0.1",
-    "zod": "^3.24.4",
+
     "zustand": "^5.0.3"
   },
   "peerDependencies": {
     "@trpc/next": "^10.0.0 || ^11.0.0",
     "@types/react": "^18.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0"
+    "react-dom": "^18.2.0",  
+     "zod": "^3.24.4"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",

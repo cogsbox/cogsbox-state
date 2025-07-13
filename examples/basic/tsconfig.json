@@ -1,30 +1,29 @@
 {
   "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx": "react-jsx",
+      "moduleResolution": "bundler",
+    "jsx":"react-jsx",
     "allowJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "strict": true,
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
-    "noEmit": true,
+    "declaration": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
+
+
+ 
     "noErrorTruncation": true,
     "noUncheckedIndexedAccess": true,
-    "lib": ["dom", "dom.iterable", "esnext"],
-    "baseUrl": ".",
-    "paths": {
-      "cogsbox-state": ["../../dist/index"],
-      "cogsbox-state/*": ["../../dist/*"],
-     
-    }
+    "lib": ["dom", "dom.iterable", "esnext"]
   },
 
-  "include": ["src/**/*", "src/examples/sync/vite", "src/examples/sync/createSyncSchema.ts", "src/examples/sync/notificationBuilder.ts", "src/examples/sync/SyncProvider.tsx", "src/examples/sync/SyncProviderSpa.tsx", "src/examples/sync/useWebsocketConnection.ts"],
+  "include": ["src/**/*" ,"../dist/index.js"],
   "exclude": ["node_modules", "dist"]
 }

@@ -26,7 +26,7 @@ import { ValidationWrapper } from './Functions.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
-import { z } from 'zod';
+import { z, ZodTypeAny } from 'zod';
 
 import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
@@ -350,7 +350,7 @@ export type ReactivityType =
 
 type ValidationOptionsType = {
   key?: string;
-  zodSchema?: z.ZodTypeAny;
+  zodSchema?: ZodTypeAny;
   onBlur?: boolean;
 };
 // Define the return type of the sync hook locally
@@ -4263,6 +4263,7 @@ function ListItemWrapper({
 
   return <div ref={setRefs}>{children}</div>;
 }
+
 function FormElementWrapper({
   stateKey,
   path,
@@ -4340,13 +4341,54 @@ function FormElementWrapper({
     [setState, path, formOpts?.debounceTime]
   );
 
-  const immediateUpdate = useCallback(() => {
+  // --- NEW onBlur HANDLER ---
+  // This replaces the old commented-out method with a modern approach.
+  const handleBlur = useCallback(async () => {
+    // Ensure the latest value is committed to the global state before validating.
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
+      debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
       setState(localValue, path, { updateType: 'update' });
     }
-  }, [setState, path, localValue]);
+
+    const { getInitialOptions, removeValidationError, addValidationError } =
+      getGlobalStore.getState();
+    const initialOptions = getInitialOptions(stateKey);
+    const validationOptions = initialOptions?.validation;
+
+    // Proceed only if onBlur validation with a Zod schema is configured.
+    if (!validationOptions?.zodSchema || !validationOptions?.onBlur) {
+      return;
+    }
+
+    const validationKey = validationOptions.key;
+    if (!validationKey) return;
+
+    const fullFieldPath = [validationKey, ...path].join('.');
+
+    // 1. Clear any previous validation errors for this specific field.
+    removeValidationError(fullFieldPath);
+
+    // 2. Validate the entire state object to get contextually correct errors.
+    const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+    const result = validationOptions.zodSchema.safeParse(fullState);
+
+    // 3. If validation fails, find the error for the current field and store it.
+    if (!result.success) {
+      result.error.errors.forEach((error) => {
+        // Check if the error's path matches this form element's path.
+        if (JSON.stringify(error.path) === JSON.stringify(path)) {
+          const errorKey = [validationKey, ...error.path].join('.');
+          // Add the error to the global validation error store.
+          addValidationError(errorKey, error.message);
+        }
+      });
+    }
+
+    // 4. Notify all subscribed components to update the UI with the new validation state.
+    notifyComponents(stateKey);
+  }, [stateKey, path, localValue, setState]);
 
   const baseState = rebuildStateShape({
     currentState: globalStateValue,
@@ -4362,7 +4404,8 @@ function FormElementWrapper({
           onChange: (e: any) => {
             debouncedUpdate(e.target.value);
           },
-          onBlur: immediateUpdate,
+          // 5. Wire the new onBlur handler to the input props.
+          onBlur: handleBlur,
           ref: formRefStore
             .getState()
             .getFormRef(stateKey + '.' + path.join('.')),
