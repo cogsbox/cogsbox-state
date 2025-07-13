@@ -145,10 +145,6 @@ function TraditionalReactForm() {
         </div>
 
         <div className="mt-6">
-          <div className="flex justify-between items-center mb-2">
-            <h4 className="font-bold text-gray-300">Current State:</h4>
-            <RenderCounter label="State Display" color="bg-purple-500" />
-          </div>
           <pre className="bg-gray-950 border border-gray-800 p-3 rounded text-sm overflow-auto text-gray-300">
             {JSON.stringify(syncState, null, 2)}
           </pre>
@@ -229,10 +225,6 @@ function CogsStateDisplay() {
   return (
     <FlashWrapper>
       <div className="mt-6">
-        <div className="flex justify-between items-center mb-2">
-          <h4 className="font-bold text-gray-300">Current State:</h4>
-          <RenderCounter label="State Display" color="bg-purple-500" />
-        </div>
         <pre className="bg-gray-950 border border-gray-800 p-3 rounded text-sm overflow-auto text-gray-300">
           {JSON.stringify(syncState.get(), null, 2)}
         </pre>
