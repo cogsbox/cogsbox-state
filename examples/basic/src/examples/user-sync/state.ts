@@ -1,5 +1,5 @@
 import { s, schema } from 'cogsbox-shape';
-import { createCogsState } from 'cogsbox-state';
+import { createCogsState } from '../../../../../src/CogsState';
 
 const userSchema = schema({
   _tableName: 'user',

@@ -651,6 +651,12 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   clearSelectedIndex: ({ arrayKey }: { arrayKey: string }): void => {
     set((state) => {
       const newMap = state.selectedIndicesMap;
+      const acutalKey = newMap.get(arrayKey);
+      if (acutalKey) {
+        get().notifyPathSubscribers(acutalKey, {
+          type: 'CLEAR_SELECTION',
+        });
+      }
 
       newMap.delete(arrayKey);
       get().notifyPathSubscribers(arrayKey, {

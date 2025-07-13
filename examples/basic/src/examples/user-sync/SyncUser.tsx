@@ -7,7 +7,7 @@ import { useCogsState, userState } from './state';
 export default function SyncUser() {
   return (
     <>
-      <UserUserState />
+      {/* <UserUserState /> */}
       <UserCogsState />
     </>
   );
@@ -86,7 +86,7 @@ function UserCogsState() {
   const syncState = useCogsState('user', {
     cogsSync: (stateObject) =>
       useSync(stateObject, {
-        syncId: syncKeyGet ?? 'test-form',
+        syncId: syncKeyGet!,
         connect: true,
         inMemoryState: true,
       }),
@@ -134,7 +134,7 @@ function UserCogsState() {
 
       <div className="mt-4 bg-gray-100 p-4 rounded">
         <h3 className="font-bold">Current State:</h3>
-        <pre>{JSON.stringify(syncState, null, 2)}</pre>
+        <pre>{JSON.stringify(syncState.get(), null, 2)}</pre>
       </div>
     </div>
   );

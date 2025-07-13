@@ -256,7 +256,7 @@ function ItemList({ title, color }: { title: string; color: 'red' | 'blue' }) {
               }
               className={`px-2 py-1 text-xs rounded ${teamColors[color].button} cursor-pointer`}
             >
-              Add Player At selected (or last)
+              Add Player
             </button>
             <button
               onClick={() => {

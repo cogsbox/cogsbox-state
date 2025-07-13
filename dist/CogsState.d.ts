@@ -197,7 +197,7 @@ type ValidationOptionsType = {
 };
 type SyncApi = {
     updateState: (data: {
-        operation: any[];
+        operation: any;
     }) => void;
     connected: boolean;
     clientId: string | null;

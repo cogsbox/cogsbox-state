@@ -62,11 +62,11 @@ const g = u((a, f) => ({
       if (Array.isArray(n)) {
         const d = [];
         n.forEach((c) => {
-          const S = `id:${w()}`;
-          d.push(i + "." + S);
-        }), t.set(i, { arrayKeys: d }), n.forEach((c, S) => {
-          const l = d[S].split(".").pop();
-          e(c, [...o, l]);
+          const l = `id:${w()}`;
+          d.push(i + "." + l);
+        }), t.set(i, { arrayKeys: d }), n.forEach((c, l) => {
+          const S = d[l].split(".").pop();
+          e(c, [...o, S]);
         });
       } else if (b(n)) {
         const d = Object.fromEntries(
@@ -112,19 +112,19 @@ const g = u((a, f) => ({
     if (!o || !o.arrayKeys) return;
     const i = `id:${w()}`, d = n + "." + i, c = [...o.arrayKeys];
     c.push(d), e.set(n, { ...o, arrayKeys: c });
-    const S = (l, y) => {
+    const l = (S, y) => {
       const h = [r, ...y].join(".");
-      if (!Array.isArray(l)) if (typeof l == "object" && l !== null) {
-        const m = Object.fromEntries(
-          Object.keys(l).map((p) => [p, h + "." + p])
+      if (!Array.isArray(S)) if (typeof S == "object" && S !== null) {
+        const E = Object.fromEntries(
+          Object.keys(S).map((p) => [p, h + "." + p])
         );
-        e.set(h, { fields: m }), Object.entries(l).forEach(([p, E]) => {
-          S(E, [...y, p]);
+        e.set(h, { fields: E }), Object.entries(S).forEach(([p, m]) => {
+          l(m, [...y, p]);
         });
       } else
-        e.set(h, { value: l });
+        e.set(h, { value: S });
     };
-    S(t, [...s, i]), a({ shadowStateStore: e }), f().notifyPathSubscribers(n, {
+    l(t, [...s, i]), a({ shadowStateStore: e }), f().notifyPathSubscribers(n, {
       type: "INSERT",
       path: n,
       itemKey: d
@@ -136,15 +136,15 @@ const g = u((a, f) => ({
       (c) => c === e
     ) !== -1) {
       const c = i.arrayKeys.filter(
-        (l) => l !== e
+        (S) => S !== e
       );
       t.set(o, {
         ...i,
         arrayKeys: c
       });
-      const S = e + ".";
-      for (const l of Array.from(t.keys()))
-        (l === e || l.startsWith(S)) && t.delete(l);
+      const l = e + ".";
+      for (const S of Array.from(t.keys()))
+        (S === e || S.startsWith(l)) && t.delete(S);
     }
     a({ shadowStateStore: t }), f().notifyPathSubscribers(o, {
       type: "REMOVE",
@@ -157,14 +157,14 @@ const g = u((a, f) => ({
     const e = new Map(f().shadowStateStore), n = [r, ...s].join("."), o = (i, d) => {
       const c = e.get(i);
       if (b(d) && c && c.fields) {
-        for (const S in d)
-          if (Object.prototype.hasOwnProperty.call(d, S)) {
-            const l = c.fields[S], y = d[S];
-            l && o(l, y);
+        for (const l in d)
+          if (Object.prototype.hasOwnProperty.call(d, l)) {
+            const S = c.fields[l], y = d[l];
+            S && o(S, y);
           }
       } else {
-        const S = e.get(i) || {};
-        e.set(i, { ...S, value: d });
+        const l = e.get(i) || {};
+        e.set(i, { ...l, value: d });
       }
     };
     o(n, t), f().notifyPathSubscribers(n, { type: "UPDATE", newValue: t }), a({ shadowStateStore: e });
@@ -193,8 +193,10 @@ const g = u((a, f) => ({
   },
   clearSelectedIndex: ({ arrayKey: r }) => {
     a((s) => {
-      const t = s.selectedIndicesMap;
-      return t.delete(r), f().notifyPathSubscribers(r, {
+      const t = s.selectedIndicesMap, e = t.get(r);
+      return e && f().notifyPathSubscribers(e, {
+        type: "CLEAR_SELECTION"
+      }), t.delete(r), f().notifyPathSubscribers(r, {
         type: "CLEAR_SELECTION"
       }), {
         ...s,
@@ -257,18 +259,18 @@ const g = u((a, f) => ({
       if (i.length >= e.length) {
         let d = !0;
         for (let c = 0; c < e.length; c++) {
-          const S = e[c], l = i[c];
-          if (S === "[*]" || Array.isArray(S)) {
-            const y = parseInt(l);
+          const l = e[c], S = i[c];
+          if (l === "[*]" || Array.isArray(l)) {
+            const y = parseInt(S);
             if (isNaN(y)) {
               d = !1;
               break;
             }
-            if (!n(S, l)) {
+            if (!n(l, S)) {
               d = !1;
               break;
             }
-          } else if (S !== l) {
+          } else if (l !== S) {
             d = !1;
             break;
           }

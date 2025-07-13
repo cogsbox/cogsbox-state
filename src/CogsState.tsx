@@ -353,7 +353,7 @@ type ValidationOptionsType = {
 };
 // Define the return type of the sync hook locally
 type SyncApi = {
-  updateState: (data: { operation: any[] }) => void;
+  updateState: (data: { operation: any }) => void;
   connected: boolean;
   clientId: string | null;
   subscribers: string[];
@@ -819,6 +819,123 @@ function markEntireStateAsServerSynced(
     });
   }
 }
+
+const _notifySubscribedComponents = (
+  stateKey: string,
+  path: string[],
+  updateType: 'update' | 'insert' | 'cut',
+  oldValue: any,
+  newValue: any
+) => {
+  const store = getGlobalStore.getState();
+  const rootMeta = store.getShadowMetadata(stateKey, []);
+  if (!rootMeta?.components) {
+    return;
+  }
+
+  const notifiedComponents = new Set<string>();
+  const shadowMeta = store.getShadowMetadata(stateKey, path);
+
+  // --- PASS 1: Notify specific subscribers based on update type ---
+
+  if (updateType === 'update') {
+    if (shadowMeta?.pathComponents) {
+      shadowMeta.pathComponents.forEach((componentId) => {
+        if (notifiedComponents.has(componentId)) return;
+        const component = rootMeta.components?.get(componentId);
+        if (component) {
+          const reactiveTypes = Array.isArray(component.reactiveType)
+            ? component.reactiveType
+            : [component.reactiveType || 'component'];
+          if (!reactiveTypes.includes('none')) {
+            component.forceUpdate();
+            notifiedComponents.add(componentId);
+          }
+        }
+      });
+    }
+
+    if (
+      newValue &&
+      typeof newValue === 'object' &&
+      !isArray(newValue) &&
+      oldValue &&
+      typeof oldValue === 'object' &&
+      !isArray(oldValue)
+    ) {
+      const changedSubPaths = getDifferences(newValue, oldValue);
+      changedSubPaths.forEach((subPathString) => {
+        const subPath = subPathString.split('.');
+        const fullSubPath = [...path, ...subPath];
+        const subPathMeta = store.getShadowMetadata(stateKey, fullSubPath);
+        if (subPathMeta?.pathComponents) {
+          subPathMeta.pathComponents.forEach((componentId) => {
+            if (notifiedComponents.has(componentId)) return;
+            const component = rootMeta.components?.get(componentId);
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || 'component'];
+              if (!reactiveTypes.includes('none')) {
+                component.forceUpdate();
+                notifiedComponents.add(componentId);
+              }
+            }
+          });
+        }
+      });
+    }
+  } else if (updateType === 'insert' || updateType === 'cut') {
+    const parentArrayPath = updateType === 'insert' ? path : path.slice(0, -1);
+    const parentMeta = store.getShadowMetadata(stateKey, parentArrayPath);
+    if (parentMeta?.pathComponents) {
+      parentMeta.pathComponents.forEach((componentId) => {
+        if (!notifiedComponents.has(componentId)) {
+          const component = rootMeta.components?.get(componentId);
+          if (component) {
+            component.forceUpdate();
+            notifiedComponents.add(componentId);
+          }
+        }
+      });
+    }
+  }
+
+  // --- PASS 2: Notify global subscribers ('all', 'deps') ---
+
+  rootMeta.components.forEach((component, componentId) => {
+    if (notifiedComponents.has(componentId)) {
+      return;
+    }
+
+    const reactiveTypes = Array.isArray(component.reactiveType)
+      ? component.reactiveType
+      : [component.reactiveType || 'component'];
+
+    if (reactiveTypes.includes('all')) {
+      component.forceUpdate();
+      notifiedComponents.add(componentId);
+      return;
+    }
+
+    if (reactiveTypes.includes('deps')) {
+      if (component.depsFunction) {
+        const currentState = store.getShadowValue(stateKey);
+        const newDeps = component.depsFunction(currentState);
+        let shouldUpdate = false;
+        if (newDeps === true || !isDeepEqual(component.prevDeps, newDeps)) {
+          if (Array.isArray(newDeps)) component.prevDeps = newDeps;
+          shouldUpdate = true;
+        }
+        if (shouldUpdate) {
+          component.forceUpdate();
+          notifiedComponents.add(componentId);
+        }
+      }
+    }
+  });
+};
+
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -1160,6 +1277,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     };
   }, []);
+
+  const syncApiRef = useRef<SyncApi | null>(null);
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
@@ -1219,6 +1338,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
       case 'cut': {
         const parentArrayPath = path.slice(0, -1);
+
         store.removeShadowArrayElement(thisKey, path);
         store.markAsDirty(thisKey, parentArrayPath, { bubble: true });
         break;
@@ -1230,6 +1350,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
 
+    console.log('sdadasdasd', syncApiRef.current, newUpdate);
+    if (syncApiRef.current && syncApiRef.current.connected) {
+      syncApiRef.current.updateState({ operation: newUpdate });
+    }
     // Handle signals - reuse shadowMeta from the beginning
     if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
       // Use updatedShadowValue if we need the new value, otherwise use payload
@@ -1673,7 +1797,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   const cogsSyncFn = latestInitialOptionsRef.current?.cogsSync;
   if (cogsSyncFn) {
-    const syncApi = cogsSyncFn(updaterFinal);
+    syncApiRef.current = cogsSyncFn(updaterFinal);
   }
 
   return updaterFinal;
@@ -2864,7 +2988,7 @@ function createProxyHandler<T>(
                     arrayValues: freshValues || [],
                   };
                 }, [cacheKey, updateTrigger]);
-
+                console.log('freshValues', validIds, arrayValues);
                 useEffect(() => {
                   const unsubscribe = getGlobalStore
                     .getState()
@@ -2889,7 +3013,13 @@ function createProxyHandler<T>(
                           }
                         }
                       }
-                      if (e.type === 'INSERT') {
+
+                      if (
+                        e.type === 'INSERT' ||
+                        e.type === 'REMOVE' ||
+                        e.type === 'CLEAR_SELECTION'
+                      ) {
+                        console.log('sssssssssssssssssssssssssssss', e);
                         forceUpdate({});
                       }
                     });
@@ -2914,7 +3044,7 @@ function createProxyHandler<T>(
                     validIds: validIds,
                   },
                 });
-
+                console.log('sssssssssssssssssssssssssssss', arraySetter);
                 return (
                   <>
                     {arrayValues.map((item, localIndex) => {
@@ -3350,13 +3480,44 @@ function createProxyHandler<T>(
             };
           }
           if (prop === 'applyJsonPatch') {
-            return (patches: any[]) => {
-              const currentState = getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey, meta?.validIds);
-              const newState = applyPatch(currentState, patches).newDocument;
+            return (patches: Operation[]) => {
+              // 1. Get the current state object that the proxy points to.
+              const store = getGlobalStore.getState();
 
-              notifyComponents(stateKey);
+              const convertPath = (jsonPath: string): string[] => {
+                if (!jsonPath || jsonPath === '/') return [];
+                return jsonPath
+                  .split('/')
+                  .slice(1)
+                  .map((p) => p.replace(/~1/g, '/').replace(/~0/g, '~'));
+              };
+
+              for (const patch of patches) {
+                const relativePath = convertPath(patch.path);
+
+                switch (patch.op) {
+                  case 'add':
+                  case 'replace': {
+                    const { value } = patch as {
+                      op: 'add' | 'replace';
+                      path: string;
+                      value: any;
+                    };
+                    store.updateShadowAtPath(stateKey, relativePath, value);
+                    store.markAsDirty(stateKey, relativePath, { bubble: true }); // Or handle status differently for server patches
+                    break;
+                  }
+                  case 'remove': {
+                    store.removeShadowArrayElement(stateKey, relativePath);
+                    const parentPath = relativePath.slice(0, -1);
+                    store.markAsDirty(stateKey, parentPath, { bubble: true });
+                    break;
+                  }
+                  // NOTE: 'move' and 'copy' operations should be deconstructed into 'remove' and 'add'
+                  // by the server before broadcasting for maximum compatibility. Your server's use
+                  // of `compare()` already does this, so we don't need to handle them here.
+                }
+              }
             };
           }
           if (prop === 'validateZodSchema') {

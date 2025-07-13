@@ -225,7 +225,7 @@ export function useSync<
     currentToken.current = token;
   }, [token]);
   const state = cogsState.get();
-
+  console.log('state 2132123213213213', state);
   const syncId = options.syncId;
   const isArray = Array.isArray(state);
   //const notArrayShape = isArray ? shape[0] : (shape as Schema<TInnershape>);
@@ -278,8 +278,7 @@ export function useSync<
       });
     },
     onMessage: async (data) => {
-      const currentId = activeSyncIdRef.current;
-
+      console.log('[datadatadatadatadata:', data);
       switch (data.type) {
         case 'auth_failed':
           console.log('auth_failed', data);
@@ -293,7 +292,16 @@ export function useSync<
           if (data.syncKey === syndIdRef.current) {
             isInitialised.current = true;
 
-            cogsState.updateInitialState(data.data as TStateType);
+            //  cogsState.updateInitialState(data.data as TStateType);
+          }
+          break;
+        case 'requestInitialState':
+          if (data.syncKey === syndIdRef.current) {
+            sendMessage({
+              type: 'provideInitialState',
+              syncKey: syncIdString,
+              state: state,
+            });
           }
           break;
         case 'subscribers':
@@ -368,14 +376,9 @@ export function useSync<
     clientId,
 
     updateState: (data: UpdateTypeDetail) => {
-      const messagePayload = {
-        operation: data,
-      };
-
-      console.log('messagePayload', messagePayload);
       sendMessage({
         type: 'queueUpdate',
-        data: messagePayload,
+        data: data,
       });
       //is sendMessage an old version
     },
