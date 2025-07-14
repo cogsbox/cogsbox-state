@@ -4395,8 +4395,6 @@ function FormElementWrapper({
               },
             });
           }
-
-          notifyComponents(stateKey);
         }
       }, debounceTime);
     },
@@ -4520,9 +4518,6 @@ function FormElementWrapper({
         },
       });
     }
-
-    // Notify components watching this path
-    notifyComponents(stateKey);
   }, [stateKey, path, localValue, setState]);
 
   const baseState = rebuildStateShape({

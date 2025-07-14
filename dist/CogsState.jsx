@@ -2,7 +2,7 @@
 import { jsx as ae, Fragment as Me, jsxs as Ve } from "react/jsx-runtime";
 import { memo as Oe, useState as X, useRef as q, useCallback as ce, useEffect as Q, useLayoutEffect as de, useMemo as fe, createElement as le, startTransition as Le } from "react";
 import { createRoot as Pe } from "react-dom/client";
-import { transformStateFunc as Fe, isFunction as re, isArray as Ee, getDifferences as De, isDeepEqual as ie } from "./utility.js";
+import { transformStateFunc as Fe, isFunction as re, isArray as Ee, getDifferences as De, isDeepEqual as se } from "./utility.js";
 import { ValidationWrapper as be } from "./Functions.jsx";
 import Ne from "superjson";
 import { v4 as ne } from "uuid";
@@ -25,7 +25,7 @@ function Ae({
   let u = !1;
   if (o)
     for (const f in o)
-      V.hasOwnProperty(f) ? (f == "localStorage" && o[f] && V[f].key !== o[f]?.key && (u = !0, V[f] = o[f]), f == "defaultState" && o[f] && V[f] !== o[f] && !ie(V[f], o[f]) && (u = !0, V[f] = o[f])) : (u = !0, V[f] = o[f]);
+      V.hasOwnProperty(f) ? (f == "localStorage" && o[f] && V[f].key !== o[f]?.key && (u = !0, V[f] = o[f]), f == "defaultState" && o[f] && V[f] !== o[f] && !se(V[f], o[f]) && (u = !0, V[f] = o[f])) : (u = !0, V[f] = o[f]);
   u && I(e, V);
 }
 function it(e, { formElements: o, validation: S }) {
@@ -77,7 +77,7 @@ const ct = (e, o) => {
     });
   };
   function V(u, f) {
-    Ae({ stateKey: u, options: f, initialOptionsPart: y }), f.localStorage && He(u, f), se(u);
+    Ae({ stateKey: u, options: f, initialOptionsPart: y }), f.localStorage && He(u, f), ie(u);
   }
   return { useCogsState: I, setCogsOptions: V };
 }, {
@@ -129,10 +129,10 @@ const ct = (e, o) => {
       `${g}-${e}-${y}`
     );
     if (I && I.lastUpdated > (I.lastSyncedWithServer || 0))
-      return se(e), !0;
+      return ie(e), !0;
   }
   return !1;
-}, se = (e) => {
+}, ie = (e) => {
   const o = t.getState().getShadowMetadata(e, []);
   if (!o) return;
   const S = /* @__PURE__ */ new Set();
@@ -295,7 +295,7 @@ function ze(e, {
         lastServerSync: c === "server" ? p : void 0,
         isDirty: !1,
         baseServerState: c === "server" ? d : void 0
-      }), se(l);
+      }), ie(l);
     }
   }, [l, ...A || []]), de(() => {
     H && me(l, {
@@ -529,7 +529,7 @@ function ze(e, {
       if (P.includes("deps") && E.depsFunction) {
         const R = c.getShadowValue(l), v = E.depsFunction(R);
         let T = !1;
-        v === !0 ? T = !0 : Array.isArray(v) && (ie(E.prevDeps, v) || (E.prevDeps = v, T = !0)), T && (E.forceUpdate(), N.add(k));
+        v === !0 ? T = !0 : Array.isArray(v) && (se(E.prevDeps, v) || (E.prevDeps = v, T = !0)), T && (E.forceUpdate(), N.add(k));
       }
     }), N.clear(), xe(l, (E) => {
       const k = [...E ?? [], C], P = /* @__PURE__ */ new Map();
@@ -642,7 +642,7 @@ function Ue(e, o, S, g) {
               if (d && !d.success && d.errors && r && (t.getState().removeValidationError(r), d.errors.forEach((c) => {
                 const p = [r, ...c.path].join(".");
                 t.getState().addValidationError(p, c.message);
-              }), se(e)), d?.success) {
+              }), ie(e)), d?.success) {
                 const c = t.getState().getShadowMetadata(e, []);
                 t.getState().setShadowMetadata(e, [], {
                   ...c,
@@ -1184,14 +1184,14 @@ function Ue(e, o, S, g) {
               let c = null;
               if (!r.some((b) => {
                 const D = n ? n.every(
-                  (U) => ie(b[U], d[U])
-                ) : ie(b, d);
+                  (U) => se(b[U], d[U])
+                ) : se(b, d);
                 return D && (c = b), D;
               }))
                 V(i), o(d, i, { updateType: "insert" });
               else if (a && c) {
                 const b = a(c), D = r.map(
-                  (U) => ie(U, c) ? b : U
+                  (U) => se(U, c) ? b : U
                 );
                 V(i), o(D, i, {
                   updateType: "update"
@@ -1340,7 +1340,7 @@ function Ue(e, o, S, g) {
               ue(n.key), s.forEach((a) => {
                 const r = [n.key, ...a.path].join(".");
                 ye(r, a.message);
-              }), se(e);
+              }), ie(e);
             };
           if (m === "applyJsonPatch")
             return (s) => {
@@ -1407,7 +1407,7 @@ function Ue(e, o, S, g) {
               }) : r.error.errors.forEach((d) => {
                 const c = [s.key, ...d.path].join(".");
                 ye(c, d.message);
-              }), se(e), !1);
+              }), ie(e), !1);
             };
           if (m === "getComponents")
             return () => t.getState().getShadowMetadata(e, [])?.components;
@@ -1766,7 +1766,7 @@ function Ze({
   Re(e, V, u);
   const A = t.getState().getShadowValue(f), [w, i] = X(A), h = q(!1), M = q(null);
   Q(() => {
-    !h.current && !ie(A, w) && i(A);
+    !h.current && !se(A, w) && i(A);
   }, [A]), Q(() => {
     const B = t.getState().subscribeToPath(f, (x) => {
       !h.current && w !== x && u({});
@@ -1807,7 +1807,6 @@ function Ze({
               }
             });
           }
-          se(e);
         }
       }, x);
     },
@@ -1869,7 +1868,6 @@ function Ze({
         }
       });
     }
-    se(e);
   }, [e, o, w, I]), z = S({
     currentState: A,
     path: o,
