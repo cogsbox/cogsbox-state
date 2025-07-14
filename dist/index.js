@@ -1,31 +1,30 @@
-import { $cogsSignal as r, DefaultValidationComponent as o, addStateOptions as n, createCogsState as a, notifyComponent as s, useCogsStateFn as i } from "./CogsState.jsx";
-import { CogsStateClient as g, config as p, useCogsConfig as c } from "./CogsStateClient.jsx";
-import { debounce as u, deepMerge as C, deleteNestedProperty as l, getArrayLengthDifferences as y, getArrayLengthDifferencesArray as m, getDifferences as D, getDifferencesArray as S, getNestedValue as A, isArray as x, isDeepEqual as F, isFunction as L, isObject as N, transformStateFunc as V, updateNestedProperty as b } from "./utility.js";
+import { $cogsSignal as r, addStateOptions as o, createCogsState as n, notifyComponent as s, useCogsStateFn as a } from "./CogsState.jsx";
+import { CogsStateClient as g, config as f, useCogsConfig as c } from "./CogsStateClient.jsx";
+import { debounce as d, deepMerge as u, deleteNestedProperty as y, getArrayLengthDifferences as C, getArrayLengthDifferencesArray as l, getDifferences as m, getDifferencesArray as S, getNestedValue as A, isArray as D, isDeepEqual as x, isFunction as F, isObject as L, transformStateFunc as N, updateNestedProperty as b } from "./utility.js";
 import { useCogsTrpcValidationLink as O } from "./TRPCValidationLink.js";
 export {
   r as $cogsSignal,
   g as CogsStateClient,
-  o as DefaultValidationComponent,
-  n as addStateOptions,
-  p as config,
-  a as createCogsState,
-  u as debounce,
-  C as deepMerge,
-  l as deleteNestedProperty,
-  y as getArrayLengthDifferences,
-  m as getArrayLengthDifferencesArray,
-  D as getDifferences,
+  o as addStateOptions,
+  f as config,
+  n as createCogsState,
+  d as debounce,
+  u as deepMerge,
+  y as deleteNestedProperty,
+  C as getArrayLengthDifferences,
+  l as getArrayLengthDifferencesArray,
+  m as getDifferences,
   S as getDifferencesArray,
   A as getNestedValue,
-  x as isArray,
-  F as isDeepEqual,
-  L as isFunction,
-  N as isObject,
+  D as isArray,
+  x as isDeepEqual,
+  F as isFunction,
+  L as isObject,
   s as notifyComponent,
-  V as transformStateFunc,
+  N as transformStateFunc,
   b as updateNestedProperty,
   c as useCogsConfig,
-  i as useCogsStateFn,
+  a as useCogsStateFn,
   O as useCogsTrpcValidationLink
 };
 //# sourceMappingURL=index.js.map

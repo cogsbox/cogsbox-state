@@ -4332,6 +4332,10 @@ function FormElementWrapper({
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
+      const currentType = typeof globalStateValue;
+      if (currentType === 'number' && typeof newValue === 'string') {
+        newValue = newValue === '' ? 0 : Number(newValue);
+      }
       setLocalValue(newValue);
       isCurrentlyDebouncing.current = true;
 
@@ -4374,17 +4378,27 @@ function FormElementWrapper({
               setShadowMetadata(stateKey, path, {
                 ...currentMeta,
                 validation: {
-                  status: 'INVALID_LIVE', // Gentle error while typing
+                  status: 'INVALID_LIVE',
                   message: pathErrors[0]?.message,
+                  validatedValue: newValue,
+                },
+              });
+            } else {
+              // This field has no errors - clear validation
+              setShadowMetadata(stateKey, path, {
+                ...currentMeta,
+                validation: {
+                  status: 'VALID_LIVE',
                   validatedValue: newValue,
                 },
               });
             }
           } else {
+            // Validation passed - clear any existing errors
             setShadowMetadata(stateKey, path, {
               ...currentMeta,
               validation: {
-                status: 'VALID_LIVE', // Valid while typing
+                status: 'VALID_LIVE',
                 validatedValue: newValue,
               },
             });
@@ -4572,40 +4586,3 @@ function useRegisterComponent(
     };
   }, [stateKey, fullComponentId]); // Dependencies are stable and correct
 }
-export const DefaultValidationComponent = ({
-  children,
-  status,
-  message,
-}: {
-  children: React.ReactNode;
-  status: ValidationStatus;
-  message?: string;
-}) => {
-  if (!message || status === 'PRISTINE' || status === 'DIRTY') {
-    return <>{children}</>;
-  }
-
-  const isLiveError = status === 'INVALID_LIVE';
-  const isBlurError = status === 'VALIDATION_FAILED';
-
-  return (
-    <div style={{ position: 'relative' }}>
-      {children}
-      {(isLiveError || isBlurError) && (
-        <div
-          style={{
-            fontSize: '12px',
-            marginTop: '4px',
-            color: isLiveError ? '#ff9800' : '#f44336', // Orange for live, red for blur
-            display: 'flex',
-            alignItems: 'center',
-            gap: '4px',
-          }}
-        >
-          <span style={{ fontSize: '16px' }}>{isLiveError ? '⚠' : '⛔'}</span>
-          {message}
-        </div>
-      )}
-    </div>
-  );
-};

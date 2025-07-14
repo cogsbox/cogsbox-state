@@ -347,9 +347,4 @@ export declare function $cogsSignal(proxy: {
         _meta?: MetaData;
     };
 }>;
-export declare const DefaultValidationComponent: ({ children, status, message, }: {
-    children: React.ReactNode;
-    status: ValidationStatus;
-    message?: string;
-}) => import("react/jsx-runtime").JSX.Element;
 export {};
