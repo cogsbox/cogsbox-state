@@ -105,6 +105,7 @@ export type ShadowMetadata = {
     domRef?: HTMLElement | null;
   };
   syncInfo?: { status: string };
+  validation?: ValidationState;
   lastUpdated?: number;
   value?: any;
   classSignals?: Array<{
@@ -151,6 +152,23 @@ export type ShadowMetadata = {
     }
   >;
 } & ComponentsType;
+
+export type ValidationStatus =
+  | 'PRISTINE' // Untouched, matches initial state.
+  | 'DIRTY' // Changed, but no validation run yet.
+  | 'INVALID_LIVE' // Gentle error during typing.
+  | 'VALIDATION_FAILED' // Hard error on blur/submit.
+  | 'VALID_PENDING_SYNC' // Passed validation, ready for sync.
+  | 'SYNCING' // Actively being sent to the server.
+  | 'SYNCED' // Server confirmed success.
+  | 'SYNC_FAILED'; // Server rejected the data.
+
+export type ValidationState = {
+  status: ValidationStatus;
+  message?: string;
+  lastValidated?: number;
+  validatedValue?: any;
+};
 export type CogsEvent =
   | { type: 'INSERT'; path: string; itemKey: string; index: number }
   | { type: 'REMOVE'; path: string; itemKey: string }

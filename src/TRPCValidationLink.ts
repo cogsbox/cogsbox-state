@@ -1,10 +1,10 @@
-import { observable } from "@trpc/server/observable";
-import type { AnyRouter } from "@trpc/server";
-import type { TRPCLink } from "@trpc/client";
-import type { Operation } from "@trpc/client";
-import type { TRPCClientError } from "@trpc/client";
-import { getGlobalStore } from "./store";
-import type { Observer } from "@trpc/server/observable";
+import { observable } from '@trpc/server/observable';
+import type { AnyRouter } from '@trpc/server';
+import type { TRPCLink } from '@trpc/client';
+import type { Operation } from '@trpc/client';
+import type { TRPCClientError } from '@trpc/client';
+import { getGlobalStore } from './store';
+import type { Observer } from '@trpc/server/observable';
 export const useCogsTrpcValidationLink = <
   TRouter extends AnyRouter,
 >(passedOpts?: {
@@ -25,27 +25,27 @@ export const useCogsTrpcValidationLink = <
                 try {
                   const errorObject = JSON.parse(err.message);
                   if (passedOpts?.log) {
-                    console.log("errorObject", errorObject);
+                    console.log('errorObject', errorObject);
                   }
                   if (Array.isArray(errorObject)) {
                     errorObject.forEach(
                       (error: { path: string[]; message: string }) => {
-                        const fullpath = `${op.path}.${error.path.join(".")}`;
+                        const fullpath = `${op.path}.${error.path.join('.')}`;
                         // In your TRPC link
                         if (passedOpts?.log) {
-                          console.log("fullpath 1", fullpath);
+                          console.log('fullpath 1', fullpath);
                         }
                         addValidationError(fullpath, error.message);
                       }
                     );
                   } else if (
-                    typeof errorObject === "object" &&
+                    typeof errorObject === 'object' &&
                     errorObject !== null
                   ) {
                     Object.entries(errorObject).forEach(([key, value]) => {
                       const fullpath = `${op.path}.${key}`;
                       if (passedOpts?.log) {
-                        console.log("fullpath 2", fullpath);
+                        console.log('fullpath 2', fullpath);
                       }
                       addValidationError(fullpath, value as string);
                     });

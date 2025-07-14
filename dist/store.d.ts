@@ -45,6 +45,7 @@ export type ShadowMetadata = {
     syncInfo?: {
         status: string;
     };
+    validation?: ValidationState;
     lastUpdated?: number;
     value?: any;
     classSignals?: Array<{
@@ -82,6 +83,13 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
 } & ComponentsType;
+export type ValidationStatus = 'PRISTINE' | 'DIRTY' | 'INVALID_LIVE' | 'VALIDATION_FAILED' | 'VALID_PENDING_SYNC' | 'SYNCING' | 'SYNCED' | 'SYNC_FAILED';
+export type ValidationState = {
+    status: ValidationStatus;
+    message?: string;
+    lastValidated?: number;
+    validatedValue?: any;
+};
 export type CogsEvent = {
     type: 'INSERT';
     path: string;

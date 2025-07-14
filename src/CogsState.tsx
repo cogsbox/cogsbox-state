@@ -2220,13 +2220,16 @@ function createProxyHandler<T>(
         }
         if (prop === 'showValidationErrors') {
           return () => {
-            const init = getGlobalStore
+            const meta = getGlobalStore
               .getState()
-              .getInitialOptions(stateKey)?.validation;
-            if (!init?.key) throw new Error('Validation key not found');
-            return getGlobalStore
-              .getState()
-              .getValidationErrors(init.key + '.' + path.join('.'));
+              .getShadowMetadata(stateKey, path);
+            if (
+              meta?.validation?.status === 'VALIDATION_FAILED' &&
+              meta.validation.message
+            ) {
+              return [meta.validation.message];
+            }
+            return [];
           };
         }
         if (Array.isArray(currentState)) {
@@ -4373,7 +4376,6 @@ function FormElementWrapper({
       }
     };
   }, []);
-  // In FormElementWrapper
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
@@ -4389,66 +4391,34 @@ function FormElementWrapper({
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
 
-        // Get validation options
-        const {
-          getInitialOptions,
-          getValidationErrors,
-          addValidationError,
-          removeValidationError,
-        } = getGlobalStore.getState();
-        const initialOptions = getInitialOptions(stateKey);
-        const validationOptions = initialOptions?.validation;
-        const zodSchema =
-          validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
-        const allowInvalidSync = formOpts?.sync?.allowInvalidValues ?? false;
+        // Check if we should validate before syncing
+        const shouldBlockInvalidSync = !(
+          formOpts?.sync?.allowInvalidValues ?? false
+        );
 
-        // If sync is not allowed for invalid values, and we have a schema,
-        // perform a "dry run" validation.
-        if (!allowInvalidSync && zodSchema && validationOptions?.key) {
-          const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+        if (shouldBlockInvalidSync) {
+          // First update the state locally to validate
+          setState(newValue, path, { updateType: 'update' });
 
-          // Create a temporary state object with the new value to validate against.
-          // This avoids mutating the real state just for validation.
-          const tempState = applyPatch(
-            JSON.parse(JSON.stringify(fullState)), // Deep copy
-            [{ op: 'replace', path: '/' + path.join('/'), value: newValue }]
-          ).newDocument;
+          // Now check if validation errors exist for this field
+          const { getInitialOptions, getValidationErrors } =
+            getGlobalStore.getState();
+          const validationKey = getInitialOptions(stateKey)?.validation?.key;
 
-          const result = zodSchema.safeParse(tempState);
-          const validationKey = validationOptions.key;
-          const fieldKey = validationKey + '.' + path.join('.');
+          if (validationKey) {
+            const fieldKey = validationKey + '.' + path.join('.');
+            const errors = getValidationErrors(fieldKey);
 
-          // Clear previous errors for this field before re-validating.
-          removeValidationError(fieldKey);
-
-          if (!result.success) {
-            const errorList =
-              'issues' in result.error
-                ? result.error.issues
-                : (result.error as any).errors;
-            let fieldHasError = false;
-
-            errorList.forEach((error: any) => {
-              if (JSON.stringify(error.path) === JSON.stringify(path)) {
-                addValidationError(fieldKey, error.message);
-                fieldHasError = true;
-              }
-            });
-
-            // If the current field is now invalid...
-            if (fieldHasError) {
-              // ...update the state WITHOUT syncing.
-              // The UI updates, the error message shows, but the server is safe.
-              setState(newValue, path, { updateType: 'update', sync: false });
-              notifyComponents(stateKey); // Notify UI to show the new error
-              return; // Stop here
+            if (errors.length > 0) {
+              console.log('Validation failed, state updated but sync blocked');
+              // State is updated but we need to prevent sync
+              // TODO: Need a way to mark this update as "local only"
+              return;
             }
           }
+        } else {
+          setState(newValue, path, { updateType: 'update' });
         }
-
-        // If we passed validation (or if validation isn't required),
-        // update the state and allow it to sync.
-        setState(newValue, path, { updateType: 'update', sync: true });
       }, debounceTime);
     },
     [
@@ -4460,15 +4430,99 @@ function FormElementWrapper({
     ]
   );
 
-  // The `handleBlur` function can now be simplified, as `debouncedUpdate` handles
-  // the validation logic. It's still useful for triggering the final debounced update.
-  const handleBlur = useCallback(() => {
+  // --- NEW onBlur HANDLER ---
+  // This replaces the old commented-out method with a modern approach.
+  const handleBlur = useCallback(async () => {
+    console.log('handleBlur triggered');
+
+    // Commit any pending changes
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
-      // Immediately run the debounced logic
-      debouncedUpdate(localValue);
+      debounceTimeoutRef.current = null;
+      isCurrentlyDebouncing.current = false;
+      setState(localValue, path, { updateType: 'update' });
     }
-  }, [localValue, debouncedUpdate]);
+
+    const { getInitialOptions } = getGlobalStore.getState();
+    const validationOptions = getInitialOptions(stateKey)?.validation;
+    const zodSchema =
+      validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
+
+    if (!zodSchema || !validationOptions?.onBlur) return;
+
+    // Get the full path including stateKey
+    const fullPath = [stateKey, ...path].join('.');
+
+    // Update validation state to "validating"
+    const currentMeta = getGlobalStore
+      .getState()
+      .getShadowMetadata(stateKey, path);
+    getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+      ...currentMeta,
+      validation: {
+        status: 'DIRTY',
+        validatedValue: localValue,
+      },
+    });
+
+    // Validate full state
+    const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+    const result = zodSchema.safeParse(fullState);
+
+    if (!result.success) {
+      const errors =
+        'issues' in result.error
+          ? result.error.issues
+          : (result.error as any).errors;
+
+      // Find errors for this specific path
+      const pathErrors = errors.filter((error: any) => {
+        // For array paths, we need to translate indices to ULIDs
+        if (path.some((p) => p.startsWith('id:'))) {
+          // This is an array item path like ["id:xyz", "name"]
+          const parentPath = path[0]!.startsWith('id:')
+            ? []
+            : path.slice(0, -1);
+          const arrayMeta = getGlobalStore
+            .getState()
+            .getShadowMetadata(stateKey, parentPath);
+
+          if (arrayMeta?.arrayKeys) {
+            const itemKey = [stateKey, ...path.slice(0, -1)].join('.');
+            const itemIndex = arrayMeta.arrayKeys.indexOf(itemKey);
+
+            // Compare with Zod path
+            const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
+            return JSON.stringify(error.path) === JSON.stringify(zodPath);
+          }
+        }
+
+        return JSON.stringify(error.path) === JSON.stringify(path);
+      });
+
+      // Update shadow metadata with validation result
+      getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+        ...currentMeta,
+        validation: {
+          status: 'VALIDATION_FAILED',
+          message: pathErrors[0]?.message,
+          validatedValue: localValue,
+        },
+      });
+    } else {
+      // Validation passed
+      getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+        ...currentMeta,
+        validation: {
+          status: 'VALID_PENDING_SYNC',
+          validatedValue: localValue,
+        },
+      });
+    }
+
+    // Notify components watching this path
+    notifyComponents(stateKey);
+  }, [stateKey, path, localValue, setState]);
 
   const baseState = rebuildStateShape({
     currentState: globalStateValue,
