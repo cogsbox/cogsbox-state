@@ -4397,6 +4397,7 @@ function FormElementWrapper({
           }
         }
       }, debounceTime);
+      forceUpdate({});
     },
     [setState, path, formOpts?.debounceTime, stateKey]
   );
@@ -4518,6 +4519,7 @@ function FormElementWrapper({
         },
       });
     }
+    forceUpdate({});
   }, [stateKey, path, localValue, setState]);
 
   const baseState = rebuildStateShape({
