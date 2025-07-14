@@ -1,30 +1,22 @@
-import { jsx as i, Fragment as v } from "react/jsx-runtime";
-import g from "react";
+import { jsx as e, Fragment as c } from "react/jsx-runtime";
+import r from "react";
 import { getGlobalStore as S } from "./store.js";
-function p({
+function h({
   formOpts: a,
   path: t,
-  stateKey: e,
-  children: o,
-  validIndices: h
+  stateKey: o,
+  children: i
 }) {
-  const { getInitialOptions: m, getShadowMetadata: c } = S.getState(), n = m(e), s = c(e, t), r = s?.validation, l = r?.status || "PRISTINE", d = r?.message;
-  return console.log("ValidationWrapper shadow:", {
-    stateKey: e,
-    path: t,
-    shadowMeta: s,
-    status: l,
-    message: d
-  }), /* @__PURE__ */ i(v, { children: n?.formElements?.validation && !a?.validation?.disable ? n.formElements.validation({
-    children: /* @__PURE__ */ i(g.Fragment, { children: o }, t.toString()),
-    status: l,
+  const { getInitialOptions: d, getShadowMetadata: l } = S.getState(), n = d(o), s = l(o, t)?.validation, m = s?.status || "PRISTINE", g = s?.message;
+  return /* @__PURE__ */ e(c, { children: n?.formElements?.validation && !a?.validation?.disable ? n.formElements.validation({
+    children: /* @__PURE__ */ e(r.Fragment, { children: i }, t.toString()),
+    status: m,
     // Pass status instead of active
-    message: a?.validation?.hideMessage ? "" : a?.validation?.message || d || "",
-    path: t,
-    stretch: a?.validation?.stretch
-  }) : /* @__PURE__ */ i(g.Fragment, { children: o }, t.toString()) });
+    message: a?.validation?.hideMessage ? "" : a?.validation?.message || g || "",
+    path: t
+  }) : /* @__PURE__ */ e(r.Fragment, { children: i }, t.toString()) });
 }
 export {
-  p as ValidationWrapper
+  h as ValidationWrapper
 };
 //# sourceMappingURL=Functions.jsx.map

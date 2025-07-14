@@ -102,7 +102,6 @@ export type FormOptsType = {
     validation?: {
         hideMessage?: boolean;
         message?: string;
-        stretch?: boolean;
         props?: GenericObject;
         disable?: boolean;
     };
@@ -263,7 +262,6 @@ type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
         status: ValidationStatus;
-        stretch?: boolean;
         path: string[];
         message?: string;
         data?: T;

@@ -6,6 +6,5 @@ export type ValidationWrapperProps = {
     path: string[];
     stateKey: string;
     children: React.ReactNode;
-    validIndices?: number[];
 };
-export declare function ValidationWrapper({ formOpts, path, stateKey, children, validIndices, }: ValidationWrapperProps): import("react/jsx-runtime").JSX.Element;
+export declare function ValidationWrapper({ formOpts, path, stateKey, children, }: ValidationWrapperProps): import("react/jsx-runtime").JSX.Element;
