@@ -107,6 +107,9 @@ export type FormOptsType = {
         disable?: boolean;
     };
     debounceTime?: number;
+    sync?: {
+        allowInvalidValues?: boolean;
+    };
 };
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);

@@ -224,6 +224,9 @@ export type FormOptsType = {
   };
 
   debounceTime?: number;
+  sync?: {
+    allowInvalidValues?: boolean; // default: false
+  };
 };
 
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
@@ -319,13 +322,17 @@ type EffectiveSetStateArg<
     ? InsertParams<InferArrayElement<T>>
     : never
   : UpdateArg<T>;
+type UpdateOptions = {
+  updateType: 'insert' | 'cut' | 'update';
 
+  sync?: boolean;
+};
 type EffectiveSetState<TStateObject> = (
   newStateOrFunction:
     | EffectiveSetStateArg<TStateObject, 'update'>
     | EffectiveSetStateArg<TStateObject, 'insert'>,
   path: string[],
-  updateObj: { updateType: 'update' | 'insert' | 'cut' },
+  updateObj: UpdateOptions,
   validationKey?: string
 ) => void;
 
@@ -1306,7 +1313,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
-    updateObj: { updateType: 'insert' | 'cut' | 'update' },
+    updateObj: UpdateOptions,
     validationKey?: string
   ) => {
     const fullPath = [thisKey, ...path].join('.');
@@ -1373,8 +1380,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
         break;
       }
     }
+    const shouldSync = updateObj.sync !== false;
 
-    if (syncApiRef.current && syncApiRef.current.connected) {
+    if (shouldSync && syncApiRef.current && syncApiRef.current.connected) {
       syncApiRef.current.updateState({ operation: newUpdate });
     }
     // Handle signals - reuse shadowMeta from the beginning
@@ -4365,6 +4373,7 @@ function FormElementWrapper({
       }
     };
   }, []);
+  // In FormElementWrapper
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
@@ -4379,72 +4388,87 @@ function FormElementWrapper({
 
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
-        setState(newValue, path, { updateType: 'update' });
+
+        // Get validation options
+        const {
+          getInitialOptions,
+          getValidationErrors,
+          addValidationError,
+          removeValidationError,
+        } = getGlobalStore.getState();
+        const initialOptions = getInitialOptions(stateKey);
+        const validationOptions = initialOptions?.validation;
+        const zodSchema =
+          validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
+        const allowInvalidSync = formOpts?.sync?.allowInvalidValues ?? false;
+
+        // If sync is not allowed for invalid values, and we have a schema,
+        // perform a "dry run" validation.
+        if (!allowInvalidSync && zodSchema && validationOptions?.key) {
+          const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+
+          // Create a temporary state object with the new value to validate against.
+          // This avoids mutating the real state just for validation.
+          const tempState = applyPatch(
+            JSON.parse(JSON.stringify(fullState)), // Deep copy
+            [{ op: 'replace', path: '/' + path.join('/'), value: newValue }]
+          ).newDocument;
+
+          const result = zodSchema.safeParse(tempState);
+          const validationKey = validationOptions.key;
+          const fieldKey = validationKey + '.' + path.join('.');
+
+          // Clear previous errors for this field before re-validating.
+          removeValidationError(fieldKey);
+
+          if (!result.success) {
+            const errorList =
+              'issues' in result.error
+                ? result.error.issues
+                : (result.error as any).errors;
+            let fieldHasError = false;
+
+            errorList.forEach((error: any) => {
+              if (JSON.stringify(error.path) === JSON.stringify(path)) {
+                addValidationError(fieldKey, error.message);
+                fieldHasError = true;
+              }
+            });
+
+            // If the current field is now invalid...
+            if (fieldHasError) {
+              // ...update the state WITHOUT syncing.
+              // The UI updates, the error message shows, but the server is safe.
+              setState(newValue, path, { updateType: 'update', sync: false });
+              notifyComponents(stateKey); // Notify UI to show the new error
+              return; // Stop here
+            }
+          }
+        }
+
+        // If we passed validation (or if validation isn't required),
+        // update the state and allow it to sync.
+        setState(newValue, path, { updateType: 'update', sync: true });
       }, debounceTime);
     },
-    [setState, path, formOpts?.debounceTime]
+    [
+      setState,
+      path,
+      formOpts?.debounceTime,
+      formOpts?.sync?.allowInvalidValues,
+      stateKey,
+    ]
   );
 
-  // --- NEW onBlur HANDLER ---
-  // This replaces the old commented-out method with a modern approach.
-  const handleBlur = useCallback(async () => {
-    console.log('handleBlurhandleBlurhandleBlur');
-    // Ensure the latest value is committed to the global state before validating.
+  // The `handleBlur` function can now be simplified, as `debouncedUpdate` handles
+  // the validation logic. It's still useful for triggering the final debounced update.
+  const handleBlur = useCallback(() => {
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = null;
-      isCurrentlyDebouncing.current = false;
-      setState(localValue, path, { updateType: 'update' });
+      // Immediately run the debounced logic
+      debouncedUpdate(localValue);
     }
-
-    const { getInitialOptions, removeValidationError, addValidationError } =
-      getGlobalStore.getState();
-    const initialOptions = getInitialOptions(stateKey);
-    const validationOptions = initialOptions?.validation;
-    console.log('validationOptions', validationOptions);
-    // UPDATED: Select v4 schema, with a fallback to v3
-    const zodSchema =
-      validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
-    console.log('zodSchema', zodSchema);
-    // Proceed only if onBlur validation with a Zod schema is configured.
-    if (!zodSchema) {
-      return;
-    }
-
-    const validationKey = validationOptions.key;
-    if (!validationKey) return;
-
-    const fullFieldPath = [validationKey, ...path].join('.');
-    console.log('fullFieldPath', fullFieldPath);
-    // 1. Clear any previous validation errors for this specific field.
-    removeValidationError(fullFieldPath);
-
-    // 2. Validate the entire state object to get contextually correct errors.
-    const fullState = getGlobalStore.getState().getShadowValue(stateKey);
-
-    // Use the selected schema for parsing
-    const result = zodSchema.safeParse(fullState);
-    console.log('result', fullState, result);
-    // 3. If validation fails, find the error for the current field and store it.
-    if (!result.success) {
-      const errorList =
-        'issues' in result.error
-          ? result.error.issues
-          : (result.error as any).errors;
-
-      errorList.forEach((error: any) => {
-        // Check if the error's path matches this form element's path.
-        if (JSON.stringify(error.path) === JSON.stringify(path)) {
-          const errorKey = [validationKey, ...error.path].join('.');
-          // Add the error to the global validation error store.
-          addValidationError(errorKey, error.message);
-        }
-      });
-    }
-
-    // 4. Notify all subscribed components to update the UI with the new validation state.
-    notifyComponents(stateKey);
-  }, [stateKey, path, localValue, setState]);
+  }, [localValue, debouncedUpdate]);
 
   const baseState = rebuildStateShape({
     currentState: globalStateValue,
