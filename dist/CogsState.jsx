@@ -1,9 +1,9 @@
 "use client";
-import { jsx as ae, Fragment as Me, jsxs as Ve } from "react/jsx-runtime";
+import { jsx as ae, Fragment as Ce, jsxs as Te } from "react/jsx-runtime";
 import { memo as Oe, useState as X, useRef as q, useCallback as ce, useEffect as Q, useLayoutEffect as de, useMemo as fe, createElement as le, startTransition as Le } from "react";
-import { createRoot as Pe } from "react-dom/client";
-import { transformStateFunc as Fe, isFunction as re, isArray as Ee, getDifferences as De, isDeepEqual as se } from "./utility.js";
-import { ValidationWrapper as be } from "./Functions.jsx";
+import { createRoot as ke } from "react-dom/client";
+import { transformStateFunc as Fe, isFunction as re, isArray as Ve, getDifferences as Pe, isDeepEqual as se } from "./utility.js";
+import { ValidationWrapper as De } from "./Functions.jsx";
 import Ne from "superjson";
 import { v4 as ne } from "uuid";
 import { getGlobalStore as t, formRefStore as ve } from "./store.js";
@@ -16,7 +16,7 @@ function me(e, o) {
     ...o
   });
 }
-function Ae({
+function Ee({
   stateKey: e,
   options: o,
   initialOptionsPart: S
@@ -57,7 +57,7 @@ const ct = (e, o) => {
   });
   const I = (u, f) => {
     const [A] = X(f?.componentId ?? ne());
-    Ae({
+    Ee({
       stateKey: u,
       options: f,
       initialOptionsPart: y
@@ -77,7 +77,7 @@ const ct = (e, o) => {
     });
   };
   function V(u, f) {
-    Ae({ stateKey: u, options: f, initialOptionsPart: y }), f.localStorage && He(u, f), ie(u);
+    Ee({ stateKey: u, options: f, initialOptionsPart: y }), f.localStorage && He(u, f), ie(u);
   }
   return { useCogsState: I, setCogsOptions: V };
 }, {
@@ -425,14 +425,14 @@ function ze(e, {
             _,
             O[$]
           ) : v.containerRef.appendChild(_);
-          const j = Pe(_), G = ne(), K = k.split(".").slice(1), ee = v.rebuildStateShape({
+          const j = ke(_), G = ne(), K = k.split(".").slice(1), ee = v.rebuildStateShape({
             path: v.path,
             currentState: R,
             componentId: v.componentId,
             meta: v.meta
           });
           j.render(
-            le(Te, {
+            le(Me, {
               stateKey: l,
               itemComponentId: G,
               itemPath: K,
@@ -476,7 +476,7 @@ function ze(e, {
           break;
         E.pop();
       }
-      D && typeof D == "object" && !Ee(D) && b && typeof b == "object" && !Ee(b) && De(D, b).forEach((P) => {
+      D && typeof D == "object" && !Ve(D) && b && typeof b == "object" && !Ve(b) && Pe(D, b).forEach((P) => {
         const R = P.split("."), v = [...a, ...R], T = c.getShadowMetadata(l, v);
         T?.pathComponents && T.pathComponents.forEach(($) => {
           if (N.has($))
@@ -577,7 +577,7 @@ const Ie = (e, o, S) => {
       ({ value: V }, u) => I.fn(V, u)
     ) : I.type === "sort" && y.sort((V, u) => I.fn(V.value, u.value));
   return y.map(({ key: I }) => I);
-}, Ce = (e, o, S) => {
+}, be = (e, o, S) => {
   const g = `${e}////${o}`, { addPathComponent: y, getShadowMetadata: I } = t.getState(), u = I(e, [])?.components?.get(g);
   !u || u.reactiveType === "none" || !(Array.isArray(u.reactiveType) ? u.reactiveType : [u.reactiveType]).includes("component") || y(e, S, g);
 }, pe = (e, o, S) => {
@@ -629,7 +629,7 @@ function Ue(e, o, S, g) {
           return () => {
             const s = t.getState().getShadowMetadata(e, []), n = t.getState().getShadowValue(e);
             let a;
-            return s?.stateSource === "server" && s.baseServerState ? a = s.baseServerState : a = t.getState().initialStateGlobal[e], De(n, a);
+            return s?.stateSource === "server" && s.baseServerState ? a = s.baseServerState : a = t.getState().initialStateGlobal[e], Pe(n, a);
           };
         if (m === "sync" && i.length === 0)
           return async function() {
@@ -679,7 +679,7 @@ function Ue(e, o, S, g) {
           if (m === "getSelected")
             return () => {
               const s = e + "." + i.join(".");
-              Ce(e, M, [
+              be(e, M, [
                 ...i,
                 "getSelected"
               ]);
@@ -1112,14 +1112,14 @@ function Ue(e, o, S, g) {
                   validIds: p
                 }
               });
-              return console.log("sssssssssssssssssssssssssssss", D), /* @__PURE__ */ ae(Me, { children: b.map((U, C) => {
+              return console.log("sssssssssssssssssssssssssssss", D), /* @__PURE__ */ ae(Ce, { children: b.map((U, C) => {
                 const F = p[C];
                 if (!F)
                   return null;
                 let W = a.current.get(F);
                 W || (W = ne(), a.current.set(F, W));
                 const L = F.split(".").slice(1);
-                return le(Te, {
+                return le(Me, {
                   key: F,
                   stateKey: e,
                   itemComponentId: W,
@@ -1291,18 +1291,18 @@ function Ue(e, o, S, g) {
           };
         }
         if (m === "get")
-          return () => (Ce(e, M, i), t.getState().getShadowValue(l, h?.validIds));
+          return () => (be(e, M, i), t.getState().getShadowValue(l, h?.validIds));
         if (m === "getState")
           return () => t.getState().getShadowValue(l, h?.validIds);
         if (m === "$derive")
-          return (s) => ke({
+          return (s) => Ae({
             _stateKey: e,
             _path: i,
             _effect: s.toString(),
             _meta: h
           });
         if (m === "$get")
-          return () => ke({ _stateKey: e, _path: i, _meta: h });
+          return () => Ae({ _stateKey: e, _path: i, _meta: h });
         if (m === "lastSynced") {
           const s = `${e}:${i.join(".")}`;
           return t.getState().getSyncInfo(s);
@@ -1421,7 +1421,7 @@ function Ue(e, o, S, g) {
             children: s,
             hideMessage: n
           }) => /* @__PURE__ */ ae(
-            be,
+            De,
             {
               formOpts: n ? { validation: { message: "" } } : void 0,
               path: i,
@@ -1466,22 +1466,14 @@ function Ue(e, o, S, g) {
         }
         if (m === "formElement")
           return (s, n) => /* @__PURE__ */ ae(
-            be,
+            Ze,
             {
-              formOpts: n,
-              path: i,
               stateKey: e,
-              children: /* @__PURE__ */ ae(
-                Ze,
-                {
-                  stateKey: e,
-                  path: i,
-                  rebuildStateShape: u,
-                  setState: o,
-                  formOpts: n,
-                  renderFn: s
-                }
-              )
+              path: i,
+              rebuildStateShape: u,
+              setState: o,
+              formOpts: n,
+              renderFn: s
             }
           );
         const te = [...i, m], Z = t.getState().getShadowValue(e, te);
@@ -1545,7 +1537,7 @@ function Ue(e, o, S, g) {
     path: []
   });
 }
-function ke(e) {
+function Ae(e) {
   return le(Ge, { proxy: e });
 }
 function qe({
@@ -1600,11 +1592,11 @@ function qe({
       if (!M) return;
       const H = ne(), l = document.createElement("div");
       l.setAttribute("data-item-path", M), u.appendChild(l);
-      const z = Pe(l);
+      const z = ke(l);
       I.current.set(M, z);
       const Y = M.split(".").slice(1);
       z.render(
-        le(Te, {
+        le(Me, {
           stateKey: e._stateKey,
           itemComponentId: H,
           itemPath: Y,
@@ -1674,7 +1666,7 @@ function Ge({
     "data-signal-id": y
   });
 }
-const Te = Oe(
+const Me = Oe(
   Ye,
   (e, o) => e.itemPath.join(".") === o.itemPath.join(".") && e.stateKey === o.stateKey && e.itemComponentId === o.itemComponentId && e.localIndex === o.localIndex
 ), Je = (e) => {
@@ -1886,7 +1878,7 @@ function Ze({
       } : B[x];
     }
   });
-  return /* @__PURE__ */ ae(Me, { children: g(Y) });
+  return /* @__PURE__ */ ae(De, { formOpts: y, path: o, stateKey: e, children: g(Y) });
 }
 function Re(e, o, S) {
   const g = `${e}////${o}`;
@@ -1907,11 +1899,11 @@ const dt = ({
   message: S
 }) => {
   if (!S || o === "PRISTINE" || o === "DIRTY")
-    return /* @__PURE__ */ ae(Me, { children: e });
+    return /* @__PURE__ */ ae(Ce, { children: e });
   const g = o === "INVALID_LIVE";
-  return /* @__PURE__ */ Ve("div", { style: { position: "relative" }, children: [
+  return /* @__PURE__ */ Te("div", { style: { position: "relative" }, children: [
     e,
-    (g || o === "VALIDATION_FAILED") && /* @__PURE__ */ Ve(
+    (g || o === "VALIDATION_FAILED") && /* @__PURE__ */ Te(
       "div",
       {
         style: {
@@ -1932,7 +1924,7 @@ const dt = ({
   ] });
 };
 export {
-  ke as $cogsSignal,
+  Ae as $cogsSignal,
   dt as DefaultValidationComponent,
   it as addStateOptions,
   ct as createCogsState,

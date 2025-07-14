@@ -11,7 +11,6 @@ export type ValidationWrapperProps = {
   children: React.ReactNode;
   validIndices?: number[];
 };
-
 export function ValidationWrapper({
   formOpts,
   path,
@@ -22,10 +21,20 @@ export function ValidationWrapper({
   const { getInitialOptions, getShadowMetadata } = getGlobalStore.getState();
   const thisStateOpts = getInitialOptions(stateKey!);
 
+  // GET VALIDATION FROM SHADOW METADATA
   const shadowMeta = getShadowMetadata(stateKey!, path);
   const validationState = shadowMeta?.validation;
   const status = validationState?.status || 'PRISTINE';
+  const hasError = status === 'VALIDATION_FAILED' || status === 'INVALID_LIVE';
   const message = validationState?.message;
+
+  console.log('ValidationWrapper shadow:', {
+    stateKey,
+    path,
+    shadowMeta,
+    status,
+    message,
+  });
 
   return (
     <>

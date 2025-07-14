@@ -3705,20 +3705,14 @@ function createProxyHandler<T>(
         if (prop === 'formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => {
             return (
-              <ValidationWrapper
-                formOpts={formOpts}
-                path={path}
+              <FormElementWrapper
                 stateKey={stateKey}
-              >
-                <FormElementWrapper
-                  stateKey={stateKey}
-                  path={path}
-                  rebuildStateShape={rebuildStateShape}
-                  setState={effectiveSetState}
-                  formOpts={formOpts}
-                  renderFn={child as any}
-                />
-              </ValidationWrapper>
+                path={path}
+                rebuildStateShape={rebuildStateShape}
+                setState={effectiveSetState}
+                formOpts={formOpts}
+                renderFn={child as any}
+              />
             );
           };
         }
@@ -4548,7 +4542,11 @@ function FormElementWrapper({
     },
   });
 
-  return <>{renderFn(stateWithInputProps)}</>;
+  return (
+    <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
+      {renderFn(stateWithInputProps)}
+    </ValidationWrapper>
+  );
 }
 function useRegisterComponent(
   stateKey: string,
