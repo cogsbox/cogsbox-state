@@ -1,6 +1,6 @@
 "use client";
 import { jsx as oe, Fragment as ke } from "react/jsx-runtime";
-import { memo as Re, useState as ee, useRef as q, useCallback as ue, useEffect as X, useLayoutEffect as ge, useMemo as Se, createElement as de, startTransition as je } from "react";
+import { memo as Re, useState as ee, useRef as q, useCallback as ue, useEffect as K, useLayoutEffect as ge, useMemo as Se, createElement as de, startTransition as je } from "react";
 import { createRoot as Ce } from "react-dom/client";
 import { transformStateFunc as Fe, isFunction as ae, isArray as Te, getDifferences as Pe, isDeepEqual as le } from "./utility.js";
 import { ValidationWrapper as Ve } from "./Functions.jsx";
@@ -190,7 +190,7 @@ function Be(e, {
   const [c] = ee(o ?? re()), H = t.getState().stateLog[c], Z = q(/* @__PURE__ */ new Set()), G = q(V ?? re()), R = q(
     null
   );
-  R.current = ne(c) ?? null, X(() => {
+  R.current = ne(c) ?? null, K(() => {
     if (u && u.stateKey === c && u.path?.[0]) {
       const n = `${u.stateKey}:${u.path.join(".")}`;
       t.getState().setSyncInfo(n, {
@@ -227,9 +227,9 @@ function Be(e, {
     },
     [c, l, e, T]
   );
-  X(() => {
+  K(() => {
     t.getState().setServerStateUpdate(c, I);
-  }, [I, c]), X(() => t.getState().subscribeToPath(c, (r) => {
+  }, [I, c]), K(() => t.getState().subscribeToPath(c, (r) => {
     if (r?.type === "SERVER_STATE_UPDATE") {
       const a = r.serverState;
       if (a?.status === "success" && a.data !== void 0) {
@@ -279,7 +279,7 @@ function Be(e, {
         });
       }
     }
-  }), [c, y]), X(() => {
+  }), [c, y]), K(() => {
     const n = t.getState().getShadowMetadata(c, []);
     if (n && n.stateSource)
       return;
@@ -564,13 +564,13 @@ function Be(e, {
     }), x;
   };
   t.getState().initialStateGlobal[c] || De(c, e);
-  const K = Se(() => $e(
+  const X = Se(() => $e(
     c,
     te,
     G.current,
     T
   ), [c, T]), s = R.current?.cogsSync;
-  return s && (Q.current = s(K)), K;
+  return s && (Q.current = s(X)), X;
 }
 function ze(e) {
   return !e || e.length === 0 ? "" : e.map(
@@ -811,7 +811,7 @@ function $e(e, o, m, h) {
                 r,
                 d
               ]);
-              X(() => {
+              K(() => {
                 const p = S.current;
                 if (!(!p || !a))
                   return p.addEventListener("scroll", B, {
@@ -845,7 +845,7 @@ function $e(e, o, m, h) {
                 },
                 []
               );
-              return X(() => {
+              return K(() => {
                 if (!a || !S.current) return;
                 const p = S.current, w = j.current;
                 let E;
@@ -1104,7 +1104,7 @@ function $e(e, o, m, h) {
                   arrayValues: j || []
                 };
               }, [a, d]);
-              if (console.log("freshValues", f, k), X(() => {
+              if (console.log("freshValues", f, k), K(() => {
                 const _ = t.getState().subscribeToPath(c, (U) => {
                   if (U.type === "GET_SELECTED")
                     return;
@@ -1500,9 +1500,9 @@ function $e(e, o, m, h) {
               )
             }
           );
-        const te = [...i, y], K = t.getState().getShadowValue(e, te);
+        const te = [...i, y], X = t.getState().getShadowValue(e, te);
         return l({
-          currentState: K,
+          currentState: X,
           path: te,
           componentId: T,
           meta: g
@@ -1569,7 +1569,7 @@ function qe({
   rebuildStateShape: o
 }) {
   const m = q(null), h = q(`map-${crypto.randomUUID()}`), v = q(!1), M = q(/* @__PURE__ */ new Map());
-  X(() => {
+  K(() => {
     const l = m.current;
     if (!l || v.current) return;
     const u = setTimeout(() => {
@@ -1641,7 +1641,7 @@ function Ge({
     [e._stateKey, ...e._path].join("."),
     e._meta?.validIds
   );
-  return X(() => {
+  return K(() => {
     const V = o.current;
     if (!V || h.current) return;
     const l = setTimeout(() => {
@@ -1735,11 +1735,11 @@ function Ye({
     },
     [u]
   );
-  X(() => {
+  K(() => {
     t.getState().subscribeToPath(T, (R) => {
       l({});
     });
-  }, []), X(() => {
+  }, []), K(() => {
     if (!P || !i || g.current)
       return;
     const R = I.current;
@@ -1781,9 +1781,9 @@ function Ze({
   const [V] = ee(() => re()), [, l] = ee({}), u = [e, ...o].join(".");
   Ue(e, V, l);
   const P = t.getState().getShadowValue(u), [I, i] = ee(P), g = q(!1), T = q(null);
-  X(() => {
+  K(() => {
     !g.current && !le(P, I) && i(P);
-  }, [P]), X(() => {
+  }, [P]), K(() => {
     const G = t.getState().subscribeToPath(u, (R) => {
       !g.current && I !== R && l({});
     });
@@ -1798,9 +1798,9 @@ function Ze({
       T.current = setTimeout(() => {
         if (g.current = !1, !(v?.sync?.allowInvalidValues ?? !1)) {
           M(G, o, { updateType: "update" });
-          const { getInitialOptions: Q, getValidationErrors: te } = t.getState(), K = Q(e)?.validation?.key;
-          if (K) {
-            const s = K + "." + o.join(".");
+          const { getInitialOptions: Q, getValidationErrors: te } = t.getState(), X = Q(e)?.validation?.key;
+          if (X) {
+            const s = X + "." + o.join(".");
             if (te(s).length > 0) {
               console.log("Validation failed, state updated but sync blocked");
               return;
@@ -1830,8 +1830,8 @@ function Ze({
         validatedValue: I
       }
     });
-    const te = t.getState().getShadowValue(e), K = y.safeParse(te);
-    if (K.success)
+    const te = t.getState().getShadowValue(e), X = y.safeParse(te);
+    if (console.log("result ", X), X.success)
       t.getState().setShadowMetadata(e, o, {
         ...Q,
         validation: {
@@ -1840,7 +1840,7 @@ function Ze({
         }
       });
     else {
-      const n = ("issues" in K.error ? K.error.issues : K.error.errors).filter((r) => {
+      const n = ("issues" in X.error ? X.error.issues : X.error.errors).filter((r) => {
         if (o.some((a) => a.startsWith("id:"))) {
           const a = o[0].startsWith("id:") ? [] : o.slice(0, -1), d = t.getState().getShadowMetadata(e, a);
           if (d?.arrayKeys) {

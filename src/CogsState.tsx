@@ -4468,7 +4468,7 @@ function FormElementWrapper({
     // Validate full state
     const fullState = getGlobalStore.getState().getShadowValue(stateKey);
     const result = zodSchema.safeParse(fullState);
-
+    console.log('result ', result);
     if (!result.success) {
       const errors =
         'issues' in result.error
