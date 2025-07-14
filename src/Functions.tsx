@@ -226,34 +226,26 @@ export type ValidationWrapperProps = {
 export function ValidationWrapper({
   formOpts,
   path,
-
   stateKey,
   children,
   validIndices,
 }: ValidationWrapperProps) {
-  const { getInitialOptions } = getGlobalStore.getState();
+  const { getInitialOptions, getShadowMetadata } = getGlobalStore.getState();
   const thisStateOpts = getInitialOptions(stateKey!);
-  const validationKey = thisStateOpts?.validation?.key ?? stateKey!;
-  const validationErrors = useGetValidationErrors(
-    validationKey,
-    path,
-    validIndices
-  );
-  console.log(
-    'validationErrors ValidationWrapper',
-    stateKey,
-    validationKey,
-    path,
-    validationErrors
-  );
-  const thesMessages: string[] = [];
 
-  if (validationErrors) {
-    const newMessage = validationErrors!.join(', ');
-    if (!thesMessages.includes(newMessage)) {
-      thesMessages.push(newMessage);
-    }
-  }
+  // Get validation from shadow metadata instead of global errors
+  const shadowMeta = getShadowMetadata(stateKey!, path);
+  const hasValidationError =
+    shadowMeta?.validation?.status === 'VALIDATION_FAILED';
+  const validationMessage = shadowMeta?.validation?.message;
+
+  console.log('ValidationWrapper shadow meta:', {
+    stateKey,
+    path,
+    shadowMeta,
+    hasValidationError,
+    validationMessage,
+  });
 
   return (
     <>
@@ -263,12 +255,12 @@ export function ValidationWrapper({
           children: (
             <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
-          active: validationErrors.length > 0 ? true : false,
+          active: hasValidationError,
           message: formOpts?.validation?.hideMessage
             ? ''
             : formOpts?.validation?.message
               ? formOpts?.validation?.message
-              : thesMessages.map((m) => m).join(', '),
+              : validationMessage || '',
           path: path,
         })
       ) : (

@@ -1,61 +1,28 @@
-import { jsx as d, Fragment as S } from "react/jsx-runtime";
-import m, { useState as v, useRef as f, useEffect as b } from "react";
-import { getGlobalStore as g } from "./store.js";
-const E = (t, e, n = (r, s) => JSON.stringify(r) === JSON.stringify(s)) => {
-  const [r, s] = v(
-    () => e(g.getState(), t)
-  ), a = f(r), i = f(t);
-  return b(() => {
-    i.current = t, s(e(g.getState(), t));
-    const u = (l) => {
-      const o = e(l, i.current);
-      n(a.current, o) || (a.current = o, s(o));
-    }, c = g.subscribe(u);
-    return () => {
-      c();
-    };
-  }, [t]), r;
-}, V = (t, e, n) => {
-  const r = t + "." + (e.length > 0 ? [e.join(".")] : []) + (n && n.length > 0 ? "." + n : "");
-  return E(
-    r,
-    (a, i) => a.getValidationErrors(i) || []
-  );
-};
-function F({
+import { jsx as o, Fragment as c } from "react/jsx-runtime";
+import d from "react";
+import { getGlobalStore as v } from "./store.js";
+function M({
   formOpts: t,
-  path: e,
-  stateKey: n,
-  children: r,
-  validIndices: s
+  path: a,
+  stateKey: i,
+  children: n,
+  validIndices: S
 }) {
-  const { getInitialOptions: a } = g.getState(), i = a(n), u = i?.validation?.key ?? n, c = V(
-    u,
-    e,
-    s
-  );
-  console.log(
-    "validationErrors ValidationWrapper",
-    n,
-    u,
-    e,
-    c
-  );
-  const l = [];
-  if (c) {
-    const o = c.join(", ");
-    l.includes(o) || l.push(o);
-  }
-  return /* @__PURE__ */ d(S, { children: i?.formElements?.validation && !t?.validation?.disable ? i.formElements.validation({
-    children: /* @__PURE__ */ d(m.Fragment, { children: r }, e.toString()),
-    active: c.length > 0,
-    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : l.map((o) => o).join(", "),
-    path: e
-  }) : /* @__PURE__ */ d(m.Fragment, { children: r }, e.toString()) });
+  const { getInitialOptions: g, getShadowMetadata: m } = v.getState(), s = g(i), e = m(i, a), l = e?.validation?.status === "VALIDATION_FAILED", r = e?.validation?.message;
+  return console.log("ValidationWrapper shadow meta:", {
+    stateKey: i,
+    path: a,
+    shadowMeta: e,
+    hasValidationError: l,
+    validationMessage: r
+  }), /* @__PURE__ */ o(c, { children: s?.formElements?.validation && !t?.validation?.disable ? s.formElements.validation({
+    children: /* @__PURE__ */ o(d.Fragment, { children: n }, a.toString()),
+    active: l,
+    message: t?.validation?.hideMessage ? "" : t?.validation?.message ? t?.validation?.message : r || "",
+    path: a
+  }) : /* @__PURE__ */ o(d.Fragment, { children: n }, a.toString()) });
 }
 export {
-  F as ValidationWrapper,
-  V as useGetValidationErrors,
-  E as useStoreSubscription
+  M as ValidationWrapper
 };
 //# sourceMappingURL=Functions.jsx.map

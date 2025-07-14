@@ -4474,31 +4474,60 @@ function FormElementWrapper({
           ? result.error.issues
           : (result.error as any).errors;
 
+      console.log('All validation errors:', errors);
+      console.log('Current blur path:', path);
+
       // Find errors for this specific path
       const pathErrors = errors.filter((error: any) => {
+        console.log('Processing error:', error);
+
         // For array paths, we need to translate indices to ULIDs
         if (path.some((p) => p.startsWith('id:'))) {
+          console.log('Detected array path with ULID');
+
           // This is an array item path like ["id:xyz", "name"]
           const parentPath = path[0]!.startsWith('id:')
             ? []
             : path.slice(0, -1);
+
+          console.log('Parent path:', parentPath);
+
           const arrayMeta = getGlobalStore
             .getState()
             .getShadowMetadata(stateKey, parentPath);
+
+          console.log('Array metadata:', arrayMeta);
 
           if (arrayMeta?.arrayKeys) {
             const itemKey = [stateKey, ...path.slice(0, -1)].join('.');
             const itemIndex = arrayMeta.arrayKeys.indexOf(itemKey);
 
+            console.log('Item key:', itemKey, 'Index:', itemIndex);
+
             // Compare with Zod path
             const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
-            return JSON.stringify(error.path) === JSON.stringify(zodPath);
+            const match =
+              JSON.stringify(error.path) === JSON.stringify(zodPath);
+
+            console.log('Zod path comparison:', {
+              zodPath,
+              errorPath: error.path,
+              match,
+            });
+            return match;
           }
         }
 
-        return JSON.stringify(error.path) === JSON.stringify(path);
+        const directMatch = JSON.stringify(error.path) === JSON.stringify(path);
+        console.log('Direct path comparison:', {
+          errorPath: error.path,
+          currentPath: path,
+          match: directMatch,
+        });
+        return directMatch;
       });
 
+      console.log('Filtered path errors:', pathErrors);
       // Update shadow metadata with validation result
       getGlobalStore.getState().setShadowMetadata(stateKey, path, {
         ...currentMeta,
