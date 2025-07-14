@@ -4448,10 +4448,9 @@ function FormElementWrapper({
     const zodSchema =
       validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
-    if (!zodSchema || !validationOptions?.onBlur) return;
+    if (!zodSchema) return;
 
     // Get the full path including stateKey
-    const fullPath = [stateKey, ...path].join('.');
 
     // Update validation state to "validating"
     const currentMeta = getGlobalStore
