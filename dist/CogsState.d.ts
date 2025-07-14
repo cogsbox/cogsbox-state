@@ -1,6 +1,6 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
-import { ComponentsType } from './store.js';
+import { ValidationStatus, ComponentsType } from './store.js';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
@@ -262,7 +262,7 @@ export type SyncRenderOptions<T extends unknown = unknown> = {
 type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
-        active: boolean;
+        status: ValidationStatus;
         stretch?: boolean;
         path: string[];
         message?: string;
@@ -347,4 +347,9 @@ export declare function $cogsSignal(proxy: {
         _meta?: MetaData;
     };
 }>;
+export declare const DefaultValidationComponent: ({ children, status, message, }: {
+    children: React.ReactNode;
+    status: ValidationStatus;
+    message?: string;
+}) => import("react/jsx-runtime").JSX.Element;
 export {};

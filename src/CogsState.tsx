@@ -27,7 +27,12 @@ import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 
-import { formRefStore, getGlobalStore, type ComponentsType } from './store.js';
+import {
+  formRefStore,
+  getGlobalStore,
+  ValidationStatus,
+  type ComponentsType,
+} from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { applyPatch, compare, Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
@@ -433,7 +438,7 @@ export type SyncRenderOptions<T extends unknown = unknown> = {
 type FormsElementsType<T> = {
   validation?: (options: {
     children: React.ReactNode;
-    active: boolean;
+    status: ValidationStatus; // Instead of 'active' boolean
     stretch?: boolean;
     path: string[];
     message?: string;
@@ -1313,8 +1318,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
-    updateObj: UpdateOptions,
-    validationKey?: string
+    updateObj: UpdateOptions
   ) => {
     const fullPath = [thisKey, ...path].join('.');
     if (Array.isArray(path)) {
@@ -1550,52 +1554,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
     }
-    if (
-      updateObj.updateType === 'update' &&
-      (validationKey || latestInitialOptionsRef.current?.validation?.key) &&
-      path
-    ) {
-      removeValidationError(
-        (validationKey || latestInitialOptionsRef.current?.validation?.key) +
-          '.' +
-          path.join('.')
-      );
-    }
-    const arrayWithoutIndex = path.slice(0, path.length - 1);
-    if (
-      updateObj.updateType === 'cut' &&
-      latestInitialOptionsRef.current?.validation?.key
-    ) {
-      removeValidationError(
-        latestInitialOptionsRef.current?.validation?.key +
-          '.' +
-          arrayWithoutIndex.join('.')
-      );
-    }
-    if (
-      updateObj.updateType === 'insert' &&
-      latestInitialOptionsRef.current?.validation?.key
-    ) {
-      const getValidation = getValidationErrors(
-        latestInitialOptionsRef.current?.validation?.key +
-          '.' +
-          arrayWithoutIndex.join('.')
-      );
 
-      getValidation.filter((k) => {
-        let length = k?.split('.').length;
-        const v = ''; // Placeholder as `v` is not used from getValidationErrors
-
-        if (
-          k == arrayWithoutIndex.join('.') &&
-          length == arrayWithoutIndex.length - 1
-        ) {
-          let newKey = k + '.' + arrayWithoutIndex;
-          removeValidationError(k!);
-          addValidationError(newKey, v!);
-        }
-      });
-    }
     // Assumes `isDeepEqual` is available in this scope.
     // Assumes `isDeepEqual` is available in this scope.
 
@@ -4391,43 +4350,57 @@ function FormElementWrapper({
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
 
-        // Check if we should validate before syncing
-        const shouldBlockInvalidSync = !(
-          formOpts?.sync?.allowInvalidValues ?? false
-        );
+        // Update state
+        setState(newValue, path, { updateType: 'update' });
 
-        if (shouldBlockInvalidSync) {
-          // First update the state locally to validate
-          setState(newValue, path, { updateType: 'update' });
+        // Perform LIVE validation (gentle)
+        const { getInitialOptions, setShadowMetadata, getShadowMetadata } =
+          getGlobalStore.getState();
+        const validationOptions = getInitialOptions(stateKey)?.validation;
+        const zodSchema =
+          validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
-          // Now check if validation errors exist for this field
-          const { getInitialOptions, getValidationErrors } =
-            getGlobalStore.getState();
-          const validationKey = getInitialOptions(stateKey)?.validation?.key;
+        if (zodSchema) {
+          const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+          const result = zodSchema.safeParse(fullState);
 
-          if (validationKey) {
-            const fieldKey = validationKey + '.' + path.join('.');
-            const errors = getValidationErrors(fieldKey);
+          const currentMeta = getShadowMetadata(stateKey, path) || {};
 
-            if (errors.length > 0) {
-              console.log('Validation failed, state updated but sync blocked');
-              // State is updated but we need to prevent sync
-              // TODO: Need a way to mark this update as "local only"
-              return;
+          if (!result.success) {
+            const errors =
+              'issues' in result.error
+                ? result.error.issues
+                : (result.error as any).errors;
+            const pathErrors = errors.filter(
+              (error: any) =>
+                JSON.stringify(error.path) === JSON.stringify(path)
+            );
+
+            if (pathErrors.length > 0) {
+              setShadowMetadata(stateKey, path, {
+                ...currentMeta,
+                validation: {
+                  status: 'INVALID_LIVE', // Gentle error while typing
+                  message: pathErrors[0]?.message,
+                  validatedValue: newValue,
+                },
+              });
             }
+          } else {
+            setShadowMetadata(stateKey, path, {
+              ...currentMeta,
+              validation: {
+                status: 'VALID_LIVE', // Valid while typing
+                validatedValue: newValue,
+              },
+            });
           }
-        } else {
-          setState(newValue, path, { updateType: 'update' });
+
+          notifyComponents(stateKey);
         }
       }, debounceTime);
     },
-    [
-      setState,
-      path,
-      formOpts?.debounceTime,
-      formOpts?.sync?.allowInvalidValues,
-      stateKey,
-    ]
+    [setState, path, formOpts?.debounceTime, stateKey]
   );
 
   // --- NEW onBlur HANDLER ---
@@ -4604,3 +4577,40 @@ function useRegisterComponent(
     };
   }, [stateKey, fullComponentId]); // Dependencies are stable and correct
 }
+export const DefaultValidationComponent = ({
+  children,
+  status,
+  message,
+}: {
+  children: React.ReactNode;
+  status: ValidationStatus;
+  message?: string;
+}) => {
+  if (!message || status === 'PRISTINE' || status === 'DIRTY') {
+    return <>{children}</>;
+  }
+
+  const isLiveError = status === 'INVALID_LIVE';
+  const isBlurError = status === 'VALIDATION_FAILED';
+
+  return (
+    <div style={{ position: 'relative' }}>
+      {children}
+      {(isLiveError || isBlurError) && (
+        <div
+          style={{
+            fontSize: '12px',
+            marginTop: '4px',
+            color: isLiveError ? '#ff9800' : '#f44336', // Orange for live, red for blur
+            display: 'flex',
+            alignItems: 'center',
+            gap: '4px',
+          }}
+        >
+          <span style={{ fontSize: '16px' }}>{isLiveError ? '⚠' : '⛔'}</span>
+          {message}
+        </div>
+      )}
+    </div>
+  );
+};

@@ -83,7 +83,7 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
 } & ComponentsType;
-export type ValidationStatus = 'PRISTINE' | 'DIRTY' | 'INVALID_LIVE' | 'VALIDATION_FAILED' | 'VALID_PENDING_SYNC' | 'SYNCING' | 'SYNCED' | 'SYNC_FAILED';
+export type ValidationStatus = 'PRISTINE' | 'DIRTY' | 'VALID_LIVE' | 'INVALID_LIVE' | 'VALIDATION_FAILED' | 'VALID_PENDING_SYNC' | 'SYNCING' | 'SYNCED' | 'SYNC_FAILED';
 export type ValidationState = {
     status: ValidationStatus;
     message?: string;

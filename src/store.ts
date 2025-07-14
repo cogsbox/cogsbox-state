@@ -156,6 +156,7 @@ export type ShadowMetadata = {
 export type ValidationStatus =
   | 'PRISTINE' // Untouched, matches initial state.
   | 'DIRTY' // Changed, but no validation run yet.
+  | 'VALID_LIVE' // Valid while typing.
   | 'INVALID_LIVE' // Gentle error during typing.
   | 'VALIDATION_FAILED' // Hard error on blur/submit.
   | 'VALID_PENDING_SYNC' // Passed validation, ready for sync.
