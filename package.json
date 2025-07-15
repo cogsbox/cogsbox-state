@@ -1,12 +1,11 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.435",
+  "version": "0.5.436",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
- 
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -23,7 +22,7 @@
     "url": "git+https://github.com/cogsbox/cogsbox-state.git"
   },
   "scripts": {
-     "build": "rimraf dist && vite build && npm pack && node scripts/rename-pack.cjs",
+    "build": "rimraf dist && vite build && npm pack && node scripts/rename-pack.cjs",
     "lint": "eslint src --ext ts,tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "dev": "vite  src/examples"
@@ -38,15 +37,14 @@
     "superjson": "^2.2.2",
     "ulid": "^3.0.1",
     "uuid": "^9.0.1",
-
     "zustand": "^5.0.3"
   },
   "peerDependencies": {
     "@trpc/next": "^10.0.0 || ^11.0.0",
     "@types/react": "^18.0.0",
     "react": "^18.2.0",
-    "react-dom": "^18.2.0",  
-     "zod": "^3.25.0 || ^4.0.0"
+    "react-dom": "^18.2.0",
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",
@@ -69,7 +67,7 @@
     "vite": "^5.0.0",
     "vite-plugin-dts": "^3.7.0",
     "vitest": "^3.2.4",
-       "zod": "^3.25.0 || ^4.0.0"
+    "zod": "^3.25.0 || ^4.0.0"
   },
   "keywords": [
     "react",
