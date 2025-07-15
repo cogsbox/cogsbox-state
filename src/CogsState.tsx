@@ -3218,15 +3218,12 @@ function createProxyHandler<T>(
           }
           if (prop === 'cutSelected') {
             return () => {
-              const baseArrayKeys =
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys || [];
               const validKeys = applyTransforms(
                 stateKey,
                 path,
                 meta?.transforms
               );
-              console.log('validKeys', validKeys);
+
               if (!validKeys || validKeys.length === 0) return;
 
               const indexKeyToCut = getGlobalStore
@@ -3236,13 +3233,15 @@ function createProxyHandler<T>(
               let indexToCut = validKeys.findIndex(
                 (key) => key === indexKeyToCut
               );
-              console.log('indexToCut', indexToCut);
+
               const pathForCut = validKeys[
                 indexToCut == -1 ? validKeys.length - 1 : indexToCut
               ]
                 ?.split('.')
                 .slice(1);
-              console.log('pathForCut', pathForCut);
+              getGlobalStore
+                .getState()
+                .clearSelectedIndex({ arrayKey: stateKeyPathKey });
               effectiveSetState(currentState, pathForCut!, {
                 updateType: 'cut',
               });

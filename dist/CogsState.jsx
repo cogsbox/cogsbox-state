@@ -2,9 +2,9 @@
 import { jsx as ot, Fragment as Ut } from "react/jsx-runtime";
 import { memo as Ot, useState as K, useRef as q, useCallback as ct, useEffect as Z, useLayoutEffect as dt, useMemo as ft, createElement as lt, startTransition as Rt } from "react";
 import { createRoot as At } from "react-dom/client";
-import { transformStateFunc as Ft, isFunction as at, isArray as Tt, getDifferences as Ct, isDeepEqual as st } from "./utility.js";
+import { transformStateFunc as jt, isFunction as at, isArray as Tt, getDifferences as Ct, isDeepEqual as st } from "./utility.js";
 import { ValidationWrapper as kt } from "./Functions.jsx";
-import jt from "superjson";
+import Ft from "superjson";
 import { v4 as rt } from "uuid";
 import { getGlobalStore as e, formRefStore as vt } from "./store.js";
 import { useCogsConfig as Pt } from "./CogsStateClient.jsx";
@@ -33,7 +33,7 @@ function se(t, { formElements: o, validation: h }) {
 }
 const ie = (t, o) => {
   let h = t;
-  const [S, y] = Ft(h);
+  const [S, y] = jt(h);
   Object.keys(S).forEach((u) => {
     let f = y[u] || {};
     const A = {
@@ -108,7 +108,7 @@ const ie = (t, o) => {
       lastSyncedWithServer: u,
       stateSource: f?.stateSource,
       baseServerState: f?.baseServerState
-    }, w = jt.serialize(A);
+    }, w = Ft.serialize(A);
     window.localStorage.setItem(
       V,
       JSON.stringify(w.json)
@@ -238,12 +238,12 @@ function xt(t, {
         if (l && Array.isArray(p) && Array.isArray(E)) {
           const U = l.key || "id", C = new Set(
             p.map((x) => x[U])
-          ), j = E.filter((x) => !C.has(x[U]));
-          j.length > 0 && j.forEach((x) => {
+          ), F = E.filter((x) => !C.has(x[U]));
+          F.length > 0 && F.forEach((x) => {
             e.getState().insertShadowArrayElement(c, [], x);
-            const F = e.getState().getShadowMetadata(c, []);
-            if (F?.arrayKeys) {
-              const L = F.arrayKeys[F.arrayKeys.length - 1];
+            const j = e.getState().getShadowMetadata(c, []);
+            if (j?.arrayKeys) {
+              const L = j.arrayKeys[j.arrayKeys.length - 1];
               if (L) {
                 const b = L.split(".").slice(1);
                 e.getState().setShadowMetadata(c, b, {
@@ -456,12 +456,12 @@ function xt(t, {
         }
       });
     }
-    const x = e.getState().getShadowValue(c), F = e.getState().getShadowMetadata(c, []), L = /* @__PURE__ */ new Set();
+    const x = e.getState().getShadowValue(c), j = e.getState().getShadowMetadata(c, []), L = /* @__PURE__ */ new Set();
     if (console.log(
       "rootMeta",
       c,
       e.getState().shadowStateStore
-    ), !F?.components)
+    ), !j?.components)
       return x;
     if (a.updateType === "update") {
       let b = [...r];
@@ -470,7 +470,7 @@ function xt(t, {
         if (k?.pathComponents && k.pathComponents.forEach((P) => {
           if (L.has(P))
             return;
-          const O = F.components?.get(P);
+          const O = j.components?.get(P);
           O && ((Array.isArray(O.reactiveType) ? O.reactiveType : [O.reactiveType || "component"]).includes("none") || (O.forceUpdate(), L.add(P)));
         }), b.length === 0)
           break;
@@ -481,7 +481,7 @@ function xt(t, {
         T?.pathComponents && T.pathComponents.forEach(($) => {
           if (L.has($))
             return;
-          const _ = F.components?.get($);
+          const _ = j.components?.get($);
           _ && ((Array.isArray(_.reactiveType) ? _.reactiveType : [_.reactiveType || "component"]).includes("none") || (_.forceUpdate(), L.add($)));
         });
       });
@@ -513,12 +513,12 @@ function xt(t, {
       }
       k?.pathComponents && k.pathComponents.forEach((P) => {
         if (!L.has(P)) {
-          const O = F.components?.get(P);
+          const O = j.components?.get(P);
           O && (O.forceUpdate(), L.add(P));
         }
       });
     }
-    return F.components.forEach((b, k) => {
+    return j.components.forEach((b, k) => {
       if (L.has(k))
         return;
       const P = Array.isArray(b.reactiveType) ? b.reactiveType : [b.reactiveType || "component"];
@@ -718,7 +718,7 @@ function _t(t, o, h, S) {
               } = s, l = q(null), [p, E] = K({
                 startIndex: 0,
                 endIndex: 10
-              }), [D, U] = K({}), C = q(!0), j = q({
+              }), [D, U] = K({}), C = q(!0), F = q({
                 isUserScrolling: !1,
                 lastScrollTop: 0,
                 scrollUpCount: 0,
@@ -727,7 +727,7 @@ function _t(t, o, h, S) {
                 /* @__PURE__ */ new Map()
               );
               dt(() => {
-                if (!a || !l.current || j.current.isUserScrolling)
+                if (!a || !l.current || F.current.isUserScrolling)
                   return;
                 const v = l.current;
                 v.scrollTo({
@@ -735,7 +735,7 @@ function _t(t, o, h, S) {
                   behavior: C.current ? "instant" : "smooth"
                 });
               }, [D, a]);
-              const F = e.getState().getShadowMetadata(t, i)?.arrayKeys || [], { totalHeight: L, itemOffsets: b } = ft(() => {
+              const j = e.getState().getShadowMetadata(t, i)?.arrayKeys || [], { totalHeight: L, itemOffsets: b } = ft(() => {
                 let v = 0;
                 const T = /* @__PURE__ */ new Map();
                 return (e.getState().getShadowMetadata(t, i)?.arrayKeys || []).forEach((_) => {
@@ -745,14 +745,14 @@ function _t(t, o, h, S) {
                     offset: v
                   }), v += N;
                 }), x.current = T, { totalHeight: v, itemOffsets: T };
-              }, [F.length, n]);
+              }, [j.length, n]);
               dt(() => {
-                if (a && F.length > 0 && l.current && !j.current.isUserScrolling && C.current) {
+                if (a && j.length > 0 && l.current && !F.current.isUserScrolling && C.current) {
                   const v = l.current, T = () => {
                     if (v.clientHeight > 0) {
                       const $ = Math.ceil(
                         v.clientHeight / n
-                      ), _ = F.length - 1, R = Math.max(
+                      ), _ = j.length - 1, R = Math.max(
                         0,
                         _ - $ - r
                       );
@@ -764,15 +764,15 @@ function _t(t, o, h, S) {
                   };
                   T();
                 }
-              }, [F.length, a, n, r]);
+              }, [j.length, a, n, r]);
               const k = ct(() => {
                 const v = l.current;
                 if (!v) return;
-                const T = v.scrollTop, { scrollHeight: $, clientHeight: _ } = v, R = j.current, N = $ - (T + _), G = R.isNearBottom;
+                const T = v.scrollTop, { scrollHeight: $, clientHeight: _ } = v, R = F.current, N = $ - (T + _), G = R.isNearBottom;
                 R.isNearBottom = N <= d, T < R.lastScrollTop ? (R.scrollUpCount++, R.scrollUpCount > 3 && G && (R.isUserScrolling = !0, console.log("User scrolled away from bottom"))) : R.isNearBottom && (R.isUserScrolling = !1, R.scrollUpCount = 0), R.lastScrollTop = T;
                 let tt = 0;
-                for (let et = 0; et < F.length; et++) {
-                  const St = F[et], ht = x.current.get(St);
+                for (let et = 0; et < j.length; et++) {
+                  const St = j[et], ht = x.current.get(St);
                   if (ht && ht.offset + ht.height > T) {
                     tt = et;
                     break;
@@ -783,13 +783,13 @@ function _t(t, o, h, S) {
                   E({
                     startIndex: Math.max(0, tt - r),
                     endIndex: Math.min(
-                      F.length - 1,
+                      j.length - 1,
                       tt + et + r
                     )
                   });
                 }
               }, [
-                F.length,
+                j.length,
                 p.startIndex,
                 n,
                 r,
@@ -808,7 +808,7 @@ function _t(t, o, h, S) {
                 (v = "smooth") => {
                   const T = l.current;
                   if (!T) return;
-                  j.current.isUserScrolling = !1, j.current.isNearBottom = !0, j.current.scrollUpCount = 0;
+                  F.current.isUserScrolling = !1, F.current.isNearBottom = !0, F.current.scrollUpCount = 0;
                   const $ = () => {
                     const _ = (R = 0) => {
                       if (R > 5) return;
@@ -831,7 +831,7 @@ function _t(t, o, h, S) {
               );
               return Z(() => {
                 if (!a || !l.current) return;
-                const v = l.current, T = j.current;
+                const v = l.current, T = F.current;
                 let $;
                 const _ = () => {
                   clearTimeout($), $ = setTimeout(() => {
@@ -857,7 +857,7 @@ function _t(t, o, h, S) {
                 }, 0) : _(), () => {
                   clearTimeout($), R.disconnect(), v.removeEventListener("load", N, !0);
                 };
-              }, [a, F.length, P]), {
+              }, [a, j.length, P]), {
                 virtualState: ft(() => {
                   const v = e.getState(), T = v.getShadowValue(
                     [t, ...i].join(".")
@@ -874,7 +874,7 @@ function _t(t, o, h, S) {
                     componentId: M,
                     meta: { ...g, validIds: R }
                   });
-                }, [p.startIndex, p.endIndex, F.length]),
+                }, [p.startIndex, p.endIndex, j.length]),
                 virtualizerProps: {
                   outer: {
                     ref: l,
@@ -893,15 +893,15 @@ function _t(t, o, h, S) {
                   list: {
                     style: {
                       transform: `translateY(${x.current.get(
-                        F[p.startIndex]
+                        j[p.startIndex]
                       )?.offset || 0}px)`
                     }
                   }
                 },
                 scrollToBottom: P,
                 scrollToIndex: (v, T = "smooth") => {
-                  if (l.current && F[v]) {
-                    const $ = x.current.get(F[v])?.offset || 0;
+                  if (l.current && j[v]) {
+                    const $ = x.current.get(j[v])?.offset || 0;
                     l.current.scrollTo({ top: $, behavior: T });
                   }
                 }
@@ -1047,10 +1047,10 @@ function _t(t, o, h, S) {
                 l?.(L);
               };
               r > 0 && (D = setInterval(C, r));
-              const j = rt(), x = e.getState().getShadowMetadata(t, i) || {}, F = x.streams || /* @__PURE__ */ new Map();
-              return F.set(j, { buffer: p, flushTimer: D }), e.getState().setShadowMetadata(t, i, {
+              const F = rt(), x = e.getState().getShadowMetadata(t, i) || {}, j = x.streams || /* @__PURE__ */ new Map();
+              return j.set(F, { buffer: p, flushTimer: D }), e.getState().setShadowMetadata(t, i, {
                 ...x,
-                streams: F
+                streams: j
               }), {
                 write: (L) => U(L),
                 writeMany: (L) => L.forEach(U),
@@ -1064,7 +1064,7 @@ function _t(t, o, h, S) {
                 close: () => {
                   C(), D && clearInterval(D);
                   const L = e.getState().getShadowMetadata(t, i);
-                  L?.streams && L.streams.delete(j);
+                  L?.streams && L.streams.delete(F);
                 }
               };
             };
@@ -1082,10 +1082,10 @@ function _t(t, o, h, S) {
                   computedAt: Date.now(),
                   transforms: g?.transforms || []
                 }));
-                const j = e.getState().getShadowValue(c, C);
+                const F = e.getState().getShadowValue(c, C);
                 return {
                   validIds: C,
-                  arrayValues: j || []
+                  arrayValues: F || []
                 };
               }, [a, d]);
               if (console.log("freshValues", p, E), Z(() => {
@@ -1094,8 +1094,8 @@ function _t(t, o, h, S) {
                     return;
                   const x = e.getState().getShadowMetadata(t, i)?.transformCaches;
                   if (x)
-                    for (const F of x.keys())
-                      F.startsWith(M) && x.delete(F);
+                    for (const j of x.keys())
+                      j.startsWith(M) && x.delete(j);
                   (C.type === "INSERT" || C.type === "REMOVE" || C.type === "CLEAR_SELECTION") && l({});
                 });
                 return () => {
@@ -1113,17 +1113,17 @@ function _t(t, o, h, S) {
                 }
               });
               return console.log("sssssssssssssssssssssssssssss", D), /* @__PURE__ */ ot(Ut, { children: E.map((U, C) => {
-                const j = p[C];
-                if (!j)
+                const F = p[C];
+                if (!F)
                   return null;
-                let x = r.current.get(j);
-                x || (x = rt(), r.current.set(j, x));
-                const F = j.split(".").slice(1);
+                let x = r.current.get(F);
+                x || (x = rt(), r.current.set(F, x));
+                const j = F.split(".").slice(1);
                 return lt(Mt, {
-                  key: j,
+                  key: F,
                   stateKey: t,
                   itemComponentId: x,
-                  itemPath: F,
+                  itemPath: j,
                   localIndex: C,
                   arraySetter: D,
                   rebuildStateShape: u,
@@ -1211,20 +1211,18 @@ function _t(t, o, h, S) {
             };
           if (m === "cutSelected")
             return () => {
-              e.getState().getShadowMetadata(t, i)?.arrayKeys;
               const s = It(
                 t,
                 i,
                 g?.transforms
               );
-              if (console.log("validKeys", s), !s || s.length === 0) return;
+              if (!s || s.length === 0) return;
               const n = e.getState().selectedIndicesMap.get(c);
               let r = s.findIndex(
                 (d) => d === n
               );
-              console.log("indexToCut", r);
               const a = s[r == -1 ? s.length - 1 : r]?.split(".").slice(1);
-              console.log("pathForCut", a), o(w, a, {
+              e.getState().clearSelectedIndex({ arrayKey: c }), o(w, a, {
                 updateType: "cut"
               });
             };
@@ -1362,8 +1360,8 @@ function _t(t, o, h, S) {
                       );
                       if (console.log("pathMeta", U), U?.pathComponents && U.pathComponents.forEach((C) => {
                         if (!d.has(C)) {
-                          const j = r.components?.get(C);
-                          j && (j.forceUpdate(), d.add(C));
+                          const F = r.components?.get(C);
+                          F && (F.forceUpdate(), d.add(C));
                         }
                       }), D.length === 0) break;
                       D.pop();
@@ -1381,8 +1379,8 @@ function _t(t, o, h, S) {
                       );
                       if (U?.pathComponents && U.pathComponents.forEach((C) => {
                         if (!d.has(C)) {
-                          const j = r.components?.get(C);
-                          j && (j.forceUpdate(), d.add(C));
+                          const F = r.components?.get(C);
+                          F && (F.forceUpdate(), d.add(C));
                         }
                       }), D.length === 0) break;
                       D.pop();
