@@ -24,3 +24,4 @@ export type DebouncedFunction<F extends (...args: any[]) => any> = F & {
     cancel: () => void;
 };
 export {};
+//# sourceMappingURL=utility.d.ts.map

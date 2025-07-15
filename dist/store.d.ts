@@ -166,3 +166,4 @@ export type CogsGlobalState = {
 };
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};
+//# sourceMappingURL=store.d.ts.map

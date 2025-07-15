@@ -346,3 +346,4 @@ export declare function $cogsSignal(proxy: {
     };
 }>;
 export {};
+//# sourceMappingURL=CogsState.d.ts.map

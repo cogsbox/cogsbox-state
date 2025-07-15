@@ -2,10 +2,10 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": "src",
-    "target": "ESNext",
+    "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "jsx":"react-jsx",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
     "allowJs": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
@@ -13,18 +13,23 @@
     "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "declaration": true,
+    "declarationMap": true,
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "noImplicitAny": true,
-
- 
     "noErrorTruncation": true,
     "noUncheckedIndexedAccess": true,
-    "lib": ["dom", "dom.iterable", "esnext"]
+    "lib": ["dom", "dom.iterable", "esnext"],
+    
+    // These are critical for fixing your issue:
+    "composite": false,
+    "incremental": false,
+    "tsBuildInfoFile": null,
+    "emitDeclarationOnly": false,
+    "sourceMap": true,
+    "inlineSources": true,
+    "types": ["node"]
   },
-  "include": ["src"],
-  "exclude": ["node_modules", "dist","examples/**/*","tests"],
-    "watchOptions": {
-    "excludeDirectories": ["examples", "node_modules", "dist"]
-  }
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "examples", "tests", "**/*.test.ts", "**/*.spec.ts"]
 }

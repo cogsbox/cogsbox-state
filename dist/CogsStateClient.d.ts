@@ -10,3 +10,4 @@ export declare function CogsStateClient({ children, sessionId, }: {
     sessionId?: string;
 }): import("react/jsx-runtime").JSX.Element;
 export {};
+//# sourceMappingURL=CogsStateClient.d.ts.map
