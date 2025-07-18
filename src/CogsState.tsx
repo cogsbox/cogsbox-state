@@ -554,44 +554,6 @@ type CogsApi<T extends Record<string, any>> = {
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
 
-type ExtractStateFromSyncSchema<T> = T extends {
-  schemas: infer S;
-  notifications: any;
-}
-  ? S extends Record<string, any>
-    ? {
-        [K in keyof S]: S[K] extends { rawSchema: infer R }
-          ? R
-          : S[K] extends { schemas: { defaults: infer D } }
-            ? D
-            : never;
-      }
-    : never
-  : never;
-
-// Type to extract just the sync schema structure
-type SyncSchemaStructure<T = any> = {
-  schemas: Record<
-    string,
-    {
-      rawSchema?: any;
-      schemas?: {
-        sql?: any;
-        client?: any;
-        validation?: any;
-        defaults?: any;
-      };
-      api?: {
-        initialData?: string;
-        update?: string;
-      };
-      validate?: (data: unknown, ctx: any) => any;
-      validateClient?: (data: unknown) => any;
-      serializable?: any;
-    }
-  >;
-  notifications: Record<string, (state: any, context: any) => any>;
-};
 // Minimal change - just add a second parameter to detect sync schema
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
@@ -714,55 +676,41 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
-
-// Helper to extract just the data shape, not the full Zod types
-type SimplifyType<T> = T extends object
-  ? T extends (...args: any[]) => any
-    ? T
-    : { [K in keyof T]: SimplifyType<T[K]> }
-  : T;
-
-type ExtractStateFromSync<T> = T extends { schemas: infer S }
-  ? S extends Record<string, any>
-    ? {
-        [K in keyof S]: S[K] extends { rawSchema: infer R }
-          ? SimplifyType<R>
-          : S[K] extends { schemas: { defaults: infer D } }
-            ? SimplifyType<D>
-            : S[K] extends { _tableName: string }
-              ? SimplifyType<S[K]>
-              : never;
-      }
-    : never
-  : never;
-
-// Then create a simple helper that extracts state from sync schema
+// or wherever your shape types are
 export function createCogsStateFromSync<
-  TSyncSchema extends { schemas: Record<string, any>; notifications: any },
->(syncSchema: TSyncSchema): CogsApi<ExtractStateFromSync<TSyncSchema>> {
-  // Extract initial state
-  type StateType = ExtractStateFromSync<TSyncSchema>;
-  const initialState = {} as StateType;
+  TSyncSchema extends {
+    schemas: Record<
+      string,
+      {
+        schemas: { defaults: any };
+        [key: string]: any;
+      }
+    >;
+    notifications: Record<string, any>;
+  },
+>(
+  syncSchema: TSyncSchema
+): CogsApi<{
+  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaults'];
+}> {
+  const schemas = syncSchema.schemas;
+  const initialState: any = {};
 
-  for (const key in syncSchema.schemas) {
-    const entry = syncSchema.schemas[key];
-    if (entry.rawSchema) {
-      initialState[key as keyof StateType] = entry.rawSchema;
-    } else if (entry.schemas?.defaults) {
-      initialState[key as keyof StateType] = entry.schemas.defaults;
-    } else if (entry._tableName) {
-      // It's a raw schema object
-      initialState[key as keyof StateType] = entry;
-    } else {
-      initialState[key as keyof StateType] = {} as any;
-    }
+  // Extract defaults from each entry
+  for (const key in schemas) {
+    const entry = schemas[key]!;
+    initialState[key] = entry.schemas?.defaults || {};
   }
 
-  return createCogsState(initialState, {
-    __fromSyncSchema: true,
-    __syncNotifications: syncSchema.notifications,
-  });
+  // Store sync metadata
+  // getGlobalStore.getState().setInitialStateOptions('__syncSchema', syncSchema);
+  getGlobalStore
+    .getState()
+    .setInitialStateOptions('__notifications', syncSchema.notifications);
+
+  return createCogsState(initialState);
 }
+
 const {
   getInitialOptions,
   getValidationErrors,

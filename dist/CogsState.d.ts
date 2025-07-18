@@ -296,26 +296,17 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
 }) => CogsApi<State>;
-type SimplifyType<T> = T extends object ? T extends (...args: any[]) => any ? T : {
-    [K in keyof T]: SimplifyType<T[K]>;
-} : T;
-type ExtractStateFromSync<T> = T extends {
-    schemas: infer S;
-} ? S extends Record<string, any> ? {
-    [K in keyof S]: S[K] extends {
-        rawSchema: infer R;
-    } ? SimplifyType<R> : S[K] extends {
-        schemas: {
-            defaults: infer D;
-        };
-    } ? SimplifyType<D> : S[K] extends {
-        _tableName: string;
-    } ? SimplifyType<S[K]> : never;
-} : never : never;
 export declare function createCogsStateFromSync<TSyncSchema extends {
-    schemas: Record<string, any>;
-    notifications: any;
-}>(syncSchema: TSyncSchema): CogsApi<ExtractStateFromSync<TSyncSchema>>;
+    schemas: Record<string, {
+        schemas: {
+            defaults: any;
+        };
+        [key: string]: any;
+    }>;
+    notifications: Record<string, any>;
+}>(syncSchema: TSyncSchema): CogsApi<{
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaults'];
+}>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
