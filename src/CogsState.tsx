@@ -592,6 +592,7 @@ type SyncSchemaStructure<T = any> = {
   >;
   notifications: Record<string, (state: any, context: any) => any>;
 };
+// Minimal change - just add a second parameter to detect sync schema
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: {
@@ -614,6 +615,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       .getState()
       .setInitialStateOptions('__notifications', opt.__syncNotifications);
   }
+
   // ... rest of your existing createCogsState code unchanged ...
 
   Object.keys(statePart).forEach((key) => {
@@ -713,14 +715,23 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
 
+// Helper to extract just the data shape, not the full Zod types
+type SimplifyType<T> = T extends object
+  ? T extends (...args: any[]) => any
+    ? T
+    : { [K in keyof T]: SimplifyType<T[K]> }
+  : T;
+
 type ExtractStateFromSync<T> = T extends { schemas: infer S }
   ? S extends Record<string, any>
     ? {
         [K in keyof S]: S[K] extends { rawSchema: infer R }
-          ? R
+          ? SimplifyType<R>
           : S[K] extends { schemas: { defaults: infer D } }
-            ? D
-            : any;
+            ? SimplifyType<D>
+            : S[K] extends { _tableName: string }
+              ? SimplifyType<S[K]>
+              : never;
       }
     : never
   : never;
@@ -739,6 +750,9 @@ export function createCogsStateFromSync<
       initialState[key as keyof StateType] = entry.rawSchema;
     } else if (entry.schemas?.defaults) {
       initialState[key as keyof StateType] = entry.schemas.defaults;
+    } else if (entry._tableName) {
+      // It's a raw schema object
+      initialState[key as keyof StateType] = entry;
     } else {
       initialState[key as keyof StateType] = {} as any;
     }
@@ -749,7 +763,6 @@ export function createCogsStateFromSync<
     __syncNotifications: syncSchema.notifications,
   });
 }
-
 const {
   getInitialOptions,
   getValidationErrors,
