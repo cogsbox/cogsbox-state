@@ -704,6 +704,8 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 export function createCogsStateFromSync<TSchema extends CogsSyncSchema>(
   syncSchema: TSchema
 ): CogsApi<TSchema> {
+  // The internal implementation doesn't need complex types.
+  // It just needs to provide the functions.
   if (syncSchema.notifications) {
     getGlobalStore
       .getState()
@@ -716,8 +718,15 @@ export function createCogsStateFromSync<TSchema extends CogsSyncSchema>(
     initialState[key] = schemas[key]?.schemas?.defaultValues || {};
   }
 
-  // The cast is fine because the exported function signature is what matters.
-  return createCogsState(initialState) as any;
+  // Get the real hook and options functions from your library
+  const { useCogsState, setCogsOptions } = createCogsState(initialState);
+
+  // Return the functions, casting the result to our perfect, explicit CogsApi type.
+  // This is the bridge between the untyped internals and the strongly-typed public API.
+  return {
+    useCogsState,
+    setCogsOptions,
+  } as CogsApi<TSchema>;
 }
 
 const {
