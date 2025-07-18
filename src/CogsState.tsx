@@ -37,7 +37,7 @@ import { useCogsConfig } from './CogsStateClient.js';
 import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
-import z, * as z4 from 'zod/v4';
+import * as z4 from 'zod/v4';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -534,36 +534,15 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
-type CogsSyncSchema = {
-  schemas: Record<
-    string,
-    {
-      schemas: { defaultValues: any };
-      apiParamsSchema?: z.ZodObject<any, any>;
-      [key: string]: any;
-    }
-  >;
-  notifications: Record<string, any>;
-};
-
-type UseCogsStateHook<TSchema extends CogsSyncSchema> = <
-  // TStateKey is now DIRECTLY a key of the schemas object. No ambiguity.
-  TStateKey extends keyof TSchema['schemas'],
->(
-  stateKey: TStateKey,
+type UseCogsStateHook<
+  T extends Record<string, any>,
+  apiParams extends Record<string, any> = never,
+> = <StateKey extends keyof TransformedStateType<T>>(
+  stateKey: StateKey,
   options?: Prettify<
-    OptionsType<
-      // The state slice type is derived directly from the schema.
-      TSchema['schemas'][TStateKey]['schemas']['defaultValues'],
-      // The API params type is also derived directly and safely.
-      TSchema['schemas'][TStateKey] extends {
-        apiParamsSchema: z.ZodObject<any, any>;
-      }
-        ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']>
-        : never
-    >
+    OptionsType<TransformedStateType<T>[StateKey]> & { apiParams: apiParams }
   >
-) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
+) => StateObject<TransformedStateType<T>[StateKey]>;
 
 // Define the type for the options setter using the Transformed state
 type SetCogsOptionsFunc<T extends Record<string, any>> = <
@@ -574,9 +553,12 @@ type SetCogsOptionsFunc<T extends Record<string, any>> = <
 ) => void;
 
 // Define the final API object shape
-type CogsApi<TSchema extends CogsSyncSchema> = {
-  useCogsState: UseCogsStateHook<TSchema>;
-  setCogsOptions: SetCogsOptionsFunc<TSchema>;
+type CogsApi<
+  T extends Record<string, any>,
+  apiParams extends Record<string, any> = never,
+> = {
+  useCogsState: UseCogsStateHook<T, apiParams>;
+  setCogsOptions: SetCogsOptionsFunc<T>;
 };
 
 // Minimal change - just add a second parameter to detect sync schema
@@ -699,34 +681,34 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     notifyComponents(stateKey as string);
   }
 
-  return { useCogsState, setCogsOptions };
+  return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
-export function createCogsStateFromSync<TSchema extends CogsSyncSchema>(
-  syncSchema: TSchema
-): CogsApi<TSchema> {
-  // The internal implementation doesn't need complex types.
-  // It just needs to provide the functions.
-  if (syncSchema.notifications) {
-    getGlobalStore
-      .getState()
-      .setInitialStateOptions('__notifications', syncSchema.notifications);
-  }
-
+export function createCogsStateFromSync<
+  TSyncSchema extends {
+    schemas: Record<
+      string,
+      {
+        schemas: { defaultValues: any };
+        [key: string]: any;
+      }
+    >;
+    notifications: Record<string, any>;
+  },
+>(
+  syncSchema: TSyncSchema
+): CogsApi<{
+  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+}> {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
+
+  // Extract defaultValues from each entry
   for (const key in schemas) {
-    initialState[key] = schemas[key]?.schemas?.defaultValues || {};
+    const entry = schemas[key];
+    initialState[key] = entry?.schemas?.defaultValues || {};
   }
 
-  // Get the real hook and options functions from your library
-  const { useCogsState, setCogsOptions } = createCogsState(initialState);
-
-  // Return the functions, casting the result to our perfect, explicit CogsApi type.
-  // This is the bridge between the untyped internals and the strongly-typed public API.
-  return {
-    useCogsState,
-    setCogsOptions,
-  } as CogsApi<TSchema>;
+  return createCogsState(initialState);
 }
 
 const {

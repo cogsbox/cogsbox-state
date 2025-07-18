@@ -1,9 +1,9 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationStatus, ComponentsType } from './store.js';
-import { default as z } from 'zod/v4';
 
 import * as z3 from 'zod/v3';
+import * as z4 from 'zod/v4';
 type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
@@ -285,34 +285,31 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-type CogsSyncSchema = {
-    schemas: Record<string, {
-        schemas: {
-            defaultValues: any;
-        };
-        apiParamsSchema?: z.ZodObject<any, any>;
-        [key: string]: any;
-    }>;
-    notifications: Record<string, any>;
-};
-type UseCogsStateHook<TSchema extends CogsSyncSchema> = <TStateKey extends keyof TSchema['schemas']>(stateKey: TStateKey, options?: Prettify<OptionsType<TSchema['schemas'][TStateKey]['schemas']['defaultValues'], TSchema['schemas'][TStateKey] extends {
-    apiParamsSchema: z.ZodObject<any, any>;
-} ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']> : never>>) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
+type UseCogsStateHook<T extends Record<string, any>, apiParams extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]> & {
+    apiParams: apiParams;
+}>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
-type CogsApi<TSchema extends CogsSyncSchema> = {
-    useCogsState: UseCogsStateHook<TSchema>;
-    setCogsOptions: SetCogsOptionsFunc<TSchema>;
+type CogsApi<T extends Record<string, any>, apiParams extends Record<string, any> = never> = {
+    useCogsState: UseCogsStateHook<T, apiParams>;
+    setCogsOptions: SetCogsOptionsFunc<T>;
 };
 export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
-}) => {
-    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<State>[StateKey]>>) => StateObject<TransformedStateType<State>[StateKey]>;
-    setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
-};
-export declare function createCogsStateFromSync<TSchema extends CogsSyncSchema>(syncSchema: TSchema): CogsApi<TSchema>;
+}) => CogsApi<State>;
+export declare function createCogsStateFromSync<TSyncSchema extends {
+    schemas: Record<string, {
+        schemas: {
+            defaultValues: any;
+        };
+        [key: string]: any;
+    }>;
+    notifications: Record<string, any>;
+}>(syncSchema: TSyncSchema): CogsApi<{
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+}>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
