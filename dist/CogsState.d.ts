@@ -1,6 +1,7 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationStatus, ComponentsType } from './store.js';
+import { default as z } from 'zod';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
@@ -298,22 +299,22 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     validation?: ValidationOptionsType;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
+    __apiParamsMap?: Record<string, any>;
 }) => CogsApi<State>;
 export declare function createCogsStateFromSync<TSyncSchema extends {
     schemas: Record<string, {
         schemas: {
             defaultValues: any;
         };
+        apiParamsSchema?: any;
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }, {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-}[keyof {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-}]>;
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<any> ? z.infer<TSyncSchema['schemas'][K]['apiParamsSchema']> : never;
+}[keyof TSyncSchema['schemas']]>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
@@ -322,10 +323,11 @@ type LocalStorageData<T> = {
     stateSource?: 'default' | 'server' | 'localStorage';
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, apiParamsSchema, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
+    apiParamsSchema?: z.ZodObject<any>;
 } & OptionsType<TStateObject>): StateObject<TStateObject>;
 export type MetaData = {
     /**

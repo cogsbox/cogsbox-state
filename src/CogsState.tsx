@@ -38,6 +38,7 @@ import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
+import z from 'zod';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -560,29 +561,33 @@ type CogsApi<
   useCogsState: UseCogsStateHook<T, apiParams>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
-
-// Minimal change - just add a second parameter to detect sync schema
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
-    // Add this flag to indicate it's from sync schema
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
+    __apiParamsMap?: Record<string, any>; // Add this
   }
 ) => {
-  // Keep ALL your existing code exactly the same
   let newInitialState = initialState;
 
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
 
-  // Only addition - store notifications if provided
+  // Store notifications if provided
   if (opt?.__fromSyncSchema && opt?.__syncNotifications) {
     getGlobalStore
       .getState()
       .setInitialStateOptions('__notifications', opt.__syncNotifications);
+  }
+
+  // Store apiParams map if provided
+  if (opt?.__fromSyncSchema && opt?.__apiParamsMap) {
+    getGlobalStore
+      .getState()
+      .setInitialStateOptions('__apiParamsMap', opt.__apiParamsMap);
   }
 
   // ... rest of your existing createCogsState code unchanged ...
@@ -637,14 +642,20 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     stateKey: StateKey,
     options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
   ) => {
-    // ... your existing useCogsState implementation ...
     const [componentId] = useState(options?.componentId ?? uuidv4());
+    const apiParamsSchema = opt?.__apiParamsMap?.[stateKey as string];
+
+    // Merge apiParams into options
+    const enhancedOptions = {
+      ...options,
+      apiParamsSchema, // Add the schema here
+    } as any;
+
     setOptions({
       stateKey,
-      options: options as any,
+      options: enhancedOptions,
       initialOptionsPart,
     });
-
     const thiState =
       getGlobalStore.getState().getShadowValue(stateKey as string) ||
       statePart[stateKey as string];
@@ -683,12 +694,14 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
+
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
       string,
       {
         schemas: { defaultValues: any };
+        apiParamsSchema?: any; // This contains the zod schema for params
         [key: string]: any;
       }
     >;
@@ -701,21 +714,32 @@ export function createCogsStateFromSync<
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
   },
   {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-  }[keyof {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-  }]
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<any>
+      ? z.infer<TSyncSchema['schemas'][K]['apiParamsSchema']>
+      : never;
+  }[keyof TSyncSchema['schemas']]
 > {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
+  const apiParamsMap: any = {};
 
-  // Extract defaultValues from each entry
+  // Extract defaultValues AND apiParams from each entry
   for (const key in schemas) {
     const entry = schemas[key];
     initialState[key] = entry?.schemas?.defaultValues || {};
+
+    // Store the apiParamsSchema for each key
+    if (entry?.apiParamsSchema) {
+      apiParamsMap[key] = entry.apiParamsSchema;
+    }
   }
 
-  return createCogsState(initialState);
+  // Pass the sync schema metadata to createCogsState
+  return createCogsState(initialState, {
+    __fromSyncSchema: true,
+    __syncNotifications: syncSchema.notifications,
+    __apiParamsMap: apiParamsMap, // Pass the apiParams schemas
+  }) as any;
 }
 
 const {
@@ -1044,10 +1068,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncUpdate,
     dependencies,
     serverState,
+    apiParamsSchema,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
+    apiParamsSchema?: z.ZodObject<any>; // Add this type
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
