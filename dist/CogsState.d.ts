@@ -296,10 +296,21 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
 }) => CogsApi<State>;
-export declare function createCogsStateFromSync<T extends Record<string, any>>(syncSchema: {
-    schemas: any;
+type ExtractStateFromSync<T> = T extends {
+    schemas: infer S;
+} ? S extends Record<string, any> ? {
+    [K in keyof S]: S[K] extends {
+        rawSchema: infer R;
+    } ? R : S[K] extends {
+        schemas: {
+            defaults: infer D;
+        };
+    } ? D : any;
+} : never : never;
+export declare function createCogsStateFromSync<TSyncSchema extends {
+    schemas: Record<string, any>;
     notifications: any;
-}): ReturnType<typeof createCogsState<T>>;
+}>(syncSchema: TSyncSchema): CogsApi<ExtractStateFromSync<TSyncSchema>>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;

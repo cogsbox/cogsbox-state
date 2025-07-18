@@ -713,30 +713,41 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
 
+type ExtractStateFromSync<T> = T extends { schemas: infer S }
+  ? S extends Record<string, any>
+    ? {
+        [K in keyof S]: S[K] extends { rawSchema: infer R }
+          ? R
+          : S[K] extends { schemas: { defaults: infer D } }
+            ? D
+            : any;
+      }
+    : never
+  : never;
+
+// Then create a simple helper that extracts state from sync schema
 export function createCogsStateFromSync<
-  T extends Record<string, any>,
->(syncSchema: {
-  schemas: any;
-  notifications: any;
-}): ReturnType<typeof createCogsState<T>> {
+  TSyncSchema extends { schemas: Record<string, any>; notifications: any },
+>(syncSchema: TSyncSchema): CogsApi<ExtractStateFromSync<TSyncSchema>> {
   // Extract initial state
-  const initialState = {} as T;
+  type StateType = ExtractStateFromSync<TSyncSchema>;
+  const initialState = {} as StateType;
 
   for (const key in syncSchema.schemas) {
     const entry = syncSchema.schemas[key];
     if (entry.rawSchema) {
-      initialState[key as keyof T] = entry.rawSchema;
+      initialState[key as keyof StateType] = entry.rawSchema;
     } else if (entry.schemas?.defaults) {
-      initialState[key as keyof T] = entry.schemas.defaults;
+      initialState[key as keyof StateType] = entry.schemas.defaults;
     } else {
-      initialState[key as keyof T] = {} as any;
+      initialState[key as keyof StateType] = {} as any;
     }
   }
 
   return createCogsState(initialState, {
     __fromSyncSchema: true,
     __syncNotifications: syncSchema.notifications,
-  }) as any;
+  });
 }
 
 const {
