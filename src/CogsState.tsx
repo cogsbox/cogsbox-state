@@ -713,7 +713,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
 
-// Then create a simple helper that extracts state from sync schema
 export function createCogsStateFromSync<
   T extends Record<string, any>,
 >(syncSchema: {
