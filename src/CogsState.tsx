@@ -676,13 +676,12 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
-// or wherever your shape types are
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
       string,
       {
-        schemas: { defaults: any };
+        schemas: { defaultValues: any };
         [key: string]: any;
       }
     >;
@@ -691,22 +690,27 @@ export function createCogsStateFromSync<
 >(
   syncSchema: TSyncSchema
 ): CogsApi<{
-  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaults'];
+  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }> {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 
-  // Extract defaults from each entry
+  // Extract defaultValues from each entry
   for (const key in schemas) {
-    const entry = schemas[key]!;
-    initialState[key] = entry.schemas?.defaults || {};
+    const entry = schemas[key];
+    initialState[key] = entry?.schemas?.defaultValues || {};
   }
 
-  // Store sync metadata
-  // getGlobalStore.getState().setInitialStateOptions('__syncSchema', syncSchema);
-  getGlobalStore
-    .getState()
-    .setInitialStateOptions('__notifications', syncSchema.notifications);
+  // Store sync metadata in each state key's options
+  // for (const key in schemas) {
+  //   const currentOptions =
+  //     getGlobalStore.getState().getInitialOptions(key) || {};
+  //   getGlobalStore.getState().setInitialStateOptions(key, {
+  //     ...currentOptions,
+  //     syncSchema: schemas[key],
+  //     notificationChannels: syncSchema.notifications,
+  //   });
+  // }
 
   return createCogsState(initialState);
 }

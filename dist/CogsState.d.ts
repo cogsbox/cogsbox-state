@@ -299,13 +299,13 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
 export declare function createCogsStateFromSync<TSyncSchema extends {
     schemas: Record<string, {
         schemas: {
-            defaults: any;
+            defaultValues: any;
         };
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema): CogsApi<{
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaults'];
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }>;
 type LocalStorageData<T> = {
     state: T;
