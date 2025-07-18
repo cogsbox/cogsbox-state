@@ -34,10 +34,10 @@ import {
   type ComponentsType,
 } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
-import { applyPatch, compare, Operation } from 'fast-json-patch';
+import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
-import * as z4 from 'zod/v4';
+import z, * as z4 from 'zod/v4';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -374,7 +374,7 @@ type ValidationOptionsType = {
 
   onBlur?: boolean;
 };
-export type OptionsType<T extends unknown = unknown> = {
+export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   log?: boolean;
   componentId?: string;
   cogsSync?: (stateObject: StateObject<T>) => SyncApi;
@@ -425,6 +425,7 @@ export type OptionsType<T extends unknown = unknown> = {
   syncUpdate?: Partial<UpdateTypeDetail>;
 
   defaultState?: T;
+  apiParams?: TApiParams;
   dependencies?: any[];
 };
 
@@ -533,12 +534,36 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
-type UseCogsStateHook<T extends Record<string, any>> = <
-  StateKey extends keyof TransformedStateType<T>,
+type CogsSyncSchema = {
+  schemas: Record<
+    string,
+    {
+      schemas: { defaultValues: any };
+      apiParamsSchema?: z.ZodObject<any, any>;
+      [key: string]: any;
+    }
+  >;
+  notifications: Record<string, any>;
+};
+
+type UseCogsStateHook<TSchema extends CogsSyncSchema> = <
+  // TStateKey is now DIRECTLY a key of the schemas object. No ambiguity.
+  TStateKey extends keyof TSchema['schemas'],
 >(
-  stateKey: StateKey,
-  options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
-) => StateObject<TransformedStateType<T>[StateKey]>;
+  stateKey: TStateKey,
+  options?: Prettify<
+    OptionsType<
+      // The state slice type is derived directly from the schema.
+      TSchema['schemas'][TStateKey]['schemas']['defaultValues'],
+      // The API params type is also derived directly and safely.
+      TSchema['schemas'][TStateKey] extends {
+        apiParamsSchema: z.ZodObject<any, any>;
+      }
+        ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']>
+        : never
+    >
+  >
+) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
 
 // Define the type for the options setter using the Transformed state
 type SetCogsOptionsFunc<T extends Record<string, any>> = <
@@ -549,9 +574,9 @@ type SetCogsOptionsFunc<T extends Record<string, any>> = <
 ) => void;
 
 // Define the final API object shape
-type CogsApi<T extends Record<string, any>> = {
-  useCogsState: UseCogsStateHook<T>;
-  setCogsOptions: SetCogsOptionsFunc<T>;
+type CogsApi<TSchema extends CogsSyncSchema> = {
+  useCogsState: UseCogsStateHook<TSchema>;
+  setCogsOptions: SetCogsOptionsFunc<TSchema>;
 };
 
 // Minimal change - just add a second parameter to detect sync schema
@@ -674,45 +699,25 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     notifyComponents(stateKey as string);
   }
 
-  return { useCogsState, setCogsOptions } as CogsApi<State>;
+  return { useCogsState, setCogsOptions };
 };
-export function createCogsStateFromSync<
-  TSyncSchema extends {
-    schemas: Record<
-      string,
-      {
-        schemas: { defaultValues: any };
-        [key: string]: any;
-      }
-    >;
-    notifications: Record<string, any>;
-  },
->(
-  syncSchema: TSyncSchema
-): CogsApi<{
-  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-}> {
-  const schemas = syncSchema.schemas;
-  const initialState: any = {};
-
-  // Extract defaultValues from each entry
-  for (const key in schemas) {
-    const entry = schemas[key];
-    initialState[key] = entry?.schemas?.defaultValues || {};
+export function createCogsStateFromSync<TSchema extends CogsSyncSchema>(
+  syncSchema: TSchema
+): CogsApi<TSchema> {
+  if (syncSchema.notifications) {
+    getGlobalStore
+      .getState()
+      .setInitialStateOptions('__notifications', syncSchema.notifications);
   }
 
-  // Store sync metadata in each state key's options
-  // for (const key in schemas) {
-  //   const currentOptions =
-  //     getGlobalStore.getState().getInitialOptions(key) || {};
-  //   getGlobalStore.getState().setInitialStateOptions(key, {
-  //     ...currentOptions,
-  //     syncSchema: schemas[key],
-  //     notificationChannels: syncSchema.notifications,
-  //   });
-  // }
+  const schemas = syncSchema.schemas;
+  const initialState: any = {};
+  for (const key in schemas) {
+    initialState[key] = schemas[key]?.schemas?.defaultValues || {};
+  }
 
-  return createCogsState(initialState);
+  // The cast is fine because the exported function signature is what matters.
+  return createCogsState(initialState) as any;
 }
 
 const {

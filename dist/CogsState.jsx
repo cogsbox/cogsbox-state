@@ -82,11 +82,10 @@ const Lt = (t, n) => {
   return { useCogsState: I, setCogsOptions: V };
 };
 function ce(t) {
+  t.notifications && e.getState().setInitialStateOptions("__notifications", t.notifications);
   const n = t.schemas, S = {};
-  for (const g in n) {
-    const y = n[g];
-    S[g] = y?.schemas?.defaultValues || {};
-  }
+  for (const g in n)
+    S[g] = n[g]?.schemas?.defaultValues || {};
   return Lt(S);
 }
 const {
