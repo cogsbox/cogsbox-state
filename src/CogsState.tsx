@@ -553,17 +553,68 @@ type CogsApi<T extends Record<string, any>> = {
   useCogsState: UseCogsStateHook<T>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
+
+type ExtractStateFromSyncSchema<T> = T extends {
+  schemas: infer S;
+  notifications: any;
+}
+  ? S extends Record<string, any>
+    ? {
+        [K in keyof S]: S[K] extends { rawSchema: infer R }
+          ? R
+          : S[K] extends { schemas: { defaults: infer D } }
+            ? D
+            : never;
+      }
+    : never
+  : never;
+
+// Type to extract just the sync schema structure
+type SyncSchemaStructure<T = any> = {
+  schemas: Record<
+    string,
+    {
+      rawSchema?: any;
+      schemas?: {
+        sql?: any;
+        client?: any;
+        validation?: any;
+        defaults?: any;
+      };
+      api?: {
+        initialData?: string;
+        update?: string;
+      };
+      validate?: (data: unknown, ctx: any) => any;
+      validateClient?: (data: unknown) => any;
+      serializable?: any;
+    }
+  >;
+  notifications: Record<string, (state: any, context: any) => any>;
+};
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
+    // Add this flag to indicate it's from sync schema
+    __fromSyncSchema?: boolean;
+    __syncNotifications?: Record<string, Function>;
   }
 ) => {
+  // Keep ALL your existing code exactly the same
   let newInitialState = initialState;
 
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
+
+  // Only addition - store notifications if provided
+  if (opt?.__fromSyncSchema && opt?.__syncNotifications) {
+    getGlobalStore
+      .getState()
+      .setInitialStateOptions('__notifications', opt.__syncNotifications);
+  }
+  // ... rest of your existing createCogsState code unchanged ...
 
   Object.keys(statePart).forEach((key) => {
     let existingOptions = initialOptionsPart[key] || {};
@@ -615,6 +666,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     stateKey: StateKey,
     options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
   ) => {
+    // ... your existing useCogsState implementation ...
     const [componentId] = useState(options?.componentId ?? uuidv4());
     setOptions({
       stateKey,
@@ -635,7 +687,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       componentId,
       localStorage: options?.localStorage,
       middleware: options?.middleware,
-
       reactiveType: options?.reactiveType,
       reactiveDeps: options?.reactiveDeps,
       defaultState: options?.defaultState as any,
@@ -661,6 +712,33 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
+
+// Then create a simple helper that extracts state from sync schema
+export function createCogsStateFromSync<
+  T extends Record<string, any>,
+>(syncSchema: {
+  schemas: any;
+  notifications: any;
+}): ReturnType<typeof createCogsState<T>> {
+  // Extract initial state
+  const initialState = {} as T;
+
+  for (const key in syncSchema.schemas) {
+    const entry = syncSchema.schemas[key];
+    if (entry.rawSchema) {
+      initialState[key as keyof T] = entry.rawSchema;
+    } else if (entry.schemas?.defaults) {
+      initialState[key as keyof T] = entry.schemas.defaults;
+    } else {
+      initialState[key as keyof T] = {} as any;
+    }
+  }
+
+  return createCogsState(initialState, {
+    __fromSyncSchema: true,
+    __syncNotifications: syncSchema.notifications,
+  }) as any;
+}
 
 const {
   getInitialOptions,
@@ -2986,7 +3064,7 @@ function createProxyHandler<T>(
                     arrayValues: freshValues || [],
                   };
                 }, [cacheKey, updateTrigger]);
-                console.log('freshValues', validIds, arrayValues);
+
                 useEffect(() => {
                   const unsubscribe = getGlobalStore
                     .getState()
@@ -3041,7 +3119,7 @@ function createProxyHandler<T>(
                     validIds: validIds,
                   },
                 });
-                console.log('sssssssssssssssssssssssssssss', arraySetter);
+
                 return (
                   <>
                     {arrayValues.map((item, localIndex) => {
@@ -3242,6 +3320,8 @@ function createProxyHandler<T>(
               getGlobalStore
                 .getState()
                 .clearSelectedIndex({ arrayKey: stateKeyPathKey });
+              const parentPath = pathForCut?.slice(0, -1)!;
+              notifySelectionComponents(stateKey, parentPath);
               effectiveSetState(currentState, pathForCut!, {
                 updateType: 'cut',
               });

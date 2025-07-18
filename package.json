@@ -24,8 +24,8 @@
   "scripts": {
     "build": "rimraf dist && vite build && npm pack && node scripts/rename-pack.cjs",
     "lint": "eslint src --ext ts,tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
-    "dev": "vite  src/examples"
+    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+  
   },
   "dependencies": {
     "@tsndr/cloudflare-worker-jwt": "^3.1.3",

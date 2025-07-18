@@ -293,7 +293,13 @@ type CogsApi<T extends Record<string, any>> = {
 export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
+    __fromSyncSchema?: boolean;
+    __syncNotifications?: Record<string, Function>;
 }) => CogsApi<State>;
+export declare function createCogsStateFromSync<T extends Record<string, any>>(syncSchema: {
+    schemas: any;
+    notifications: any;
+}): ReturnType<typeof createCogsState<T>>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;

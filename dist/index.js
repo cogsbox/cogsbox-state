@@ -1,33 +1,34 @@
-import { $cogsSignal as r, addStateOptions as o, createCogsState as n, notifyComponent as s, useCogsStateFn as a } from "./CogsState.jsx";
-import { CogsStateClient as g, config as i, useCogsConfig as p } from "./CogsStateClient.jsx";
-import { debounce as d, deepMerge as u, deleteNestedProperty as l, getArrayLengthDifferences as m, getArrayLengthDifferencesArray as y, getDifferences as C, getDifferencesArray as S, getNestedValue as x, isArray as A, isDeepEqual as D, isFunction as b, isObject as F, transformStateFunc as L, updateNestedProperty as N } from "./utility.js";
-import { useCogsTrpcValidationLink as O } from "./TRPCValidationLink.js";
-import { formRefStore as V, getGlobalStore as j } from "./store.js";
+import { $cogsSignal as r, addStateOptions as o, createCogsState as n, createCogsStateFromSync as s, notifyComponent as a, useCogsStateFn as f } from "./CogsState.jsx";
+import { CogsStateClient as i, config as c, useCogsConfig as p } from "./CogsStateClient.jsx";
+import { debounce as S, deepMerge as m, deleteNestedProperty as u, getArrayLengthDifferences as y, getArrayLengthDifferencesArray as C, getDifferences as l, getDifferencesArray as x, getNestedValue as A, isArray as D, isDeepEqual as F, isFunction as b, isObject as L, transformStateFunc as N, updateNestedProperty as h } from "./utility.js";
+import { useCogsTrpcValidationLink as P } from "./TRPCValidationLink.js";
+import { formRefStore as j, getGlobalStore as k } from "./store.js";
 export {
   r as $cogsSignal,
-  g as CogsStateClient,
+  i as CogsStateClient,
   o as addStateOptions,
-  i as config,
+  c as config,
   n as createCogsState,
-  d as debounce,
-  u as deepMerge,
-  l as deleteNestedProperty,
-  V as formRefStore,
-  m as getArrayLengthDifferences,
-  y as getArrayLengthDifferencesArray,
-  C as getDifferences,
-  S as getDifferencesArray,
-  j as getGlobalStore,
-  x as getNestedValue,
-  A as isArray,
-  D as isDeepEqual,
+  s as createCogsStateFromSync,
+  S as debounce,
+  m as deepMerge,
+  u as deleteNestedProperty,
+  j as formRefStore,
+  y as getArrayLengthDifferences,
+  C as getArrayLengthDifferencesArray,
+  l as getDifferences,
+  x as getDifferencesArray,
+  k as getGlobalStore,
+  A as getNestedValue,
+  D as isArray,
+  F as isDeepEqual,
   b as isFunction,
-  F as isObject,
-  s as notifyComponent,
-  L as transformStateFunc,
-  N as updateNestedProperty,
+  L as isObject,
+  a as notifyComponent,
+  N as transformStateFunc,
+  h as updateNestedProperty,
   p as useCogsConfig,
-  a as useCogsStateFn,
-  O as useCogsTrpcValidationLink
+  f as useCogsStateFn,
+  P as useCogsTrpcValidationLink
 };
 //# sourceMappingURL=index.js.map
