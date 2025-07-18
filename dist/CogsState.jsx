@@ -95,13 +95,17 @@ function ce(t) {
     useCogsState: (v, M) => {
       const c = n[v];
       if (c?.apiParamsSchema && M?.apiParams) {
-        const f = c.apiParamsSchema.safeParse(M.apiParams);
-        if (!f.success)
+        const I = c.apiParamsSchema.safeParse(M.apiParams);
+        if (!I.success)
           throw new Error(
-            `Invalid API params for ${String(v)}: ${f.error.message}`
+            `Invalid API params for ${String(v)}: ${I.error.message}`
           );
       }
-      return g.useCogsState(v, M);
+      const { apiParams: f, ...A } = M || {};
+      return g.useCogsState(
+        v,
+        A
+      );
     },
     setCogsOptions: g.setCogsOptions
   };

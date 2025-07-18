@@ -724,6 +724,7 @@ type UseCogsStateFromSync<
   ): StateObject<TSyncSchema['schemas'][K]['schemas']['defaultValues']>;
 };
 // Simplified approach that actually works
+// Fixed version that properly handles the apiParams type
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
@@ -752,13 +753,14 @@ export function createCogsStateFromSync<
     __syncNotifications: syncSchema.notifications,
   });
 
-  // Create a wrapper that validates API params at runtime
+  // Create a wrapper that handles API params properly
   const useCogsState = <K extends keyof TSyncSchema['schemas']>(
     stateKey: K,
-    options?: OptionsType<
-      TSyncSchema['schemas'][K]['schemas']['defaultValues']
+    options?: Omit<
+      OptionsType<TSyncSchema['schemas'][K]['schemas']['defaultValues']>,
+      'apiParams'
     > & {
-      apiParams?: any; // We'll validate this at runtime
+      apiParams?: any; // Allow any apiParams, validate at runtime
     }
   ): StateObject<TSyncSchema['schemas'][K]['schemas']['defaultValues']> => {
     // Runtime validation of API params
@@ -773,10 +775,14 @@ export function createCogsStateFromSync<
       }
     }
 
+    // Create options without apiParams for the base call
+    const { apiParams, ...baseOptions } = options || {};
+
     // Cast to the correct type since we know it's properly typed
-    return baseApi.useCogsState(stateKey as any, options as any) as StateObject<
-      TSyncSchema['schemas'][K]['schemas']['defaultValues']
-    >;
+    return baseApi.useCogsState(
+      stateKey as any,
+      baseOptions as any
+    ) as StateObject<TSyncSchema['schemas'][K]['schemas']['defaultValues']>;
   };
 
   return {
