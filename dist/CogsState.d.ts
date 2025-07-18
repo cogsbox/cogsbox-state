@@ -285,29 +285,36 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-type BasicUseCogsStateHook<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>) => StateObject<TransformedStateType<T>[StateKey]>;
+type UseCogsStateHook<T extends Record<string, any>, apiParams extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]> & {
+    apiParams?: apiParams;
+}>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
-type BasicCogsApi<T extends Record<string, any>> = {
-    useCogsState: BasicUseCogsStateHook<T>;
+type CogsApi<T extends Record<string, any>, apiParams extends Record<string, any> = never> = {
+    useCogsState: UseCogsStateHook<T, apiParams>;
     setCogsOptions: SetCogsOptionsFunc<T>;
-};
-export type CogsApi<TSchema extends {
-    schemas: Record<string, any>;
-}> = {
-    useCogsState: <TStateKey extends keyof TSchema['schemas']>(stateKey: TStateKey, options?: OptionsType<TSchema['schemas'][TStateKey]['schemas']['defaultValues'], TSchema['schemas'][TStateKey] extends {
-        apiParamsSchema: z.ZodObject<any, any>;
-    } ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']> : never>) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
-    setCogsOptions: <TStateKey extends keyof TSchema['schemas']>(stateKey: TStateKey, options: OptionsType<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>) => void;
 };
 export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
-}) => BasicCogsApi<State>;
-export declare function createCogsStateFromSync<TSchema extends {
-    schemas: Record<string, any>;
-}>(syncSchema: TSchema): CogsApi<TSchema>;
+}) => CogsApi<State>;
+export declare function createCogsStateFromSync<TSyncSchema extends {
+    schemas: Record<string, {
+        schemas: {
+            defaultValues: any;
+        };
+        apiParamsSchema?: z.ZodObject<any>;
+        [key: string]: any;
+    }>;
+    notifications: Record<string, any>;
+}>(syncSchema: TSyncSchema): CogsApi<{
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+}, {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<infer U> ? {
+        [P in keyof U]: z.infer<U[P]>;
+    } : never;
+}[keyof TSyncSchema['schemas']]>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
