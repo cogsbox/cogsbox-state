@@ -1,9 +1,9 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationStatus, ComponentsType } from './store.js';
+import { default as z } from 'zod/v4';
 
 import * as z3 from 'zod/v3';
-import * as z4 from 'zod/v4';
 type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
@@ -285,35 +285,29 @@ export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-type UseCogsStateHook<T extends Record<string, any>, apiParams extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]> & {
-    apiParams?: apiParams;
-}>) => StateObject<TransformedStateType<T>[StateKey]>;
+type BasicUseCogsStateHook<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
-type CogsApi<T extends Record<string, any>, apiParams extends Record<string, any> = never> = {
-    useCogsState: UseCogsStateHook<T, apiParams>;
+type BasicCogsApi<T extends Record<string, any>> = {
+    useCogsState: BasicUseCogsStateHook<T>;
     setCogsOptions: SetCogsOptionsFunc<T>;
+};
+export type CogsApi<TSchema extends {
+    schemas: Record<string, any>;
+}> = {
+    useCogsState: <TStateKey extends keyof TSchema['schemas']>(stateKey: TStateKey, options?: OptionsType<TSchema['schemas'][TStateKey]['schemas']['defaultValues'], TSchema['schemas'][TStateKey] extends {
+        apiParamsSchema: z.ZodObject<any, any>;
+    } ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']> : never>) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
+    setCogsOptions: <TStateKey extends keyof TSchema['schemas']>(stateKey: TStateKey, options: OptionsType<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>) => void;
 };
 export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
-}) => CogsApi<State>;
-export declare function createCogsStateFromSync<TSyncSchema extends {
-    schemas: Record<string, {
-        schemas: {
-            defaultValues: any;
-        };
-        [key: string]: any;
-    }>;
-    notifications: Record<string, any>;
-}>(syncSchema: TSyncSchema): CogsApi<{
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-}, {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-}[keyof {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-}]>;
+}) => BasicCogsApi<State>;
+export declare function createCogsStateFromSync<TSchema extends {
+    schemas: Record<string, any>;
+}>(syncSchema: TSchema): CogsApi<TSchema>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;

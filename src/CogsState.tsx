@@ -37,7 +37,7 @@ import { useCogsConfig } from './CogsStateClient.js';
 import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
-import * as z4 from 'zod/v4';
+import z, * as z4 from 'zod/v4';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -534,33 +534,46 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
-type UseCogsStateHook<
-  T extends Record<string, any>,
-  apiParams extends Record<string, any> = never,
-> = <StateKey extends keyof TransformedStateType<T>>(
+type BasicUseCogsStateHook<T extends Record<string, any>> = <
+  StateKey extends keyof TransformedStateType<T>,
+>(
   stateKey: StateKey,
-  options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey]> & { apiParams?: apiParams }
-  >
+  // This hook DOES NOT know about apiParams.
+  options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
 ) => StateObject<TransformedStateType<T>[StateKey]>;
-
-// Define the type for the options setter using the Transformed state
 type SetCogsOptionsFunc<T extends Record<string, any>> = <
   StateKey extends keyof TransformedStateType<T>,
 >(
   stateKey: StateKey,
   options: OptionsType<TransformedStateType<T>[StateKey]>
 ) => void;
-
-// Define the final API object shape
-type CogsApi<
-  T extends Record<string, any>,
-  apiParams extends Record<string, any> = never,
-> = {
-  useCogsState: UseCogsStateHook<T, apiParams>;
+type BasicCogsApi<T extends Record<string, any>> = {
+  useCogsState: BasicUseCogsStateHook<T>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
 
+export type CogsApi<TSchema extends { schemas: Record<string, any> }> = {
+  useCogsState: <TStateKey extends keyof TSchema['schemas']>(
+    stateKey: TStateKey,
+    options?: OptionsType<
+      TSchema['schemas'][TStateKey]['schemas']['defaultValues'],
+      TSchema['schemas'][TStateKey] extends {
+        // This checks for the params schema we create in `createSyncSchema`
+        apiParamsSchema: z.ZodObject<any, any>;
+      }
+        ? z.infer<TSchema['schemas'][TStateKey]['apiParamsSchema']>
+        : never
+    >
+  ) => StateObject<TSchema['schemas'][TStateKey]['schemas']['defaultValues']>;
+
+  // You also need the type for the other function
+  setCogsOptions: <TStateKey extends keyof TSchema['schemas']>(
+    stateKey: TStateKey,
+    options: OptionsType<
+      TSchema['schemas'][TStateKey]['schemas']['defaultValues']
+    >
+  ) => void;
+};
 // Minimal change - just add a second parameter to detect sync schema
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
@@ -681,31 +694,11 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     notifyComponents(stateKey as string);
   }
 
-  return { useCogsState, setCogsOptions } as CogsApi<State>;
+  return { useCogsState, setCogsOptions } as BasicCogsApi<State>;
 };
 export function createCogsStateFromSync<
-  TSyncSchema extends {
-    schemas: Record<
-      string,
-      {
-        schemas: { defaultValues: any };
-        [key: string]: any;
-      }
-    >;
-    notifications: Record<string, any>;
-  },
->(
-  syncSchema: TSyncSchema
-): CogsApi<
-  {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-  },
-  {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-  }[keyof {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
-  }]
-> {
+  TSchema extends { schemas: Record<string, any> }, // Use a simpler generic
+>(syncSchema: TSchema): CogsApi<TSchema> {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 
@@ -715,7 +708,7 @@ export function createCogsStateFromSync<
     initialState[key] = entry?.schemas?.defaultValues || {};
   }
 
-  return createCogsState(initialState);
+  return createCogsState(initialState) as any;
 }
 
 const {
