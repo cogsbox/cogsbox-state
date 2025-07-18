@@ -753,7 +753,6 @@ export function createCogsStateFromSync<
     __syncNotifications: syncSchema.notifications,
   });
 
-  // Create a wrapper that handles API params properly
   const useCogsState = <K extends keyof TSyncSchema['schemas']>(
     stateKey: K,
     options?: Omit<
