@@ -38,6 +38,7 @@ import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
 import z, * as z4 from 'zod/v4';
+import { keyof } from 'zod';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -683,7 +684,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
-
+// Fixed version that properly handles the apiParams type without complex inference
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
@@ -696,7 +697,20 @@ export function createCogsStateFromSync<
     >;
     notifications: Record<string, any>;
   },
->(syncSchema: TSyncSchema) {
+>(
+  syncSchema: TSyncSchema
+): {
+  useCogsState: <K extends keyof TSyncSchema['schemas']>(
+    stateKey: K,
+    options?: OptionsType<
+      TSyncSchema['schemas'][K]['schemas']['defaultValues'],
+      any
+    > & {
+      apiParams?: any;
+    }
+  ) => StateObject<TSyncSchema['schemas'][K]['schemas']['defaultValues']>;
+  setCogsOptions: any;
+} {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 
@@ -712,12 +726,30 @@ export function createCogsStateFromSync<
     __syncNotifications: syncSchema.notifications,
   });
 
-  // Override the useCogsState function to handle apiParams properly
+  // Create the properly typed useCogsState function
   const useCogsState = <K extends keyof TSyncSchema['schemas']>(
     stateKey: K,
-    options?: any // Just make this flexible
-  ) => {
-    return baseApi.useCogsState(stateKey as any, options);
+    options?: OptionsType<
+      TSyncSchema['schemas'][K]['schemas']['defaultValues'],
+      any
+    > & {
+      apiParams?: any;
+    }
+  ): StateObject<TSyncSchema['schemas'][K]['schemas']['defaultValues']> => {
+    // Runtime validation of API params
+    const schemaEntry = schemas[stateKey as keyof typeof schemas];
+    if (schemaEntry?.apiParamsSchema && options?.apiParams) {
+      const result = schemaEntry.apiParamsSchema.safeParse(options.apiParams);
+      if (!result.success) {
+        throw new Error(
+          `Invalid API params for ${String(stateKey)}: ${result.error.message}`
+        );
+      }
+    }
+
+    return baseApi.useCogsState(stateKey as any, options as any) as StateObject<
+      TSyncSchema['schemas'][K]['schemas']['defaultValues']
+    >;
   };
 
   return {
@@ -725,7 +757,6 @@ export function createCogsStateFromSync<
     setCogsOptions: baseApi.setCogsOptions,
   };
 }
-
 const {
   getInitialOptions,
   getValidationErrors,
