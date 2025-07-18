@@ -309,7 +309,9 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
     }>;
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema): {
-    useCogsState: <K extends keyof TSyncSchema["schemas"]>(stateKey: K, options?: any) => StateObject<any>;
+    useCogsState: <K extends keyof TSyncSchema["schemas"]>(stateKey: K, options?: OptionsType<TSyncSchema["schemas"][K]["schemas"]["defaultValues"]> & {
+        apiParams?: any;
+    }) => StateObject<TSyncSchema["schemas"][K]["schemas"]["defaultValues"]>;
     setCogsOptions: SetCogsOptionsFunc<any>;
 };
 type LocalStorageData<T> = {
