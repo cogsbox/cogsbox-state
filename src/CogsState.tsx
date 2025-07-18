@@ -540,7 +540,7 @@ type UseCogsStateHook<
 > = <StateKey extends keyof TransformedStateType<T>>(
   stateKey: StateKey,
   options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey]> & { apiParams: apiParams }
+    OptionsType<TransformedStateType<T>[StateKey]> & { apiParams?: apiParams }
   >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
 
@@ -696,9 +696,16 @@ export function createCogsStateFromSync<
   },
 >(
   syncSchema: TSyncSchema
-): CogsApi<{
-  [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-}> {
+): CogsApi<
+  {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+  },
+  {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+  }[keyof {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+  }]
+> {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 

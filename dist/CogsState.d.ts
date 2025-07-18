@@ -286,7 +286,7 @@ export type TransformedStateType<T> = {
 };
 export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
 type UseCogsStateHook<T extends Record<string, any>, apiParams extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]> & {
-    apiParams: apiParams;
+    apiParams?: apiParams;
 }>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
 type CogsApi<T extends Record<string, any>, apiParams extends Record<string, any> = never> = {
@@ -309,7 +309,11 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-}>;
+}, {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+}[keyof {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+}]>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
