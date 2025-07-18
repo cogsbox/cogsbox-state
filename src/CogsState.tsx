@@ -37,7 +37,7 @@ import { useCogsConfig } from './CogsStateClient.js';
 import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
-import z, * as z4 from 'zod/v4';
+import * as z4 from 'zod/v4';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -683,20 +683,29 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
-
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
       string,
       {
         schemas: { defaultValues: any };
-        apiParamsSchema?: z.ZodObject<any>;
         [key: string]: any;
       }
     >;
     notifications: Record<string, any>;
   },
->(syncSchema: TSyncSchema) {
+>(
+  syncSchema: TSyncSchema
+): CogsApi<
+  {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+  },
+  {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+  }[keyof {
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParams'];
+  }]
+> {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 
@@ -706,24 +715,7 @@ export function createCogsStateFromSync<
     initialState[key] = entry?.schemas?.defaultValues || {};
   }
 
-  // Create the base CogsApi
-  const baseApi = createCogsState(initialState, {
-    __fromSyncSchema: true,
-    __syncNotifications: syncSchema.notifications,
-  });
-
-  // Override the useCogsState function to handle apiParams properly
-  const useCogsState = <K extends keyof TSyncSchema['schemas']>(
-    stateKey: K,
-    options?: any // Just make this flexible
-  ) => {
-    return baseApi.useCogsState(stateKey as any, options);
-  };
-
-  return {
-    useCogsState,
-    setCogsOptions: baseApi.setCogsOptions,
-  };
+  return createCogsState(initialState);
 }
 
 const {
