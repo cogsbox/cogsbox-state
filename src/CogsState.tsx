@@ -689,26 +689,13 @@ export function createCogsStateFromSync<
       string,
       {
         schemas: { defaultValues: any };
-        apiParamsSchema?: z.ZodObject<any>; // Add this type
+        apiParamsSchema?: z.ZodObject<any>;
         [key: string]: any;
       }
     >;
     notifications: Record<string, any>;
   },
->(
-  syncSchema: TSyncSchema
-): CogsApi<
-  {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-  },
-  {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<
-      infer U
-    >
-      ? { [P in keyof U]: z.infer<U[P]> }
-      : never;
-  }[keyof TSyncSchema['schemas']]
-> {
+>(syncSchema: TSyncSchema) {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
 
@@ -718,11 +705,24 @@ export function createCogsStateFromSync<
     initialState[key] = entry?.schemas?.defaultValues || {};
   }
 
-  // Create the cogs state with proper API params type inference
-  return createCogsState(initialState, {
+  // Create the base CogsApi
+  const baseApi = createCogsState(initialState, {
     __fromSyncSchema: true,
     __syncNotifications: syncSchema.notifications,
   });
+
+  // Override the useCogsState function to handle apiParams properly
+  const useCogsState = <K extends keyof TSyncSchema['schemas']>(
+    stateKey: K,
+    options?: any // Just make this flexible
+  ) => {
+    return baseApi.useCogsState(stateKey as any, options);
+  };
+
+  return {
+    useCogsState,
+    setCogsOptions: baseApi.setCogsOptions,
+  };
 }
 
 const {

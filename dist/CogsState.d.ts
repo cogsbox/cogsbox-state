@@ -308,13 +308,10 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
-}>(syncSchema: TSyncSchema): CogsApi<{
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
-}, {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<infer U> ? {
-        [P in keyof U]: z.infer<U[P]>;
-    } : never;
-}[keyof TSyncSchema['schemas']]>;
+}>(syncSchema: TSyncSchema): {
+    useCogsState: <K extends keyof TSyncSchema["schemas"]>(stateKey: K, options?: any) => StateObject<any>;
+    setCogsOptions: SetCogsOptionsFunc<any>;
+};
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
