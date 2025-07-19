@@ -677,6 +677,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
+
 // Fix for UseCogsStateHook to support per-key apiParams
 type UseCogsStateHook<
   T extends Record<string, any>,
@@ -700,7 +701,11 @@ type CogsApi<
   useCogsState: UseCogsStateHook<T, TApiParamsMap>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
-
+type GetParamType<SchemaEntry> = SchemaEntry extends {
+  api?: { queryData?: { _paramType?: infer P } };
+}
+  ? P // If the full path exists, infer the parameter type P.
+  : never; // Otherwise, the type is 'never', meaning no params.
 // Fixed createCogsStateFromSync return type
 export function createCogsStateFromSync<
   TSyncSchema extends {
@@ -723,13 +728,9 @@ export function createCogsStateFromSync<
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
   },
   {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['api'] extends {
-      queryData: infer Q;
-    }
-      ? Q extends { _paramType: infer P }
-        ? P
-        : never
-      : never;
+    [K in keyof TSyncSchema['schemas']]: GetParamType<
+      TSyncSchema['schemas'][K]
+    >;
   }
 > {
   const schemas = syncSchema.schemas;

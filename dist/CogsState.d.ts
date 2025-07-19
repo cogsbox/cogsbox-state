@@ -300,6 +300,13 @@ type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string,
     useCogsState: UseCogsStateHook<T, TApiParamsMap>;
     setCogsOptions: SetCogsOptionsFunc<T>;
 };
+type GetParamType<SchemaEntry> = SchemaEntry extends {
+    api?: {
+        queryData?: {
+            _paramType?: infer P;
+        };
+    };
+} ? P : never;
 export declare function createCogsStateFromSync<TSyncSchema extends {
     schemas: Record<string, {
         schemas: {
@@ -314,11 +321,7 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
 }>(syncSchema: TSyncSchema): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }, {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['api'] extends {
-        queryData: infer Q;
-    } ? Q extends {
-        _paramType: infer P;
-    } ? P : never : never;
+    [K in keyof TSyncSchema['schemas']]: GetParamType<TSyncSchema['schemas'][K]>;
 }>;
 type LocalStorageData<T> = {
     state: T;
