@@ -2,8 +2,8 @@
 import { jsx as ot, Fragment as Ot } from "react/jsx-runtime";
 import { memo as Ut, useState as tt, useRef as G, useCallback as ct, useEffect as X, useLayoutEffect as ft, useMemo as gt, createElement as lt, startTransition as Rt } from "react";
 import { createRoot as At } from "react-dom/client";
-import { transformStateFunc as Nt, isFunction as at, isArray as Tt, getDifferences as Pt, isDeepEqual as st } from "./utility.js";
-import { ValidationWrapper as _t } from "./Functions.jsx";
+import { transformStateFunc as Nt, isFunction as at, isArray as Tt, getDifferences as _t, isDeepEqual as st } from "./utility.js";
+import { ValidationWrapper as Pt } from "./Functions.jsx";
 import Ft from "superjson";
 import { v4 as rt } from "uuid";
 import { getGlobalStore as e, formRefStore as vt } from "./store.js";
@@ -89,7 +89,7 @@ function ce(t) {
   const a = t.schemas, h = {}, g = {};
   for (const p in a) {
     const I = a[p];
-    h[p] = I?.schemas?.defaultValues || {}, I?.apiParamsSchema && (g[p] = I.apiParamsSchema);
+    h[p] = I?.schemas?.defaultValues || {}, I?.api?.queryData?._paramType && (g[p] = I.api.queryData._paramType);
   }
   return Lt(h, {
     __fromSyncSchema: !0,
@@ -269,8 +269,8 @@ function zt(t, {
                   stateSource: "server",
                   lastServerSync: n.timestamp || Date.now()
                 });
-                const P = e.getState().getShadowValue(x);
-                P && typeof P == "object" && !Array.isArray(P) && Object.keys(P).forEach((U) => {
+                const _ = e.getState().getShadowValue(x);
+                _ && typeof _ == "object" && !Array.isArray(_) && Object.keys(_).forEach((U) => {
                   const v = [...A, U];
                   e.getState().setShadowMetadata(u, v, {
                     isDirty: !1,
@@ -361,9 +361,9 @@ function zt(t, {
         f.insertShadowArrayElement(u, r, R.newValue), f.markAsDirty(u, r, { bubble: !0 });
         const A = f.getShadowMetadata(u, r);
         if (A?.arrayKeys) {
-          const P = A.arrayKeys[A.arrayKeys.length - 1];
-          if (P) {
-            const U = P.split(".").slice(1);
+          const _ = A.arrayKeys[A.arrayKeys.length - 1];
+          if (_) {
+            const U = _.split(".").slice(1);
             f.markAsDirty(u, U, { bubble: !1 });
           }
         }
@@ -381,8 +381,8 @@ function zt(t, {
     }
     if (n.sync !== !1 && Y.current && Y.current.connected && Y.current.updateState({ operation: R }), b?.signals && b.signals.length > 0) {
       const A = n.updateType === "cut" ? null : O;
-      b.signals.forEach(({ parentId: P, position: U, effect: v }) => {
-        const w = document.querySelector(`[data-parent-id="${P}"]`);
+      b.signals.forEach(({ parentId: _, position: U, effect: v }) => {
+        const w = document.querySelector(`[data-parent-id="${_}"]`);
         if (w) {
           const D = Array.from(w.childNodes);
           if (D[U]) {
@@ -393,8 +393,8 @@ function zt(t, {
                   "state",
                   `return (${v})(state)`
                 )(A);
-              } catch (_) {
-                console.error("Error evaluating effect function:", _);
+              } catch (P) {
+                console.error("Error evaluating effect function:", P);
               }
             $ != null && typeof $ == "object" && ($ = JSON.stringify($)), D[U].textContent = String($ ?? "");
           }
@@ -402,20 +402,20 @@ function zt(t, {
       });
     }
     if (n.updateType === "insert" && b?.mapWrappers && b.mapWrappers.length > 0) {
-      const A = f.getShadowMetadata(u, r)?.arrayKeys || [], P = A[A.length - 1], U = f.getShadowValue(P), v = f.getShadowValue(
+      const A = f.getShadowMetadata(u, r)?.arrayKeys || [], _ = A[A.length - 1], U = f.getShadowValue(_), v = f.getShadowValue(
         [u, ...r].join(".")
       );
-      if (!P || U === void 0) return;
+      if (!_ || U === void 0) return;
       b.mapWrappers.forEach((w) => {
         let D = !0, $ = -1;
         if (w.meta?.transforms && w.meta.transforms.length > 0) {
-          for (const _ of w.meta.transforms)
-            if (_.type === "filter" && !_.fn(U, -1)) {
+          for (const P of w.meta.transforms)
+            if (P.type === "filter" && !P.fn(U, -1)) {
               D = !1;
               break;
             }
           if (D) {
-            const _ = It(
+            const P = It(
               u,
               r,
               w.meta.transforms
@@ -423,27 +423,27 @@ function zt(t, {
               (z) => z.type === "sort"
             );
             if (B) {
-              const z = _.map((J) => ({
+              const z = P.map((J) => ({
                 key: J,
                 value: f.getShadowValue(J)
               }));
-              z.push({ key: P, value: U }), z.sort((J, Q) => B.fn(J.value, Q.value)), $ = z.findIndex(
-                (J) => J.key === P
+              z.push({ key: _, value: U }), z.sort((J, Q) => B.fn(J.value, Q.value)), $ = z.findIndex(
+                (J) => J.key === _
               );
             } else
-              $ = _.length;
+              $ = P.length;
           }
         } else
           D = !0, $ = A.length - 1;
         if (D && w.containerRef && w.containerRef.isConnected) {
-          const _ = document.createElement("div");
-          _.setAttribute("data-item-path", P);
+          const P = document.createElement("div");
+          P.setAttribute("data-item-path", _);
           const B = Array.from(w.containerRef.children);
           $ >= 0 && $ < B.length ? w.containerRef.insertBefore(
-            _,
+            P,
             B[$]
-          ) : w.containerRef.appendChild(_);
-          const z = At(_), J = rt(), Q = P.split(".").slice(1), ut = w.rebuildStateShape({
+          ) : w.containerRef.appendChild(P);
+          const z = At(P), J = rt(), Q = _.split(".").slice(1), ut = w.rebuildStateShape({
             path: w.path,
             currentState: v,
             componentId: w.componentId,
@@ -464,8 +464,8 @@ function zt(t, {
       });
     }
     if (n.updateType === "cut") {
-      const A = r.slice(0, -1), P = f.getShadowMetadata(u, A);
-      P?.mapWrappers && P.mapWrappers.length > 0 && P.mapWrappers.forEach((U) => {
+      const A = r.slice(0, -1), _ = f.getShadowMetadata(u, A);
+      _?.mapWrappers && _.mapWrappers.length > 0 && _.mapWrappers.forEach((U) => {
         if (U.containerRef && U.containerRef.isConnected) {
           const v = U.containerRef.querySelector(
             `[data-item-path="${S}"]`
@@ -484,8 +484,8 @@ function zt(t, {
     if (n.updateType === "update") {
       let A = [...r];
       for (; ; ) {
-        const P = f.getShadowMetadata(u, A);
-        if (P?.pathComponents && P.pathComponents.forEach((U) => {
+        const _ = f.getShadowMetadata(u, A);
+        if (_?.pathComponents && _.pathComponents.forEach((U) => {
           if (x.has(U))
             return;
           const v = W.components?.get(U);
@@ -494,25 +494,25 @@ function zt(t, {
           break;
         A.pop();
       }
-      O && typeof O == "object" && !Tt(O) && E && typeof E == "object" && !Tt(E) && Pt(O, E).forEach((U) => {
+      O && typeof O == "object" && !Tt(O) && E && typeof E == "object" && !Tt(E) && _t(O, E).forEach((U) => {
         const v = U.split("."), w = [...r, ...v], D = f.getShadowMetadata(u, w);
         D?.pathComponents && D.pathComponents.forEach(($) => {
           if (x.has($))
             return;
-          const _ = W.components?.get($);
-          _ && ((Array.isArray(_.reactiveType) ? _.reactiveType : [_.reactiveType || "component"]).includes("none") || (_.forceUpdate(), x.add($)));
+          const P = W.components?.get($);
+          P && ((Array.isArray(P.reactiveType) ? P.reactiveType : [P.reactiveType || "component"]).includes("none") || (P.forceUpdate(), x.add($)));
         });
       });
     } else if (n.updateType === "insert" || n.updateType === "cut") {
-      const A = n.updateType === "insert" ? r : r.slice(0, -1), P = f.getShadowMetadata(u, A);
-      if (P?.signals && P.signals.length > 0) {
+      const A = n.updateType === "insert" ? r : r.slice(0, -1), _ = f.getShadowMetadata(u, A);
+      if (_?.signals && _.signals.length > 0) {
         const U = [u, ...A].join("."), v = f.getShadowValue(U);
-        P.signals.forEach(({ parentId: w, position: D, effect: $ }) => {
-          const _ = document.querySelector(
+        _.signals.forEach(({ parentId: w, position: D, effect: $ }) => {
+          const P = document.querySelector(
             `[data-parent-id="${w}"]`
           );
-          if (_) {
-            const B = Array.from(_.childNodes);
+          if (P) {
+            const B = Array.from(P.childNodes);
             if (B[D]) {
               let z = v;
               if ($)
@@ -529,29 +529,29 @@ function zt(t, {
           }
         });
       }
-      P?.pathComponents && P.pathComponents.forEach((U) => {
+      _?.pathComponents && _.pathComponents.forEach((U) => {
         if (!x.has(U)) {
           const v = W.components?.get(U);
           v && (v.forceUpdate(), x.add(U));
         }
       });
     }
-    return W.components.forEach((A, P) => {
-      if (x.has(P))
+    return W.components.forEach((A, _) => {
+      if (x.has(_))
         return;
       const U = Array.isArray(A.reactiveType) ? A.reactiveType : [A.reactiveType || "component"];
       if (U.includes("all")) {
-        A.forceUpdate(), x.add(P);
+        A.forceUpdate(), x.add(_);
         return;
       }
       if (U.includes("deps") && A.depsFunction) {
         const v = f.getShadowValue(u), w = A.depsFunction(v);
         let D = !1;
-        w === !0 ? D = !0 : Array.isArray(w) && (st(A.prevDeps, w) || (A.prevDeps = w, D = !0)), D && (A.forceUpdate(), x.add(P));
+        w === !0 ? D = !0 : Array.isArray(w) && (st(A.prevDeps, w) || (A.prevDeps = w, D = !0)), D && (A.forceUpdate(), x.add(_));
       }
     }), x.clear(), Wt(u, (A) => {
-      const P = [...A ?? [], R], U = /* @__PURE__ */ new Map();
-      return P.forEach((v) => {
+      const _ = [...A ?? [], R], U = /* @__PURE__ */ new Map();
+      return _.forEach((v) => {
         const w = `${v.stateKey}:${JSON.stringify(v.path)}`, D = U.get(w);
         D ? (D.timeStamp = Math.max(D.timeStamp, v.timeStamp), D.newValue = v.newValue, D.oldValue = D.oldValue ?? v.oldValue, D.updateType = v.updateType) : U.set(w, { ...v });
       }), Array.from(U.values());
@@ -647,7 +647,7 @@ function Dt(t, a, h, g) {
           return () => {
             const o = e.getState().getShadowMetadata(t, []), i = e.getState().getShadowValue(t);
             let s;
-            return o?.stateSource === "server" && o.baseServerState ? s = o.baseServerState : s = e.getState().initialStateGlobal[t], Pt(i, s);
+            return o?.stateSource === "server" && o.baseServerState ? s = o.baseServerState : s = e.getState().initialStateGlobal[t], _t(i, s);
           };
         if (y === "sync" && c.length === 0)
           return async function() {
@@ -757,7 +757,7 @@ function Dt(t, a, h, g) {
                 let v = 0;
                 const w = /* @__PURE__ */ new Map();
                 return (e.getState().getShadowMetadata(t, c)?.arrayKeys || []).forEach(($) => {
-                  const _ = $.split(".").slice(1), B = e.getState().getShadowMetadata(t, _)?.virtualizer?.itemHeight || i;
+                  const P = $.split(".").slice(1), B = e.getState().getShadowMetadata(t, P)?.virtualizer?.itemHeight || i;
                   w.set($, {
                     height: B,
                     offset: v
@@ -770,12 +770,12 @@ function Dt(t, a, h, g) {
                     if (v.clientHeight > 0) {
                       const D = Math.ceil(
                         v.clientHeight / i
-                      ), $ = N.length - 1, _ = Math.max(
+                      ), $ = N.length - 1, P = Math.max(
                         0,
                         $ - D - s
                       );
-                      b({ startIndex: _, endIndex: $ }), requestAnimationFrame(() => {
-                        P("instant"), k.current = !1;
+                      b({ startIndex: P, endIndex: $ }), requestAnimationFrame(() => {
+                        _("instant"), k.current = !1;
                       });
                     } else
                       requestAnimationFrame(w);
@@ -786,8 +786,8 @@ function Dt(t, a, h, g) {
               const A = ct(() => {
                 const v = S.current;
                 if (!v) return;
-                const w = v.scrollTop, { scrollHeight: D, clientHeight: $ } = v, _ = R.current, B = D - (w + $), z = _.isNearBottom;
-                _.isNearBottom = B <= n, w < _.lastScrollTop ? (_.scrollUpCount++, _.scrollUpCount > 3 && z && (_.isUserScrolling = !0, console.log("User scrolled away from bottom"))) : _.isNearBottom && (_.isUserScrolling = !1, _.scrollUpCount = 0), _.lastScrollTop = w;
+                const w = v.scrollTop, { scrollHeight: D, clientHeight: $ } = v, P = R.current, B = D - (w + $), z = P.isNearBottom;
+                P.isNearBottom = B <= n, w < P.lastScrollTop ? (P.scrollUpCount++, P.scrollUpCount > 3 && z && (P.isUserScrolling = !0, console.log("User scrolled away from bottom"))) : P.isNearBottom && (P.isUserScrolling = !1, P.scrollUpCount = 0), P.lastScrollTop = w;
                 let J = 0;
                 for (let Q = 0; Q < N.length; Q++) {
                   const ut = N[Q], mt = q.current.get(ut);
@@ -822,21 +822,21 @@ function Dt(t, a, h, g) {
                     v.removeEventListener("scroll", A);
                   };
               }, [A, r]);
-              const P = ct(
+              const _ = ct(
                 (v = "smooth") => {
                   const w = S.current;
                   if (!w) return;
                   R.current.isUserScrolling = !1, R.current.isNearBottom = !0, R.current.scrollUpCount = 0;
                   const D = () => {
-                    const $ = (_ = 0) => {
-                      if (_ > 5) return;
+                    const $ = (P = 0) => {
+                      if (P > 5) return;
                       const B = w.scrollHeight, z = w.scrollTop, J = w.clientHeight;
                       z + J >= B - 1 || (w.scrollTo({
                         top: B,
                         behavior: v
                       }), setTimeout(() => {
                         const Q = w.scrollHeight, ut = w.scrollTop;
-                        (Q !== B || ut + J < Q - 1) && $(_ + 1);
+                        (Q !== B || ut + J < Q - 1) && $(P + 1);
                       }, 50));
                     };
                     $();
@@ -853,14 +853,14 @@ function Dt(t, a, h, g) {
                 let D;
                 const $ = () => {
                   clearTimeout(D), D = setTimeout(() => {
-                    !w.isUserScrolling && w.isNearBottom && P(
+                    !w.isUserScrolling && w.isNearBottom && _(
                       k.current ? "instant" : "smooth"
                     );
                   }, 100);
-                }, _ = new MutationObserver(() => {
+                }, P = new MutationObserver(() => {
                   w.isUserScrolling || $();
                 });
-                _.observe(v, {
+                P.observe(v, {
                   childList: !0,
                   subtree: !0,
                   attributes: !0,
@@ -871,18 +871,18 @@ function Dt(t, a, h, g) {
                   z.target instanceof HTMLImageElement && !w.isUserScrolling && $();
                 };
                 return v.addEventListener("load", B, !0), k.current ? setTimeout(() => {
-                  P("instant");
+                  _("instant");
                 }, 0) : $(), () => {
-                  clearTimeout(D), _.disconnect(), v.removeEventListener("load", B, !0);
+                  clearTimeout(D), P.disconnect(), v.removeEventListener("load", B, !0);
                 };
-              }, [r, N.length, P]), {
+              }, [r, N.length, _]), {
                 virtualState: gt(() => {
                   const v = e.getState(), w = v.getShadowValue(
                     [t, ...c].join(".")
                   ), D = v.getShadowMetadata(t, c)?.arrayKeys || [], $ = w.slice(
                     f.startIndex,
                     f.endIndex + 1
-                  ), _ = D.slice(
+                  ), P = D.slice(
                     f.startIndex,
                     f.endIndex + 1
                   );
@@ -890,7 +890,7 @@ function Dt(t, a, h, g) {
                     currentState: $,
                     path: c,
                     componentId: T,
-                    meta: { ...m, validIds: _ }
+                    meta: { ...m, validIds: P }
                   });
                 }, [f.startIndex, f.endIndex, N.length]),
                 virtualizerProps: {
@@ -916,7 +916,7 @@ function Dt(t, a, h, g) {
                     }
                   }
                 },
-                scrollToBottom: P,
+                scrollToBottom: _,
                 scrollToIndex: (v, w = "smooth") => {
                   if (S.current && N[v]) {
                     const D = q.current.get(N[v])?.offset || 0;
@@ -1051,8 +1051,8 @@ function Dt(t, a, h, g) {
                 const W = [...f];
                 if (f = [], n) {
                   const x = n(W);
-                  x !== void 0 && (Array.isArray(x) ? x : [x]).forEach((P) => {
-                    a(P, c, {
+                  x !== void 0 && (Array.isArray(x) ? x : [x]).forEach((_) => {
+                    a(_, c, {
                       updateType: "insert"
                     });
                   });
@@ -1439,7 +1439,7 @@ function Dt(t, a, h, g) {
             children: o,
             hideMessage: i
           }) => /* @__PURE__ */ ot(
-            _t,
+            Pt,
             {
               formOpts: i ? { validation: { message: "" } } : void 0,
               path: c,
@@ -1900,7 +1900,7 @@ function Zt({
       } : L[H];
     }
   });
-  return /* @__PURE__ */ ot(_t, { formOpts: p, path: a, stateKey: t, children: g(Z) });
+  return /* @__PURE__ */ ot(Pt, { formOpts: p, path: a, stateKey: t, children: g(Z) });
 }
 function $t(t, a, h) {
   const g = `${t}////${a}`;

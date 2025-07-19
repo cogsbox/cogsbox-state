@@ -426,7 +426,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   syncUpdate?: Partial<UpdateTypeDetail>;
 
   defaultState?: T;
-  apiParams?: TApiParams;
+
   dependencies?: any[];
 };
 
@@ -708,7 +708,9 @@ export function createCogsStateFromSync<
       string,
       {
         schemas: { defaultValues: any };
-        apiParamsSchema?: any;
+        api?: {
+          queryData?: any;
+        };
         [key: string]: any;
       }
     >;
@@ -721,10 +723,12 @@ export function createCogsStateFromSync<
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
   },
   {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<
-      infer P
-    >
-      ? P
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['api'] extends {
+      queryData: infer Q;
+    }
+      ? Q extends { _paramType: infer P }
+        ? P
+        : never
       : never;
   }
 > {
@@ -737,9 +741,9 @@ export function createCogsStateFromSync<
     const entry = schemas[key];
     initialState[key] = entry?.schemas?.defaultValues || {};
 
-    // Store the apiParamsSchema for each key
-    if (entry?.apiParamsSchema) {
-      apiParamsMap[key] = entry.apiParamsSchema;
+    // Extract apiParams from the api.queryData._paramType
+    if (entry?.api?.queryData?._paramType) {
+      apiParamsMap[key] = entry.api.queryData._paramType;
     }
   }
 
@@ -750,7 +754,6 @@ export function createCogsStateFromSync<
     __apiParamsMap: apiParamsMap,
   }) as any;
 }
-
 const {
   getInitialOptions,
   getValidationErrors,

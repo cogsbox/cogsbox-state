@@ -251,7 +251,6 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
     reactiveType?: ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
-    apiParams?: TApiParams;
     dependencies?: any[];
 };
 export type SyncRenderOptions<T extends unknown = unknown> = {
@@ -306,14 +305,20 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
         schemas: {
             defaultValues: any;
         };
-        apiParamsSchema?: any;
+        api?: {
+            queryData?: any;
+        };
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }, {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<infer P> ? P : never;
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['api'] extends {
+        queryData: infer Q;
+    } ? Q extends {
+        _paramType: infer P;
+    } ? P : never : never;
 }>;
 type LocalStorageData<T> = {
     state: T;
