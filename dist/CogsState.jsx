@@ -95,7 +95,6 @@ function ce(t) {
     __fromSyncSchema: !0,
     __syncNotifications: t.notifications,
     __apiParamsMap: g
-    // Pass the apiParams schemas
   });
 }
 const {

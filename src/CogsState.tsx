@@ -535,15 +535,6 @@ export function addStateOptions<T extends unknown>(
 ) {
   return { initialState: initialState, formElements, validation } as T;
 }
-type UseCogsStateHook<
-  T extends Record<string, any>,
-  apiParams extends Record<string, any> = never,
-> = <StateKey extends keyof TransformedStateType<T>>(
-  stateKey: StateKey,
-  options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey]> & { apiParams?: apiParams }
-  >
-) => StateObject<TransformedStateType<T>[StateKey]>;
 
 // Define the type for the options setter using the Transformed state
 type SetCogsOptionsFunc<T extends Record<string, any>> = <
@@ -553,14 +544,6 @@ type SetCogsOptionsFunc<T extends Record<string, any>> = <
   options: OptionsType<TransformedStateType<T>[StateKey]>
 ) => void;
 
-// Define the final API object shape
-type CogsApi<
-  T extends Record<string, any>,
-  apiParams extends Record<string, any> = never,
-> = {
-  useCogsState: UseCogsStateHook<T, apiParams>;
-  setCogsOptions: SetCogsOptionsFunc<T>;
-};
 export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: {
@@ -694,14 +677,38 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   return { useCogsState, setCogsOptions } as CogsApi<State>;
 };
+// Fix for UseCogsStateHook to support per-key apiParams
+type UseCogsStateHook<
+  T extends Record<string, any>,
+  TApiParamsMap extends Record<string, any> = Record<string, never>,
+> = <StateKey extends keyof TransformedStateType<T>>(
+  stateKey: StateKey,
+  options?: Prettify<
+    OptionsType<TransformedStateType<T>[StateKey]> & {
+      apiParams?: StateKey extends keyof TApiParamsMap
+        ? TApiParamsMap[StateKey]
+        : never;
+    }
+  >
+) => StateObject<TransformedStateType<T>[StateKey]>;
 
+// Updated CogsApi type
+type CogsApi<
+  T extends Record<string, any>,
+  TApiParamsMap extends Record<string, any> = Record<string, never>,
+> = {
+  useCogsState: UseCogsStateHook<T, TApiParamsMap>;
+  setCogsOptions: SetCogsOptionsFunc<T>;
+};
+
+// Fixed createCogsStateFromSync return type
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
       string,
       {
         schemas: { defaultValues: any };
-        apiParamsSchema?: any; // This contains the zod schema for params
+        apiParamsSchema?: any;
         [key: string]: any;
       }
     >;
@@ -714,10 +721,12 @@ export function createCogsStateFromSync<
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
   },
   {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<any>
-      ? z.infer<TSyncSchema['schemas'][K]['apiParamsSchema']>
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['apiParamsSchema'] extends z.ZodObject<
+      infer P
+    >
+      ? P
       : never;
-  }[keyof TSyncSchema['schemas']]
+  }
 > {
   const schemas = syncSchema.schemas;
   const initialState: any = {};
@@ -738,7 +747,7 @@ export function createCogsStateFromSync<
   return createCogsState(initialState, {
     __fromSyncSchema: true,
     __syncNotifications: syncSchema.notifications,
-    __apiParamsMap: apiParamsMap, // Pass the apiParams schemas
+    __apiParamsMap: apiParamsMap,
   }) as any;
 }
 
