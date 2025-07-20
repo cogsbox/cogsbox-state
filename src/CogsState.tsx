@@ -375,10 +375,22 @@ type ValidationOptionsType = {
 
   onBlur?: boolean;
 };
+type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
+type SyncOptionsType<TApiParams> = {
+  apiParams: TApiParams;
+  stateKey?: string;
+  stateRoom:
+    | number
+    | string
+    | (({ clientId }: { clientId: string }) => string | null);
+  connect?: boolean;
+  inMemoryState?: boolean;
+};
 export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   log?: boolean;
   componentId?: string;
-  cogsSync?: (stateObject: StateObject<T>) => SyncApi;
+  syncOptions?: SyncOptionsType<TApiParams>;
+
   validation?: ValidationOptionsType;
 
   serverState?: {
@@ -551,7 +563,8 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     validation?: ValidationOptionsType;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
-    __apiParamsMap?: Record<string, any>; // Add this
+    __apiParamsMap?: Record<string, any>;
+    __useSync?: (state: State, a: SyncOptionsType<any>) => void;
   }
 ) => {
   let newInitialState = initialState;
@@ -623,7 +636,9 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
+    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>> & {
+      __useSync?: UseSyncType<(typeof statePart)[StateKey]>;
+    }
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
     const apiParamsSchema = opt?.__apiParamsMap?.[stateKey as string];
@@ -657,6 +672,9 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       defaultState: options?.defaultState as any,
       dependencies: options?.dependencies,
       serverState: options?.serverState,
+      __useSync: options?.__useSync as UseSyncType<
+        (typeof statePart)[StateKey]
+      >,
     });
 
     return updater;
@@ -682,13 +700,15 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 type UseCogsStateHook<
   T extends Record<string, any>,
   TApiParamsMap extends Record<string, any> = Record<string, never>,
-> = <StateKey extends keyof TransformedStateType<T>>(
+> = <StateKey extends keyof TransformedStateType<T> & string>(
   stateKey: StateKey,
   options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey]> & {
-      apiParams?: StateKey extends keyof TApiParamsMap
-        ? TApiParamsMap[StateKey]
-        : never;
+    OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
+      syncOptions: Prettify<
+        SyncOptionsType<
+          StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never
+        >
+      >;
     }
   >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
@@ -720,6 +740,7 @@ export function createCogsStateFromSync<
       }
     >;
     notifications: Record<string, any>;
+    useSync?: (a: SyncOptionsType<any>) => void;
   },
 >(
   syncSchema: TSyncSchema
@@ -753,6 +774,7 @@ export function createCogsStateFromSync<
     __fromSyncSchema: true,
     __syncNotifications: syncSchema.notifications,
     __apiParamsMap: apiParamsMap,
+    __useSync: syncSchema.useSync,
   }) as any;
 }
 const {
@@ -1081,12 +1103,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncUpdate,
     dependencies,
     serverState,
-    apiParamsSchema,
+    __useSync,
+    syncOptions,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    apiParamsSchema?: z.ZodObject<any>; // Add this type
+    __useSync?: UseSyncType<TStateObject>;
+    syncOptions?: SyncOptionsType<any>;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -1895,9 +1919,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
     );
   }, [thisKey, sessionId]);
 
-  const cogsSyncFn = latestInitialOptionsRef.current?.cogsSync;
+  const cogsSyncFn = __useSync;
   if (cogsSyncFn) {
-    syncApiRef.current = cogsSyncFn(updaterFinal);
+    syncApiRef.current = cogsSyncFn(
+      updaterFinal as any,
+      syncOptions ?? ({} as any)
+    );
   }
 
   return updaterFinal;

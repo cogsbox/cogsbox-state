@@ -1,7 +1,6 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationStatus, ComponentsType } from './store.js';
-import { default as z } from 'zod';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
@@ -209,10 +208,20 @@ type ValidationOptionsType = {
     zodSchemaV4?: z4.ZodType<any, any, any>;
     onBlur?: boolean;
 };
+type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
+type SyncOptionsType<TApiParams> = {
+    apiParams: TApiParams;
+    stateKey?: string;
+    stateRoom: number | string | (({ clientId }: {
+        clientId: string;
+    }) => string | null);
+    connect?: boolean;
+    inMemoryState?: boolean;
+};
 export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
     log?: boolean;
     componentId?: string;
-    cogsSync?: (stateObject: StateObject<T>) => SyncApi;
+    syncOptions?: SyncOptionsType<TApiParams>;
     validation?: ValidationOptionsType;
     serverState?: {
         id?: string | number;
@@ -292,9 +301,10 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
+    __useSync?: (state: State, a: SyncOptionsType<any>) => void;
 }) => CogsApi<State>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey]> & {
-    apiParams?: StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never;
+type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
+    syncOptions: Prettify<SyncOptionsType<StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never>>;
 }>) => StateObject<TransformedStateType<T>[StateKey]>;
 type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = {
     useCogsState: UseCogsStateHook<T, TApiParamsMap>;
@@ -318,6 +328,7 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
+    useSync?: (a: SyncOptionsType<any>) => void;
 }>(syncSchema: TSyncSchema): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }, {
@@ -331,11 +342,12 @@ type LocalStorageData<T> = {
     stateSource?: 'default' | 'server' | 'localStorage';
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, apiParamsSchema, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, syncOptions, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    apiParamsSchema?: z.ZodObject<any>;
+    __useSync?: UseSyncType<TStateObject>;
+    syncOptions?: SyncOptionsType<any>;
 } & OptionsType<TStateObject>): StateObject<TStateObject>;
 export type MetaData = {
     /**
