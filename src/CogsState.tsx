@@ -390,9 +390,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   log?: boolean;
   componentId?: string;
   syncOptions?: SyncOptionsType<TApiParams>;
-
   validation?: ValidationOptionsType;
-
   serverState?: {
     id?: string | number;
     data?: T;
@@ -402,7 +400,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
       | boolean
       | {
           strategy: 'append' | 'prepend' | 'diff';
-          key?: string; // For diff strategy - which field to use as unique identifier
+          key?: string;
         };
   };
   sync?: {
@@ -493,7 +491,6 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...newOptions,
   });
 }
-
 function setOptions<StateKey, Opt>({
   stateKey,
   options,
@@ -537,10 +534,19 @@ function setOptions<StateKey, Opt>({
     }
   }
 
+  // Always preserve syncOptions if it exists in mergedOptions but not in options
+  if (
+    mergedOptions.syncOptions &&
+    (!options || !options.hasOwnProperty('syncOptions'))
+  ) {
+    needToAdd = true;
+  }
+
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
 }
+
 export function addStateOptions<T extends unknown>(
   initialState: T,
   { formElements, validation }: OptionsType<T>
@@ -564,11 +570,11 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
-    __useSync?: (state: State, a: SyncOptionsType<any>) => void;
+    __useSync?: UseSyncType<State>;
   }
 ) => {
   let newInitialState = initialState;
-
+  console.log('optsc', opt?.__useSync);
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
 
@@ -636,22 +642,13 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>> & {
-      __useSync?: UseSyncType<(typeof statePart)[StateKey]>;
-    }
+    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-    const apiParamsSchema = opt?.__apiParamsMap?.[stateKey as string];
-
-    // Merge apiParams into options
-    const enhancedOptions = {
-      ...options,
-      apiParamsSchema, // Add the schema here
-    } as any;
 
     setOptions({
       stateKey,
-      options: enhancedOptions,
+      options,
       initialOptionsPart,
     });
     const thiState =
@@ -672,9 +669,8 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       defaultState: options?.defaultState as any,
       dependencies: options?.dependencies,
       serverState: options?.serverState,
-      __useSync: options?.__useSync as UseSyncType<
-        (typeof statePart)[StateKey]
-      >,
+      syncOptions: options?.syncOptions,
+      __useSync: opt?.__useSync as UseSyncType<(typeof statePart)[StateKey]>,
     });
 
     return updater;
@@ -724,9 +720,9 @@ type CogsApi<
 type GetParamType<SchemaEntry> = SchemaEntry extends {
   api?: { queryData?: { _paramType?: infer P } };
 }
-  ? P // If the full path exists, infer the parameter type P.
-  : never; // Otherwise, the type is 'never', meaning no params.
-// Fixed createCogsStateFromSync return type
+  ? P
+  : never;
+
 export function createCogsStateFromSync<
   TSyncSchema extends {
     schemas: Record<
@@ -740,10 +736,10 @@ export function createCogsStateFromSync<
       }
     >;
     notifications: Record<string, any>;
-    useSync?: (a: SyncOptionsType<any>) => void;
   },
 >(
-  syncSchema: TSyncSchema
+  syncSchema: TSyncSchema,
+  useSync: UseSyncType<any>
 ): CogsApi<
   {
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
@@ -769,12 +765,11 @@ export function createCogsStateFromSync<
     }
   }
 
-  // Pass the sync schema metadata to createCogsState
   return createCogsState(initialState, {
     __fromSyncSchema: true,
     __syncNotifications: syncSchema.notifications,
     __apiParamsMap: apiParamsMap,
-    __useSync: syncSchema.useSync,
+    __useSync: useSync,
   }) as any;
 }
 const {
@@ -973,122 +968,6 @@ function markEntireStateAsServerSynced(
   }
 }
 
-const _notifySubscribedComponents = (
-  stateKey: string,
-  path: string[],
-  updateType: 'update' | 'insert' | 'cut',
-  oldValue: any,
-  newValue: any
-) => {
-  const store = getGlobalStore.getState();
-  const rootMeta = store.getShadowMetadata(stateKey, []);
-  if (!rootMeta?.components) {
-    return;
-  }
-
-  const notifiedComponents = new Set<string>();
-  const shadowMeta = store.getShadowMetadata(stateKey, path);
-
-  // --- PASS 1: Notify specific subscribers based on update type ---
-
-  if (updateType === 'update') {
-    if (shadowMeta?.pathComponents) {
-      shadowMeta.pathComponents.forEach((componentId) => {
-        if (notifiedComponents.has(componentId)) return;
-        const component = rootMeta.components?.get(componentId);
-        if (component) {
-          const reactiveTypes = Array.isArray(component.reactiveType)
-            ? component.reactiveType
-            : [component.reactiveType || 'component'];
-          if (!reactiveTypes.includes('none')) {
-            component.forceUpdate();
-            notifiedComponents.add(componentId);
-          }
-        }
-      });
-    }
-
-    if (
-      newValue &&
-      typeof newValue === 'object' &&
-      !isArray(newValue) &&
-      oldValue &&
-      typeof oldValue === 'object' &&
-      !isArray(oldValue)
-    ) {
-      const changedSubPaths = getDifferences(newValue, oldValue);
-      changedSubPaths.forEach((subPathString) => {
-        const subPath = subPathString.split('.');
-        const fullSubPath = [...path, ...subPath];
-        const subPathMeta = store.getShadowMetadata(stateKey, fullSubPath);
-        if (subPathMeta?.pathComponents) {
-          subPathMeta.pathComponents.forEach((componentId) => {
-            if (notifiedComponents.has(componentId)) return;
-            const component = rootMeta.components?.get(componentId);
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
-              if (!reactiveTypes.includes('none')) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
-              }
-            }
-          });
-        }
-      });
-    }
-  } else if (updateType === 'insert' || updateType === 'cut') {
-    const parentArrayPath = updateType === 'insert' ? path : path.slice(0, -1);
-    const parentMeta = store.getShadowMetadata(stateKey, parentArrayPath);
-    if (parentMeta?.pathComponents) {
-      parentMeta.pathComponents.forEach((componentId) => {
-        if (!notifiedComponents.has(componentId)) {
-          const component = rootMeta.components?.get(componentId);
-          if (component) {
-            component.forceUpdate();
-            notifiedComponents.add(componentId);
-          }
-        }
-      });
-    }
-  }
-
-  // --- PASS 2: Notify global subscribers ('all', 'deps') ---
-
-  rootMeta.components.forEach((component, componentId) => {
-    if (notifiedComponents.has(componentId)) {
-      return;
-    }
-
-    const reactiveTypes = Array.isArray(component.reactiveType)
-      ? component.reactiveType
-      : [component.reactiveType || 'component'];
-
-    if (reactiveTypes.includes('all')) {
-      component.forceUpdate();
-      notifiedComponents.add(componentId);
-      return;
-    }
-
-    if (reactiveTypes.includes('deps')) {
-      if (component.depsFunction) {
-        const currentState = store.getShadowValue(stateKey);
-        const newDeps = component.depsFunction(currentState);
-        let shouldUpdate = false;
-        if (newDeps === true || !isDeepEqual(component.prevDeps, newDeps)) {
-          if (Array.isArray(newDeps)) component.prevDeps = newDeps;
-          shouldUpdate = true;
-        }
-        if (shouldUpdate) {
-          component.forceUpdate();
-          notifiedComponents.add(componentId);
-        }
-      }
-    }
-  });
-};
-
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
@@ -1213,7 +1092,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       .subscribeToPath(thisKey, (event) => {
         if (event?.type === 'SERVER_STATE_UPDATE') {
           const serverStateData = event.serverState;
-
+          console.log('SERVER_STATE_UPDATE', event);
           if (
             serverStateData?.status === 'success' &&
             serverStateData.data !== undefined
@@ -1232,13 +1111,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
               .getState()
               .getShadowValue(thisKey);
             const incomingData = serverStateData.data;
-
             if (
               mergeConfig &&
               Array.isArray(currentState) &&
               Array.isArray(incomingData)
             ) {
-              const keyField = mergeConfig.key || 'id';
+              const keyField = mergeConfig.key;
               const existingIds = new Set(
                 currentState.map((item: any) => item[keyField])
               );
@@ -1920,10 +1798,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, [thisKey, sessionId]);
 
   const cogsSyncFn = __useSync;
+  const syncOpt = latestInitialOptionsRef.current?.syncOptions;
+  console.log('cogsSyncFn', cogsSyncFn, syncOpt);
   if (cogsSyncFn) {
     syncApiRef.current = cogsSyncFn(
       updaterFinal as any,
-      syncOptions ?? ({} as any)
+      syncOpt ?? ({} as any)
     );
   }
 

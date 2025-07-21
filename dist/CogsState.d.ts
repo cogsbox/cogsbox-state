@@ -301,7 +301,7 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
-    __useSync?: (state: State, a: SyncOptionsType<any>) => void;
+    __useSync?: UseSyncType<State>;
 }) => CogsApi<State>;
 type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
     syncOptions: Prettify<SyncOptionsType<StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never>>;
@@ -328,8 +328,7 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
-    useSync?: (a: SyncOptionsType<any>) => void;
-}>(syncSchema: TSyncSchema): CogsApi<{
+}>(syncSchema: TSyncSchema, useSync: UseSyncType<any>): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
 }, {
     [K in keyof TSyncSchema['schemas']]: GetParamType<TSyncSchema['schemas'][K]>;
