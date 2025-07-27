@@ -1,13 +1,13 @@
-import { create as b } from "zustand";
-import { ulid as u } from "ulid";
-const A = b((c, f) => ({
+import { create as u } from "zustand";
+import { ulid as m } from "ulid";
+const A = u((a, f) => ({
   formRefs: /* @__PURE__ */ new Map(),
-  registerFormRef: (t, n) => c((o) => {
+  registerFormRef: (t, n) => a((o) => {
     const e = new Map(o.formRefs);
     return e.set(t, n), { formRefs: e };
   }),
   getFormRef: (t) => f().formRefs.get(t),
-  removeFormRef: (t) => c((n) => {
+  removeFormRef: (t) => a((n) => {
     const o = new Map(n.formRefs);
     return o.delete(t), { formRefs: o };
   }),
@@ -18,32 +18,32 @@ const A = b((c, f) => ({
       (r.startsWith(o) || r === t) && e.set(r, s);
     }), e;
   }
-})), m = (c) => c === null || typeof c != "object" || c instanceof Uint8Array || c instanceof Int8Array || c instanceof Uint16Array || c instanceof Int16Array || c instanceof Uint32Array || c instanceof Int32Array || c instanceof Float32Array || c instanceof Float64Array || c instanceof ArrayBuffer || c instanceof Date || c instanceof RegExp || c instanceof Map || c instanceof Set ? !1 : Array.isArray(c) || c.constructor === Object, E = b((c, f) => ({
+})), b = (a) => a === null || typeof a != "object" || a instanceof Uint8Array || a instanceof Int8Array || a instanceof Uint16Array || a instanceof Int16Array || a instanceof Uint32Array || a instanceof Int32Array || a instanceof Float32Array || a instanceof Float64Array || a instanceof ArrayBuffer || a instanceof Date || a instanceof RegExp || a instanceof Map || a instanceof Set ? !1 : Array.isArray(a) || a.constructor === Object, E = u((a, f) => ({
   addPathComponent: (t, n, o) => {
-    c((e) => {
-      const s = new Map(e.shadowStateStore), r = [t, ...n].join("."), i = s.get(r) || {}, d = new Set(i.pathComponents);
-      d.add(o), s.set(r, { ...i, pathComponents: d });
-      const a = s.get(t) || {}, p = a.components?.get(o);
+    a((e) => {
+      const s = new Map(e.shadowStateStore), r = [t, ...n].join("."), i = s.get(r) || {}, S = new Set(i.pathComponents);
+      S.add(o), s.set(r, { ...i, pathComponents: S });
+      const c = s.get(t) || {}, p = c.components?.get(o);
       if (p) {
-        const S = new Set(p.paths);
-        S.add(r);
-        const h = { ...p, paths: S }, l = new Map(a.components);
-        l.set(o, h), s.set(t, {
-          ...a,
-          components: l
+        const d = new Set(p.paths);
+        d.add(r);
+        const h = { ...p, paths: d }, w = new Map(c.components);
+        w.set(o, h), s.set(t, {
+          ...c,
+          components: w
         });
       }
       return { shadowStateStore: s };
     });
   },
   registerComponent: (t, n, o) => {
-    c((e) => {
+    a((e) => {
       const s = new Map(e.shadowStateStore), r = s.get(t) || {}, i = new Map(r.components);
       return i.set(n, o), s.set(t, { ...r, components: i }), { shadowStateStore: s };
     });
   },
   unregisterComponent: (t, n) => {
-    c((o) => {
+    a((o) => {
       const e = new Map(o.shadowStateStore), s = e.get(t);
       if (!s?.components)
         return o;
@@ -55,19 +55,19 @@ const A = b((c, f) => ({
     const e = new Map(f().shadowStateStore);
     let s = !1;
     const r = (i) => {
-      const d = [t, ...i].join("."), a = e.get(d);
-      a && a.isDirty !== !0 ? (e.set(d, { ...a, isDirty: !0 }), s = !0) : a || (e.set(d, { isDirty: !0 }), s = !0);
+      const S = [t, ...i].join("."), c = e.get(S);
+      c && c.isDirty !== !0 ? (e.set(S, { ...c, isDirty: !0 }), s = !0) : c || (e.set(S, { isDirty: !0 }), s = !0);
     };
     if (r(n), o.bubble) {
       let i = [...n];
       for (; i.length > 0; )
         i.pop(), r(i);
     }
-    s && c({ shadowStateStore: e });
+    s && a({ shadowStateStore: e });
   },
   serverStateUpdates: /* @__PURE__ */ new Map(),
   setServerStateUpdate: (t, n) => {
-    c((o) => {
+    a((o) => {
       const e = new Map(o.serverStateUpdates);
       return e.set(t, n), { serverStateUpdates: e };
     }), f().notifyPathSubscribers(t, {
@@ -89,35 +89,35 @@ const A = b((c, f) => ({
     e && e.forEach((s) => s(n));
   },
   initializeShadowState: (t, n) => {
-    c((o) => {
+    a((o) => {
       const e = new Map(o.shadowStateStore), r = e.get(t)?.components, i = t + ".";
-      for (const a of Array.from(e.keys()))
-        (a === t || a.startsWith(i)) && e.delete(a);
-      const d = (a, p) => {
-        const S = [t, ...p].join(".");
-        if (Array.isArray(a)) {
+      for (const c of Array.from(e.keys()))
+        (c === t || c.startsWith(i)) && e.delete(c);
+      const S = (c, p) => {
+        const d = [t, ...p].join(".");
+        if (Array.isArray(c)) {
           const h = [];
-          a.forEach(() => {
-            const l = `id:${u()}`;
-            h.push(S + "." + l);
-          }), e.set(S, { arrayKeys: h }), a.forEach((l, y) => {
-            const w = h[y].split(".").pop();
-            d(l, [...p, w]);
+          c.forEach(() => {
+            const w = `id:${m()}`;
+            h.push(d + "." + w);
+          }), e.set(d, { arrayKeys: h }), c.forEach((w, y) => {
+            const l = h[y].split(".").pop();
+            S(w, [...p, l]);
           });
-        } else if (m(a)) {
+        } else if (b(c)) {
           const h = Object.fromEntries(
-            Object.keys(a).map((l) => [l, S + "." + l])
+            Object.keys(c).map((w) => [w, d + "." + w])
           );
-          e.set(S, { fields: h }), Object.keys(a).forEach((l) => {
-            d(a[l], [...p, l]);
+          e.set(d, { fields: h }), Object.keys(c).forEach((w) => {
+            S(c[w], [...p, w]);
           });
         } else
-          e.set(S, { value: a });
+          e.set(d, { value: c });
       };
-      if (d(n, []), r) {
-        const a = e.get(t) || {};
+      if (S(n, []), r) {
+        const c = e.get(t) || {};
         e.set(t, {
-          ...a,
+          ...c,
           components: r
         });
       }
@@ -161,52 +161,52 @@ const A = b((c, f) => ({
       "font-weight: bold;"
     ), console.trace(), console.groupEnd());
     const r = new Map(f().shadowStateStore), i = { ...s || {}, ...o };
-    r.set(e, i), c({ shadowStateStore: r });
+    r.set(e, i), a({ shadowStateStore: r });
   },
   setTransformCache: (t, n, o, e) => {
     const s = [t, ...n].join("."), r = new Map(f().shadowStateStore), i = r.get(s) || {};
-    i.transformCaches || (i.transformCaches = /* @__PURE__ */ new Map()), i.transformCaches.set(o, e), r.set(s, i), c({ shadowStateStore: r });
+    i.transformCaches || (i.transformCaches = /* @__PURE__ */ new Map()), i.transformCaches.set(o, e), r.set(s, i), a({ shadowStateStore: r });
   },
   insertShadowArrayElement: (t, n, o) => {
     const e = new Map(f().shadowStateStore), s = [t, ...n].join("."), r = e.get(s);
     if (!r || !r.arrayKeys) return;
-    const i = `id:${u()}`, d = s + "." + i, a = [...r.arrayKeys];
-    a.push(d), e.set(s, { ...r, arrayKeys: a });
-    const p = (S, h) => {
-      const l = [t, ...h].join(".");
-      if (!Array.isArray(S)) if (typeof S == "object" && S !== null) {
+    const i = `id:${m()}`, S = s + "." + i, c = [...r.arrayKeys];
+    c.push(S), e.set(s, { ...r, arrayKeys: c });
+    const p = (d, h) => {
+      const w = [t, ...h].join(".");
+      if (!Array.isArray(d)) if (typeof d == "object" && d !== null) {
         const y = Object.fromEntries(
-          Object.keys(S).map((w) => [w, l + "." + w])
+          Object.keys(d).map((l) => [l, w + "." + l])
         );
-        e.set(l, { fields: y }), Object.entries(S).forEach(([w, M]) => {
-          p(M, [...h, w]);
+        e.set(w, { fields: y }), Object.entries(d).forEach(([l, M]) => {
+          p(M, [...h, l]);
         });
       } else
-        e.set(l, { value: S });
+        e.set(w, { value: d });
     };
-    p(o, [...n, i]), c({ shadowStateStore: e }), f().notifyPathSubscribers(s, {
+    p(o, [...n, i]), a({ shadowStateStore: e }), f().notifyPathSubscribers(s, {
       type: "INSERT",
       path: s,
-      itemKey: d
+      itemKey: S
     });
   },
   removeShadowArrayElement: (t, n) => {
     const o = new Map(f().shadowStateStore), e = [t, ...n].join("."), s = n.slice(0, -1), r = [t, ...s].join("."), i = o.get(r);
     if (i && i.arrayKeys && i.arrayKeys.findIndex(
-      (a) => a === e
+      (c) => c === e
     ) !== -1) {
-      const a = i.arrayKeys.filter(
-        (S) => S !== e
+      const c = i.arrayKeys.filter(
+        (d) => d !== e
       );
       o.set(r, {
         ...i,
-        arrayKeys: a
+        arrayKeys: c
       });
       const p = e + ".";
-      for (const S of Array.from(o.keys()))
-        (S === e || S.startsWith(p)) && o.delete(S);
+      for (const d of Array.from(o.keys()))
+        (d === e || d.startsWith(p)) && o.delete(d);
     }
-    c({ shadowStateStore: o }), f().notifyPathSubscribers(r, {
+    a({ shadowStateStore: o }), f().notifyPathSubscribers(r, {
       type: "REMOVE",
       path: r,
       itemKey: e
@@ -214,20 +214,20 @@ const A = b((c, f) => ({
     });
   },
   updateShadowAtPath: (t, n, o) => {
-    const e = new Map(f().shadowStateStore), s = [t, ...n].join("."), r = (i, d) => {
-      const a = e.get(i);
-      if (m(d) && a && a.fields) {
-        for (const p in d)
-          if (Object.prototype.hasOwnProperty.call(d, p)) {
-            const S = a.fields[p], h = d[p];
-            S && r(S, h);
+    const e = new Map(f().shadowStateStore), s = [t, ...n].join("."), r = (i, S) => {
+      const c = e.get(i);
+      if (b(S) && c && c.fields) {
+        for (const p in S)
+          if (Object.prototype.hasOwnProperty.call(S, p)) {
+            const d = c.fields[p], h = S[p];
+            d && r(d, h);
           }
       } else {
         const p = e.get(i) || {};
-        e.set(i, { ...p, value: d });
+        e.set(i, { ...p, value: S });
       }
     };
-    r(s, o), f().notifyPathSubscribers(s, { type: "UPDATE", newValue: o }), c({ shadowStateStore: e });
+    r(s, o), f().notifyPathSubscribers(s, { type: "UPDATE", newValue: o }), a({ shadowStateStore: e });
   },
   selectedIndicesMap: /* @__PURE__ */ new Map(),
   getSelectedIndex: (t, n) => {
@@ -237,7 +237,7 @@ const A = b((c, f) => ({
     return e ? e.indexOf(o) : -1;
   },
   setSelectedIndex: (t, n) => {
-    c((o) => {
+    a((o) => {
       const e = o.selectedIndicesMap;
       return n === void 0 ? e.delete(t) : (e.has(t) && f().notifyPathSubscribers(e.get(t), {
         type: "THIS_UNSELECTED"
@@ -252,7 +252,7 @@ const A = b((c, f) => ({
     });
   },
   clearSelectedIndex: ({ arrayKey: t }) => {
-    c((n) => {
+    a((n) => {
       const o = n.selectedIndicesMap, e = o.get(t);
       return e && f().notifyPathSubscribers(e, {
         type: "CLEAR_SELECTION"
@@ -265,7 +265,7 @@ const A = b((c, f) => ({
     });
   },
   clearSelectedIndexesForState: (t) => {
-    c((n) => {
+    a((n) => {
       const o = new Map(n.selectedIndicesMap);
       return o.delete(t) ? { selectedIndicesMap: o } : {};
     });
@@ -277,7 +277,7 @@ const A = b((c, f) => ({
   initialStateGlobal: {},
   validationErrors: /* @__PURE__ */ new Map(),
   setStateLog: (t, n) => {
-    c((o) => {
+    a((o) => {
       const e = o.stateLog[t] ?? [], s = n(e);
       return {
         stateLog: {
@@ -287,64 +287,9 @@ const A = b((c, f) => ({
       };
     });
   },
-  addValidationError: (t, n) => {
-    c((o) => {
-      const e = new Map(o.validationErrors), s = e.get(t) || [];
-      return console.log("addValidationError", t, n, s), e.set(t, [...s, n]), { validationErrors: e };
-    });
-  },
-  removeValidationError: (t) => {
-    c((n) => {
-      const o = new Map(n.validationErrors);
-      let e = !1;
-      const s = t.split(".");
-      return Array.from(o.keys()).forEach((r) => {
-        const i = r.split(".");
-        if (i.length >= s.length) {
-          let d = !0;
-          for (let a = 0; a < s.length; a++)
-            if (i[a] !== s[a]) {
-              d = !1;
-              break;
-            }
-          d && (e = !0, o.delete(r));
-        }
-      }), e ? { validationErrors: o } : n;
-    });
-  },
-  getValidationErrors: (t) => {
-    const n = [], o = f().validationErrors, e = t.split("."), s = (r, i) => r === "[*]" ? !0 : Array.isArray(r) ? r.includes(parseInt(i)) : r === i;
-    return Array.from(o.keys()).forEach((r) => {
-      const i = r.split(".");
-      if (i.length >= e.length) {
-        let d = !0;
-        for (let a = 0; a < e.length; a++) {
-          const p = e[a], S = i[a];
-          if (p === "[*]" || Array.isArray(p)) {
-            const h = parseInt(S);
-            if (isNaN(h)) {
-              d = !1;
-              break;
-            }
-            if (!s(p, S)) {
-              d = !1;
-              break;
-            }
-          } else if (p !== S) {
-            d = !1;
-            break;
-          }
-        }
-        if (d) {
-          const a = o.get(r);
-          a && n.push(...a);
-        }
-      }
-    }), n;
-  },
   getInitialOptions: (t) => f().initialStateOptions[t],
   setInitialStateOptions: (t, n) => {
-    c((o) => ({
+    a((o) => ({
       initialStateOptions: {
         ...o.initialStateOptions,
         [t]: n
@@ -352,7 +297,7 @@ const A = b((c, f) => ({
     }));
   },
   updateInitialStateGlobal: (t, n) => {
-    c((o) => ({
+    a((o) => ({
       initialStateGlobal: {
         ...o.initialStateGlobal,
         [t]: n
@@ -360,7 +305,7 @@ const A = b((c, f) => ({
     }));
   },
   syncInfoStore: /* @__PURE__ */ new Map(),
-  setSyncInfo: (t, n) => c((o) => {
+  setSyncInfo: (t, n) => a((o) => {
     const e = new Map(o.syncInfoStore);
     return e.set(t, n), { ...o, syncInfoStore: e };
   }),

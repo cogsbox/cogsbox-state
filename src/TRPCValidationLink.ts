@@ -1,3 +1,4 @@
+//@ts-nocheck
 import { observable } from '@trpc/server/observable';
 import type { AnyRouter } from '@trpc/server';
 import type { TRPCLink } from '@trpc/client';

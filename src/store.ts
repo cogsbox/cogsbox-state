@@ -251,10 +251,6 @@ export type CogsGlobalState = {
   setInitialStateOptions: (key: string, value: OptionsType) => void;
 
   // --- Validation ---
-  validationErrors: Map<string, string[]>;
-  addValidationError: (path: string, message: string) => void;
-  getValidationErrors: (path: string) => string[];
-  removeValidationError: (path: string) => void;
 
   // --- Server Sync and Logging ---
 
@@ -863,95 +859,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
 
-  addValidationError: (path, message) => {
-    set((prev) => {
-      const updatedErrors = new Map(prev.validationErrors);
-      const existingMessages = updatedErrors.get(path) || [];
-      console.log('addValidationError', path, message, existingMessages);
-      // Append the new message instead of replacing
-      updatedErrors.set(path, [...existingMessages, message]);
-      return { validationErrors: updatedErrors };
-    });
-  },
-  removeValidationError: (path) => {
-    set((prev) => {
-      const updatedErrors = new Map(prev.validationErrors);
-
-      let doSomething = false;
-      const pathArray = path.split('.');
-      Array.from(updatedErrors.keys()).forEach((key) => {
-        const keyArray = key.split('.');
-        if (keyArray.length >= pathArray.length) {
-          let match = true;
-          for (let i = 0; i < pathArray.length; i++) {
-            if (keyArray[i] !== pathArray[i]) {
-              match = false;
-              break;
-            }
-          }
-
-          if (match) {
-            doSomething = true;
-            updatedErrors.delete(key);
-          }
-        }
-      });
-
-      return doSomething ? { validationErrors: updatedErrors } : prev;
-    });
-  },
-  getValidationErrors: (path: string) => {
-    const errors: string[] = [];
-    const valErrors = get().validationErrors;
-    const pathArray = path.split('.');
-
-    // Helper to check if an index matches either a wildcard or is in an array of indices
-    const isIndexMatch = (pathSegment: string, keySegment: string) => {
-      if (pathSegment === '[*]') return true;
-      if (Array.isArray(pathSegment)) {
-        return pathSegment.includes(parseInt(keySegment));
-      }
-      return pathSegment === keySegment;
-    };
-
-    Array.from(valErrors.keys()).forEach((key) => {
-      const keyArray = key.split('.');
-      if (keyArray.length >= pathArray.length) {
-        let match = true;
-        for (let i = 0; i < pathArray.length; i++) {
-          const pathSegment = pathArray[i];
-          const keySegment = keyArray[i]!;
-
-          // If current path segment is a number or [*], we need special handling
-          if (pathSegment === '[*]' || Array.isArray(pathSegment)) {
-            // Key segment should be a number if we're using [*] or array indices
-            const keyIndex = parseInt(keySegment);
-            if (isNaN(keyIndex)) {
-              match = false;
-              break;
-            }
-
-            if (!isIndexMatch(pathSegment, keySegment)) {
-              match = false;
-              break;
-            }
-          } else if (pathSegment !== keySegment) {
-            match = false;
-            break;
-          }
-        }
-
-        if (match) {
-          const errorMessages = valErrors.get(key);
-          if (errorMessages) {
-            errors.push(...errorMessages);
-          }
-        }
-      }
-    });
-
-    return errors;
-  },
   getInitialOptions: (key) => {
     return get().initialStateOptions[key];
   },

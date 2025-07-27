@@ -251,7 +251,8 @@ export type ValidationError = {
 };
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-  addValidation: (errors: ValidationError[]) => void;
+  addZodValidation: (errors: ValidationError[]) => void;
+  clearZodValidation: (paths?: string[]) => void;
   applyJsonPatch: (patches: any[]) => void;
   update: UpdateType<T>;
   _path: string[];
@@ -297,7 +298,7 @@ export type StateObject<T> = (T extends any[]
     getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
-    validateZodSchema: () => void;
+
     _initialState: T;
     updateInitialState: (newState: T | null) => {
       fetchId: (field: keyof T) => string | number;
@@ -390,6 +391,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   log?: boolean;
   componentId?: string;
   syncOptions?: SyncOptionsType<TApiParams>;
+
   validation?: ValidationOptionsType;
   serverState?: {
     id?: string | number;
@@ -403,6 +405,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
           key?: string;
         };
   };
+
   sync?: {
     action: (state: T) => Promise<{
       success: boolean;
@@ -699,16 +702,24 @@ type UseCogsStateHook<
 > = <StateKey extends keyof TransformedStateType<T> & string>(
   stateKey: StateKey,
   options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
-      syncOptions: Prettify<
-        SyncOptionsType<
-          StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never
-        >
-      >;
-    }
+    OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> &
+      // This is the conditional part that solves the problem
+      ([keyof TApiParamsMap] extends [never]
+        ? // If TApiParamsMap has NO keys, intersect with an empty object.
+          // This means `syncOptions` is NOT a valid property.
+          {}
+        : // If TApiParamsMap HAS keys, intersect with a type that REQUIRES `syncOptions`.
+          {
+            syncOptions: Prettify<
+              SyncOptionsType<
+                StateKey extends keyof TApiParamsMap
+                  ? TApiParamsMap[StateKey]
+                  : never
+              >
+            >;
+          })
   >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
-
 // Updated CogsApi type
 type CogsApi<
   T extends Record<string, any>,
@@ -774,11 +785,9 @@ export function createCogsStateFromSync<
 }
 const {
   getInitialOptions,
-  getValidationErrors,
+
   setStateLog,
   updateInitialStateGlobal,
-  addValidationError,
-  removeValidationError,
 } = getGlobalStore.getState();
 const saveToLocalStorage = <T,>(
   state: T,
@@ -1558,11 +1567,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const newState = getGlobalStore.getState().getShadowValue(thisKey);
     const rootMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
     const notifiedComponents = new Set<string>();
-    console.log(
-      'rootMeta',
-      thisKey,
-      getGlobalStore.getState().shadowStateStore
-    );
+
     if (!rootMeta?.components) {
       return newState;
     }
@@ -1799,7 +1804,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   const cogsSyncFn = __useSync;
   const syncOpt = latestInitialOptionsRef.current?.syncOptions;
-  console.log('cogsSyncFn', cogsSyncFn, syncOpt);
+
   if (cogsSyncFn) {
     syncApiRef.current = cogsSyncFn(
       updaterFinal as any,
@@ -2076,14 +2081,14 @@ function createProxyHandler<T>(
                 response.errors &&
                 validationKey
               ) {
-                getGlobalStore.getState().removeValidationError(validationKey);
-                response.errors.forEach((error) => {
-                  const errorPath = [validationKey, ...error.path].join('.');
-                  getGlobalStore
-                    .getState()
-                    .addValidationError(errorPath, error.message);
-                });
-                notifyComponents(stateKey);
+                //  getGlobalStore.getState().removeValidationError(validationKey);
+                // response.errors.forEach((error) => {
+                //   const errorPath = [validationKey, ...error.path].join('.');
+                //   getGlobalStore
+                //     .getState()
+                //     .addValidationError(errorPath, error.message);
+                // });
+                //   notifyComponents(stateKey);
               }
 
               if (response?.success) {
@@ -3473,18 +3478,61 @@ function createProxyHandler<T>(
           return componentId;
         }
         if (path.length == 0) {
-          if (prop === 'addValidation') {
-            return (errors: ValidationError[]) => {
+          if (prop === 'addZodValidation') {
+            return (zodErrors: any[]) => {
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
               if (!init?.key) throw new Error('Validation key not found');
-              removeValidationError(init.key);
-              errors.forEach((error) => {
-                const fullErrorPath = [init.key, ...error.path].join('.');
-                addValidationError(fullErrorPath, error.message);
+
+              // For each error, set shadow metadata
+              zodErrors.forEach((error) => {
+                const currentMeta =
+                  getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, error.path) || {};
+
+                getGlobalStore
+                  .getState()
+                  .setShadowMetadata(stateKey, error.path, {
+                    ...currentMeta,
+                    validation: {
+                      status: 'VALIDATION_FAILED',
+                      message: error.message,
+                      validatedValue: undefined,
+                    },
+                  });
+                getGlobalStore.getState().notifyPathSubscribers(error.path, {
+                  type: 'VALIDATION_FAILED',
+                  message: error.message,
+                  validatedValue: undefined,
+                });
               });
-              notifyComponents(stateKey);
+            };
+          }
+          if (prop === 'clearZodValidation') {
+            return (path?: string[]) => {
+              // Clear specific paths
+              if (!path) {
+                throw new Error('clearZodValidation requires a path');
+                return;
+              }
+              const currentMeta =
+                getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
+                {};
+
+              if (currentMeta.validation) {
+                getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+                  ...currentMeta,
+                  validation: undefined,
+                });
+
+                getGlobalStore
+                  .getState()
+                  .notifyPathSubscribers([stateKey, ...path].join('.'), {
+                    type: 'VALIDATION_CLEARED',
+                  });
+              }
             };
           }
           if (prop === 'applyJsonPatch') {
@@ -3524,7 +3572,7 @@ function createProxyHandler<T>(
                         stateKey,
                         currentPath
                       );
-                      console.log('pathMeta', pathMeta);
+
                       if (pathMeta?.pathComponents) {
                         pathMeta.pathComponents.forEach((componentId) => {
                           if (!notifiedComponents.has(componentId)) {
@@ -3575,51 +3623,6 @@ function createProxyHandler<T>(
                   }
                 }
               }
-            };
-          }
-          if (prop === 'validateZodSchema') {
-            return () => {
-              const init = getGlobalStore
-                .getState()
-                .getInitialOptions(stateKey)?.validation;
-
-              // UPDATED: Select v4 schema, with a fallback to v3
-              const zodSchema = init?.zodSchemaV4 || init?.zodSchemaV3;
-
-              if (!zodSchema || !init?.key) {
-                throw new Error(
-                  'Zod schema (v3 or v4) or validation key not found'
-                );
-              }
-
-              removeValidationError(init.key);
-              const thisObject = getGlobalStore
-                .getState()
-                .getShadowValue(stateKey);
-
-              // Use the selected schema for parsing
-              const result = zodSchema.safeParse(thisObject);
-
-              if (!result.success) {
-                // This logic already handles both v3 and v4 error types correctly
-                if ('issues' in result.error) {
-                  // Zod v4 error
-                  result.error.issues.forEach((error) => {
-                    const fullErrorPath = [init.key, ...error.path].join('.');
-                    addValidationError(fullErrorPath, error.message);
-                  });
-                } else {
-                  // Zod v3 error
-                  (result.error as any).errors.forEach((error: any) => {
-                    const fullErrorPath = [init.key, ...error.path].join('.');
-                    addValidationError(fullErrorPath, error.message);
-                  });
-                }
-
-                notifyComponents(stateKey);
-                return false;
-              }
-              return true;
             };
           }
 
@@ -3741,22 +3744,10 @@ function createProxyHandler<T>(
   }
 
   const baseObj = {
-    removeValidation: (obj?: { validationKey?: string }) => {
-      if (obj?.validationKey) {
-        removeValidationError(obj.validationKey);
-      }
-    },
     revertToInitialState: (obj?: { validationKey?: string }) => {
       const init = getGlobalStore
         .getState()
         .getInitialOptions(stateKey)?.validation;
-      if (init?.key) {
-        removeValidationError(init.key);
-      }
-
-      if (obj?.validationKey) {
-        removeValidationError(obj.validationKey);
-      }
 
       const shadowMeta = getGlobalStore
         .getState()
@@ -4393,6 +4384,7 @@ function FormElementWrapper({
                 validation: {
                   status: 'VALID_LIVE',
                   validatedValue: newValue,
+                  message: undefined,
                 },
               });
             }
@@ -4403,6 +4395,7 @@ function FormElementWrapper({
               validation: {
                 status: 'VALID_LIVE',
                 validatedValue: newValue,
+                message: undefined,
               },
             });
           }

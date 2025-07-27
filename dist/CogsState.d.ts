@@ -127,7 +127,8 @@ export type ValidationError = {
 };
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-    addValidation: (errors: ValidationError[]) => void;
+    addZodValidation: (errors: ValidationError[]) => void;
+    clearZodValidation: (paths?: string[]) => void;
     applyJsonPatch: (patches: any[]) => void;
     update: UpdateType<T>;
     _path: string[];
@@ -164,7 +165,6 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     getAllFormRefs: () => Map<string, React.RefObject<any>>;
     _componentId: string | null;
     getComponents: () => ComponentsType;
-    validateZodSchema: () => void;
     _initialState: T;
     updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;
@@ -303,9 +303,9 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __apiParamsMap?: Record<string, any>;
     __useSync?: UseSyncType<State>;
 }) => CogsApi<State>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
+type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & ([keyof TApiParamsMap] extends [never] ? {} : {
     syncOptions: Prettify<SyncOptionsType<StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never>>;
-}>) => StateObject<TransformedStateType<T>[StateKey]>;
+})>) => StateObject<TransformedStateType<T>[StateKey]>;
 type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = {
     useCogsState: UseCogsStateHook<T, TApiParamsMap>;
     setCogsOptions: SetCogsOptionsFunc<T>;

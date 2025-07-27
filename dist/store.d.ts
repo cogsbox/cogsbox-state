@@ -146,10 +146,6 @@ export type CogsGlobalState = {
     updateInitialStateGlobal: (key: string, newState: StateValue) => void;
     getInitialOptions: (key: string) => OptionsType | undefined;
     setInitialStateOptions: (key: string, value: OptionsType) => void;
-    validationErrors: Map<string, string[]>;
-    addValidationError: (path: string, message: string) => void;
-    getValidationErrors: (path: string) => string[];
-    removeValidationError: (path: string) => void;
     serverStateUpdates: Map<string, {
         data: any;
         status: 'loading' | 'success' | 'error';
