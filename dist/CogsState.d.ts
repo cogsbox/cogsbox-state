@@ -302,11 +302,12 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>>
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
     __useSync?: UseSyncType<State>;
-}) => CogsApi<State>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & ([keyof TApiParamsMap] extends [never] ? {} : {
-    syncOptions: Prettify<SyncOptionsType<StateKey extends keyof TApiParamsMap ? TApiParamsMap[StateKey] : never>>;
-})>) => StateObject<TransformedStateType<T>[StateKey]>;
-type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = Record<string, never>> = {
+    __syncSchemas?: Record<string, any>;
+}) => CogsApi<State, never>;
+type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: [TApiParamsMap] extends [never] ? Prettify<OptionsType<TransformedStateType<T>[StateKey]>> : StateKey extends keyof TApiParamsMap ? Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
+    syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
+}> : Prettify<OptionsType<TransformedStateType<T>[StateKey]>>) => StateObject<TransformedStateType<T>[StateKey]>;
+type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never> = {
     useCogsState: UseCogsStateHook<T, TApiParamsMap>;
     setCogsOptions: SetCogsOptionsFunc<T>;
 };

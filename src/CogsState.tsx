@@ -574,6 +574,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
     __useSync?: UseSyncType<State>;
+    __syncSchemas?: Record<string, any>;
   }
 ) => {
   let newInitialState = initialState;
@@ -621,7 +622,12 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
         mergedOptions.validation.key = `${opt.validation.key}.${key}`;
       }
     }
-
+    if (opt?.__syncSchemas?.[key]?.schemas?.validation) {
+      mergedOptions.validation = {
+        zodSchemaV4: opt.__syncSchemas[key].schemas.validation,
+        ...existingOptions.validation,
+      };
+    }
     if (Object.keys(mergedOptions).length > 0) {
       const existingGlobalOptions = getInitialOptions(key);
 
@@ -692,38 +698,33 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     notifyComponents(stateKey as string);
   }
 
-  return { useCogsState, setCogsOptions } as CogsApi<State>;
+  return { useCogsState, setCogsOptions } as CogsApi<State, never>;
 };
-
-// Fix for UseCogsStateHook to support per-key apiParams
 type UseCogsStateHook<
   T extends Record<string, any>,
-  TApiParamsMap extends Record<string, any> = Record<string, never>,
+  TApiParamsMap extends Record<string, any> = never,
 > = <StateKey extends keyof TransformedStateType<T> & string>(
   stateKey: StateKey,
-  options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> &
-      // This is the conditional part that solves the problem
-      ([keyof TApiParamsMap] extends [never]
-        ? // If TApiParamsMap has NO keys, intersect with an empty object.
-          // This means `syncOptions` is NOT a valid property.
-          {}
-        : // If TApiParamsMap HAS keys, intersect with a type that REQUIRES `syncOptions`.
-          {
-            syncOptions: Prettify<
-              SyncOptionsType<
-                StateKey extends keyof TApiParamsMap
-                  ? TApiParamsMap[StateKey]
-                  : never
-              >
-            >;
-          })
-  >
+  options?: [TApiParamsMap] extends [never]
+    ? // When TApiParamsMap is never (no sync)
+      Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
+    : // When TApiParamsMap exists (sync enabled)
+      StateKey extends keyof TApiParamsMap
+      ? Prettify<
+          OptionsType<
+            TransformedStateType<T>[StateKey],
+            TApiParamsMap[StateKey]
+          > & {
+            syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
+          }
+        >
+      : Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
 ) => StateObject<TransformedStateType<T>[StateKey]>;
-// Updated CogsApi type
+
+// Update CogsApi to default to never instead of Record<string, never>
 type CogsApi<
   T extends Record<string, any>,
-  TApiParamsMap extends Record<string, any> = Record<string, never>,
+  TApiParamsMap extends Record<string, any> = never,
 > = {
   useCogsState: UseCogsStateHook<T, TApiParamsMap>;
   setCogsOptions: SetCogsOptionsFunc<T>;
@@ -781,6 +782,7 @@ export function createCogsStateFromSync<
     __syncNotifications: syncSchema.notifications,
     __apiParamsMap: apiParamsMap,
     __useSync: useSync,
+    __syncSchemas: schemas,
   }) as any;
 }
 const {
@@ -3483,7 +3485,6 @@ function createProxyHandler<T>(
               const init = getGlobalStore
                 .getState()
                 .getInitialOptions(stateKey)?.validation;
-              if (!init?.key) throw new Error('Validation key not found');
 
               // For each error, set shadow metadata
               zodErrors.forEach((error) => {

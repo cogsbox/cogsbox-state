@@ -12,7 +12,6 @@ export const useCogsTrpcValidationLink = <
   log?: boolean;
 }) => {
   const addValidationError = getGlobalStore.getState().addValidationError;
-
   const TrpcValidationLink = (): TRPCLink<TRouter> => {
     return (opts) => {
       return ({ next, op }: { next: any; op: Operation }) => {
