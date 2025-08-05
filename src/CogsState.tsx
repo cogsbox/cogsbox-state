@@ -642,7 +642,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     stateKey: StateKey,
     options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
   ) => {
-    console.time('useCogsState');
     const [componentId] = useState(options?.componentId ?? uuidv4());
 
     setOptions({
@@ -656,8 +655,6 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
     const partialState = options?.modifyState
       ? options.modifyState(thiState)
       : thiState;
-
-    console.timeEnd('useCogsState');
 
     const updater = useCogsStateFn<(typeof statePart)[StateKey]>(partialState, {
       stateKey: stateKey as string,
@@ -996,7 +993,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncOptions?: SyncOptionsType<any>;
   } & OptionsType<TStateObject> = {}
 ) {
-  console.time('useCogsStateFn top');
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
   const { sessionId } = useCogsConfig();
   let noStateKey = stateKey ? false : true;
@@ -1312,22 +1308,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, []);
 
   const syncApiRef = useRef<SyncApi | null>(null);
-  console.timeEnd('useCogsStateFn top');
 
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
     updateObj: UpdateOptions
   ) => {
-    console.time('top of effectiveSetState');
     const fullPath = [thisKey, ...path].join('.');
     const store = getGlobalStore.getState();
 
     const shadowMeta = store.getShadowMetadata(thisKey, path);
     const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
-    console.timeEnd('top of effectiveSetState');
 
-    console.time('top of payload');
     const payload = (
       updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
         ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
@@ -1347,9 +1339,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       oldValue: nestedShadowValue,
       newValue: payload,
     } satisfies UpdateTypeDetail;
-    console.timeEnd('top of payload');
 
-    console.time('switch in effectiveSetState');
     // Perform the update
     switch (updateObj.updateType) {
       case 'insert': {
@@ -1379,9 +1369,8 @@ export function useCogsStateFn<TStateObject extends unknown>(
         break;
       }
     }
-    console.timeEnd('switch in effectiveSetState');
+
     const shouldSync = updateObj.sync !== false;
-    console.time('signals');
 
     if (shouldSync && syncApiRef.current && syncApiRef.current.connected) {
       syncApiRef.current.updateState({ operation: newUpdate });
@@ -1552,9 +1541,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
         });
       }
     }
-    console.timeEnd('signals');
 
-    console.time('notify');
     const rootMeta = store.getShadowMetadata(thisKey, []);
     const notifiedComponents = new Set<string>();
 
@@ -1741,8 +1728,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     });
     notifiedComponents.clear();
-    console.timeEnd('notify');
-    console.time('end stuff');
+
     addStateLog(thisKey, newUpdate);
 
     saveToLocalStorage(
@@ -1757,7 +1743,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
         update: newUpdate,
       });
     }
-    console.timeEnd('end stuff');
   };
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
@@ -1765,14 +1750,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }
 
   const updaterFinal = useMemo(() => {
-    console.time('createProxyHandler');
     const handler = createProxyHandler<TStateObject>(
       thisKey,
       effectiveSetState,
       componentIdRef.current,
       sessionId
     );
-    console.timeEnd('createProxyHandler'); // <--- AND THIS
+
     return handler;
   }, [thisKey, sessionId]);
 
@@ -1936,7 +1920,6 @@ function createProxyHandler<T>(
 ): StateObject<T> {
   const proxyCache = new Map<string, any>();
   let stateVersion = 0;
-  console.time('rebuildStateShape Outer');
 
   let recursionTimerName: string | null = null;
 
@@ -1949,7 +1932,6 @@ function createProxyHandler<T>(
     componentId: string;
     meta?: MetaData;
   }): any {
-    console.time('rebuildStateShape Inner');
     const derivationSignature = meta
       ? JSON.stringify(meta.validIds || meta.transforms)
       : '';
@@ -1975,16 +1957,7 @@ function createProxyHandler<T>(
     // This is a placeholder for the proxy.
 
     const handler = {
-      apply(target: any, thisArg: any, args: any[]) {
-        //return getGlobalStore().getShadowValue(stateKey, path);
-      },
-
       get(target: any, prop: string) {
-        if (path.length === 0) {
-          // Create a unique name for this specific timer instance
-          recursionTimerName = `Recursion-${Math.random()}`;
-          console.time(recursionTimerName);
-        }
         if (prop === '_rebuildStateShape') {
           return rebuildStateShape;
         }
@@ -3608,11 +3581,6 @@ function createProxyHandler<T>(
         if (prop === '_stateKey') return stateKey;
         if (prop === '_path') return path;
         if (prop === 'update') {
-          if (recursionTimerName) {
-            console.timeEnd(recursionTimerName);
-            recursionTimerName = null;
-          }
-
           return (payload: UpdateArg<T>) => {
             // Check if we're in a React event handler
             const error = new Error();
@@ -3669,10 +3637,7 @@ function createProxyHandler<T>(
               existing.push(payload);
               updateBatchQueue.set(batchKey, existing);
             } else {
-              // NOT in React event - execute immediately
-              console.time('update inner');
               effectiveSetState(payload as any, path, { updateType: 'update' });
-              console.timeEnd('update inner');
             }
 
             return {
@@ -3740,10 +3705,9 @@ function createProxyHandler<T>(
 
     const proxyInstance = new Proxy(baseFunction, handler);
     proxyCache.set(cacheKey, proxyInstance);
-    console.timeEnd('rebuildStateShape Inner');
+
     return proxyInstance;
   }
-  console.timeEnd('rebuildStateShape Outer');
 
   const baseObj = {
     revertToInitialState: (obj?: { validationKey?: string }) => {
