@@ -8,7 +8,7 @@ import type {
   UpdateTypeDetail,
 } from './CogsState.js';
 
-import type { ReactNode } from 'react';
+import { startTransition, type ReactNode } from 'react';
 
 type StateUpdater<StateValue> =
   | StateValue
@@ -177,6 +177,11 @@ export type CogsEvent =
   | { type: 'ITEMHEIGHT'; itemKey: string; height: number } // For full re-initializations (e.g., when a component is removed)
   | { type: 'RELOAD'; path: string }; // For full re-initializations
 export type CogsGlobalState = {
+  updateQueue: Set<() => void>;
+  isFlushScheduled: boolean;
+
+  flushUpdates: () => void;
+
   // --- Shadow State and Subscription System ---
   registerComponent: (
     stateKey: string,
@@ -190,6 +195,7 @@ export type CogsGlobalState = {
     fullComponentId: string
   ) => void;
   shadowStateStore: Map<string, ShadowMetadata>;
+
   markAsDirty: (
     key: string,
     path: string[],
@@ -265,13 +271,10 @@ export type CogsGlobalState = {
 
   setServerStateUpdate: (key: string, serverState: any) => void;
 
-  stateLog: { [key: string]: UpdateTypeDetail[] };
+  stateLog: Map<string, Map<string, UpdateTypeDetail>>;
   syncInfoStore: Map<string, SyncInfo>;
+  addStateLog: (key: string, update: UpdateTypeDetail) => void;
 
-  setStateLog: (
-    key: string,
-    updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]
-  ) => void;
   setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
   getSyncInfo: (key: string) => SyncInfo | null;
 };
@@ -301,6 +304,23 @@ const isSimpleObject = (value: any): boolean => {
   return Array.isArray(value) || value.constructor === Object;
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  updateQueue: new Set<() => void>(),
+  // A flag to ensure we only schedule the flush once per event-loop tick.
+  isFlushScheduled: false,
+
+  // This function is called by queueMicrotask to execute all queued updates.
+  flushUpdates: () => {
+    const { updateQueue } = get();
+
+    if (updateQueue.size > 0) {
+      startTransition(() => {
+        updateQueue.forEach((updateFn) => updateFn());
+      });
+    }
+
+    // Clear the queue and reset the flag for the next event loop tick.
+    set({ updateQueue: new Set(), isFlushScheduled: false });
+  },
   addPathComponent: (stateKey, dependencyPath, fullComponentId) => {
     set((state) => {
       const newShadowStore = new Map(state.shadowStateStore);
@@ -432,6 +452,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
   shadowStateStore: new Map(),
+  getShadowNode: (key: string) => get().shadowStateStore.get(key),
   pathSubscribers: new Map<string, Set<(newValue: any) => void>>(),
 
   subscribeToPath: (path, callback) => {
@@ -521,39 +542,57 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
-    const shadowMeta = get().shadowStateStore.get(fullKey);
+    // The cache is created here. It's temporary and exists only for this one top-level call.
+    const memo = new Map<string, any>();
 
-    // If no metadata found, return undefined
-    if (!shadowMeta) {
-      return undefined;
-    }
+    // This is the inner recursive function that does the real work.
+    const reconstruct = (keyToBuild: string, ids?: string[]): any => {
+      // --- STEP 1: Check the cache first ---
+      // If we have already built the object for this path *during this call*, return it instantly.
+      if (memo.has(keyToBuild)) {
+        return memo.get(keyToBuild);
+      }
 
-    // For primitive values, return the value
-    if (shadowMeta.value !== undefined) {
-      return shadowMeta.value;
-    }
+      const shadowMeta = get().shadowStateStore.get(keyToBuild);
 
-    // For arrays, reconstruct with possible validArrayIds
-    if (shadowMeta.arrayKeys) {
-      const arrayKeys = validArrayIds ?? shadowMeta.arrayKeys;
-      const items = arrayKeys.map((itemKey) => {
-        // RECURSIVELY call getShadowValue for each item
-        return get().getShadowValue(itemKey);
-      });
-      return items;
-    }
+      if (!shadowMeta) {
+        return undefined;
+      }
 
-    // For objects with fields, reconstruct object
-    if (shadowMeta.fields) {
-      const reconstructedObject: any = {};
-      Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
-        // RECURSIVELY call getShadowValue for each field
-        reconstructedObject[key] = get().getShadowValue(fieldPath as string);
-      });
-      return reconstructedObject;
-    }
+      if (shadowMeta.value !== undefined) {
+        return shadowMeta.value;
+      }
 
-    return undefined;
+      let result: any; // The value we are about to build.
+
+      if (shadowMeta.arrayKeys) {
+        const keys = ids ?? shadowMeta.arrayKeys;
+        // --- IMPORTANT: Set the cache BEFORE the recursive calls ---
+        // This handles circular references gracefully. We put an empty array in the cache now.
+        result = [];
+        memo.set(keyToBuild, result);
+        // Now, fill the array with the recursively constructed items.
+        keys.forEach((itemKey) => {
+          result.push(reconstruct(itemKey)); // Pass the memo cache along implicitly via closure
+        });
+      } else if (shadowMeta.fields) {
+        // --- IMPORTANT: Set the cache BEFORE the recursive calls ---
+        result = {};
+        memo.set(keyToBuild, result);
+        // Now, fill the object with the recursively constructed items.
+        Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
+          result[key] = reconstruct(fieldPath as string);
+        });
+      } else {
+        result = undefined;
+      }
+
+      // Return the final, fully populated result.
+      return result;
+    };
+
+    // Start the process by calling the inner function on the root key.
+    return reconstruct(fullKey, validArrayIds);
   },
   getShadowMetadata: (
     key: string,
@@ -837,25 +876,29 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
   stateTimeline: {},
   cogsStateStore: {},
-  stateLog: {},
+  stateLog: new Map(),
 
   initialStateGlobal: {},
 
   validationErrors: new Map(),
+  addStateLog: (key, update) => {
+    set((state) => {
+      const newLog = new Map(state.stateLog);
+      const stateLogForKey = new Map(newLog.get(key));
+      const uniquePathKey = JSON.stringify(update.path);
 
-  setStateLog: (
-    key: string,
-    updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]
-  ) => {
-    set((prev) => {
-      const currentUpdates = prev.stateLog[key] ?? [];
-      const newUpdates = updater(currentUpdates);
-      return {
-        stateLog: {
-          ...prev.stateLog,
-          [key]: newUpdates,
-        },
-      };
+      const existing = stateLogForKey.get(uniquePathKey);
+      if (existing) {
+        // If an update for this path already exists, just modify it. (Fast)
+        existing.newValue = update.newValue;
+        existing.timeStamp = update.timeStamp;
+      } else {
+        // Otherwise, add the new update. (Fast)
+        stateLogForKey.set(uniquePathKey, { ...update });
+      }
+
+      newLog.set(key, stateLogForKey);
+      return { stateLog: newLog };
     });
   },
 

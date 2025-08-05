@@ -112,6 +112,9 @@ export type CogsEvent = {
     path: string;
 };
 export type CogsGlobalState = {
+    updateQueue: Set<() => void>;
+    isFlushScheduled: boolean;
+    flushUpdates: () => void;
     registerComponent: (stateKey: string, componentId: string, registration: any) => void;
     unregisterComponent: (stateKey: string, componentId: string) => void;
     addPathComponent: (stateKey: string, dependencyPath: string[], fullComponentId: string) => void;
@@ -152,11 +155,9 @@ export type CogsGlobalState = {
         timestamp: number;
     }>;
     setServerStateUpdate: (key: string, serverState: any) => void;
-    stateLog: {
-        [key: string]: UpdateTypeDetail[];
-    };
+    stateLog: Map<string, Map<string, UpdateTypeDetail>>;
     syncInfoStore: Map<string, SyncInfo>;
-    setStateLog: (key: string, updater: (prevUpdates: UpdateTypeDetail[]) => UpdateTypeDetail[]) => void;
+    addStateLog: (key: string, update: UpdateTypeDetail) => void;
     setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
     getSyncInfo: (key: string) => SyncInfo | null;
 };

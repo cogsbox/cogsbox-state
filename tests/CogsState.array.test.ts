@@ -670,8 +670,8 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
       });
     }
     // Remove every other item
-    setter.products.findWith('id', 'alt-1').cut();
-    setter.products.findWith('id', 'alt-3').cut();
+    setter.products.findWith('id', 'alt-1').cutThis();
+    setter.products.findWith('id', 'alt-3').cutThis();
 
     expect(setter.products.get().length).toBe(initialCount + 3);
     expect(setter.products.findWith('id', 'alt-0')).toBeDefined();

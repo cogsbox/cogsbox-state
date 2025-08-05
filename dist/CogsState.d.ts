@@ -156,7 +156,7 @@ export type EndType<T, IsArrayElement = false> = {
     }) => JSX.Element;
     lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? {
-    cut: () => void;
+    cutThis: () => void;
 } : {});
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
@@ -246,8 +246,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
         onSuccess?: (data: any) => void;
         onError?: (error: any) => void;
     };
-    middleware?: ({ updateLog, update, }: {
-        updateLog: UpdateTypeDetail[] | undefined;
+    middleware?: ({ update }: {
         update: UpdateTypeDetail;
     }) => void;
     modifyState?: (state: T) => T;

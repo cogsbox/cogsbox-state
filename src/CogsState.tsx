@@ -284,7 +284,7 @@ export type EndType<T, IsArrayElement = false> = {
     hideMessage?: boolean;
   }) => JSX.Element;
   lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cut: () => void } : {});
+} & (IsArrayElement extends true ? { cutThis: () => void } : {});
 
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
@@ -419,13 +419,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
     onSuccess?: (data: any) => void;
     onError?: (error: any) => void;
   };
-  middleware?: ({
-    updateLog,
-    update,
-  }: {
-    updateLog: UpdateTypeDetail[] | undefined;
-    update: UpdateTypeDetail;
-  }) => void;
+  middleware?: ({ update }: { update: UpdateTypeDetail }) => void;
 
   modifyState?: (state: T) => T;
   localStorage?: {
@@ -788,7 +782,7 @@ export function createCogsStateFromSync<
 const {
   getInitialOptions,
 
-  setStateLog,
+  addStateLog,
   updateInitialStateGlobal,
 } = getGlobalStore.getState();
 const saveToLocalStorage = <T,>(
@@ -1008,8 +1002,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   let noStateKey = stateKey ? false : true;
   const [thisKey] = useState(stateKey ?? uuidv4());
-  const stateLog = getGlobalStore.getState().stateLog[thisKey];
-  const componentUpdatesRef = useRef(new Set<string>());
+
   const componentIdRef = useRef(componentId ?? uuidv4());
   const latestInitialOptionsRef = useRef<OptionsType<TStateObject> | null>(
     null
@@ -1254,6 +1247,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       notifyComponents(thisKey);
     }
   }, [thisKey, ...(dependencies || [])]);
+
   useLayoutEffect(() => {
     if (noStateKey) {
       setAndMergeOptions(thisKey as string, {
@@ -1323,19 +1317,16 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }, []);
 
   const syncApiRef = useRef<SyncApi | null>(null);
+
   const effectiveSetState = (
     newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
     path: string[],
     updateObj: UpdateOptions
   ) => {
     const fullPath = [thisKey, ...path].join('.');
-    if (Array.isArray(path)) {
-      const pathKey = `${thisKey}-${path.join('.')}`;
-      componentUpdatesRef.current.add(pathKey);
-    }
+
     const store = getGlobalStore.getState();
 
-    // FETCH ONCE at the beginning
     const shadowMeta = store.getShadowMetadata(thisKey, path);
     const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
 
@@ -1563,15 +1554,11 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     }
 
-    // Assumes `isDeepEqual` is available in this scope.
-    // Assumes `isDeepEqual` is available in this scope.
-
-    const newState = getGlobalStore.getState().getShadowValue(thisKey);
-    const rootMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+    const rootMeta = store.getShadowMetadata(thisKey, []);
     const notifiedComponents = new Set<string>();
 
     if (!rootMeta?.components) {
-      return newState;
+      return;
     }
 
     // --- PASS 1: Notify specific subscribers based on update type ---
@@ -1753,26 +1740,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       }
     });
     notifiedComponents.clear();
-    setStateLog(thisKey, (prevLogs) => {
-      const logs = [...(prevLogs ?? []), newUpdate];
-      const aggregatedLogs = new Map<string, typeof newUpdate>();
-
-      logs.forEach((log) => {
-        const uniqueKey = `${log.stateKey}:${JSON.stringify(log.path)}`;
-        const existing = aggregatedLogs.get(uniqueKey);
-
-        if (existing) {
-          existing.timeStamp = Math.max(existing.timeStamp, log.timeStamp);
-          existing.newValue = log.newValue;
-          existing.oldValue = existing.oldValue ?? log.oldValue;
-          existing.updateType = log.updateType;
-        } else {
-          aggregatedLogs.set(uniqueKey, { ...(log as any) });
-        }
-      });
-
-      return Array.from(aggregatedLogs.values());
-    });
+    addStateLog(thisKey, newUpdate);
 
     saveToLocalStorage(
       payload,
@@ -1783,12 +1751,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     if (latestInitialOptionsRef.current?.middleware) {
       latestInitialOptionsRef.current!.middleware({
-        updateLog: stateLog,
         update: newUpdate,
       });
     }
-
-    return newState;
   };
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
@@ -1961,48 +1926,33 @@ const notifySelectionComponents = (
     }
   }
 };
+
 function createProxyHandler<T>(
   stateKey: string,
   effectiveSetState: EffectiveSetState<T>,
   componentId: string,
   sessionId?: string
 ): StateObject<T> {
-  type CacheEntry = {
-    proxy: any;
-    stateVersion: number;
-  };
-
-  const shapeCache = new Map<string, CacheEntry>();
+  const proxyCache = new Map<string, any>();
   let stateVersion = 0;
 
-  const invalidateCachePath = (path: string[]) => {
-    const pathKey = path.join('.');
-    for (const [key] of shapeCache) {
-      if (key === pathKey || key.startsWith(pathKey + '.')) {
-        shapeCache.delete(key);
-      }
-    }
-    stateVersion++;
-  };
-
   function rebuildStateShape({
-    currentState,
     path = [],
     meta,
     componentId,
   }: {
-    currentState: T;
     path: string[];
     componentId: string;
     meta?: MetaData;
   }): any {
-    const cacheKey = path.map(String).join('.');
+    const derivationSignature = meta
+      ? JSON.stringify(meta.validIds || meta.transforms)
+      : '';
+    const cacheKey = path.join('.') + ':' + derivationSignature;
     const stateKeyPathKey = [stateKey, ...path].join('.');
-
-    currentState = getGlobalStore
-      .getState()
-      .getShadowValue(stateKeyPathKey, meta?.validIds);
-
+    if (proxyCache.has(cacheKey)) {
+      return proxyCache.get(cacheKey);
+    }
     type CallableStateObject<T> = {
       (): T;
     } & {
@@ -2200,1167 +2150,1154 @@ function createProxyHandler<T>(
             return [];
           };
         }
-        if (Array.isArray(currentState)) {
-          if (prop === 'getSelected') {
-            return () => {
-              const fullKey = stateKey + '.' + path.join('.');
-              registerComponentDependency(stateKey, componentId, [
-                ...path,
-                'getSelected',
-              ]);
 
-              const selectedIndicesMap =
-                getGlobalStore.getState().selectedIndicesMap;
-              if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
+        if (prop === 'getSelected') {
+          return () => {
+            const fullKey = stateKey + '.' + path.join('.');
+            registerComponentDependency(stateKey, componentId, [
+              ...path,
+              'getSelected',
+            ]);
+
+            const selectedIndicesMap =
+              getGlobalStore.getState().selectedIndicesMap;
+            if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
+              return undefined;
+            }
+
+            const selectedItemKey = selectedIndicesMap.get(fullKey)!;
+            if (meta?.validIds) {
+              if (!meta.validIds.includes(selectedItemKey)) {
                 return undefined;
               }
+            }
 
-              const selectedItemKey = selectedIndicesMap.get(fullKey)!;
-              if (meta?.validIds) {
-                if (!meta.validIds.includes(selectedItemKey)) {
-                  return undefined;
-                }
-              }
+            const value = getGlobalStore
+              .getState()
+              .getShadowValue(selectedItemKey);
 
-              const value = getGlobalStore
-                .getState()
-                .getShadowValue(selectedItemKey);
+            if (!value) {
+              return undefined;
+            }
 
-              if (!value) {
-                return undefined;
-              }
-
-              return rebuildStateShape({
-                currentState: value,
-                path: selectedItemKey.split('.').slice(1) as string[],
-                componentId: componentId!,
-              });
-            };
-          }
-          if (prop === 'getSelectedIndex') {
-            return () => {
-              const selectedIndex = getGlobalStore
-                .getState()
-                .getSelectedIndex(
-                  stateKey + '.' + path.join('.'),
-                  meta?.validIds
-                );
-
-              return selectedIndex;
-            };
-          }
-          if (prop === 'clearSelected') {
-            notifySelectionComponents(stateKey, path);
-            return () => {
-              getGlobalStore.getState().clearSelectedIndex({
-                arrayKey: stateKey + '.' + path.join('.'),
-              });
-            };
-          }
-
-          if (prop === 'useVirtualView') {
-            return (
-              options: VirtualViewOptions
-            ): VirtualStateObjectResult<any[]> => {
-              const {
-                itemHeight = 50,
-                overscan = 6,
-                stickToBottom = false,
-                scrollStickTolerance = 75,
-              } = options;
-
-              const containerRef = useRef<HTMLDivElement | null>(null);
-              const [range, setRange] = useState({
-                startIndex: 0,
-                endIndex: 10,
-              });
-              const [rerender, forceUpdate] = useState({});
-              const initialScrollRef = useRef(true);
-
-              // Scroll state management
-              const scrollStateRef = useRef({
-                isUserScrolling: false,
-                lastScrollTop: 0,
-                scrollUpCount: 0,
-                isNearBottom: true,
-              });
-
-              // Measurement cache
-              const measurementCache = useRef(
-                new Map<string, { height: number; offset: number }>()
+            return rebuildStateShape({
+              path: selectedItemKey.split('.').slice(1) as string[],
+              componentId: componentId!,
+            });
+          };
+        }
+        if (prop === 'getSelectedIndex') {
+          return () => {
+            const selectedIndex = getGlobalStore
+              .getState()
+              .getSelectedIndex(
+                stateKey + '.' + path.join('.'),
+                meta?.validIds
               );
 
-              // Separate effect for handling rerender updates
-              useLayoutEffect(() => {
-                if (
-                  !stickToBottom ||
-                  !containerRef.current ||
-                  scrollStateRef.current.isUserScrolling
-                )
-                  return;
+            return selectedIndex;
+          };
+        }
+        if (prop === 'clearSelected') {
+          notifySelectionComponents(stateKey, path);
+          return () => {
+            getGlobalStore.getState().clearSelectedIndex({
+              arrayKey: stateKey + '.' + path.join('.'),
+            });
+          };
+        }
 
-                const container = containerRef.current;
-                container.scrollTo({
-                  top: container.scrollHeight,
-                  behavior: initialScrollRef.current ? 'instant' : 'smooth',
-                });
-              }, [rerender, stickToBottom]);
+        if (prop === 'useVirtualView') {
+          return (
+            options: VirtualViewOptions
+          ): VirtualStateObjectResult<any[]> => {
+            const {
+              itemHeight = 50,
+              overscan = 6,
+              stickToBottom = false,
+              scrollStickTolerance = 75,
+            } = options;
 
-              const arrayKeys =
+            const containerRef = useRef<HTMLDivElement | null>(null);
+            const [range, setRange] = useState({
+              startIndex: 0,
+              endIndex: 10,
+            });
+            const [rerender, forceUpdate] = useState({});
+            const initialScrollRef = useRef(true);
+
+            // Scroll state management
+            const scrollStateRef = useRef({
+              isUserScrolling: false,
+              lastScrollTop: 0,
+              scrollUpCount: 0,
+              isNearBottom: true,
+            });
+
+            // Measurement cache
+            const measurementCache = useRef(
+              new Map<string, { height: number; offset: number }>()
+            );
+
+            // Separate effect for handling rerender updates
+            useLayoutEffect(() => {
+              if (
+                !stickToBottom ||
+                !containerRef.current ||
+                scrollStateRef.current.isUserScrolling
+              )
+                return;
+
+              const container = containerRef.current;
+              container.scrollTo({
+                top: container.scrollHeight,
+                behavior: initialScrollRef.current ? 'instant' : 'smooth',
+              });
+            }, [rerender, stickToBottom]);
+
+            const arrayKeys =
+              getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                ?.arrayKeys || [];
+
+            // Calculate total height and offsets
+            const { totalHeight, itemOffsets } = useMemo(() => {
+              let runningOffset = 0;
+              const offsets = new Map<
+                string,
+                { height: number; offset: number }
+              >();
+              const allItemKeys =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path)
                   ?.arrayKeys || [];
 
-              // Calculate total height and offsets
-              const { totalHeight, itemOffsets } = useMemo(() => {
-                let runningOffset = 0;
-                const offsets = new Map<
-                  string,
-                  { height: number; offset: number }
-                >();
-                const allItemKeys =
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                    ?.arrayKeys || [];
+              allItemKeys.forEach((itemKey) => {
+                const itemPath = itemKey.split('.').slice(1);
+                const measuredHeight =
+                  getGlobalStore
+                    .getState()
+                    .getShadowMetadata(stateKey, itemPath)?.virtualizer
+                    ?.itemHeight || itemHeight;
 
-                allItemKeys.forEach((itemKey) => {
-                  const itemPath = itemKey.split('.').slice(1);
-                  const measuredHeight =
-                    getGlobalStore
-                      .getState()
-                      .getShadowMetadata(stateKey, itemPath)?.virtualizer
-                      ?.itemHeight || itemHeight;
-
-                  offsets.set(itemKey, {
-                    height: measuredHeight,
-                    offset: runningOffset,
-                  });
-
-                  runningOffset += measuredHeight;
+                offsets.set(itemKey, {
+                  height: measuredHeight,
+                  offset: runningOffset,
                 });
 
-                measurementCache.current = offsets;
-                return { totalHeight: runningOffset, itemOffsets: offsets };
-              }, [arrayKeys.length, itemHeight]);
+                runningOffset += measuredHeight;
+              });
 
-              // Improved initial positioning effect
-              useLayoutEffect(() => {
-                if (
-                  stickToBottom &&
-                  arrayKeys.length > 0 &&
-                  containerRef.current &&
-                  !scrollStateRef.current.isUserScrolling &&
-                  initialScrollRef.current
-                ) {
-                  const container = containerRef.current;
+              measurementCache.current = offsets;
+              return { totalHeight: runningOffset, itemOffsets: offsets };
+            }, [arrayKeys.length, itemHeight]);
 
-                  // Wait for container to have dimensions
-                  const waitForContainer = () => {
-                    if (container.clientHeight > 0) {
-                      const visibleCount = Math.ceil(
-                        container.clientHeight / itemHeight
-                      );
-                      const endIndex = arrayKeys.length - 1;
-                      const startIndex = Math.max(
-                        0,
-                        endIndex - visibleCount - overscan
-                      );
+            // Improved initial positioning effect
+            useLayoutEffect(() => {
+              if (
+                stickToBottom &&
+                arrayKeys.length > 0 &&
+                containerRef.current &&
+                !scrollStateRef.current.isUserScrolling &&
+                initialScrollRef.current
+              ) {
+                const container = containerRef.current;
 
-                      setRange({ startIndex, endIndex });
+                // Wait for container to have dimensions
+                const waitForContainer = () => {
+                  if (container.clientHeight > 0) {
+                    const visibleCount = Math.ceil(
+                      container.clientHeight / itemHeight
+                    );
+                    const endIndex = arrayKeys.length - 1;
+                    const startIndex = Math.max(
+                      0,
+                      endIndex - visibleCount - overscan
+                    );
 
-                      // Ensure scroll after range is set
-                      requestAnimationFrame(() => {
-                        scrollToBottom('instant');
-                        initialScrollRef.current = false; // Mark initial scroll as done
-                      });
-                    } else {
-                      // Container not ready, try again
-                      requestAnimationFrame(waitForContainer);
-                    }
-                  };
+                    setRange({ startIndex, endIndex });
 
-                  waitForContainer();
+                    // Ensure scroll after range is set
+                    requestAnimationFrame(() => {
+                      scrollToBottom('instant');
+                      initialScrollRef.current = false; // Mark initial scroll as done
+                    });
+                  } else {
+                    // Container not ready, try again
+                    requestAnimationFrame(waitForContainer);
+                  }
+                };
+
+                waitForContainer();
+              }
+            }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
+
+            // Combined scroll handler
+            const handleScroll = useCallback(() => {
+              const container = containerRef.current;
+              if (!container) return;
+
+              const currentScrollTop = container.scrollTop;
+              const { scrollHeight, clientHeight } = container;
+              const scrollState = scrollStateRef.current;
+
+              // Check if user is near bottom
+              const distanceFromBottom =
+                scrollHeight - (currentScrollTop + clientHeight);
+              const wasNearBottom = scrollState.isNearBottom;
+              scrollState.isNearBottom =
+                distanceFromBottom <= scrollStickTolerance;
+
+              // Detect scroll direction
+              if (currentScrollTop < scrollState.lastScrollTop) {
+                // User scrolled up
+                scrollState.scrollUpCount++;
+
+                if (scrollState.scrollUpCount > 3 && wasNearBottom) {
+                  // User has deliberately scrolled away from bottom
+                  scrollState.isUserScrolling = true;
+                  console.log('User scrolled away from bottom');
                 }
-              }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
+              } else if (scrollState.isNearBottom) {
+                // Reset if we're back near the bottom
+                scrollState.isUserScrolling = false;
+                scrollState.scrollUpCount = 0;
+              }
 
-              // Combined scroll handler
-              const handleScroll = useCallback(() => {
+              scrollState.lastScrollTop = currentScrollTop;
+
+              // Update visible range
+              let newStartIndex = 0;
+              for (let i = 0; i < arrayKeys.length; i++) {
+                const itemKey = arrayKeys[i];
+                const item = measurementCache.current.get(itemKey!);
+                if (item && item.offset + item.height > currentScrollTop) {
+                  newStartIndex = i;
+                  break;
+                }
+              }
+
+              // Only update if range actually changed
+              if (newStartIndex !== range.startIndex) {
+                const visibleCount = Math.ceil(clientHeight / itemHeight);
+                setRange({
+                  startIndex: Math.max(0, newStartIndex - overscan),
+                  endIndex: Math.min(
+                    arrayKeys.length - 1,
+                    newStartIndex + visibleCount + overscan
+                  ),
+                });
+              }
+            }, [
+              arrayKeys.length,
+              range.startIndex,
+              itemHeight,
+              overscan,
+              scrollStickTolerance,
+            ]);
+
+            // Set up scroll listener
+            useEffect(() => {
+              const container = containerRef.current;
+              if (!container || !stickToBottom) return;
+
+              container.addEventListener('scroll', handleScroll, {
+                passive: true,
+              });
+
+              return () => {
+                container.removeEventListener('scroll', handleScroll);
+              };
+            }, [handleScroll, stickToBottom]);
+            const scrollToBottom = useCallback(
+              (behavior: ScrollBehavior = 'smooth') => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                const currentScrollTop = container.scrollTop;
-                const { scrollHeight, clientHeight } = container;
-                const scrollState = scrollStateRef.current;
+                // Reset scroll state
+                scrollStateRef.current.isUserScrolling = false;
+                scrollStateRef.current.isNearBottom = true;
+                scrollStateRef.current.scrollUpCount = 0;
 
-                // Check if user is near bottom
-                const distanceFromBottom =
-                  scrollHeight - (currentScrollTop + clientHeight);
-                const wasNearBottom = scrollState.isNearBottom;
-                scrollState.isNearBottom =
-                  distanceFromBottom <= scrollStickTolerance;
+                const performScroll = () => {
+                  // Multiple attempts to ensure we hit the bottom
+                  const attemptScroll = (attempts = 0) => {
+                    if (attempts > 5) return; // Prevent infinite loops
 
-                // Detect scroll direction
-                if (currentScrollTop < scrollState.lastScrollTop) {
-                  // User scrolled up
-                  scrollState.scrollUpCount++;
+                    const currentHeight = container.scrollHeight;
+                    const currentScroll = container.scrollTop;
+                    const clientHeight = container.clientHeight;
 
-                  if (scrollState.scrollUpCount > 3 && wasNearBottom) {
-                    // User has deliberately scrolled away from bottom
-                    scrollState.isUserScrolling = true;
-                    console.log('User scrolled away from bottom');
-                  }
-                } else if (scrollState.isNearBottom) {
-                  // Reset if we're back near the bottom
-                  scrollState.isUserScrolling = false;
-                  scrollState.scrollUpCount = 0;
-                }
+                    // Check if we're already at the bottom
+                    if (currentScroll + clientHeight >= currentHeight - 1) {
+                      return;
+                    }
 
-                scrollState.lastScrollTop = currentScrollTop;
+                    container.scrollTo({
+                      top: currentHeight,
+                      behavior: behavior,
+                    });
 
-                // Update visible range
-                let newStartIndex = 0;
-                for (let i = 0; i < arrayKeys.length; i++) {
-                  const itemKey = arrayKeys[i];
-                  const item = measurementCache.current.get(itemKey!);
-                  if (item && item.offset + item.height > currentScrollTop) {
-                    newStartIndex = i;
-                    break;
-                  }
-                }
+                    // In slow environments, check again after a short delay
+                    setTimeout(() => {
+                      const newHeight = container.scrollHeight;
+                      const newScroll = container.scrollTop;
 
-                // Only update if range actually changed
-                if (newStartIndex !== range.startIndex) {
-                  const visibleCount = Math.ceil(clientHeight / itemHeight);
-                  setRange({
-                    startIndex: Math.max(0, newStartIndex - overscan),
-                    endIndex: Math.min(
-                      arrayKeys.length - 1,
-                      newStartIndex + visibleCount + overscan
-                    ),
-                  });
-                }
-              }, [
-                arrayKeys.length,
-                range.startIndex,
-                itemHeight,
-                overscan,
-                scrollStickTolerance,
-              ]);
-
-              // Set up scroll listener
-              useEffect(() => {
-                const container = containerRef.current;
-                if (!container || !stickToBottom) return;
-
-                container.addEventListener('scroll', handleScroll, {
-                  passive: true,
-                });
-
-                return () => {
-                  container.removeEventListener('scroll', handleScroll);
-                };
-              }, [handleScroll, stickToBottom]);
-              const scrollToBottom = useCallback(
-                (behavior: ScrollBehavior = 'smooth') => {
-                  const container = containerRef.current;
-                  if (!container) return;
-
-                  // Reset scroll state
-                  scrollStateRef.current.isUserScrolling = false;
-                  scrollStateRef.current.isNearBottom = true;
-                  scrollStateRef.current.scrollUpCount = 0;
-
-                  const performScroll = () => {
-                    // Multiple attempts to ensure we hit the bottom
-                    const attemptScroll = (attempts = 0) => {
-                      if (attempts > 5) return; // Prevent infinite loops
-
-                      const currentHeight = container.scrollHeight;
-                      const currentScroll = container.scrollTop;
-                      const clientHeight = container.clientHeight;
-
-                      // Check if we're already at the bottom
-                      if (currentScroll + clientHeight >= currentHeight - 1) {
-                        return;
+                      // If height changed or we're not at bottom, try again
+                      if (
+                        newHeight !== currentHeight ||
+                        newScroll + clientHeight < newHeight - 1
+                      ) {
+                        attemptScroll(attempts + 1);
                       }
-
-                      container.scrollTo({
-                        top: currentHeight,
-                        behavior: behavior,
-                      });
-
-                      // In slow environments, check again after a short delay
-                      setTimeout(() => {
-                        const newHeight = container.scrollHeight;
-                        const newScroll = container.scrollTop;
-
-                        // If height changed or we're not at bottom, try again
-                        if (
-                          newHeight !== currentHeight ||
-                          newScroll + clientHeight < newHeight - 1
-                        ) {
-                          attemptScroll(attempts + 1);
-                        }
-                      }, 50);
-                    };
-
-                    attemptScroll();
+                    }, 50);
                   };
 
-                  // Use requestIdleCallback for better performance in slow environments
-                  if ('requestIdleCallback' in window) {
-                    requestIdleCallback(performScroll, { timeout: 100 });
-                  } else {
-                    // Fallback to rAF chain
-                    requestAnimationFrame(() => {
-                      requestAnimationFrame(performScroll);
-                    });
-                  }
-                },
-                []
-              );
-              // Auto-scroll to bottom when new content arrives
-              // Consolidated auto-scroll effect with debouncing
-              useEffect(() => {
-                if (!stickToBottom || !containerRef.current) return;
-
-                const container = containerRef.current;
-                const scrollState = scrollStateRef.current;
-
-                // Debounced scroll function
-                let scrollTimeout: NodeJS.Timeout;
-                const debouncedScrollToBottom = () => {
-                  clearTimeout(scrollTimeout);
-                  scrollTimeout = setTimeout(() => {
-                    if (
-                      !scrollState.isUserScrolling &&
-                      scrollState.isNearBottom
-                    ) {
-                      scrollToBottom(
-                        initialScrollRef.current ? 'instant' : 'smooth'
-                      );
-                    }
-                  }, 100);
+                  attemptScroll();
                 };
 
-                // Single MutationObserver for all DOM changes
-                const observer = new MutationObserver(() => {
-                  if (!scrollState.isUserScrolling) {
-                    debouncedScrollToBottom();
-                  }
-                });
-
-                observer.observe(container, {
-                  childList: true,
-                  subtree: true,
-                  attributes: true,
-                  attributeFilter: ['style', 'class'], // More specific than just 'height'
-                });
-
-                // Handle image loads with event delegation
-                const handleImageLoad = (e: Event) => {
-                  if (
-                    e.target instanceof HTMLImageElement &&
-                    !scrollState.isUserScrolling
-                  ) {
-                    debouncedScrollToBottom();
-                  }
-                };
-
-                container.addEventListener('load', handleImageLoad, true);
-
-                // Initial scroll with proper timing
-                if (initialScrollRef.current) {
-                  // For initial load, wait for next tick to ensure DOM is ready
-                  setTimeout(() => {
-                    scrollToBottom('instant');
-                  }, 0);
+                // Use requestIdleCallback for better performance in slow environments
+                if ('requestIdleCallback' in window) {
+                  requestIdleCallback(performScroll, { timeout: 100 });
                 } else {
+                  // Fallback to rAF chain
+                  requestAnimationFrame(() => {
+                    requestAnimationFrame(performScroll);
+                  });
+                }
+              },
+              []
+            );
+            // Auto-scroll to bottom when new content arrives
+            // Consolidated auto-scroll effect with debouncing
+            useEffect(() => {
+              if (!stickToBottom || !containerRef.current) return;
+
+              const container = containerRef.current;
+              const scrollState = scrollStateRef.current;
+
+              // Debounced scroll function
+              let scrollTimeout: NodeJS.Timeout;
+              const debouncedScrollToBottom = () => {
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                  if (
+                    !scrollState.isUserScrolling &&
+                    scrollState.isNearBottom
+                  ) {
+                    scrollToBottom(
+                      initialScrollRef.current ? 'instant' : 'smooth'
+                    );
+                  }
+                }, 100);
+              };
+
+              // Single MutationObserver for all DOM changes
+              const observer = new MutationObserver(() => {
+                if (!scrollState.isUserScrolling) {
                   debouncedScrollToBottom();
                 }
+              });
 
-                return () => {
-                  clearTimeout(scrollTimeout);
-                  observer.disconnect();
-                  container.removeEventListener('load', handleImageLoad, true);
-                };
-              }, [stickToBottom, arrayKeys.length, scrollToBottom]);
-              // Create virtual state
-              const virtualState = useMemo(() => {
-                const store = getGlobalStore.getState();
-                const sourceArray = store.getShadowValue(
-                  [stateKey, ...path].join('.')
-                ) as any[];
-                const currentKeys =
-                  store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
+              observer.observe(container, {
+                childList: true,
+                subtree: true,
+                attributes: true,
+                attributeFilter: ['style', 'class'], // More specific than just 'height'
+              });
 
-                const slicedArray = sourceArray.slice(
-                  range.startIndex,
-                  range.endIndex + 1
-                );
-                const slicedIds = currentKeys.slice(
-                  range.startIndex,
-                  range.endIndex + 1
-                );
-
-                return rebuildStateShape({
-                  currentState: slicedArray as any,
-                  path,
-                  componentId: componentId!,
-                  meta: { ...meta, validIds: slicedIds },
-                });
-              }, [range.startIndex, range.endIndex, arrayKeys.length]);
-
-              return {
-                virtualState,
-                virtualizerProps: {
-                  outer: {
-                    ref: containerRef,
-                    style: {
-                      overflowY: 'auto',
-                      height: '100%',
-                      position: 'relative',
-                    },
-                  },
-                  inner: {
-                    style: {
-                      height: `${totalHeight}px`,
-                      position: 'relative',
-                    },
-                  },
-                  list: {
-                    style: {
-                      transform: `translateY(${
-                        measurementCache.current.get(
-                          arrayKeys[range.startIndex]!
-                        )?.offset || 0
-                      }px)`,
-                    },
-                  },
-                },
-                scrollToBottom,
-                scrollToIndex: (
-                  index: number,
-                  behavior: ScrollBehavior = 'smooth'
-                ) => {
-                  if (containerRef.current && arrayKeys[index]) {
-                    const offset =
-                      measurementCache.current.get(arrayKeys[index]!)?.offset ||
-                      0;
-                    containerRef.current.scrollTo({ top: offset, behavior });
-                  }
-                },
+              // Handle image loads with event delegation
+              const handleImageLoad = (e: Event) => {
+                if (
+                  e.target instanceof HTMLImageElement &&
+                  !scrollState.isUserScrolling
+                ) {
+                  debouncedScrollToBottom();
+                }
               };
-            };
-          }
-          if (prop === 'stateMap') {
-            return (
-              callbackfn: (
-                setter: any,
-                index: number,
 
-                arraySetter: any
-              ) => void
-            ) => {
-              const [arrayKeys, setArrayKeys] = useState<any>(
-                meta?.validIds ??
-                  getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                    ?.arrayKeys
-              );
-              // getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-              //   console.log(
-              //     "stateKeyPathKeyccccccccccccccccc",
-              //     stateKeyPathKey
-              //   );
-              //   setArrayKeys(
-              //     getGlobalStore.getState().getShadowMetadata(stateKey, path)
-              //   );
-              // });
+              container.addEventListener('load', handleImageLoad, true);
 
-              const shadowValue = getGlobalStore
-                .getState()
-                .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
-              if (!arrayKeys) {
-                throw new Error('No array keys found for mapping');
+              // Initial scroll with proper timing
+              if (initialScrollRef.current) {
+                // For initial load, wait for next tick to ensure DOM is ready
+                setTimeout(() => {
+                  scrollToBottom('instant');
+                }, 0);
+              } else {
+                debouncedScrollToBottom();
               }
-              const arraySetter = rebuildStateShape({
-                currentState: shadowValue as any,
+
+              return () => {
+                clearTimeout(scrollTimeout);
+                observer.disconnect();
+                container.removeEventListener('load', handleImageLoad, true);
+              };
+            }, [stickToBottom, arrayKeys.length, scrollToBottom]);
+            // Create virtual state
+            const virtualState = useMemo(() => {
+              const store = getGlobalStore.getState();
+              const sourceArray = store.getShadowValue(
+                [stateKey, ...path].join('.')
+              ) as any[];
+              const currentKeys =
+                store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
+
+              const slicedArray = sourceArray.slice(
+                range.startIndex,
+                range.endIndex + 1
+              );
+              const slicedIds = currentKeys.slice(
+                range.startIndex,
+                range.endIndex + 1
+              );
+
+              return rebuildStateShape({
                 path,
+                componentId: componentId!,
+                meta: { ...meta, validIds: slicedIds },
+              });
+            }, [range.startIndex, range.endIndex, arrayKeys.length]);
+
+            return {
+              virtualState,
+              virtualizerProps: {
+                outer: {
+                  ref: containerRef,
+                  style: {
+                    overflowY: 'auto',
+                    height: '100%',
+                    position: 'relative',
+                  },
+                },
+                inner: {
+                  style: {
+                    height: `${totalHeight}px`,
+                    position: 'relative',
+                  },
+                },
+                list: {
+                  style: {
+                    transform: `translateY(${
+                      measurementCache.current.get(arrayKeys[range.startIndex]!)
+                        ?.offset || 0
+                    }px)`,
+                  },
+                },
+              },
+              scrollToBottom,
+              scrollToIndex: (
+                index: number,
+                behavior: ScrollBehavior = 'smooth'
+              ) => {
+                if (containerRef.current && arrayKeys[index]) {
+                  const offset =
+                    measurementCache.current.get(arrayKeys[index]!)?.offset ||
+                    0;
+                  containerRef.current.scrollTo({ top: offset, behavior });
+                }
+              },
+            };
+          };
+        }
+        if (prop === 'stateMap') {
+          return (
+            callbackfn: (
+              setter: any,
+              index: number,
+
+              arraySetter: any
+            ) => void
+          ) => {
+            const [arrayKeys, setArrayKeys] = useState<any>(
+              meta?.validIds ??
+                getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                  ?.arrayKeys
+            );
+            // getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
+            //   console.log(
+            //     "stateKeyPathKeyccccccccccccccccc",
+            //     stateKeyPathKey
+            //   );
+            //   setArrayKeys(
+            //     getGlobalStore.getState().getShadowMetadata(stateKey, path)
+            //   );
+            // });
+
+            const shadowValue = getGlobalStore
+              .getState()
+              .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
+            if (!arrayKeys) {
+              throw new Error('No array keys found for mapping');
+            }
+            const arraySetter = rebuildStateShape({
+              path,
+              componentId: componentId!,
+              meta,
+            });
+
+            return shadowValue.map((item, index) => {
+              const itemPath = arrayKeys[index]?.split('.').slice(1);
+              const itemSetter = rebuildStateShape({
+                path: itemPath as any,
                 componentId: componentId!,
                 meta,
               });
 
-              return shadowValue.map((item, index) => {
-                const itemPath = arrayKeys[index]?.split('.').slice(1);
-                const itemSetter = rebuildStateShape({
-                  currentState: item,
-                  path: itemPath as any,
-                  componentId: componentId!,
-                  meta,
-                });
+              return callbackfn(
+                itemSetter,
+                index,
 
-                return callbackfn(
-                  itemSetter,
-                  index,
-
-                  arraySetter
-                );
-              });
-            };
-          }
-
-          if (prop === '$stateMap') {
-            return (callbackfn: any) =>
-              createElement(SignalMapRenderer, {
-                proxy: {
-                  _stateKey: stateKey,
-                  _path: path,
-                  _mapFn: callbackfn,
-                  _meta: meta,
-                },
-                rebuildStateShape,
-              });
-          } // In createProxyHandler -> handler -> get -> if (Array.isArray(currentState))
-
-          if (prop === 'stateFind') {
-            return (
-              callbackfn: (value: any, index: number) => boolean
-            ): StateObject<any> | undefined => {
-              // 1. Use the correct set of keys: filtered/sorted from meta, or all keys from the store.
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-
-              if (!arrayKeys) {
-                return undefined;
-              }
-
-              // 2. Iterate through the keys, get the value for each, and run the callback.
-              for (let i = 0; i < arrayKeys.length; i++) {
-                const itemKey = arrayKeys[i];
-                if (!itemKey) continue; // Safety check
-
-                const itemValue = getGlobalStore
-                  .getState()
-                  .getShadowValue(itemKey);
-
-                // 3. If the callback returns true, we've found our item.
-                if (callbackfn(itemValue, i)) {
-                  // Get the item's path relative to the stateKey (e.g., ['messages', '42'] -> ['42'])
-                  const itemPath = itemKey.split('.').slice(1);
-
-                  // 4. Rebuild a new, fully functional StateObject for just that item and return it.
-                  return rebuildStateShape({
-                    currentState: itemValue,
-                    path: itemPath,
-                    componentId: componentId,
-                    meta, // Pass along meta for potential further chaining
-                  });
-                }
-              }
-
-              // 5. If the loop finishes without finding anything, return undefined.
-              return undefined;
-            };
-          }
-          if (prop === 'stateFilter') {
-            return (callbackfn: (value: any, index: number) => boolean) => {
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-
-              if (!arrayKeys) {
-                throw new Error('No array keys found for filtering.');
-              }
-
-              const newValidIds: string[] = [];
-              const filteredArray = currentState.filter(
-                (val: any, index: number) => {
-                  const didPass = callbackfn(val, index);
-                  if (didPass) {
-                    newValidIds.push(arrayKeys[index]!);
-                    return true;
-                  }
-                  return false;
-                }
+                arraySetter
               );
+            });
+          };
+        }
 
-              return rebuildStateShape({
-                currentState: filteredArray as any,
-                path,
-                componentId: componentId!,
-                meta: {
-                  validIds: newValidIds,
-                  transforms: [
-                    ...(meta?.transforms || []),
-                    {
-                      type: 'filter',
-                      fn: callbackfn,
-                    },
-                  ],
-                },
-              });
-            };
-          }
-          if (prop === 'stateSort') {
-            return (compareFn: (a: any, b: any) => number) => {
-              const arrayKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
-              if (!arrayKeys) {
-                throw new Error('No array keys found for sorting');
+        if (prop === '$stateMap') {
+          return (callbackfn: any) =>
+            createElement(SignalMapRenderer, {
+              proxy: {
+                _stateKey: stateKey,
+                _path: path,
+                _mapFn: callbackfn,
+                _meta: meta,
+              },
+              rebuildStateShape,
+            });
+        } // In createProxyHandler -> handler -> get -> if (Array.isArray(currentState))
+
+        if (prop === 'stateFind') {
+          return (
+            callbackfn: (value: any, index: number) => boolean
+          ): StateObject<any> | undefined => {
+            // 1. Use the correct set of keys: filtered/sorted from meta, or all keys from the store.
+            const arrayKeys =
+              meta?.validIds ??
+              getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                ?.arrayKeys;
+
+            if (!arrayKeys) {
+              return undefined;
+            }
+
+            // 2. Iterate through the keys, get the value for each, and run the callback.
+            for (let i = 0; i < arrayKeys.length; i++) {
+              const itemKey = arrayKeys[i];
+              if (!itemKey) continue; // Safety check
+
+              const itemValue = getGlobalStore
+                .getState()
+                .getShadowValue(itemKey);
+
+              // 3. If the callback returns true, we've found our item.
+              if (callbackfn(itemValue, i)) {
+                // Get the item's path relative to the stateKey (e.g., ['messages', '42'] -> ['42'])
+                const itemPath = itemKey.split('.').slice(1);
+
+                // 4. Rebuild a new, fully functional StateObject for just that item and return it.
+                return rebuildStateShape({
+                  path: itemPath,
+                  componentId: componentId,
+                  meta, // Pass along meta for potential further chaining
+                });
               }
-              const itemsWithIds = currentState.map((item, index) => ({
-                item,
-                key: arrayKeys[index],
-              }));
+            }
 
-              itemsWithIds
-                .sort((a, b) => compareFn(a.item, b.item))
-                .filter(Boolean);
+            // 5. If the loop finishes without finding anything, return undefined.
+            return undefined;
+          };
+        }
+        if (prop === 'stateFilter') {
+          return (callbackfn: (value: any, index: number) => boolean) => {
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+            if (!Array.isArray(currentState)) return [];
+            const arrayKeys =
+              meta?.validIds ??
+              getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                ?.arrayKeys;
 
-              return rebuildStateShape({
-                currentState: itemsWithIds.map((i) => i.item) as any,
-                path,
-                componentId: componentId!,
-                meta: {
-                  validIds: itemsWithIds.map((i) => i.key) as string[],
-                  transforms: [
-                    ...(meta?.transforms || []),
-                    { type: 'sort', fn: compareFn },
-                  ],
-                },
-              });
+            if (!arrayKeys) {
+              throw new Error('No array keys found for filtering.');
+            }
+
+            const newValidIds: string[] = [];
+            const filteredArray = currentState.filter(
+              (val: any, index: number) => {
+                const didPass = callbackfn(val, index);
+                if (didPass) {
+                  newValidIds.push(arrayKeys[index]!);
+                  return true;
+                }
+                return false;
+              }
+            );
+
+            return rebuildStateShape({
+              path,
+              componentId: componentId!,
+              meta: {
+                validIds: newValidIds,
+                transforms: [
+                  ...(meta?.transforms || []),
+                  {
+                    type: 'filter',
+                    fn: callbackfn,
+                  },
+                ],
+              },
+            });
+          };
+        }
+        if (prop === 'stateSort') {
+          return (compareFn: (a: any, b: any) => number) => {
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+            if (!Array.isArray(currentState)) return []; // Guard clause
+            const arrayKeys =
+              meta?.validIds ??
+              getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                ?.arrayKeys;
+            if (!arrayKeys) {
+              throw new Error('No array keys found for sorting');
+            }
+            const itemsWithIds = currentState.map((item, index) => ({
+              item,
+              key: arrayKeys[index],
+            }));
+
+            itemsWithIds
+              .sort((a, b) => compareFn(a.item, b.item))
+              .filter(Boolean);
+
+            return rebuildStateShape({
+              path,
+              componentId: componentId!,
+              meta: {
+                validIds: itemsWithIds.map((i) => i.key) as string[],
+                transforms: [
+                  ...(meta?.transforms || []),
+                  { type: 'sort', fn: compareFn },
+                ],
+              },
+            });
+          };
+        }
+        // In createProxyHandler, inside the get trap where you have other array methods:
+        if (prop === 'stream') {
+          return function <U = InferArrayElement<T>, R = U>(
+            options: StreamOptions<U, R> = {}
+          ): StreamHandle<U> {
+            const {
+              bufferSize = 100,
+              flushInterval = 100,
+              bufferStrategy = 'accumulate',
+              store,
+              onFlush,
+            } = options;
+
+            let buffer: U[] = [];
+            let isPaused = false;
+            let flushTimer: NodeJS.Timeout | null = null;
+
+            const addToBuffer = (item: U) => {
+              if (isPaused) return;
+
+              if (bufferStrategy === 'sliding' && buffer.length >= bufferSize) {
+                buffer.shift();
+              } else if (
+                bufferStrategy === 'dropping' &&
+                buffer.length >= bufferSize
+              ) {
+                return;
+              }
+
+              buffer.push(item);
+
+              if (buffer.length >= bufferSize) {
+                flushBuffer();
+              }
             };
-          }
-          // In createProxyHandler, inside the get trap where you have other array methods:
-          if (prop === 'stream') {
-            return function <U = InferArrayElement<T>, R = U>(
-              options: StreamOptions<U, R> = {}
-            ): StreamHandle<U> {
-              const {
-                bufferSize = 100,
-                flushInterval = 100,
-                bufferStrategy = 'accumulate',
-                store,
-                onFlush,
-              } = options;
 
-              let buffer: U[] = [];
-              let isPaused = false;
-              let flushTimer: NodeJS.Timeout | null = null;
+            const flushBuffer = () => {
+              if (buffer.length === 0) return;
 
-              const addToBuffer = (item: U) => {
-                if (isPaused) return;
+              const toFlush = [...buffer];
+              buffer = [];
 
-                if (
-                  bufferStrategy === 'sliding' &&
-                  buffer.length >= bufferSize
-                ) {
-                  buffer.shift();
-                } else if (
-                  bufferStrategy === 'dropping' &&
-                  buffer.length >= bufferSize
-                ) {
-                  return;
-                }
-
-                buffer.push(item);
-
-                if (buffer.length >= bufferSize) {
-                  flushBuffer();
-                }
-              };
-
-              const flushBuffer = () => {
-                if (buffer.length === 0) return;
-
-                const toFlush = [...buffer];
-                buffer = [];
-
-                if (store) {
-                  const result = store(toFlush);
-                  if (result !== undefined) {
-                    const items = Array.isArray(result) ? result : [result];
-                    items.forEach((item) => {
-                      effectiveSetState(item as any, path, {
-                        updateType: 'insert',
-                      });
-                    });
-                  }
-                } else {
-                  toFlush.forEach((item) => {
+              if (store) {
+                const result = store(toFlush);
+                if (result !== undefined) {
+                  const items = Array.isArray(result) ? result : [result];
+                  items.forEach((item) => {
                     effectiveSetState(item as any, path, {
                       updateType: 'insert',
                     });
                   });
                 }
-
-                onFlush?.(toFlush);
-              };
-
-              if (flushInterval > 0) {
-                flushTimer = setInterval(flushBuffer, flushInterval);
+              } else {
+                toFlush.forEach((item) => {
+                  effectiveSetState(item as any, path, {
+                    updateType: 'insert',
+                  });
+                });
               }
 
-              const streamId = uuidv4();
-              const currentMeta =
-                getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                {};
-              const streams = currentMeta.streams || new Map();
-              streams.set(streamId, { buffer, flushTimer });
-
-              getGlobalStore.getState().setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                streams,
-              });
-
-              return {
-                write: (data: U) => addToBuffer(data),
-                writeMany: (data: U[]) => data.forEach(addToBuffer),
-                flush: () => flushBuffer(),
-                pause: () => {
-                  isPaused = true;
-                },
-                resume: () => {
-                  isPaused = false;
-                  if (buffer.length > 0) flushBuffer();
-                },
-                close: () => {
-                  flushBuffer();
-                  if (flushTimer) clearInterval(flushTimer);
-
-                  const meta = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, path);
-                  if (meta?.streams) {
-                    meta.streams.delete(streamId);
-                  }
-                },
-              };
+              onFlush?.(toFlush);
             };
-          }
 
-          if (prop === 'stateList') {
-            return (
-              callbackfn: (
-                setter: any,
-                index: number,
-                arraySetter: any
-              ) => ReactNode
-            ) => {
-              const StateListWrapper = () => {
-                const componentIdsRef = useRef<Map<string, string>>(new Map());
+            if (flushInterval > 0) {
+              flushTimer = setInterval(flushBuffer, flushInterval);
+            }
 
-                const cacheKey =
-                  meta?.transforms && meta.transforms.length > 0
-                    ? `${componentId}-${hashTransforms(meta.transforms)}`
-                    : `${componentId}-base`;
+            const streamId = uuidv4();
+            const currentMeta =
+              getGlobalStore.getState().getShadowMetadata(stateKey, path) || {};
+            const streams = currentMeta.streams || new Map();
+            streams.set(streamId, { buffer, flushTimer });
 
-                const [updateTrigger, forceUpdate] = useState({});
+            getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+              ...currentMeta,
+              streams,
+            });
 
-                const { validIds, arrayValues } = useMemo(() => {
-                  const cached = getGlobalStore
+            return {
+              write: (data: U) => addToBuffer(data),
+              writeMany: (data: U[]) => data.forEach(addToBuffer),
+              flush: () => flushBuffer(),
+              pause: () => {
+                isPaused = true;
+              },
+              resume: () => {
+                isPaused = false;
+                if (buffer.length > 0) flushBuffer();
+              },
+              close: () => {
+                flushBuffer();
+                if (flushTimer) clearInterval(flushTimer);
+
+                const meta = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path);
+                if (meta?.streams) {
+                  meta.streams.delete(streamId);
+                }
+              },
+            };
+          };
+        }
+
+        if (prop === 'stateList') {
+          return (
+            callbackfn: (
+              setter: any,
+              index: number,
+              arraySetter: any
+            ) => ReactNode
+          ) => {
+            const StateListWrapper = () => {
+              const componentIdsRef = useRef<Map<string, string>>(new Map());
+
+              const cacheKey =
+                meta?.transforms && meta.transforms.length > 0
+                  ? `${componentId}-${hashTransforms(meta.transforms)}`
+                  : `${componentId}-base`;
+
+              const [updateTrigger, forceUpdate] = useState({});
+
+              const { validIds, arrayValues } = useMemo(() => {
+                const cached = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path)
+                  ?.transformCaches?.get(cacheKey);
+
+                let freshValidIds: string[];
+
+                if (cached && cached.validIds) {
+                  freshValidIds = cached.validIds;
+                } else {
+                  freshValidIds = applyTransforms(
+                    stateKey,
+                    path,
+                    meta?.transforms
+                  );
+
+                  getGlobalStore
                     .getState()
-                    .getShadowMetadata(stateKey, path)
-                    ?.transformCaches?.get(cacheKey);
+                    .setTransformCache(stateKey, path, cacheKey, {
+                      validIds: freshValidIds,
+                      computedAt: Date.now(),
+                      transforms: meta?.transforms || [],
+                    });
+                }
 
-                  let freshValidIds: string[];
+                const freshValues = getGlobalStore
+                  .getState()
+                  .getShadowValue(stateKeyPathKey, freshValidIds);
 
-                  if (cached && cached.validIds) {
-                    freshValidIds = cached.validIds;
-                  } else {
-                    freshValidIds = applyTransforms(
-                      stateKey,
-                      path,
-                      meta?.transforms
-                    );
+                return {
+                  validIds: freshValidIds,
+                  arrayValues: freshValues || [],
+                };
+              }, [cacheKey, updateTrigger]);
 
-                    getGlobalStore
+              useEffect(() => {
+                const unsubscribe = getGlobalStore
+                  .getState()
+                  .subscribeToPath(stateKeyPathKey, (e) => {
+                    // A data change has occurred for the source array.
+
+                    if (e.type === 'GET_SELECTED') {
+                      return;
+                    }
+                    const shadowMeta = getGlobalStore
                       .getState()
-                      .setTransformCache(stateKey, path, cacheKey, {
-                        validIds: freshValidIds,
-                        computedAt: Date.now(),
-                        transforms: meta?.transforms || [],
-                      });
-                  }
+                      .getShadowMetadata(stateKey, path);
 
-                  const freshValues = getGlobalStore
-                    .getState()
-                    .getShadowValue(stateKeyPathKey, freshValidIds);
-
-                  return {
-                    validIds: freshValidIds,
-                    arrayValues: freshValues || [],
-                  };
-                }, [cacheKey, updateTrigger]);
-
-                useEffect(() => {
-                  const unsubscribe = getGlobalStore
-                    .getState()
-                    .subscribeToPath(stateKeyPathKey, (e) => {
-                      // A data change has occurred for the source array.
-
-                      if (e.type === 'GET_SELECTED') {
-                        return;
-                      }
-                      const shadowMeta = getGlobalStore
-                        .getState()
-                        .getShadowMetadata(stateKey, path);
-
-                      const caches = shadowMeta?.transformCaches;
-                      if (caches) {
-                        // Iterate over ALL keys in the cache map.
-                        for (const key of caches.keys()) {
-                          // If the key belongs to this component instance, delete it.
-                          // This purges caches for 'sort by name', 'sort by score', etc.
-                          if (key.startsWith(componentId)) {
-                            caches.delete(key);
-                          }
+                    const caches = shadowMeta?.transformCaches;
+                    if (caches) {
+                      // Iterate over ALL keys in the cache map.
+                      for (const key of caches.keys()) {
+                        // If the key belongs to this component instance, delete it.
+                        // This purges caches for 'sort by name', 'sort by score', etc.
+                        if (key.startsWith(componentId)) {
+                          caches.delete(key);
                         }
                       }
+                    }
 
-                      if (
-                        e.type === 'INSERT' ||
-                        e.type === 'REMOVE' ||
-                        e.type === 'CLEAR_SELECTION'
-                      ) {
-                        forceUpdate({});
-                      }
+                    if (
+                      e.type === 'INSERT' ||
+                      e.type === 'REMOVE' ||
+                      e.type === 'CLEAR_SELECTION'
+                    ) {
+                      forceUpdate({});
+                    }
+                  });
+
+                return () => {
+                  unsubscribe();
+                };
+
+                // This effect's logic now depends on the componentId to perform the purge.
+              }, [componentId, stateKeyPathKey]);
+
+              if (!Array.isArray(arrayValues)) {
+                return null;
+              }
+
+              const arraySetter = rebuildStateShape({
+                path,
+                componentId: componentId!,
+                meta: {
+                  ...meta,
+                  validIds: validIds,
+                },
+              });
+
+              return (
+                <>
+                  {arrayValues.map((item, localIndex) => {
+                    const itemKey = validIds[localIndex];
+
+                    if (!itemKey) {
+                      return null;
+                    }
+
+                    let itemComponentId = componentIdsRef.current.get(itemKey);
+                    if (!itemComponentId) {
+                      itemComponentId = uuidv4();
+                      componentIdsRef.current.set(itemKey, itemComponentId);
+                    }
+
+                    const itemPath = itemKey.split('.').slice(1);
+
+                    return createElement(MemoizedCogsItemWrapper, {
+                      key: itemKey,
+                      stateKey,
+                      itemComponentId,
+                      itemPath,
+                      localIndex,
+                      arraySetter,
+                      rebuildStateShape,
+                      renderFn: callbackfn,
                     });
-
-                  return () => {
-                    unsubscribe();
-                  };
-
-                  // This effect's logic now depends on the componentId to perform the purge.
-                }, [componentId, stateKeyPathKey]);
-
-                if (!Array.isArray(arrayValues)) {
-                  return null;
-                }
-
-                const arraySetter = rebuildStateShape({
-                  currentState: arrayValues as any,
-                  path,
-                  componentId: componentId!,
-                  meta: {
-                    ...meta,
-                    validIds: validIds,
-                  },
-                });
-
-                return (
-                  <>
-                    {arrayValues.map((item, localIndex) => {
-                      const itemKey = validIds[localIndex];
-
-                      if (!itemKey) {
-                        return null;
-                      }
-
-                      let itemComponentId =
-                        componentIdsRef.current.get(itemKey);
-                      if (!itemComponentId) {
-                        itemComponentId = uuidv4();
-                        componentIdsRef.current.set(itemKey, itemComponentId);
-                      }
-
-                      const itemPath = itemKey.split('.').slice(1);
-
-                      return createElement(MemoizedCogsItemWrapper, {
-                        key: itemKey,
-                        stateKey,
-                        itemComponentId,
-                        itemPath,
-                        localIndex,
-                        arraySetter,
-                        rebuildStateShape,
-                        renderFn: callbackfn,
-                      });
-                    })}
-                  </>
-                );
-              };
-
-              return <StateListWrapper />;
-            };
-          }
-          if (prop === 'stateFlattenOn') {
-            return (fieldName: string) => {
-              const arrayToMap = currentState as any[];
-              shapeCache.clear();
-              stateVersion++;
-              const flattenedResults = arrayToMap.flatMap(
-                (val: any) => val[fieldName] ?? []
+                  })}
+                </>
               );
-              return rebuildStateShape({
-                currentState: flattenedResults as any,
-                path: [...path, '[*]', fieldName],
-                componentId: componentId!,
-                meta,
-              });
             };
-          }
-          if (prop === 'index') {
-            return (index: number) => {
-              const arrayKeys = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, path)
-                ?.arrayKeys?.filter(
-                  (key) =>
-                    !meta?.validIds ||
-                    (meta?.validIds && meta?.validIds?.includes(key))
-                );
-              const itemId = arrayKeys?.[index];
-              if (!itemId) return undefined;
-              const value = getGlobalStore
-                .getState()
-                .getShadowValue(itemId, meta?.validIds);
-              const state = rebuildStateShape({
-                currentState: value,
-                path: itemId.split('.').slice(1) as string[],
-                componentId: componentId!,
-                meta,
-              });
-              return state;
-            };
-          }
-          if (prop === 'last') {
-            return () => {
-              const currentArray = getGlobalStore
-                .getState()
-                .getShadowValue(stateKey, path) as any[];
-              if (currentArray.length === 0) return undefined;
-              const lastIndex = currentArray.length - 1;
-              const lastValue = currentArray[lastIndex];
-              const newPath = [...path, lastIndex.toString()];
-              return rebuildStateShape({
-                currentState: lastValue,
-                path: newPath,
-                componentId: componentId!,
-                meta,
-              });
-            };
-          }
-          if (prop === 'insert') {
-            return (
-              payload: InsertParams<InferArrayElement<T>>,
-              index?: number
-            ) => {
-              effectiveSetState(payload as any, path, { updateType: 'insert' });
-              return rebuildStateShape({
-                currentState: getGlobalStore
-                  .getState()
-                  .getShadowValue(stateKey, path),
-                path,
-                componentId: componentId!,
-                meta,
-              });
-            };
-          }
-          if (prop === 'uniqueInsert') {
-            return (
-              payload: UpdateArg<T>,
-              fields?: (keyof InferArrayElement<T>)[],
-              onMatch?: (existingItem: any) => any
-            ) => {
-              const currentArray = getGlobalStore
-                .getState()
-                .getShadowValue(stateKey, path) as any[];
-              const newValue = isFunction<T>(payload)
-                ? payload(currentArray as any)
-                : (payload as any);
 
-              let matchedItem: any = null;
-              const isUnique = !currentArray.some((item) => {
-                const isMatch = fields
-                  ? fields.every((field) =>
-                      isDeepEqual(item[field], newValue[field])
-                    )
-                  : isDeepEqual(item, newValue);
-                if (isMatch) matchedItem = item;
-                return isMatch;
-              });
+            return <StateListWrapper />;
+          };
+        }
+        if (prop === 'stateFlattenOn') {
+          return (fieldName: string) => {
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+            if (!Array.isArray(currentState)) return []; // Guard clause
+            const arrayToMap = currentState as any[];
 
-              if (isUnique) {
-                invalidateCachePath(path);
-                effectiveSetState(newValue, path, { updateType: 'insert' });
-              } else if (onMatch && matchedItem) {
-                const updatedItem = onMatch(matchedItem);
-                const updatedArray = currentArray.map((item) =>
-                  isDeepEqual(item, matchedItem) ? updatedItem : item
-                );
-                invalidateCachePath(path);
-                effectiveSetState(updatedArray as any, path, {
-                  updateType: 'update',
-                });
-              }
-            };
-          }
+            stateVersion++;
+            const flattenedResults = arrayToMap.flatMap(
+              (val: any) => val[fieldName] ?? []
+            );
+            return rebuildStateShape({
+              path: [...path, '[*]', fieldName],
+              componentId: componentId!,
+              meta,
+            });
+          };
+        }
+        if (prop === 'index') {
+          return (index: number) => {
+            const arrayKeys = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, path)
+              ?.arrayKeys?.filter(
+                (key) =>
+                  !meta?.validIds ||
+                  (meta?.validIds && meta?.validIds?.includes(key))
+              );
+            const itemId = arrayKeys?.[index];
+            if (!itemId) return undefined;
+            const value = getGlobalStore
+              .getState()
+              .getShadowValue(itemId, meta?.validIds);
+            const state = rebuildStateShape({
+              path: itemId.split('.').slice(1) as string[],
+              componentId: componentId!,
+              meta,
+            });
+            return state;
+          };
+        }
+        if (prop === 'last') {
+          return () => {
+            const currentArray = getGlobalStore
+              .getState()
+              .getShadowValue(stateKey, path) as any[];
+            if (currentArray.length === 0) return undefined;
+            const lastIndex = currentArray.length - 1;
+            const lastValue = currentArray[lastIndex];
+            const newPath = [...path, lastIndex.toString()];
+            return rebuildStateShape({
+              path: newPath,
+              componentId: componentId!,
+              meta,
+            });
+          };
+        }
+        if (prop === 'insert') {
+          return (
+            payload: InsertParams<InferArrayElement<T>>,
+            index?: number
+          ) => {
+            effectiveSetState(payload as any, path, { updateType: 'insert' });
+            return rebuildStateShape({
+              path,
+              componentId: componentId!,
+              meta,
+            });
+          };
+        }
+        if (prop === 'uniqueInsert') {
+          return (
+            payload: UpdateArg<T>,
+            fields?: (keyof InferArrayElement<T>)[],
+            onMatch?: (existingItem: any) => any
+          ) => {
+            const currentArray = getGlobalStore
+              .getState()
+              .getShadowValue(stateKey, path) as any[];
+            const newValue = isFunction<T>(payload)
+              ? payload(currentArray as any)
+              : (payload as any);
 
-          if (prop === 'cut') {
-            return (index?: number, options?: { waitForSync?: boolean }) => {
-              const validKeys =
-                meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys;
+            let matchedItem: any = null;
+            const isUnique = !currentArray.some((item) => {
+              const isMatch = fields
+                ? fields.every((field) =>
+                    isDeepEqual(item[field], newValue[field])
+                  )
+                : isDeepEqual(item, newValue);
+              if (isMatch) matchedItem = item;
+              return isMatch;
+            });
 
-              if (!validKeys || validKeys.length === 0) return;
-
-              const indexToCut =
-                index == -1
-                  ? validKeys.length - 1
-                  : index !== undefined
-                    ? index
-                    : validKeys.length - 1;
-
-              const fullIdToCut = validKeys[indexToCut];
-              if (!fullIdToCut) return; // Index out of bounds
-
-              const pathForCut = fullIdToCut.split('.').slice(1);
-              effectiveSetState(currentState, pathForCut, {
-                updateType: 'cut',
-              });
-            };
-          }
-          if (prop === 'cutSelected') {
-            return () => {
-              const validKeys = applyTransforms(
-                stateKey,
-                path,
-                meta?.transforms
+            if (isUnique) {
+              effectiveSetState(newValue, path, { updateType: 'insert' });
+            } else if (onMatch && matchedItem) {
+              const updatedItem = onMatch(matchedItem);
+              const updatedArray = currentArray.map((item) =>
+                isDeepEqual(item, matchedItem) ? updatedItem : item
               );
 
-              if (!validKeys || validKeys.length === 0) return;
-
-              const indexKeyToCut = getGlobalStore
-                .getState()
-                .selectedIndicesMap.get(stateKeyPathKey);
-
-              let indexToCut = validKeys.findIndex(
-                (key) => key === indexKeyToCut
-              );
-
-              const pathForCut = validKeys[
-                indexToCut == -1 ? validKeys.length - 1 : indexToCut
-              ]
-                ?.split('.')
-                .slice(1);
-              getGlobalStore
-                .getState()
-                .clearSelectedIndex({ arrayKey: stateKeyPathKey });
-              const parentPath = pathForCut?.slice(0, -1)!;
-              notifySelectionComponents(stateKey, parentPath);
-              effectiveSetState(currentState, pathForCut!, {
-                updateType: 'cut',
+              effectiveSetState(updatedArray as any, path, {
+                updateType: 'update',
               });
-            };
-          }
-          if (prop === 'cutByValue') {
-            return (value: string | number | boolean) => {
-              // Step 1: Get the list of all unique keys for the current view.
-              const arrayMeta = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, path);
-              const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
-
-              if (!relevantKeys) return;
-
-              let keyToCut: string | null = null;
-
-              // Step 2: Iterate through the KEYS, get the value for each, and find the match.
-              for (const key of relevantKeys) {
-                const itemValue = getGlobalStore.getState().getShadowValue(key);
-                if (itemValue === value) {
-                  keyToCut = key;
-                  break; // We found the key, no need to search further.
-                }
-              }
-
-              // Step 3: If we found a matching key, use it to perform the cut.
-              if (keyToCut) {
-                const itemPath = keyToCut.split('.').slice(1);
-                effectiveSetState(null as any, itemPath, { updateType: 'cut' });
-              }
-            };
-          }
-
-          if (prop === 'toggleByValue') {
-            return (value: string | number | boolean) => {
-              // Step 1: Get the list of all unique keys for the current view.
-              const arrayMeta = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, path);
-              const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
-
-              if (!relevantKeys) return;
-
-              let keyToCut: string | null = null;
-
-              // Step 2: Iterate through the KEYS to find the one matching the value. This is the robust way.
-              for (const key of relevantKeys) {
-                const itemValue = getGlobalStore.getState().getShadowValue(key);
-                console.log('itemValue sdasdasdasd', itemValue);
-                if (itemValue === value) {
-                  keyToCut = key;
-                  break; // Found it!
-                }
-              }
-              console.log('itemValue keyToCut', keyToCut);
-              // Step 3: Act based on whether the key was found.
-              if (keyToCut) {
-                // Item exists, so we CUT it using its *actual* key.
-                const itemPath = keyToCut.split('.').slice(1);
-                console.log('itemValue keyToCut', keyToCut);
-                effectiveSetState(value as any, itemPath, {
-                  updateType: 'cut',
-                });
-              } else {
-                // Item does not exist, so we INSERT it.
-                effectiveSetState(value as any, path, { updateType: 'insert' });
-              }
-            };
-          }
-          if (prop === 'findWith') {
-            return (
-              searchKey: keyof InferArrayElement<T>,
-              searchValue: any
-            ) => {
-              const arrayKeys = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, path)?.arrayKeys;
-
-              if (!arrayKeys) {
-                throw new Error('No array keys found for sorting');
-              }
-
-              let value = null;
-              let foundPath: string[] = [];
-
-              for (const fullPath of arrayKeys) {
-                let shadowValue = getGlobalStore
-                  .getState()
-                  .getShadowValue(fullPath, meta?.validIds);
-                if (shadowValue && shadowValue[searchKey] === searchValue) {
-                  value = shadowValue;
-                  foundPath = fullPath.split('.').slice(1);
-                  break;
-                }
-              }
-
-              return rebuildStateShape({
-                currentState: value as any,
-                path: foundPath,
-                componentId: componentId!,
-                meta,
-              });
-            };
-          }
+            }
+          };
         }
 
         if (prop === 'cut') {
+          return (index?: number, options?: { waitForSync?: boolean }) => {
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+            const validKeys =
+              meta?.validIds ??
+              getGlobalStore.getState().getShadowMetadata(stateKey, path)
+                ?.arrayKeys;
+
+            if (!validKeys || validKeys.length === 0) return;
+
+            const indexToCut =
+              index == -1
+                ? validKeys.length - 1
+                : index !== undefined
+                  ? index
+                  : validKeys.length - 1;
+
+            const fullIdToCut = validKeys[indexToCut];
+            if (!fullIdToCut) return; // Index out of bounds
+
+            const pathForCut = fullIdToCut.split('.').slice(1);
+            effectiveSetState(currentState, pathForCut, {
+              updateType: 'cut',
+            });
+          };
+        }
+        if (prop === 'cutSelected') {
+          return () => {
+            const validKeys = applyTransforms(stateKey, path, meta?.transforms);
+            const currentState = getGlobalStore
+              .getState()
+              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+            if (!validKeys || validKeys.length === 0) return;
+
+            const indexKeyToCut = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(stateKeyPathKey);
+
+            let indexToCut = validKeys.findIndex(
+              (key) => key === indexKeyToCut
+            );
+
+            const pathForCut = validKeys[
+              indexToCut == -1 ? validKeys.length - 1 : indexToCut
+            ]
+              ?.split('.')
+              .slice(1);
+            getGlobalStore
+              .getState()
+              .clearSelectedIndex({ arrayKey: stateKeyPathKey });
+            const parentPath = pathForCut?.slice(0, -1)!;
+            notifySelectionComponents(stateKey, parentPath);
+            effectiveSetState(currentState, pathForCut!, {
+              updateType: 'cut',
+            });
+          };
+        }
+        if (prop === 'cutByValue') {
+          return (value: string | number | boolean) => {
+            // Step 1: Get the list of all unique keys for the current view.
+            const arrayMeta = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, path);
+            const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
+
+            if (!relevantKeys) return;
+
+            let keyToCut: string | null = null;
+
+            // Step 2: Iterate through the KEYS, get the value for each, and find the match.
+            for (const key of relevantKeys) {
+              const itemValue = getGlobalStore.getState().getShadowValue(key);
+              if (itemValue === value) {
+                keyToCut = key;
+                break; // We found the key, no need to search further.
+              }
+            }
+
+            // Step 3: If we found a matching key, use it to perform the cut.
+            if (keyToCut) {
+              const itemPath = keyToCut.split('.').slice(1);
+              effectiveSetState(null as any, itemPath, { updateType: 'cut' });
+            }
+          };
+        }
+
+        if (prop === 'toggleByValue') {
+          return (value: string | number | boolean) => {
+            // Step 1: Get the list of all unique keys for the current view.
+            const arrayMeta = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, path);
+            const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
+
+            if (!relevantKeys) return;
+
+            let keyToCut: string | null = null;
+
+            // Step 2: Iterate through the KEYS to find the one matching the value. This is the robust way.
+            for (const key of relevantKeys) {
+              const itemValue = getGlobalStore.getState().getShadowValue(key);
+              console.log('itemValue sdasdasdasd', itemValue);
+              if (itemValue === value) {
+                keyToCut = key;
+                break; // Found it!
+              }
+            }
+            console.log('itemValue keyToCut', keyToCut);
+            // Step 3: Act based on whether the key was found.
+            if (keyToCut) {
+              // Item exists, so we CUT it using its *actual* key.
+              const itemPath = keyToCut.split('.').slice(1);
+              console.log('itemValue keyToCut', keyToCut);
+              effectiveSetState(value as any, itemPath, {
+                updateType: 'cut',
+              });
+            } else {
+              // Item does not exist, so we INSERT it.
+              effectiveSetState(value as any, path, { updateType: 'insert' });
+            }
+          };
+        }
+        if (prop === 'findWith') {
+          return (searchKey: keyof InferArrayElement<T>, searchValue: any) => {
+            const arrayKeys = getGlobalStore
+              .getState()
+              .getShadowMetadata(stateKey, path)?.arrayKeys;
+
+            if (!arrayKeys) {
+              throw new Error('No array keys found for sorting');
+            }
+
+            let value = null;
+            let foundPath: string[] = [];
+
+            for (const fullPath of arrayKeys) {
+              let shadowValue = getGlobalStore
+                .getState()
+                .getShadowValue(fullPath, meta?.validIds);
+              if (shadowValue && shadowValue[searchKey] === searchValue) {
+                value = shadowValue;
+                foundPath = fullPath.split('.').slice(1);
+                break;
+              }
+            }
+
+            return rebuildStateShape({
+              path: foundPath,
+              componentId: componentId!,
+              meta,
+            });
+          };
+        }
+
+        if (prop === 'cutThis') {
           let shadowValue = getGlobalStore
             .getState()
             .getShadowValue(path.join('.'));
@@ -3698,7 +3635,9 @@ function createProxyHandler<T>(
           const currentValueAtPath = getGlobalStore
             .getState()
             .getShadowValue([stateKey, ...path].join('.'));
-
+          const currentState = getGlobalStore
+            .getState()
+            .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
           console.log('currentValueAtPath', currentValueAtPath);
           if (typeof currentState != 'boolean') {
             throw new Error('toggle() can only be used on boolean values');
@@ -3728,7 +3667,6 @@ function createProxyHandler<T>(
           .getState()
           .getShadowValue(stateKey, nextPath);
         return rebuildStateShape({
-          currentState: nextValue,
           path: nextPath,
           componentId: componentId!,
           meta,
@@ -3737,10 +3675,7 @@ function createProxyHandler<T>(
     };
 
     const proxyInstance = new Proxy(baseFunction, handler);
-    shapeCache.set(cacheKey, {
-      proxy: proxyInstance,
-      stateVersion: stateVersion,
-    });
+    proxyCache.set(cacheKey, proxyInstance);
     return proxyInstance;
   }
 
@@ -3766,11 +3701,10 @@ function createProxyHandler<T>(
         getGlobalStore.getState().initialStateGlobal[stateKey];
 
       getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
-      shapeCache.clear();
+
       stateVersion++;
       getGlobalStore.getState().initializeShadowState(stateKey, initialState);
-      const newProxy = rebuildStateShape({
-        currentState: initialState,
+      rebuildStateShape({
         path: [],
         componentId: componentId!,
       });
@@ -3797,7 +3731,6 @@ function createProxyHandler<T>(
       return initialState;
     },
     updateInitialState: (newState: T) => {
-      shapeCache.clear();
       stateVersion++;
 
       const newUpdaterState = createProxyHandler(
@@ -3839,7 +3772,6 @@ function createProxyHandler<T>(
     },
   };
   const returnShape = rebuildStateShape({
-    currentState: getGlobalStore.getState().getShadowValue(stateKey, []),
     componentId,
     path: [],
   });
