@@ -341,7 +341,7 @@ type LocalStorageData<T> = {
     stateSource?: 'default' | 'server' | 'localStorage';
 };
 export declare const notifyComponent: (stateKey: string, componentId: string) => void;
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, syncOptions, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
