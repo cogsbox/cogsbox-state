@@ -109,7 +109,6 @@ export type ShadowMetadata = {
   lastUpdated?: number;
   value?: any;
   classSignals?: Array<{
-    // <-- ADD THIS BLOCK
     id: string;
     effect: string;
     lastClasses: string;
@@ -174,8 +173,8 @@ export type CogsEvent =
   | { type: 'INSERT'; path: string; itemKey: string; index: number }
   | { type: 'REMOVE'; path: string; itemKey: string }
   | { type: 'UPDATE'; path: string; newValue: any }
-  | { type: 'ITEMHEIGHT'; itemKey: string; height: number } // For full re-initializations (e.g., when a component is removed)
-  | { type: 'RELOAD'; path: string }; // For full re-initializations
+  | { type: 'ITEMHEIGHT'; itemKey: string; height: number }
+  | { type: 'RELOAD'; path: string };
 export type CogsGlobalState = {
   updateQueue: Set<() => void>;
   isFlushScheduled: boolean;
@@ -256,10 +255,6 @@ export type CogsGlobalState = {
   getInitialOptions: (key: string) => OptionsType | undefined;
   setInitialStateOptions: (key: string, value: OptionsType) => void;
 
-  // --- Validation ---
-
-  // --- Server Sync and Logging ---
-
   serverStateUpdates: Map<
     string,
     {
@@ -279,29 +274,17 @@ export type CogsGlobalState = {
   getSyncInfo: (key: string) => SyncInfo | null;
 };
 const isSimpleObject = (value: any): boolean => {
+  // Most common cases first
   if (value === null || typeof value !== 'object') return false;
 
-  // Handle special cases that should be treated as primitives
-  if (
-    value instanceof Uint8Array ||
-    value instanceof Int8Array ||
-    value instanceof Uint16Array ||
-    value instanceof Int16Array ||
-    value instanceof Uint32Array ||
-    value instanceof Int32Array ||
-    value instanceof Float32Array ||
-    value instanceof Float64Array ||
-    value instanceof ArrayBuffer ||
-    value instanceof Date ||
-    value instanceof RegExp ||
-    value instanceof Map ||
-    value instanceof Set
-  ) {
-    return false; // Treat as primitive
-  }
+  // Arrays are simple objects
+  if (Array.isArray(value)) return true;
 
-  // Arrays and plain objects are complex
-  return Array.isArray(value) || value.constructor === Object;
+  // Plain objects second most common
+  if (value.constructor === Object) return true;
+
+  // Everything else is not simple
+  return false;
 };
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   updateQueue: new Set<() => void>(),
@@ -360,20 +343,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
   registerComponent: (stateKey, fullComponentId, registration) => {
     set((state) => {
-      // Create a new Map to ensure Zustand detects the change
       const newShadowStore = new Map(state.shadowStateStore);
-
-      // Get the metadata for the ROOT of the state (where the components map lives)
       const rootMeta = newShadowStore.get(stateKey) || {};
-
-      // Also clone the components map to avoid direct mutation
       const components = new Map(rootMeta.components);
       components.set(fullComponentId, registration);
-
-      // Update the root metadata with the new components map
       newShadowStore.set(stateKey, { ...rootMeta, components });
-
-      // Return the updated state
       return { shadowStateStore: newShadowStore };
     });
   },
@@ -382,8 +356,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     set((state) => {
       const newShadowStore = new Map(state.shadowStateStore);
       const rootMeta = newShadowStore.get(stateKey);
-
-      // If there's no metadata or no components map, do nothing
       if (!rootMeta?.components) {
         return state; // Return original state, no change needed
       }
@@ -401,40 +373,45 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
   markAsDirty: (key: string, path: string[], options = { bubble: true }) => {
-    const newShadowStore = new Map(get().shadowStateStore);
-    let changed = false;
+    const { shadowStateStore } = get();
+    const updates = new Map<string, ShadowMetadata>();
 
     const setDirty = (currentPath: string[]) => {
       const fullKey = [key, ...currentPath].join('.');
-      const meta = newShadowStore.get(fullKey);
+      const meta = shadowStateStore.get(fullKey) || {};
 
-      // We mark something as dirty if it isn't already.
-      // The original data source doesn't matter.
-      if (meta && meta.isDirty !== true) {
-        newShadowStore.set(fullKey, { ...meta, isDirty: true });
-        changed = true;
-      } else if (!meta) {
-        // If there's no metadata, create it and mark it as dirty.
-        // This handles newly created fields within an object.
-        newShadowStore.set(fullKey, { isDirty: true });
-        changed = true;
+      // If already dirty, no need to update
+      if (meta.isDirty === true) {
+        return true; // Return true to indicate parent is dirty
       }
+
+      updates.set(fullKey, { ...meta, isDirty: true });
+      return false; // Not previously dirty
     };
 
-    // 1. Mark the target path itself as dirty.
+    // Mark the target path
     setDirty(path);
 
-    // 2. If `bubble` is true, walk up the path and mark all parents as dirty.
+    // Bubble up if requested
     if (options.bubble) {
       let parentPath = [...path];
       while (parentPath.length > 0) {
         parentPath.pop();
-        setDirty(parentPath);
+        const wasDirty = setDirty(parentPath);
+        if (wasDirty) {
+          break; // Stop bubbling if parent was already dirty
+        }
       }
     }
 
-    if (changed) {
-      set({ shadowStateStore: newShadowStore });
+    // Apply all updates at once
+    if (updates.size > 0) {
+      set((state) => {
+        updates.forEach((meta, key) => {
+          state.shadowStateStore.set(key, meta);
+        });
+        return state;
+      });
     }
   },
   serverStateUpdates: new Map(),
@@ -485,7 +462,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     set((state) => {
       // 1. Make a copy of the current store to modify it
       const newShadowStore = new Map(state.shadowStateStore);
-
+      console.log('initializeShadowState');
       // 2. PRESERVE the existing components map before doing anything else
       const existingRootMeta = newShadowStore.get(key);
       const preservedComponents = existingRootMeta?.components;
@@ -542,19 +519,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
-    // The cache is created here. It's temporary and exists only for this one top-level call.
     const memo = new Map<string, any>();
-
-    // This is the inner recursive function that does the real work.
     const reconstruct = (keyToBuild: string, ids?: string[]): any => {
-      // --- STEP 1: Check the cache first ---
-      // If we have already built the object for this path *during this call*, return it instantly.
       if (memo.has(keyToBuild)) {
         return memo.get(keyToBuild);
       }
 
       const shadowMeta = get().shadowStateStore.get(keyToBuild);
-
       if (!shadowMeta) {
         return undefined;
       }
@@ -567,19 +538,14 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
       if (shadowMeta.arrayKeys) {
         const keys = ids ?? shadowMeta.arrayKeys;
-        // --- IMPORTANT: Set the cache BEFORE the recursive calls ---
-        // This handles circular references gracefully. We put an empty array in the cache now.
         result = [];
         memo.set(keyToBuild, result);
-        // Now, fill the array with the recursively constructed items.
         keys.forEach((itemKey) => {
-          result.push(reconstruct(itemKey)); // Pass the memo cache along implicitly via closure
+          result.push(reconstruct(itemKey));
         });
       } else if (shadowMeta.fields) {
-        // --- IMPORTANT: Set the cache BEFORE the recursive calls ---
         result = {};
         memo.set(keyToBuild, result);
-        // Now, fill the object with the recursively constructed items.
         Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
           result[key] = reconstruct(fieldPath as string);
         });
@@ -594,13 +560,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // Start the process by calling the inner function on the root key.
     return reconstruct(fullKey, validArrayIds);
   },
-  getShadowMetadata: (
-    key: string,
-    path: string[],
-    validArrayIds?: string[]
-  ) => {
+  getShadowMetadata: (key: string, path: string[]) => {
     const fullKey = [key, ...path].join('.');
-    let data = get().shadowStateStore.get(fullKey);
 
     return get().shadowStateStore.get(fullKey);
   },
@@ -766,36 +727,63 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       itemKey: itemKey, // The exact ID of the removed item
     });
   },
+
   updateShadowAtPath: (key, path, newValue) => {
-    const newShadowStore = new Map(get().shadowStateStore);
     const fullKey = [key, ...path].join('.');
 
-    const updateValue = (currentKey: string, valueToSet: any) => {
-      const meta = newShadowStore.get(currentKey);
+    // Optimization: Only update if value actually changed
+    const existingMeta = get().shadowStateStore.get(fullKey);
+    if (existingMeta?.value === newValue && !isSimpleObject(newValue)) {
+      return; // Skip update for unchanged primitives
+    }
 
-      // If it's a simple object with fields, update recursively
-      if (isSimpleObject(valueToSet) && meta && meta.fields) {
-        for (const fieldKey in valueToSet) {
-          if (Object.prototype.hasOwnProperty.call(valueToSet, fieldKey)) {
-            const childPath = meta.fields[fieldKey];
-            const childValue = valueToSet[fieldKey];
+    // CHANGE: Don't clone the entire Map, just update in place
+    set((state) => {
+      const store = state.shadowStateStore;
 
-            if (childPath) {
-              updateValue(childPath as string, childValue);
+      if (!isSimpleObject(newValue)) {
+        const meta = store.get(fullKey) || {};
+        store.set(fullKey, { ...meta, value: newValue });
+      } else {
+        // Handle objects by iterating
+        const processObject = (currentPath: string[], objectToSet: any) => {
+          const currentFullKey = [key, ...currentPath].join('.');
+          const meta = store.get(currentFullKey);
+
+          if (meta && meta.fields) {
+            for (const fieldKey in objectToSet) {
+              if (Object.prototype.hasOwnProperty.call(objectToSet, fieldKey)) {
+                const childValue = objectToSet[fieldKey];
+                const childFullPath = meta.fields[fieldKey];
+
+                if (childFullPath) {
+                  if (isSimpleObject(childValue)) {
+                    processObject(
+                      childFullPath.split('.').slice(1),
+                      childValue
+                    );
+                  } else {
+                    const existingChildMeta = store.get(childFullPath) || {};
+                    store.set(childFullPath, {
+                      ...existingChildMeta,
+                      value: childValue,
+                    });
+                  }
+                }
+              }
             }
           }
-        }
-      } else {
-        // For primitives (including Uint8Array), just replace the value
-        // This gives you useState-like behavior
-        const existing = newShadowStore.get(currentKey) || {};
-        newShadowStore.set(currentKey, { ...existing, value: valueToSet });
-      }
-    };
+        };
 
-    updateValue(fullKey, newValue);
-    get().notifyPathSubscribers(fullKey, { type: 'UPDATE', newValue });
-    set({ shadowStateStore: newShadowStore });
+        processObject(path, newValue);
+      }
+
+      // Only notify after all changes are made
+      get().notifyPathSubscribers(fullKey, { type: 'UPDATE', newValue });
+
+      // Return same reference if using Zustand's immer middleware
+      return state;
+    });
   },
   selectedIndicesMap: new Map<string, string>(),
   getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {
