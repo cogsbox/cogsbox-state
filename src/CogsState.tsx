@@ -572,25 +572,20 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   }
 ) => {
   let newInitialState = initialState;
-  console.log('optsc', opt?.__useSync);
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(newInitialState);
 
-  // Store notifications if provided
   if (opt?.__fromSyncSchema && opt?.__syncNotifications) {
     getGlobalStore
       .getState()
       .setInitialStateOptions('__notifications', opt.__syncNotifications);
   }
 
-  // Store apiParams map if provided
   if (opt?.__fromSyncSchema && opt?.__apiParamsMap) {
     getGlobalStore
       .getState()
       .setInitialStateOptions('__apiParamsMap', opt.__apiParamsMap);
   }
-
-  // ... rest of your existing createCogsState code unchanged ...
 
   Object.keys(statePart).forEach((key) => {
     let existingOptions = initialOptionsPart[key] || {};
@@ -993,7 +988,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     dependencies,
     serverState,
     __useSync,
-    syncOptions,
   }: {
     stateKey?: string;
     componentId?: string;
@@ -1826,12 +1820,9 @@ function hashTransforms(transforms: any[]) {
   if (!transforms || transforms.length === 0) {
     return '';
   }
-  // This creates a string representation of the transforms AND their dependencies.
-  // Example: "filter['red']sort['score','asc']"
   return transforms
     .map(
       (transform) =>
-        // Safely stringify dependencies. An empty array becomes '[]'.
         `${transform.type}${JSON.stringify(transform.dependencies || [])}`
     )
     .join('');
@@ -1874,8 +1865,6 @@ const registerComponentDependency = (
   const fullComponentId = `${stateKey}////${componentId}`;
   const { addPathComponent, getShadowMetadata } = getGlobalStore.getState();
 
-  // First, check if the component should even be registered.
-  // This check is safe to do outside the setter.
   const rootMeta = getShadowMetadata(stateKey, []);
   const component = rootMeta?.components?.get(fullComponentId);
 
@@ -1891,7 +1880,6 @@ const registerComponentDependency = (
     return;
   }
 
-  // Now, call the single, safe, atomic function to perform the update.
   addPathComponent(stateKey, dependencyPath, fullComponentId);
 };
 const notifySelectionComponents = (
