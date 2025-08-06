@@ -30,6 +30,19 @@ export type ComponentsType = {
         reactiveType: ReactivityType[] | ReactivityType;
     }>;
 };
+export type ValidationStatus = 'NOT_VALIDATED' | 'VALIDATING' | 'VALID' | 'INVALID';
+export type ValidationError = {
+    source: 'client' | 'sync_engine' | 'api';
+    message: string;
+    severity: 'warning' | 'error';
+    code?: string;
+};
+export type ValidationState = {
+    status: ValidationStatus;
+    errors: ValidationError[];
+    lastValidated?: number;
+    validatedValue?: any;
+};
 export type ShadowMetadata = {
     id?: string;
     stateSource?: 'default' | 'server' | 'localStorage';
@@ -46,6 +59,11 @@ export type ShadowMetadata = {
         status: string;
     };
     validation?: ValidationState;
+    features?: {
+        syncEnabled: boolean;
+        validationEnabled: boolean;
+        localStorageEnabled: boolean;
+    };
     lastUpdated?: number;
     value?: any;
     classSignals?: Array<{
@@ -83,13 +101,6 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
 } & ComponentsType;
-export type ValidationStatus = 'PRISTINE' | 'DIRTY' | 'VALID_LIVE' | 'INVALID_LIVE' | 'VALIDATION_FAILED' | 'VALID_PENDING_SYNC' | 'SYNCING' | 'SYNCED' | 'SYNC_FAILED';
-export type ValidationState = {
-    status: ValidationStatus;
-    message?: string;
-    lastValidated?: number;
-    validatedValue?: any;
-};
 export type CogsEvent = {
     type: 'INSERT';
     path: string;

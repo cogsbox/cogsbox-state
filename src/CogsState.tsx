@@ -16,7 +16,6 @@ import {
 } from 'react';
 import { createRoot } from 'react-dom/client';
 import {
-  debounce,
   getDifferences,
   isArray,
   isFunction,
@@ -30,6 +29,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   formRefStore,
   getGlobalStore,
+  ValidationError,
   ValidationStatus,
   type ComponentsType,
 } from './store.js';
@@ -38,7 +38,6 @@ import { Operation } from 'fast-json-patch';
 import { useInView } from 'react-intersection-observer';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
-import z from 'zod';
 
 type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -245,10 +244,7 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => { synced: () => void };
 
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
-export type ValidationError = {
-  path: (string | number)[];
-  message: string;
-};
+
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
   addZodValidation: (errors: ValidationError[]) => void;
@@ -259,7 +255,7 @@ export type EndType<T, IsArrayElement = false> = {
   _stateKey: string;
   formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
   get: () => T;
-  getState: () => T;
+
   $get: () => T;
   $derive: <R>(fn: EffectFunction<T, R>) => R;
 
@@ -449,10 +445,13 @@ type FormsElementsType<T> = {
     children: React.ReactNode;
     status: ValidationStatus; // Instead of 'active' boolean
 
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    allErrors: ValidationError[];
+
     path: string[];
     message?: string;
-    data?: T;
-    key?: string;
+    getData?: () => T;
   }) => React.ReactNode;
   syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
 };
@@ -1213,6 +1212,17 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     const options = getInitialOptions(thisKey as string);
 
+    const features = {
+      syncEnabled: !!cogsSyncFn && !!syncOpt,
+      validationEnabled: !!(
+        options?.validation?.zodSchemaV4 || options?.validation?.zodSchemaV3
+      ),
+      localStorageEnabled: !!options?.localStorage?.key,
+    };
+    getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+      ...existingMeta,
+      features,
+    });
     if (options?.defaultState !== undefined || defaultState !== undefined) {
       const finalDefaultState = options?.defaultState || defaultState;
 
@@ -1912,6 +1922,36 @@ const notifySelectionComponents = (
   }
 };
 
+function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
+  const store = getGlobalStore.getState();
+  const shadowMeta = store.getShadowMetadata(stateKey, path);
+
+  // --- THE OPTIMIZATION (THE "CHEAP PATH") ---
+  // If the metadata node has a 'value' property, it's a primitive.
+  // We can return it directly without any expensive reconstruction.
+  if (shadowMeta?.value !== undefined) {
+    return {
+      store,
+      shadowMeta,
+      value: shadowMeta.value, // Directly return the primitive value
+      arrayKeys: undefined, // Primitives don't have array keys
+    };
+  }
+
+  // --- THE RECONSTRUCTION (THE "EXPENSIVE PATH") ---
+  // If no direct value exists, it's an object or array. Now we MUST
+  // call the expensive reconstruction function.
+  const arrayKeys = meta?.validIds ?? shadowMeta?.arrayKeys;
+  const value = store.getShadowValue([stateKey, ...path].join('.'), arrayKeys);
+
+  return {
+    store,
+    shadowMeta,
+    value,
+    arrayKeys,
+  };
+}
+
 function createProxyHandler<T>(
   stateKey: string,
   effectiveSetState: EffectiveSetState<T>,
@@ -1920,8 +1960,6 @@ function createProxyHandler<T>(
 ): StateObject<T> {
   const proxyCache = new Map<string, any>();
   let stateVersion = 0;
-
-  let recursionTimerName: string | null = null;
 
   function rebuildStateShape({
     path = [],
@@ -1936,9 +1974,7 @@ function createProxyHandler<T>(
       ? JSON.stringify(meta.validIds || meta.transforms)
       : '';
     const cacheKey = path.join('.') + ':' + derivationSignature;
-    console.log('PROXY CACHE KEY ', cacheKey);
     if (proxyCache.has(cacheKey)) {
-      console.log('PROXY CACHE HIT');
       return proxyCache.get(cacheKey);
     }
     const stateKeyPathKey = [stateKey, ...path].join('.');
@@ -1969,25 +2005,14 @@ function createProxyHandler<T>(
 
         if (prop === 'getDifferences') {
           return () => {
-            const shadowMeta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, []);
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue(stateKey);
-
-            // Use the appropriate base state for comparison
-            let baseState;
-            if (
-              shadowMeta?.stateSource === 'server' &&
-              shadowMeta.baseServerState
-            ) {
-              baseState = shadowMeta.baseServerState;
-            } else {
-              baseState =
-                getGlobalStore.getState().initialStateGlobal[stateKey];
-            }
-
+            const { value: currentState, shadowMeta } = getScopedData(
+              stateKey,
+              path,
+              meta
+            );
+            const baseState =
+              shadowMeta?.baseServerState ??
+              getGlobalStore.getState().initialStateGlobal[stateKey];
             return getDifferences(currentState, baseState);
           };
         }
@@ -2055,56 +2080,46 @@ function createProxyHandler<T>(
         // Fixed getStatus function in createProxyHandler
         if (prop === '_status' || prop === 'getStatus') {
           const getStatusFunc = () => {
-            const shadowMeta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path);
-            const value = getGlobalStore
-              .getState()
-              .getShadowValue(stateKeyPathKey);
+            // ✅ Use the optimized helper to get all data in one efficient call
+            const { shadowMeta, value } = getScopedData(stateKey, path, meta);
 
-            // Priority 1: Explicitly dirty items
+            // Priority 1: Explicitly dirty items. This is the most important status.
             if (shadowMeta?.isDirty === true) {
               return 'dirty';
             }
 
-            // Priority 2: Explicitly synced items (isDirty: false)
-            if (shadowMeta?.isDirty === false) {
+            // ✅ Priority 2: Synced items. This condition is now cleaner.
+            // An item is considered synced if it came from the server OR was explicitly
+            // marked as not dirty (isDirty: false), covering all sync-related cases.
+            if (
+              shadowMeta?.stateSource === 'server' ||
+              shadowMeta?.isDirty === false
+            ) {
               return 'synced';
             }
 
-            // Priority 3: Items from server source (should be synced even without explicit isDirty flag)
-            if (shadowMeta?.stateSource === 'server') {
-              return 'synced';
-            }
-
-            // Priority 4: Items restored from localStorage
+            // Priority 3: Items restored from localStorage.
             if (shadowMeta?.stateSource === 'localStorage') {
               return 'restored';
             }
 
-            // Priority 5: Items from default/initial state
+            // Priority 4: Items from default/initial state.
             if (shadowMeta?.stateSource === 'default') {
               return 'fresh';
             }
 
-            // Priority 6: Check if this is part of initial server load
-            // Look up the tree to see if parent has server source
-            const rootMeta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, []);
-            if (rootMeta?.stateSource === 'server' && !shadowMeta?.isDirty) {
-              return 'synced';
-            }
+            // ✅ REMOVED the redundant "root" check. The item's own `stateSource` is sufficient.
 
-            // Priority 7: If no metadata exists but value exists, it's probably fresh
+            // Priority 5: A value exists but has no metadata. This is a fallback.
             if (value !== undefined && !shadowMeta) {
               return 'fresh';
             }
 
-            // Fallback
+            // Fallback if no other condition is met.
             return 'unknown';
           };
 
+          // This part remains the same
           return prop === '_status' ? getStatusFunc() : getStatusFunc;
         }
         if (prop === 'removeStorage') {
@@ -2121,14 +2136,15 @@ function createProxyHandler<T>(
         }
         if (prop === 'showValidationErrors') {
           return () => {
-            const meta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path);
+            const { shadowMeta } = getScopedData(stateKey, path, meta);
             if (
-              meta?.validation?.status === 'VALIDATION_FAILED' &&
-              meta.validation.message
+              shadowMeta?.validation?.status === 'INVALID' &&
+              shadowMeta.validation.errors.length > 0
             ) {
-              return [meta.validation.message];
+              // Return only error-severity messages (not warnings)
+              return shadowMeta.validation.errors
+                .filter((err) => err.severity === 'error')
+                .map((err) => err.message);
             }
             return [];
           };
@@ -2238,9 +2254,7 @@ function createProxyHandler<T>(
               });
             }, [rerender, stickToBottom]);
 
-            const arrayKeys =
-              getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                ?.arrayKeys || [];
+            const { arrayKeys = [] } = getScopedData(stateKey, path, meta);
 
             // Calculate total height and offsets
             const { totalHeight, itemOffsets } = useMemo(() => {
@@ -2590,24 +2604,15 @@ function createProxyHandler<T>(
               arraySetter: any
             ) => void
           ) => {
-            const [arrayKeys, setArrayKeys] = useState<any>(
-              meta?.validIds ??
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys
-            );
-            // getGlobalStore.getState().subscribeToPath(stateKeyPathKey, () => {
-            //   console.log(
-            //     "stateKeyPathKeyccccccccccccccccc",
-            //     stateKeyPathKey
-            //   );
-            //   setArrayKeys(
-            //     getGlobalStore.getState().getShadowMetadata(stateKey, path)
-            //   );
-            // });
+            const { value: shadowValue, arrayKeys } = getScopedData(
+              stateKey,
+              path,
+              meta
+            ) as {
+              value: any[];
+              arrayKeys: string[] | undefined;
+            };
 
-            const shadowValue = getGlobalStore
-              .getState()
-              .getShadowValue(stateKeyPathKey, meta?.validIds) as any[];
             if (!arrayKeys) {
               throw new Error('No array keys found for mapping');
             }
@@ -2653,23 +2658,16 @@ function createProxyHandler<T>(
             callbackfn: (value: any, index: number) => boolean
           ): StateObject<any> | undefined => {
             // 1. Use the correct set of keys: filtered/sorted from meta, or all keys from the store.
-            const arrayKeys =
-              meta?.validIds ??
-              getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                ?.arrayKeys;
-
+            const { store, arrayKeys } = getScopedData(stateKey, path, meta);
             if (!arrayKeys) {
               return undefined;
             }
-
             // 2. Iterate through the keys, get the value for each, and run the callback.
             for (let i = 0; i < arrayKeys.length; i++) {
               const itemKey = arrayKeys[i];
               if (!itemKey) continue; // Safety check
 
-              const itemValue = getGlobalStore
-                .getState()
-                .getShadowValue(itemKey);
+              const itemValue = store.getShadowValue(itemKey);
 
               // 3. If the callback returns true, we've found our item.
               if (callbackfn(itemValue, i)) {
@@ -2691,15 +2689,11 @@ function createProxyHandler<T>(
         }
         if (prop === 'stateFilter') {
           return (callbackfn: (value: any, index: number) => boolean) => {
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
-            if (!Array.isArray(currentState)) return [];
-            const arrayKeys =
-              meta?.validIds ??
-              getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                ?.arrayKeys;
-
+            const { value: currentState, arrayKeys } = getScopedData(
+              stateKey,
+              path,
+              meta
+            );
             if (!arrayKeys) {
               throw new Error('No array keys found for filtering.');
             }
@@ -2734,14 +2728,14 @@ function createProxyHandler<T>(
         }
         if (prop === 'stateSort') {
           return (compareFn: (a: any, b: any) => number) => {
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
-            if (!Array.isArray(currentState)) return []; // Guard clause
-            const arrayKeys =
-              meta?.validIds ??
-              getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                ?.arrayKeys;
+            const { value: currentState, arrayKeys } = getScopedData(
+              stateKey,
+              path,
+              meta
+            ) as {
+              value: any[];
+              arrayKeys: string[] | undefined;
+            };
             if (!arrayKeys) {
               throw new Error('No array keys found for sorting');
             }
@@ -3023,9 +3017,7 @@ function createProxyHandler<T>(
             const arrayToMap = currentState as any[];
 
             stateVersion++;
-            const flattenedResults = arrayToMap.flatMap(
-              (val: any) => val[fieldName] ?? []
-            );
+
             return rebuildStateShape({
               path: [...path, '[*]', fieldName],
               componentId: componentId!,
@@ -3058,9 +3050,7 @@ function createProxyHandler<T>(
         }
         if (prop === 'last') {
           return () => {
-            const currentArray = getGlobalStore
-              .getState()
-              .getShadowValue(stateKey, path) as any[];
+            const { value: currentArray } = getScopedData(stateKey, path, meta);
             if (currentArray.length === 0) return undefined;
             const lastIndex = currentArray.length - 1;
             const lastValue = currentArray[lastIndex];
@@ -3091,9 +3081,13 @@ function createProxyHandler<T>(
             fields?: (keyof InferArrayElement<T>)[],
             onMatch?: (existingItem: any) => any
           ) => {
-            const currentArray = getGlobalStore
-              .getState()
-              .getShadowValue(stateKey, path) as any[];
+            const { value: currentArray } = getScopedData(
+              stateKey,
+              path,
+              meta
+            ) as {
+              value: any[];
+            };
             const newValue = isFunction<T>(payload)
               ? payload(currentArray as any)
               : (payload as any);
@@ -3126,14 +3120,11 @@ function createProxyHandler<T>(
 
         if (prop === 'cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
-            const validKeys =
-              meta?.validIds ??
-              getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                ?.arrayKeys;
-
+            const { value: currentState, arrayKeys: validKeys } = getScopedData(
+              stateKey,
+              path,
+              meta
+            );
             if (!validKeys || validKeys.length === 0) return;
 
             const indexToCut =
@@ -3186,18 +3177,18 @@ function createProxyHandler<T>(
         if (prop === 'cutByValue') {
           return (value: string | number | boolean) => {
             // Step 1: Get the list of all unique keys for the current view.
-            const arrayMeta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path);
-            const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
-
+            const { store, arrayKeys: relevantKeys } = getScopedData(
+              stateKey,
+              path,
+              meta
+            );
             if (!relevantKeys) return;
 
             let keyToCut: string | null = null;
 
             // Step 2: Iterate through the KEYS, get the value for each, and find the match.
             for (const key of relevantKeys) {
-              const itemValue = getGlobalStore.getState().getShadowValue(key);
+              const itemValue = store.getShadowValue(key);
               if (itemValue === value) {
                 keyToCut = key;
                 break; // We found the key, no need to search further.
@@ -3250,9 +3241,7 @@ function createProxyHandler<T>(
         }
         if (prop === 'findWith') {
           return (searchKey: keyof InferArrayElement<T>, searchValue: any) => {
-            const arrayKeys = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path)?.arrayKeys;
+            const { store, arrayKeys } = getScopedData(stateKey, path, meta);
 
             if (!arrayKeys) {
               throw new Error('No array keys found for sorting');
@@ -3262,9 +3251,7 @@ function createProxyHandler<T>(
             let foundPath: string[] = [];
 
             for (const fullPath of arrayKeys) {
-              let shadowValue = getGlobalStore
-                .getState()
-                .getShadowValue(fullPath, meta?.validIds);
+              let shadowValue = store.getShadowValue(fullPath, meta?.validIds);
               if (shadowValue && shadowValue[searchKey] === searchValue) {
                 value = shadowValue;
                 foundPath = fullPath.split('.').slice(1);
@@ -3281,9 +3268,7 @@ function createProxyHandler<T>(
         }
 
         if (prop === 'cutThis') {
-          let shadowValue = getGlobalStore
-            .getState()
-            .getShadowValue(path.join('.'));
+          const { value: shadowValue } = getScopedData(stateKey, path, meta);
 
           return () => {
             effectiveSetState(shadowValue, path, { updateType: 'cut' });
@@ -3293,16 +3278,8 @@ function createProxyHandler<T>(
         if (prop === 'get') {
           return () => {
             registerComponentDependency(stateKey, componentId, path);
-            return getGlobalStore
-              .getState()
-              .getShadowValue(stateKeyPathKey, meta?.validIds);
-          };
-        }
-        if (prop === 'getState') {
-          return () => {
-            return getGlobalStore
-              .getState()
-              .getShadowValue(stateKeyPathKey, meta?.validIds);
+            const { value } = getScopedData(stateKey, path, meta);
+            return value;
           };
         }
 
@@ -3402,11 +3379,6 @@ function createProxyHandler<T>(
         if (path.length == 0) {
           if (prop === 'addZodValidation') {
             return (zodErrors: any[]) => {
-              const init = getGlobalStore
-                .getState()
-                .getInitialOptions(stateKey)?.validation;
-
-              // For each error, set shadow metadata
               zodErrors.forEach((error) => {
                 const currentMeta =
                   getGlobalStore
@@ -3418,42 +3390,40 @@ function createProxyHandler<T>(
                   .setShadowMetadata(stateKey, error.path, {
                     ...currentMeta,
                     validation: {
-                      status: 'VALIDATION_FAILED',
-                      message: error.message,
+                      status: 'INVALID',
+                      errors: [
+                        {
+                          source: 'client',
+                          message: error.message,
+                          severity: 'error',
+                          code: error.code,
+                        },
+                      ],
+                      lastValidated: Date.now(),
                       validatedValue: undefined,
                     },
                   });
-                getGlobalStore.getState().notifyPathSubscribers(error.path, {
-                  type: 'VALIDATION_FAILED',
-                  message: error.message,
-                  validatedValue: undefined,
-                });
               });
             };
           }
           if (prop === 'clearZodValidation') {
             return (path?: string[]) => {
-              // Clear specific paths
               if (!path) {
                 throw new Error('clearZodValidation requires a path');
-                return;
               }
+
               const currentMeta =
                 getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
                 {};
 
-              if (currentMeta.validation) {
-                getGlobalStore.getState().setShadowMetadata(stateKey, path, {
-                  ...currentMeta,
-                  validation: undefined,
-                });
-
-                getGlobalStore
-                  .getState()
-                  .notifyPathSubscribers([stateKey, ...path].join('.'), {
-                    type: 'VALIDATION_CLEARED',
-                  });
-              }
+              getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+                ...currentMeta,
+                validation: {
+                  status: 'NOT_VALIDATED',
+                  errors: [],
+                  lastValidated: Date.now(),
+                },
+              });
             };
           }
           if (prop === 'applyJsonPatch') {
@@ -3664,9 +3634,11 @@ function createProxyHandler<T>(
         }
 
         if (prop === 'toggle') {
-          const currentValueAtPath = getGlobalStore
-            .getState()
-            .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
+          const { value: currentValueAtPath } = getScopedData(
+            stateKey,
+            path,
+            meta
+          );
 
           if (typeof currentValueAtPath != 'boolean') {
             throw new Error('toggle() can only be used on boolean values');
@@ -4304,11 +4276,14 @@ function FormElementWrapper({
 
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
-
-        // Update state
         setState(newValue, path, { updateType: 'update' });
 
-        // Perform LIVE validation (gentle)
+        // NEW: Check if validation is enabled via features
+        const rootMeta = getGlobalStore
+          .getState()
+          .getShadowMetadata(stateKey, []);
+        if (!rootMeta?.features?.validationEnabled) return;
+
         const { getInitialOptions, setShadowMetadata, getShadowMetadata } =
           getGlobalStore.getState();
         const validationOptions = getInitialOptions(stateKey)?.validation;
@@ -4318,7 +4293,6 @@ function FormElementWrapper({
         if (zodSchema) {
           const fullState = getGlobalStore.getState().getShadowValue(stateKey);
           const result = zodSchema.safeParse(fullState);
-
           const currentMeta = getShadowMetadata(stateKey, path) || {};
 
           if (!result.success) {
@@ -4326,6 +4300,7 @@ function FormElementWrapper({
               'issues' in result.error
                 ? result.error.issues
                 : (result.error as any).errors;
+
             const pathErrors = errors.filter(
               (error: any) =>
                 JSON.stringify(error.path) === JSON.stringify(path)
@@ -4335,30 +4310,37 @@ function FormElementWrapper({
               setShadowMetadata(stateKey, path, {
                 ...currentMeta,
                 validation: {
-                  status: 'INVALID_LIVE',
-                  message: pathErrors[0]?.message,
+                  status: 'INVALID',
+                  errors: [
+                    {
+                      source: 'client',
+                      message: pathErrors[0]?.message,
+                      severity: 'warning', // Gentle error during typing
+                    },
+                  ],
+                  lastValidated: Date.now(),
                   validatedValue: newValue,
                 },
               });
             } else {
-              // This field has no errors - clear validation
               setShadowMetadata(stateKey, path, {
                 ...currentMeta,
                 validation: {
-                  status: 'VALID_LIVE',
+                  status: 'VALID',
+                  errors: [],
+                  lastValidated: Date.now(),
                   validatedValue: newValue,
-                  message: undefined,
                 },
               });
             }
           } else {
-            // Validation passed - clear any existing errors
             setShadowMetadata(stateKey, path, {
               ...currentMeta,
               validation: {
-                status: 'VALID_LIVE',
+                status: 'VALID',
+                errors: [],
+                lastValidated: Date.now(),
                 validatedValue: newValue,
-                message: undefined,
               },
             });
           }
@@ -4381,7 +4363,8 @@ function FormElementWrapper({
       isCurrentlyDebouncing.current = false;
       setState(localValue, path, { updateType: 'update' });
     }
-
+    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+    if (!rootMeta?.features?.validationEnabled) return;
     const { getInitialOptions } = getGlobalStore.getState();
     const validationOptions = getInitialOptions(stateKey)?.validation;
     const zodSchema =
@@ -4395,10 +4378,13 @@ function FormElementWrapper({
     const currentMeta = getGlobalStore
       .getState()
       .getShadowMetadata(stateKey, path);
+
     getGlobalStore.getState().setShadowMetadata(stateKey, path, {
       ...currentMeta,
       validation: {
-        status: 'DIRTY',
+        status: 'VALIDATING',
+        errors: [],
+        lastValidated: Date.now(),
         validatedValue: localValue,
       },
     });
@@ -4471,8 +4457,13 @@ function FormElementWrapper({
       getGlobalStore.getState().setShadowMetadata(stateKey, path, {
         ...currentMeta,
         validation: {
-          status: 'VALIDATION_FAILED',
-          message: pathErrors[0]?.message,
+          status: 'INVALID',
+          errors: pathErrors.map((err: any) => ({
+            source: 'client' as const,
+            message: err.message,
+            severity: 'error' as const, // Hard error on blur
+          })),
+          lastValidated: Date.now(),
           validatedValue: localValue,
         },
       });
@@ -4481,7 +4472,9 @@ function FormElementWrapper({
       getGlobalStore.getState().setShadowMetadata(stateKey, path, {
         ...currentMeta,
         validation: {
-          status: 'VALID_PENDING_SYNC',
+          status: 'VALID',
+          errors: [],
+          lastValidated: Date.now(),
           validatedValue: localValue,
         },
       });

@@ -3,16 +3,11 @@ import { ulid } from 'ulid';
 import type {
   OptionsType,
   ReactivityType,
-  StateKeys,
   SyncInfo,
   UpdateTypeDetail,
 } from './CogsState.js';
 
 import { startTransition, type ReactNode } from 'react';
-
-type StateUpdater<StateValue> =
-  | StateValue
-  | ((prevValue: StateValue) => StateValue);
 
 export type FreshValuesObject = {
   pathsToValues?: string[];
@@ -21,9 +16,6 @@ export type FreshValuesObject = {
   timeStamp: number;
 };
 
-type SyncLogType = {
-  timeStamp: number;
-};
 type StateValue = any;
 
 export type TrieNode = {
@@ -89,6 +81,26 @@ export type ComponentsType = {
     }
   >;
 };
+
+export type ValidationStatus =
+  | 'NOT_VALIDATED' // Never run
+  | 'VALIDATING' // Currently running
+  | 'VALID' // Passed
+  | 'INVALID'; // Failed
+
+export type ValidationError = {
+  source: 'client' | 'sync_engine' | 'api';
+  message: string;
+  severity: 'warning' | 'error'; // warning = gentle, error = blocking
+  code?: string; // Optional error code
+};
+
+export type ValidationState = {
+  status: ValidationStatus;
+  errors: ValidationError[];
+  lastValidated?: number;
+  validatedValue?: any; // Value when last validated
+};
 export type ShadowMetadata = {
   id?: string;
 
@@ -106,6 +118,11 @@ export type ShadowMetadata = {
   };
   syncInfo?: { status: string };
   validation?: ValidationState;
+  features?: {
+    syncEnabled: boolean;
+    validationEnabled: boolean;
+    localStorageEnabled: boolean;
+  };
   lastUpdated?: number;
   value?: any;
   classSignals?: Array<{
@@ -152,23 +169,6 @@ export type ShadowMetadata = {
   >;
 } & ComponentsType;
 
-export type ValidationStatus =
-  | 'PRISTINE' // Untouched, matches initial state.
-  | 'DIRTY' // Changed, but no validation run yet.
-  | 'VALID_LIVE' // Valid while typing.
-  | 'INVALID_LIVE' // Gentle error during typing.
-  | 'VALIDATION_FAILED' // Hard error on blur/submit.
-  | 'VALID_PENDING_SYNC' // Passed validation, ready for sync.
-  | 'SYNCING' // Actively being sent to the server.
-  | 'SYNCED' // Server confirmed success.
-  | 'SYNC_FAILED'; // Server rejected the data.
-
-export type ValidationState = {
-  status: ValidationStatus;
-  message?: string;
-  lastValidated?: number;
-  validatedValue?: any;
-};
 export type CogsEvent =
   | { type: 'INSERT'; path: string; itemKey: string; index: number }
   | { type: 'REMOVE'; path: string; itemKey: string }

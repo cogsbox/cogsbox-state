@@ -1,6 +1,6 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
-import { ValidationStatus, ComponentsType } from './store.js';
+import { ValidationError, ValidationStatus, ComponentsType } from './store.js';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
@@ -121,10 +121,6 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => {
 };
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
-export type ValidationError = {
-    path: (string | number)[];
-    message: string;
-};
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
     addZodValidation: (errors: ValidationError[]) => void;
@@ -135,7 +131,6 @@ export type EndType<T, IsArrayElement = false> = {
     _stateKey: string;
     formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     get: () => T;
-    getState: () => T;
     $get: () => T;
     $derive: <R>(fn: EffectFunction<T, R>) => R;
     _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
@@ -271,10 +266,12 @@ type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
         status: ValidationStatus;
+        hasErrors: boolean;
+        hasWarnings: boolean;
+        allErrors: ValidationError[];
         path: string[];
         message?: string;
-        data?: T;
-        key?: string;
+        getData?: () => T;
     }) => React.ReactNode;
     syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
 };

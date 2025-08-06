@@ -1,7 +1,7 @@
 import { type FormOptsType } from './CogsState';
-
 import React from 'react';
-import { getGlobalStore } from './store';
+import { getGlobalStore, ValidationError } from './store';
+import { get } from 'http';
 
 export type ValidationWrapperProps = {
   formOpts?: FormOptsType;
@@ -9,21 +9,36 @@ export type ValidationWrapperProps = {
   stateKey: string;
   children: React.ReactNode;
 };
+
 export function ValidationWrapper({
   formOpts,
   path,
   stateKey,
   children,
 }: ValidationWrapperProps) {
-  const { getInitialOptions, getShadowMetadata } = getGlobalStore.getState();
+  const { getInitialOptions, getShadowMetadata, getShadowValue } =
+    getGlobalStore.getState();
   const thisStateOpts = getInitialOptions(stateKey!);
 
-  // GET VALIDATION FROM SHADOW METADATA
   const shadowMeta = getShadowMetadata(stateKey!, path);
   const validationState = shadowMeta?.validation;
-  const status = validationState?.status || 'PRISTINE';
 
-  const message = validationState?.message;
+  const status = validationState?.status || 'NOT_VALIDATED';
+
+  const errors = (validationState?.errors || []).map((err) => ({
+    ...err,
+    path: path,
+  })) as ValidationError[];
+  const errorMessages = errors
+    .filter((err) => err.severity === 'error')
+    .map((err) => err.message);
+  const warningMessages = errors
+    .filter((err) => err.severity === 'warning')
+    .map((err) => err.message);
+
+  // Use first error, or first warning if no errors
+  const message = errorMessages[0] || warningMessages[0];
+
   return (
     <>
       {thisStateOpts?.formElements?.validation &&
@@ -32,11 +47,16 @@ export function ValidationWrapper({
           children: (
             <React.Fragment key={path.toString()}>{children}</React.Fragment>
           ),
-          status, // Pass status instead of active
+          status, // Now passes the new ValidationStatus type
           message: formOpts?.validation?.hideMessage
             ? ''
             : formOpts?.validation?.message || message || '',
+
+          hasErrors: errorMessages.length > 0,
+          hasWarnings: warningMessages.length > 0,
+          allErrors: errors,
           path: path,
+          getData: () => getShadowValue(stateKey!, path),
         })
       ) : (
         <React.Fragment key={path.toString()}>{children}</React.Fragment>

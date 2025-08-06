@@ -1,22 +1,29 @@
-import { jsx as e, Fragment as c } from "react/jsx-runtime";
-import r from "react";
-import { getGlobalStore as S } from "./store.js";
-function h({
+import { jsx as o, Fragment as w } from "react/jsx-runtime";
+import d from "react";
+import { getGlobalStore as M } from "./store.js";
+function F({
   formOpts: a,
-  path: t,
-  stateKey: o,
-  children: i
+  path: e,
+  stateKey: s,
+  children: n
 }) {
-  const { getInitialOptions: d, getShadowMetadata: l } = S.getState(), n = d(o), s = l(o, t)?.validation, m = s?.status || "PRISTINE", g = s?.message;
-  return /* @__PURE__ */ e(c, { children: n?.formElements?.validation && !a?.validation?.disable ? n.formElements.validation({
-    children: /* @__PURE__ */ e(r.Fragment, { children: i }, t.toString()),
-    status: m,
-    // Pass status instead of active
-    message: a?.validation?.hideMessage ? "" : a?.validation?.message || g || "",
-    path: t
-  }) : /* @__PURE__ */ e(r.Fragment, { children: i }, t.toString()) });
+  const { getInitialOptions: c, getShadowMetadata: v, getShadowValue: S } = M.getState(), i = c(s), g = v(s, e)?.validation, f = g?.status || "NOT_VALIDATED", r = (g?.errors || []).map((t) => ({
+    ...t,
+    path: e
+  })), l = r.filter((t) => t.severity === "error").map((t) => t.message), m = r.filter((t) => t.severity === "warning").map((t) => t.message), h = l[0] || m[0];
+  return /* @__PURE__ */ o(w, { children: i?.formElements?.validation && !a?.validation?.disable ? i.formElements.validation({
+    children: /* @__PURE__ */ o(d.Fragment, { children: n }, e.toString()),
+    status: f,
+    // Now passes the new ValidationStatus type
+    message: a?.validation?.hideMessage ? "" : a?.validation?.message || h || "",
+    hasErrors: l.length > 0,
+    hasWarnings: m.length > 0,
+    allErrors: r,
+    path: e,
+    getData: () => S(s, e)
+  }) : /* @__PURE__ */ o(d.Fragment, { children: n }, e.toString()) });
 }
 export {
-  h as ValidationWrapper
+  F as ValidationWrapper
 };
 //# sourceMappingURL=Functions.jsx.map
