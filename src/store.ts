@@ -215,12 +215,15 @@ type ShadowArrayNEW = {
   >;
 };
 
-type ShadowRootNEW = ShadowObjectNEW | ShadowArrayNEW;
-
 export type CogsGlobalState = {
   // NEW shadow store
-  shadowStateStore: Map<string, ShadowRootNEW>;
-
+  shadowStateStore: Map<string, ShadowMetadata>;
+  setTransformCache: (
+    key: string,
+    path: string[],
+    cacheKey: string,
+    cacheData: any
+  ) => void;
   // NEW functions
   initializeShadowState: (key: string, initialState: any) => void;
   getShadowMetadata: (
@@ -303,19 +306,6 @@ export type CogsGlobalState = {
   setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
   getSyncInfo: (key: string) => SyncInfo | null;
 };
-const isSimpleObject = (value: any): boolean => {
-  // Most common cases first
-  if (value === null || typeof value !== 'object') return false;
-
-  // Arrays are simple objects
-  if (Array.isArray(value)) return true;
-
-  // Plain objects second most common
-  if (value.constructor === Object) return true;
-
-  // Everything else is not simple
-  return false;
-};
 
 // ✅ CHANGE 1: Add `arrayKeys` to the list of recognized metadata keys.
 export const METADATA_KEYS = new Set([
@@ -375,7 +365,32 @@ export function buildShadowNode(value: any): any {
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   // Add to CogsGlobalState in store.ts
 
-  shadowStateStore: new Map<string, ShadowRootNEW>(),
+  shadowStateStore: new Map<string, ShadowMetadata>(),
+
+  setTransformCache: (
+    key: string,
+    path: string[],
+    cacheKey: string,
+    cacheData: any
+  ) => {
+    const fullKey = [key, ...path].join('.');
+    const newShadowStore = new Map(get().shadowStateStore);
+    const existing = newShadowStore.get(fullKey) || {};
+
+    // Initialize transformCaches if it doesn't exist
+    if (!existing.transformCaches) {
+      existing.transformCaches = new Map();
+    }
+
+    // Update just the specific cache entry
+    existing.transformCaches.set(cacheKey, cacheData);
+
+    // Update shadow store WITHOUT notifying path subscribers
+    newShadowStore.set(fullKey, existing);
+    set({ shadowStateStore: newShadowStore });
+
+    // Don't call notifyPathSubscribers here - cache updates shouldn't trigger renders
+  },
   initializeShadowState: (key: string, initialState: any) => {
     set((state) => {
       const newShadowStoreNEW = new Map(state.shadowStateStore);

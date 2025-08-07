@@ -2799,12 +2799,42 @@ function createProxyHandler<T>(
                   : `${componentId}-base`;
 
               const [updateTrigger, forceUpdate] = useState({});
+              const { validIds, arrayValues } = useMemo(() => {
+                const cached = getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, path)
+                  ?.transformCaches?.get(cacheKey);
 
-              const { keys: validIds, value: arrayValues } = getArrayData(
-                stateKey,
-                path,
-                meta
-              );
+                let freshValidIds: string[];
+
+                if (cached && cached.validIds) {
+                  freshValidIds = cached.validIds;
+                } else {
+                  freshValidIds = applyTransforms(
+                    stateKey,
+                    path,
+                    meta?.transforms
+                  );
+
+                  getGlobalStore
+                    .getState()
+                    .setTransformCache(stateKey, path, cacheKey, {
+                      validIds: freshValidIds,
+                      computedAt: Date.now(),
+                      transforms: meta?.transforms || [],
+                    });
+                }
+
+                const freshValues = getGlobalStore
+                  .getState()
+                  .getShadowValue(stateKey, path, freshValidIds);
+
+                return {
+                  validIds: freshValidIds,
+                  arrayValues: freshValues || [],
+                };
+              }, [cacheKey, updateTrigger]);
+
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()

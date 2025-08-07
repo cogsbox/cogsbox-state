@@ -116,48 +116,9 @@ export type CogsEvent = {
     type: 'RELOAD';
     path: string;
 };
-type ShadowValueNEW = {
-    value: any;
-    signals?: Array<{
-        instanceId: string;
-        parentId: string;
-        position: number;
-        effect?: string;
-    }>;
-    validation?: ValidationState;
-    virtualizer?: {
-        itemHeight?: number;
-        domRef?: HTMLElement | null;
-    };
-    pathComponents?: Set<string>;
-};
-type ShadowObjectNEW = {
-    [key: string]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
-};
-type ShadowArrayNEW = {
-    [key: `id:${string}`]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
-    arrayKeys: string[];
-    mapWrappers?: Array<{
-        instanceId: string;
-        path: string[];
-        componentId: string;
-        meta?: any;
-        mapFn: (setter: any, index: number, arraySetter: any) => ReactNode;
-        containerRef: HTMLDivElement | null;
-        rebuildStateShape: any;
-    }>;
-    transformCaches?: Map<string, {
-        validIds: string[];
-        computedAt: number;
-        transforms: Array<{
-            type: 'filter' | 'sort';
-            fn: Function;
-        }>;
-    }>;
-};
-type ShadowRootNEW = ShadowObjectNEW | ShadowArrayNEW;
 export type CogsGlobalState = {
-    shadowStateStore: Map<string, ShadowRootNEW>;
+    shadowStateStore: Map<string, ShadowMetadata>;
+    setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     initializeShadowState: (key: string, initialState: any) => void;
     getShadowMetadata: (key: string, path: string[]) => ShadowMetadata | undefined;
     setShadowMetadata: (key: string, path: string[], metadata: any) => void;
