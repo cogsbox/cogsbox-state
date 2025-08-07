@@ -337,7 +337,6 @@ type LocalStorageData<T> = {
     baseServerState?: T;
     stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare const notifyComponent: (stateKey: string, componentId: string) => void;
 export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, }?: {
     stateKey?: string;
     componentId?: string;
@@ -345,29 +344,14 @@ export declare function useCogsStateFn<TStateObject extends unknown>(stateObject
     __useSync?: UseSyncType<TStateObject>;
     syncOptions?: SyncOptionsType<any>;
 } & OptionsType<TStateObject>): StateObject<TStateObject>;
-export type MetaData = {
-    /**
-     * An array of the full, unique string IDs (e.g., `"stateKey.arrayName.id:123"`)
-     * of the items that belong to the current derived "view" of an array.
-     * This is the primary mechanism for tracking the state of filtered or sorted lists.
-     *
-     * - `stateFilter` populates this with only the IDs of items that passed the filter.
-     * - `stateSort` reorders this list to match the new sort order.
-     * - All subsequent chained operations (like `.get()`, `.index()`, or `.cut()`)
-     *   MUST consult this list first to know which items they apply to and in what order.
-     */
-    validIds?: string[];
-    /**
-     * An array of the actual filter functions that have been applied in a chain.
-     * This is primarily used by reactive renderers like `$stateMap` to make predictions.
-     *
-     * For example, when a new item is inserted into the original source array, a
-     * `$stateMap` renderer on a filtered view can use these functions to test if the
-     * newly inserted item should be dynamically rendered in its view.
-     */
+type MetaData = {
+    arrayViews?: {
+        [arrayPath: string]: string[];
+    };
     transforms?: Array<{
         type: 'filter' | 'sort';
         fn: Function;
+        path: string[];
     }>;
 };
 export declare function $cogsSignal(proxy: {

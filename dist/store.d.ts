@@ -66,12 +66,6 @@ export type ShadowMetadata = {
     };
     lastUpdated?: number;
     value?: any;
-    classSignals?: Array<{
-        id: string;
-        effect: string;
-        lastClasses: string;
-        deps: any[];
-    }>;
     signals?: Array<{
         instanceId: string;
         parentId: string;
@@ -122,25 +116,61 @@ export type CogsEvent = {
     type: 'RELOAD';
     path: string;
 };
+type ShadowValueNEW = {
+    value: any;
+    signals?: Array<{
+        instanceId: string;
+        parentId: string;
+        position: number;
+        effect?: string;
+    }>;
+    validation?: ValidationState;
+    virtualizer?: {
+        itemHeight?: number;
+        domRef?: HTMLElement | null;
+    };
+    pathComponents?: Set<string>;
+};
+type ShadowObjectNEW = {
+    [key: string]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
+};
+type ShadowArrayNEW = {
+    [key: `id:${string}`]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
+    arrayKeys: string[];
+    mapWrappers?: Array<{
+        instanceId: string;
+        path: string[];
+        componentId: string;
+        meta?: any;
+        mapFn: (setter: any, index: number, arraySetter: any) => ReactNode;
+        containerRef: HTMLDivElement | null;
+        rebuildStateShape: any;
+    }>;
+    transformCaches?: Map<string, {
+        validIds: string[];
+        computedAt: number;
+        transforms: Array<{
+            type: 'filter' | 'sort';
+            fn: Function;
+        }>;
+    }>;
+};
+type ShadowRootNEW = ShadowObjectNEW | ShadowArrayNEW;
 export type CogsGlobalState = {
-    updateQueue: Set<() => void>;
-    isFlushScheduled: boolean;
-    flushUpdates: () => void;
+    shadowStateStore: Map<string, ShadowRootNEW>;
+    initializeShadowState: (key: string, initialState: any) => void;
+    getShadowMetadata: (key: string, path: string[]) => ShadowMetadata | undefined;
+    setShadowMetadata: (key: string, path: string[], metadata: any) => void;
+    getShadowValue: (key: string, path: string[], validArrayIds?: string[], log?: boolean) => any;
+    updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any, index?: number) => void;
+    removeShadowArrayElement: (key: string, itemPath: string[]) => void;
     registerComponent: (stateKey: string, componentId: string, registration: any) => void;
     unregisterComponent: (stateKey: string, componentId: string) => void;
     addPathComponent: (stateKey: string, dependencyPath: string[], fullComponentId: string) => void;
-    shadowStateStore: Map<string, ShadowMetadata>;
     markAsDirty: (key: string, path: string[], options: {
         bubble: boolean;
     }) => void;
-    initializeShadowState: (key: string, initialState: any) => void;
-    updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
-    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any) => void;
-    removeShadowArrayElement: (key: string, arrayPath: string[]) => void;
-    getShadowValue: (key: string, validArrayIds?: string[]) => any;
-    getShadowMetadata: (key: string, path: string[]) => ShadowMetadata | undefined;
-    setShadowMetadata: (key: string, path: string[], metadata: Omit<ShadowMetadata, 'id'>) => void;
-    setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     pathSubscribers: Map<string, Set<(newValue: any) => void>>;
     subscribeToPath: (path: string, callback: (newValue: any) => void) => () => void;
     notifyPathSubscribers: (updatedPath: string, newValue: any) => void;
@@ -168,10 +198,16 @@ export type CogsGlobalState = {
     setServerStateUpdate: (key: string, serverState: any) => void;
     stateLog: Map<string, Map<string, UpdateTypeDetail>>;
     syncInfoStore: Map<string, SyncInfo>;
-    addStateLog: (key: string, update: UpdateTypeDetail) => void;
+    addStateLog: (updates: UpdateTypeDetail[]) => void;
     setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
     getSyncInfo: (key: string) => SyncInfo | null;
 };
+export declare const METADATA_KEYS: Set<string>;
+/**
+ * The single source of truth for converting a regular JS value/object
+ * into the shadow state tree format.
+ */
+export declare function buildShadowNode(value: any): any;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};
 //# sourceMappingURL=store.d.ts.map

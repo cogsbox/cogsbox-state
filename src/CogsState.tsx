@@ -27,8 +27,10 @@ import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
+  buildShadowNode,
   formRefStore,
   getGlobalStore,
+  METADATA_KEYS,
   ValidationError,
   ValidationStatus,
   type ComponentsType,
@@ -333,7 +335,8 @@ type UpdateOptions = {
 type EffectiveSetState<TStateObject> = (
   newStateOrFunction:
     | EffectiveSetStateArg<TStateObject, 'update'>
-    | EffectiveSetStateArg<TStateObject, 'insert'>,
+    | EffectiveSetStateArg<TStateObject, 'insert'>
+    | null,
   path: string[],
   updateObj: UpdateOptions,
   validationKey?: string
@@ -475,11 +478,72 @@ export type TransformedStateType<T> = {
   [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
 
-function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
-  const getInitialOptions = getGlobalStore.getState().getInitialOptions;
-  const setInitialStateOptions =
-    getGlobalStore.getState().setInitialStateOptions;
+const {
+  getInitialOptions,
+  updateInitialStateGlobal,
+  // ALIAS THE NEW FUNCTIONS TO THE OLD NAMES
+  getShadowMetadata,
+  setShadowMetadata,
+  getShadowValue,
+  initializeShadowState,
+  updateShadowAtPath,
+  insertShadowArrayElement,
+  removeShadowArrayElement,
+  getSelectedIndex,
+  setInitialStateOptions,
+  setServerStateUpdate,
+  markAsDirty,
+  registerComponent,
+  unregisterComponent,
+  addPathComponent,
+  clearSelectedIndexesForState,
+  addStateLog,
+  setSyncInfo,
+  clearSelectedIndex,
+  getSyncInfo,
+  notifyPathSubscribers,
+  subscribeToPath,
+  // Note: The old functions are no longer imported under their original names
+} = getGlobalStore.getState();
 
+function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
+  const shadowNode = getShadowMetadata(stateKey, path);
+  console.log('shadowNode', shadowNode, meta);
+  if (shadowNode && 'value' in shadowNode) {
+    return { isArray: false, value: shadowNode.value, keys: [] };
+  }
+
+  const arrayPathKey = path.join('.');
+  const viewIds = meta?.arrayViews?.[arrayPathKey] ?? shadowNode?.arrayKeys;
+
+  const value = getGlobalStore
+    .getState()
+    .getShadowValue(stateKey, path, viewIds);
+
+  if (!Array.isArray(value)) {
+    return { isArray: false, value, keys: [] };
+  }
+
+  return { isArray: true, value, keys: viewIds ?? [] };
+}
+
+function findArrayItem(
+  array: any[],
+  keys: string[],
+  predicate: (item: any, index: number) => boolean
+): { key: string; index: number; value: any } | null {
+  for (let i = 0; i < array.length; i++) {
+    if (predicate(array[i], i)) {
+      const key = keys[i];
+      if (key) {
+        return { key, index: i, value: array[i] };
+      }
+    }
+  }
+  return null;
+}
+
+function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
 
   setInitialStateOptions(stateKey as string, {
@@ -498,8 +562,7 @@ function setOptions<StateKey, Opt>({
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
-  const setInitialStateOptions =
-    getGlobalStore.getState().setInitialStateOptions;
+
   const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
 
   let needToAdd = false;
@@ -620,10 +683,10 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       const existingGlobalOptions = getInitialOptions(key);
 
       if (!existingGlobalOptions) {
-        getGlobalStore.getState().setInitialStateOptions(key, mergedOptions);
+        setInitialStateOptions(key, mergedOptions);
       } else {
         // Merge with existing global options
-        getGlobalStore.getState().setInitialStateOptions(key, {
+        setInitialStateOptions(key, {
           ...existingGlobalOptions,
           ...mergedOptions,
         });
@@ -632,9 +695,9 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   });
 
   Object.keys(statePart).forEach((key) => {
-    getGlobalStore.getState().initializeShadowState(key, statePart[key]);
+    initializeShadowState(key, statePart[key]);
   });
-
+  console.log('new stateObject ', getGlobalStore.getState().shadowStateStore);
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
@@ -649,8 +712,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       initialOptionsPart,
     });
     const thiState =
-      getGlobalStore.getState().getShadowValue(stateKey as string) ||
-      statePart[stateKey as string];
+      getShadowValue(stateKey as string, []) || statePart[stateKey as string];
     const partialState = options?.modifyState
       ? options.modifyState(thiState)
       : thiState;
@@ -773,12 +835,7 @@ export function createCogsStateFromSync<
     __syncSchemas: schemas,
   }) as any;
 }
-const {
-  getInitialOptions,
 
-  addStateLog,
-  updateInitialStateGlobal,
-} = getGlobalStore.getState();
 const saveToLocalStorage = <T,>(
   state: T,
   thisKey: string,
@@ -810,7 +867,7 @@ const saveToLocalStorage = <T,>(
     } catch {
       // Ignore errors, will use undefined
     }
-    const shadowMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+    const shadowMeta = getShadowMetadata(thisKey, []);
 
     const data: LocalStorageData<T> = {
       state,
@@ -846,7 +903,7 @@ const loadFromLocalStorage = (localStorageKey: string) => {
   }
 };
 const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
-  const currentState = getGlobalStore.getState().getShadowValue(stateKey);
+  const currentState = getShadowValue(stateKey, []);
   const { sessionId } = useCogsConfig();
   const localkey = isFunction(options?.localStorage?.key)
     ? options.localStorage.key(currentState)
@@ -877,7 +934,7 @@ type LocalStorageData<T> = {
 };
 
 const notifyComponents = (thisKey: string) => {
-  const stateEntry = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+  const stateEntry = getShadowMetadata(thisKey, []);
   if (!stateEntry) return;
 
   // Batch component updates
@@ -899,40 +956,15 @@ const notifyComponents = (thisKey: string) => {
   });
 };
 
-export const notifyComponent = (stateKey: string, componentId: string) => {
-  const stateEntry = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-  if (stateEntry) {
-    const fullComponentId = `${stateKey}////${componentId}`;
-    const component = stateEntry?.components?.get(fullComponentId);
-    const reactiveTypes = component
-      ? Array.isArray(component.reactiveType)
-        ? component.reactiveType
-        : [component.reactiveType || 'component']
-      : null;
-
-    // Skip if reactivity is disabled
-    if (reactiveTypes?.includes('none')) {
-      return;
-    }
-
-    if (component) {
-      // Force an update to ensure the current value is saved
-
-      component.forceUpdate();
-    }
-  }
-};
 function markEntireStateAsServerSynced(
   stateKey: string,
   path: string[],
   data: any,
   timestamp: number
 ) {
-  const store = getGlobalStore.getState();
-
   // Mark current path as synced
-  const currentMeta = store.getShadowMetadata(stateKey, path);
-  store.setShadowMetadata(stateKey, path, {
+  const currentMeta = getShadowMetadata(stateKey, path);
+  setShadowMetadata(stateKey, path, {
     ...currentMeta,
     isDirty: false,
     stateSource: 'server',
@@ -941,10 +973,11 @@ function markEntireStateAsServerSynced(
 
   // If it's an array, mark each item as synced
   if (Array.isArray(data)) {
-    const arrayMeta = store.getShadowMetadata(stateKey, path);
+    const arrayMeta = getShadowMetadata(stateKey, path);
     if (arrayMeta?.arrayKeys) {
       arrayMeta.arrayKeys.forEach((itemKey, index) => {
-        const itemPath = itemKey.split('.').slice(1);
+        // Fix: Don't split the itemKey, just use it directly
+        const itemPath = [...path, itemKey];
         const itemData = data[index];
         if (itemData !== undefined) {
           markEntireStateAsServerSynced(
@@ -966,8 +999,356 @@ function markEntireStateAsServerSynced(
     });
   }
 }
-let updateBatchQueue = new Map<string, Array<UpdateArg<any>>>();
-let batchFlushScheduled = false;
+// 5. Batch queue
+let updateBatchQueue: any[] = [];
+let isFlushScheduled = false;
+
+function scheduleFlush() {
+  if (!isFlushScheduled) {
+    isFlushScheduled = true;
+    queueMicrotask(flushQueue);
+  }
+}
+function handleUpdate(
+  stateKey: string,
+  path: string[],
+  payload: any
+): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } {
+  // Get the full existing node, including its metadata
+  const existingNode = getShadowMetadata(stateKey, path) || {};
+  const currentValue = getGlobalStore.getState().getShadowValue(stateKey, path);
+
+  const newValue = isFunction(payload) ? payload(currentValue) : payload;
+
+  const newNode = buildShadowNode(newValue);
+
+  if (Object.prototype.hasOwnProperty.call(newNode, 'value')) {
+    // Get all keys from the old node that are metadata keys
+    for (const key in existingNode) {
+      if (METADATA_KEYS.has(key)) {
+        newNode[key] = existingNode[key as keyof typeof existingNode];
+      }
+    }
+  }
+
+  updateShadowAtPath(stateKey, path, newValue); // The logic will be moved into this function
+
+  markAsDirty(stateKey, path, { bubble: true });
+
+  // Return the metadata of the node *after* the update
+  const newShadowMeta = getShadowMetadata(stateKey, path);
+
+  return {
+    type: 'update',
+    oldValue: currentValue,
+    newValue,
+    shadowMeta: newShadowMeta,
+  };
+}
+// 2. Update signals
+function updateSignals(shadowMeta: any, displayValue: any) {
+  if (!shadowMeta?.signals?.length) return;
+
+  shadowMeta.signals.forEach(({ parentId, position, effect }: any) => {
+    const parent = document.querySelector(`[data-parent-id="${parentId}"]`);
+    if (!parent) return;
+
+    const childNodes = Array.from(parent.childNodes);
+    if (!childNodes[position]) return;
+
+    let finalDisplayValue = displayValue;
+    if (effect && displayValue !== null) {
+      try {
+        finalDisplayValue = new Function('state', `return (${effect})(state)`)(
+          displayValue
+        );
+      } catch (err) {
+        console.error('Error evaluating effect function:', err);
+      }
+    }
+
+    if (finalDisplayValue !== null && typeof finalDisplayValue === 'object') {
+      finalDisplayValue = JSON.stringify(finalDisplayValue);
+    }
+
+    childNodes[position].textContent = String(finalDisplayValue ?? '');
+  });
+}
+
+function getComponentNotifications(
+  stateKey: string,
+  path: string[],
+  result: any
+): Set<any> {
+  const rootMeta = getShadowMetadata(stateKey, []);
+
+  if (!rootMeta?.components) {
+    return new Set();
+  }
+
+  const componentsToNotify = new Set<any>();
+
+  // --- PASS 1: Notify specific subscribers based on update type ---
+
+  if (result.type === 'update') {
+    // --- Bubble-up Notification ---
+    // An update to `user.address.street` notifies listeners of `street`, `address`, and `user`.
+    let currentPath = [...path];
+    while (true) {
+      const pathMeta = getShadowMetadata(stateKey, currentPath);
+
+      if (pathMeta?.pathComponents) {
+        pathMeta.pathComponents.forEach((componentId: string) => {
+          const component = rootMeta.components?.get(componentId);
+          // NEW: Add component to the set instead of calling forceUpdate()
+          if (component) {
+            const reactiveTypes = Array.isArray(component.reactiveType)
+              ? component.reactiveType
+              : [component.reactiveType || 'component'];
+            if (!reactiveTypes.includes('none')) {
+              componentsToNotify.add(component);
+            }
+          }
+        });
+      }
+
+      if (currentPath.length === 0) break;
+      currentPath.pop(); // Go up one level
+    }
+
+    // --- Deep Object Change Notification ---
+    // If the new value is an object, notify components subscribed to sub-paths that changed.
+    if (
+      result.newValue &&
+      typeof result.newValue === 'object' &&
+      !isArray(result.newValue)
+    ) {
+      const changedSubPaths = getDifferences(result.newValue, result.oldValue);
+
+      changedSubPaths.forEach((subPathString: string) => {
+        const subPath = subPathString.split('.');
+        const fullSubPath = [...path, ...subPath];
+        const subPathMeta = getShadowMetadata(stateKey, fullSubPath);
+
+        if (subPathMeta?.pathComponents) {
+          subPathMeta.pathComponents.forEach((componentId: string) => {
+            const component = rootMeta.components?.get(componentId);
+            // NEW: Add component to the set
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || 'component'];
+              if (!reactiveTypes.includes('none')) {
+                componentsToNotify.add(component);
+              }
+            }
+          });
+        }
+      });
+    }
+  } else if (result.type === 'insert' || result.type === 'cut') {
+    // For array structural changes (add/remove), notify components listening to the parent array.
+    const parentArrayPath = result.type === 'insert' ? path : path.slice(0, -1);
+    const parentMeta = getShadowMetadata(stateKey, parentArrayPath);
+
+    if (parentMeta?.pathComponents) {
+      parentMeta.pathComponents.forEach((componentId: string) => {
+        const component = rootMeta.components?.get(componentId);
+        // NEW: Add component to the set
+        if (component) {
+          componentsToNotify.add(component);
+        }
+      });
+    }
+  }
+
+  // --- PASS 2: Handle 'all' and 'deps' reactivity types ---
+  // Iterate over all components for this stateKey that haven't been notified yet.
+  rootMeta.components.forEach((component, componentId) => {
+    // If we've already added this component, skip it.
+    if (componentsToNotify.has(component)) {
+      return;
+    }
+
+    const reactiveTypes = Array.isArray(component.reactiveType)
+      ? component.reactiveType
+      : [component.reactiveType || 'component'];
+
+    if (reactiveTypes.includes('all')) {
+      componentsToNotify.add(component);
+    } else if (reactiveTypes.includes('deps') && component.depsFunction) {
+      const currentState = getShadowValue(stateKey, []);
+      const newDeps = component.depsFunction(currentState);
+
+      if (
+        newDeps === true ||
+        (Array.isArray(newDeps) && !isDeepEqual(component.prevDeps, newDeps))
+      ) {
+        component.prevDeps = newDeps as any; // Update the dependencies for the next check
+        componentsToNotify.add(component);
+      }
+    }
+  });
+
+  return componentsToNotify;
+}
+
+function handleInsert(
+  stateKey: string,
+  path: string[],
+  payload: any
+): { type: 'insert'; newValue: any; shadowMeta: any } {
+  let newValue;
+  if (isFunction(payload)) {
+    const { value: currentValue } = getScopedData(stateKey, path);
+    newValue = payload({ state: currentValue, uuid: uuidv4() });
+  } else {
+    newValue = payload;
+  }
+
+  insertShadowArrayElement(stateKey, path, newValue);
+  markAsDirty(stateKey, path, { bubble: true });
+
+  const updatedMeta = getShadowMetadata(stateKey, path);
+  if (updatedMeta?.arrayKeys) {
+    const newItemKey = updatedMeta.arrayKeys[updatedMeta.arrayKeys.length - 1];
+    if (newItemKey) {
+      const newItemPath = newItemKey.split('.').slice(1);
+      markAsDirty(stateKey, newItemPath, { bubble: false });
+    }
+  }
+
+  return { type: 'insert', newValue, shadowMeta: updatedMeta };
+}
+
+function handleCut(
+  stateKey: string,
+  path: string[]
+): { type: 'cut'; oldValue: any; parentPath: string[] } {
+  const parentArrayPath = path.slice(0, -1);
+  const oldValue = getShadowValue(stateKey, path);
+  removeShadowArrayElement(stateKey, path);
+  markAsDirty(stateKey, parentArrayPath, { bubble: true });
+  return { type: 'cut', oldValue: oldValue, parentPath: parentArrayPath };
+}
+
+function flushQueue() {
+  const allComponentsToNotify = new Set<any>();
+  const signalUpdates: { shadowMeta: any; displayValue: any }[] = [];
+
+  const logsToAdd: UpdateTypeDetail[] = [];
+
+  for (const item of updateBatchQueue) {
+    if (item.status && item.updateType) {
+      logsToAdd.push(item as UpdateTypeDetail);
+      continue;
+    }
+
+    const result = item;
+
+    const displayValue = result.type === 'cut' ? null : result.newValue;
+    if (result.shadowMeta?.signals?.length > 0) {
+      signalUpdates.push({ shadowMeta: result.shadowMeta, displayValue });
+    }
+
+    const componentNotifications = getComponentNotifications(
+      result.stateKey,
+      result.path,
+      result
+    );
+
+    componentNotifications.forEach((component) => {
+      allComponentsToNotify.add(component);
+    });
+  }
+
+  if (logsToAdd.length > 0) {
+    addStateLog(logsToAdd);
+  }
+
+  signalUpdates.forEach(({ shadowMeta, displayValue }) => {
+    updateSignals(shadowMeta, displayValue);
+  });
+
+  allComponentsToNotify.forEach((component) => {
+    component.forceUpdate();
+  });
+
+  // --- Step 3: CLEANUP ---
+  // Clear the queue for the next batch of updates.
+  updateBatchQueue = [];
+  isFlushScheduled = false;
+}
+
+function createEffectiveSetState<T>(
+  thisKey: string,
+  syncApiRef: React.MutableRefObject<any>,
+  sessionId: string | undefined,
+  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
+): EffectiveSetState<T> {
+  // The returned function is the core setter that gets called by all state operations.
+  // It is now much simpler, delegating all work to the executeUpdate function.
+  return (newStateOrFunction, path, updateObj, validationKey?) => {
+    executeUpdate(thisKey, path, newStateOrFunction, updateObj);
+  };
+
+  // This inner function handles the logic for a single state update.
+  function executeUpdate(
+    stateKey: string,
+    path: string[],
+    payload: any,
+    options: UpdateOptions
+  ) {
+    // --- Step 1: Execute the core state change (Synchronous & Fast) ---
+    // This part modifies the in-memory state representation immediately.
+    let result: any;
+    switch (options.updateType) {
+      case 'update':
+        result = handleUpdate(stateKey, path, payload);
+        break;
+      case 'insert':
+        result = handleInsert(stateKey, path, payload);
+        break;
+      case 'cut':
+        result = handleCut(stateKey, path);
+        break;
+    }
+
+    result.stateKey = stateKey;
+    result.path = path;
+    updateBatchQueue.push(result);
+    scheduleFlush();
+
+    const newUpdate: UpdateTypeDetail = {
+      timeStamp: Date.now(),
+      stateKey,
+      path,
+      updateType: options.updateType,
+      status: 'new',
+      oldValue: result.oldValue,
+      newValue: result.newValue ?? null,
+    };
+
+    updateBatchQueue.push(newUpdate);
+
+    if (result.newValue !== undefined) {
+      saveToLocalStorage(
+        result.newValue,
+        stateKey,
+        latestInitialOptionsRef.current,
+        sessionId
+      );
+    }
+
+    if (latestInitialOptionsRef.current?.middleware) {
+      latestInitialOptionsRef.current.middleware({ update: newUpdate });
+    }
+
+    if (options.sync !== false && syncApiRef.current?.connected) {
+      syncApiRef.current.updateState({ operation: newUpdate });
+    }
+  }
+}
 
 export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
@@ -1006,7 +1387,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   useEffect(() => {
     if (syncUpdate && syncUpdate.stateKey === thisKey && syncUpdate.path?.[0]) {
       const syncKey = `${syncUpdate.stateKey}:${syncUpdate.path.join('.')}`;
-      getGlobalStore.getState().setSyncInfo(syncKey, {
+      setSyncInfo(syncKey, {
         timeStamp: syncUpdate.timeStamp!,
         userId: syncUpdate.userId!,
       });
@@ -1076,7 +1457,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   // Effect 1: When this component's serverState prop changes, broadcast it
   useEffect(() => {
-    getGlobalStore.getState().setServerStateUpdate(thisKey, serverState);
+    setServerStateUpdate(thisKey, serverState);
   }, [serverState, thisKey]);
 
   // Effect 2: Listen for server state updates from ANY component
@@ -1086,115 +1467,79 @@ export function useCogsStateFn<TStateObject extends unknown>(
       .subscribeToPath(thisKey, (event) => {
         if (event?.type === 'SERVER_STATE_UPDATE') {
           const serverStateData = event.serverState;
-          console.log('SERVER_STATE_UPDATE', event);
+
           if (
-            serverStateData?.status === 'success' &&
-            serverStateData.data !== undefined
+            serverStateData?.status !== 'success' ||
+            serverStateData.data === undefined
           ) {
-            const newOptions = { serverState: serverStateData };
-            setAndMergeOptions(thisKey, newOptions);
+            return; // Ignore if no valid data
+          }
 
-            const mergeConfig =
-              typeof serverStateData.merge === 'object'
-                ? serverStateData.merge
-                : serverStateData.merge === true
-                  ? { strategy: 'append' }
-                  : null;
+          console.log(
+            '✅ SERVER_STATE_UPDATE received with data:',
+            serverStateData
+          );
 
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue(thisKey);
-            const incomingData = serverStateData.data;
-            if (
-              mergeConfig &&
-              Array.isArray(currentState) &&
-              Array.isArray(incomingData)
-            ) {
-              const keyField = mergeConfig.key;
-              const existingIds = new Set(
-                currentState.map((item: any) => item[keyField])
+          setAndMergeOptions(thisKey, { serverState: serverStateData });
+
+          const mergeConfig =
+            typeof serverStateData.merge === 'object'
+              ? serverStateData.merge
+              : serverStateData.merge === true
+                ? { strategy: 'append' }
+                : null;
+
+          // ✅ FIX 1: The path for the root value is now `[]`.
+          const currentState = getShadowValue(thisKey, []);
+          const incomingData = serverStateData.data;
+
+          if (
+            mergeConfig &&
+            mergeConfig.strategy === 'append' &&
+            'key' in mergeConfig && // Type guard for key
+            Array.isArray(currentState) &&
+            Array.isArray(incomingData)
+          ) {
+            const keyField = mergeConfig.key;
+            if (!keyField) {
+              console.error(
+                "CogsState: Merge strategy 'append' requires a 'key' field."
               );
+              return;
+            }
+            console.log('SERVER_STATE_UPDATE 2');
+            const existingIds = new Set(
+              currentState.map((item: any) => item[keyField])
+            );
 
-              const newUniqueItems = incomingData.filter((item: any) => {
-                return !existingIds.has(item[keyField]);
+            const newUniqueItems = incomingData.filter(
+              (item: any) => !existingIds.has(item[keyField])
+            );
+
+            if (newUniqueItems.length > 0) {
+              newUniqueItems.forEach((item) => {
+                insertShadowArrayElement(thisKey, [], item);
               });
-
-              if (newUniqueItems.length > 0) {
-                newUniqueItems.forEach((item) => {
-                  getGlobalStore
-                    .getState()
-                    .insertShadowArrayElement(thisKey, [], item);
-
-                  // MARK NEW SERVER ITEMS AS SYNCED
-                  const arrayMeta = getGlobalStore
-                    .getState()
-                    .getShadowMetadata(thisKey, []);
-
-                  if (arrayMeta?.arrayKeys) {
-                    const newItemKey =
-                      arrayMeta.arrayKeys[arrayMeta.arrayKeys.length - 1];
-                    if (newItemKey) {
-                      const newItemPath = newItemKey.split('.').slice(1);
-
-                      // Mark the new server item as synced, not dirty
-                      getGlobalStore
-                        .getState()
-                        .setShadowMetadata(thisKey, newItemPath, {
-                          isDirty: false,
-                          stateSource: 'server',
-                          lastServerSync:
-                            serverStateData.timestamp || Date.now(),
-                        });
-
-                      // Also mark all its child fields as synced if it's an object
-                      const itemValue = getGlobalStore
-                        .getState()
-                        .getShadowValue(newItemKey);
-                      if (
-                        itemValue &&
-                        typeof itemValue === 'object' &&
-                        !Array.isArray(itemValue)
-                      ) {
-                        Object.keys(itemValue).forEach((fieldKey) => {
-                          const fieldPath = [...newItemPath, fieldKey];
-                          getGlobalStore
-                            .getState()
-                            .setShadowMetadata(thisKey, fieldPath, {
-                              isDirty: false,
-                              stateSource: 'server',
-                              lastServerSync:
-                                serverStateData.timestamp || Date.now(),
-                            });
-                        });
-                      }
-                    }
-                  }
-                });
-              }
-            } else {
-              // For replace strategy or initial load
-              getGlobalStore
-                .getState()
-                .initializeShadowState(thisKey, incomingData);
-
-              // Mark the entire state tree as synced from server
-              markEntireStateAsServerSynced(
-                thisKey,
-                [],
-                incomingData,
-                serverStateData.timestamp
-              );
             }
 
-            const meta = getGlobalStore
-              .getState()
-              .getShadowMetadata(thisKey, []);
-            getGlobalStore.getState().setShadowMetadata(thisKey, [], {
-              ...meta,
-              stateSource: 'server',
-              lastServerSync: serverStateData.timestamp || Date.now(),
-              isDirty: false,
-            });
+            // Mark the entire final state as synced
+            const finalState = getShadowValue(thisKey, []);
+            markEntireStateAsServerSynced(
+              thisKey,
+              [],
+              finalState,
+              serverStateData.timestamp
+            );
+          } else {
+            // This handles the "replace" strategy (initial load)
+            initializeShadowState(thisKey, incomingData);
+
+            markEntireStateAsServerSynced(
+              thisKey,
+              [],
+              incomingData,
+              serverStateData.timestamp
+            );
           }
         }
       });
@@ -1219,7 +1564,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
       ),
       localStorageEnabled: !!options?.localStorage?.key,
     };
-    getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+    setShadowMetadata(thisKey, [], {
       ...existingMeta,
       features,
     });
@@ -1235,10 +1580,10 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       const { value: resolvedState, source, timestamp } = resolveInitialState();
 
-      getGlobalStore.getState().initializeShadowState(thisKey, resolvedState);
+      initializeShadowState(thisKey, resolvedState);
 
       // Set shadow metadata with the correct source info
-      getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+      setShadowMetadata(thisKey, [], {
         stateSource: source,
         lastServerSync: source === 'server' ? timestamp : undefined,
         isDirty: false,
@@ -1262,29 +1607,27 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const componentKey = `${thisKey}////${componentIdRef.current}`;
 
     // Register component in shadow metadata at root level
-    const rootMeta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+    const rootMeta = getShadowMetadata(thisKey, []);
     const components = rootMeta?.components || new Map();
 
     components.set(componentKey, {
       forceUpdate: () => forceUpdate({}),
-      reactiveType: reactiveType ?? ['component', 'deps'],
+      reactiveType: reactiveType ?? ['component'],
       paths: new Set(),
       depsFunction: reactiveDeps || undefined,
-      deps: reactiveDeps
-        ? reactiveDeps(getGlobalStore.getState().getShadowValue(thisKey))
-        : [],
+      deps: reactiveDeps ? reactiveDeps(getShadowValue(thisKey, [])) : [],
       prevDeps: reactiveDeps // Initialize prevDeps with the same initial value
-        ? reactiveDeps(getGlobalStore.getState().getShadowValue(thisKey))
+        ? reactiveDeps(getShadowValue(thisKey, []))
         : [],
     });
 
-    getGlobalStore.getState().setShadowMetadata(thisKey, [], {
+    setShadowMetadata(thisKey, [], {
       ...rootMeta,
       components,
     });
     forceUpdate({});
     return () => {
-      const meta = getGlobalStore.getState().getShadowMetadata(thisKey, []);
+      const meta = getShadowMetadata(thisKey, []);
       const component = meta?.components?.get(componentKey);
 
       // Remove from each path we registered to
@@ -1312,448 +1655,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
       // Remove from root components
       if (meta?.components) {
-        getGlobalStore.getState().setShadowMetadata(thisKey, [], meta);
+        setShadowMetadata(thisKey, [], meta);
       }
     };
   }, []);
 
   const syncApiRef = useRef<SyncApi | null>(null);
-
-  const effectiveSetState = (
-    newStateOrFunction: UpdateArg<TStateObject> | InsertParams<TStateObject>,
-    path: string[],
-    updateObj: UpdateOptions
-  ) => {
-    const fullPath = [thisKey, ...path].join('.');
-    const store = getGlobalStore.getState();
-
-    const shadowMeta = store.getShadowMetadata(thisKey, path);
-    const nestedShadowValue = store.getShadowValue(fullPath) as TStateObject;
-
-    const payload = (
-      updateObj.updateType === 'insert' && isFunction(newStateOrFunction)
-        ? newStateOrFunction({ state: nestedShadowValue, uuid: uuidv4() })
-        : isFunction(newStateOrFunction)
-          ? newStateOrFunction(nestedShadowValue)
-          : newStateOrFunction
-    ) as TStateObject;
-
-    const timeStamp = Date.now();
-
-    const newUpdate = {
-      timeStamp,
-      stateKey: thisKey,
-      path,
-      updateType: updateObj.updateType,
-      status: 'new' as const,
-      oldValue: nestedShadowValue,
-      newValue: payload,
-    } satisfies UpdateTypeDetail;
-
-    // Perform the update
-    switch (updateObj.updateType) {
-      case 'insert': {
-        store.insertShadowArrayElement(thisKey, path, newUpdate.newValue);
-        store.markAsDirty(thisKey, path, { bubble: true });
-        const arrayMeta = shadowMeta;
-        if (arrayMeta?.arrayKeys) {
-          const newItemKey =
-            arrayMeta.arrayKeys[arrayMeta.arrayKeys.length - 1];
-          if (newItemKey) {
-            const newItemPath = newItemKey.split('.').slice(1); // Remove stateKey
-            store.markAsDirty(thisKey, newItemPath, { bubble: false });
-          }
-        }
-        break;
-      }
-      case 'cut': {
-        const parentArrayPath = path.slice(0, -1);
-
-        store.removeShadowArrayElement(thisKey, path);
-        store.markAsDirty(thisKey, parentArrayPath, { bubble: true });
-        break;
-      }
-      case 'update': {
-        store.updateShadowAtPath(thisKey, path, newUpdate.newValue);
-        store.markAsDirty(thisKey, path, { bubble: true });
-        break;
-      }
-    }
-
-    const shouldSync = updateObj.sync !== false;
-
-    if (shouldSync && syncApiRef.current && syncApiRef.current.connected) {
-      syncApiRef.current.updateState({ operation: newUpdate });
-    }
-    // Handle signals - reuse shadowMeta from the beginning
-    if (shadowMeta?.signals && shadowMeta.signals.length > 0) {
-      // Use updatedShadowValue if we need the new value, otherwise use payload
-      const displayValue = updateObj.updateType === 'cut' ? null : payload;
-
-      shadowMeta.signals.forEach(({ parentId, position, effect }) => {
-        const parent = document.querySelector(`[data-parent-id="${parentId}"]`);
-        if (parent) {
-          const childNodes = Array.from(parent.childNodes);
-          if (childNodes[position]) {
-            let finalDisplayValue = displayValue;
-            if (effect && displayValue !== null) {
-              try {
-                finalDisplayValue = new Function(
-                  'state',
-                  `return (${effect})(state)`
-                )(displayValue);
-              } catch (err) {
-                console.error('Error evaluating effect function:', err);
-              }
-            }
-
-            if (
-              finalDisplayValue !== null &&
-              finalDisplayValue !== undefined &&
-              typeof finalDisplayValue === 'object'
-            ) {
-              finalDisplayValue = JSON.stringify(finalDisplayValue) as any;
-            }
-
-            childNodes[position].textContent = String(finalDisplayValue ?? '');
-          }
-        }
-      });
-    }
-
-    // Update in effectiveSetState for insert handling:
-    if (updateObj.updateType === 'insert') {
-      // Use shadowMeta from beginning if it's an array
-      if (shadowMeta?.mapWrappers && shadowMeta.mapWrappers.length > 0) {
-        // Get fresh array keys after insert
-        const sourceArrayKeys =
-          store.getShadowMetadata(thisKey, path)?.arrayKeys || [];
-        const newItemKey = sourceArrayKeys[sourceArrayKeys.length - 1]!;
-        const newItemValue = store.getShadowValue(newItemKey);
-        const fullSourceArray = store.getShadowValue(
-          [thisKey, ...path].join('.')
-        );
-
-        if (!newItemKey || newItemValue === undefined) return;
-
-        shadowMeta.mapWrappers.forEach((wrapper) => {
-          let shouldRender = true;
-          let insertPosition = -1;
-
-          // Check if wrapper has transforms
-          if (wrapper.meta?.transforms && wrapper.meta.transforms.length > 0) {
-            // Check if new item passes all filters
-            for (const transform of wrapper.meta.transforms) {
-              if (transform.type === 'filter') {
-                if (!transform.fn(newItemValue, -1)) {
-                  shouldRender = false;
-                  break;
-                }
-              }
-            }
-
-            if (shouldRender) {
-              // Get current valid keys by applying transforms
-              const currentValidKeys = applyTransforms(
-                thisKey,
-                path,
-                wrapper.meta.transforms
-              );
-
-              // Find where to insert based on sort
-              const sortTransform = wrapper.meta.transforms.find(
-                (t: any) => t.type === 'sort'
-              );
-              if (sortTransform) {
-                // Add new item to the list and sort to find position
-                const allItems = currentValidKeys.map((key) => ({
-                  key,
-                  value: store.getShadowValue(key),
-                }));
-
-                allItems.push({ key: newItemKey, value: newItemValue });
-                allItems.sort((a, b) => sortTransform.fn(a.value, b.value));
-
-                insertPosition = allItems.findIndex(
-                  (item) => item.key === newItemKey
-                );
-              } else {
-                // No sort, insert at end
-                insertPosition = currentValidKeys.length;
-              }
-            }
-          } else {
-            // No transforms, always render at end
-            shouldRender = true;
-            insertPosition = sourceArrayKeys.length - 1;
-          }
-
-          if (!shouldRender) {
-            return; // Skip this wrapper, item doesn't pass filters
-          }
-
-          if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-            const itemElement = document.createElement('div');
-            itemElement.setAttribute('data-item-path', newItemKey);
-
-            // Insert at correct position
-            const children = Array.from(wrapper.containerRef.children);
-            if (insertPosition >= 0 && insertPosition < children.length) {
-              wrapper.containerRef.insertBefore(
-                itemElement,
-                children[insertPosition]!
-              );
-            } else {
-              wrapper.containerRef.appendChild(itemElement);
-            }
-
-            const root = createRoot(itemElement);
-            const componentId = uuidv4();
-            const itemPath = newItemKey.split('.').slice(1);
-
-            const arraySetter = wrapper.rebuildStateShape({
-              path: wrapper.path,
-              currentState: fullSourceArray,
-              componentId: wrapper.componentId,
-              meta: wrapper.meta,
-            });
-
-            root.render(
-              createElement(MemoizedCogsItemWrapper, {
-                stateKey: thisKey,
-                itemComponentId: componentId,
-                itemPath: itemPath,
-                localIndex: insertPosition,
-                arraySetter: arraySetter,
-                rebuildStateShape: wrapper.rebuildStateShape,
-                renderFn: wrapper.mapFn,
-              })
-            );
-          }
-        });
-      }
-    }
-
-    if (updateObj.updateType === 'cut') {
-      const arrayPath = path.slice(0, -1);
-      const arrayMeta = store.getShadowMetadata(thisKey, arrayPath);
-
-      if (arrayMeta?.mapWrappers && arrayMeta.mapWrappers.length > 0) {
-        arrayMeta.mapWrappers.forEach((wrapper) => {
-          if (wrapper.containerRef && wrapper.containerRef.isConnected) {
-            const elementToRemove = wrapper.containerRef.querySelector(
-              `[data-item-path="${fullPath}"]`
-            );
-            if (elementToRemove) {
-              elementToRemove.remove();
-            }
-          }
-        });
-      }
-    }
-
-    const rootMeta = store.getShadowMetadata(thisKey, []);
-    const notifiedComponents = new Set<string>();
-
-    if (!rootMeta?.components) {
-      return;
-    }
-
-    // --- PASS 1: Notify specific subscribers based on update type ---
-
-    if (updateObj.updateType === 'update') {
-      // --- Bubble-up Notification ---
-      // When a nested property changes, notify components listening at that exact path,
-      // and also "bubble up" to notify components listening on parent paths.
-      // e.g., an update to `user.address.street` notifies listeners of `street`, `address`, and `user`.
-      let currentPath = [...path]; // Create a mutable copy of the path
-
-      while (true) {
-        const currentPathMeta = store.getShadowMetadata(thisKey, currentPath);
-
-        if (currentPathMeta?.pathComponents) {
-          currentPathMeta.pathComponents.forEach((componentId) => {
-            if (notifiedComponents.has(componentId)) {
-              return; // Avoid sending redundant notifications
-            }
-            const component = rootMeta.components?.get(componentId);
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
-
-              // This notification logic applies to components that depend on object structures.
-              if (!reactiveTypes.includes('none')) {
-                component.forceUpdate();
-                notifiedComponents.add(componentId);
-              }
-            }
-          });
-        }
-
-        if (currentPath.length === 0) {
-          break; // We've reached the root, stop bubbling.
-        }
-        currentPath.pop(); // Go up one level for the next iteration.
-      }
-
-      // ADDITIONALLY, if the payload is an object, perform a deep-check and
-      // notify any components that are subscribed to specific sub-paths that changed.
-      if (
-        payload &&
-        typeof payload === 'object' &&
-        !isArray(payload) &&
-        nestedShadowValue &&
-        typeof nestedShadowValue === 'object' &&
-        !isArray(nestedShadowValue)
-      ) {
-        // Get a list of dot-separated paths that have changed (e.g., ['name', 'address.city'])
-        const changedSubPaths = getDifferences(payload, nestedShadowValue);
-
-        changedSubPaths.forEach((subPathString) => {
-          const subPath = subPathString.split('.');
-          const fullSubPath = [...path, ...subPath];
-
-          // Get the metadata (and subscribers) for this specific nested path
-          const subPathMeta = store.getShadowMetadata(thisKey, fullSubPath);
-          if (subPathMeta?.pathComponents) {
-            subPathMeta.pathComponents.forEach((componentId) => {
-              // Avoid sending a redundant update
-              if (notifiedComponents.has(componentId)) {
-                return;
-              }
-              const component = rootMeta.components?.get(componentId);
-              if (component) {
-                const reactiveTypes = Array.isArray(component.reactiveType)
-                  ? component.reactiveType
-                  : [component.reactiveType || 'component'];
-
-                if (!reactiveTypes.includes('none')) {
-                  component.forceUpdate();
-                  notifiedComponents.add(componentId);
-                }
-              }
-            });
-          }
-        });
-      }
-    } else if (
-      updateObj.updateType === 'insert' ||
-      updateObj.updateType === 'cut'
-    ) {
-      // For array structural changes, notify components listening to the parent array.
-      const parentArrayPath =
-        updateObj.updateType === 'insert' ? path : path.slice(0, -1);
-
-      const parentMeta = store.getShadowMetadata(thisKey, parentArrayPath);
-
-      // Handle signal updates for array length, etc.
-      if (parentMeta?.signals && parentMeta.signals.length > 0) {
-        const parentFullPath = [thisKey, ...parentArrayPath].join('.');
-        const parentValue = store.getShadowValue(parentFullPath);
-
-        parentMeta.signals.forEach(({ parentId, position, effect }) => {
-          const parent = document.querySelector(
-            `[data-parent-id="${parentId}"]`
-          );
-          if (parent) {
-            const childNodes = Array.from(parent.childNodes);
-            if (childNodes[position]) {
-              let displayValue = parentValue;
-              if (effect) {
-                try {
-                  displayValue = new Function(
-                    'state',
-                    `return (${effect})(state)`
-                  )(parentValue);
-                } catch (err) {
-                  console.error('Error evaluating effect function:', err);
-                  displayValue = parentValue;
-                }
-              }
-
-              if (
-                displayValue !== null &&
-                displayValue !== undefined &&
-                typeof displayValue === 'object'
-              ) {
-                displayValue = JSON.stringify(displayValue);
-              }
-
-              childNodes[position].textContent = String(displayValue ?? '');
-            }
-          }
-        });
-      }
-
-      // Notify components subscribed to the array itself.
-      if (parentMeta?.pathComponents) {
-        parentMeta.pathComponents.forEach((componentId) => {
-          if (!notifiedComponents.has(componentId)) {
-            const component = rootMeta.components?.get(componentId);
-            if (component) {
-              component.forceUpdate();
-              notifiedComponents.add(componentId);
-            }
-          }
-        });
-      }
-    }
-
-    rootMeta.components.forEach((component, componentId) => {
-      if (notifiedComponents.has(componentId)) {
-        return;
-      }
-
-      const reactiveTypes = Array.isArray(component.reactiveType)
-        ? component.reactiveType
-        : [component.reactiveType || 'component'];
-
-      if (reactiveTypes.includes('all')) {
-        component.forceUpdate();
-        notifiedComponents.add(componentId);
-        return;
-      }
-
-      if (reactiveTypes.includes('deps')) {
-        if (component.depsFunction) {
-          const currentState = store.getShadowValue(thisKey);
-          const newDeps = component.depsFunction(currentState);
-          let shouldUpdate = false;
-
-          if (newDeps === true) {
-            shouldUpdate = true;
-          } else if (Array.isArray(newDeps)) {
-            if (!isDeepEqual(component.prevDeps, newDeps)) {
-              component.prevDeps = newDeps;
-              shouldUpdate = true;
-            }
-          }
-
-          if (shouldUpdate) {
-            component.forceUpdate();
-            notifiedComponents.add(componentId);
-          }
-        }
-      }
-    });
-    notifiedComponents.clear();
-
-    addStateLog(thisKey, newUpdate);
-
-    saveToLocalStorage(
-      payload,
-      thisKey,
-      latestInitialOptionsRef.current,
-      sessionId
-    );
-
-    if (latestInitialOptionsRef.current?.middleware) {
-      latestInitialOptionsRef.current!.middleware({
-        update: newUpdate,
-      });
-    }
-  };
+  const effectiveSetState = createEffectiveSetState(
+    thisKey,
+    syncApiRef,
+    sessionId,
+    latestInitialOptionsRef
+  );
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
     updateInitialStateGlobal(thisKey, stateObject);
@@ -1783,30 +1696,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
   return updaterFinal;
 }
 
-export type MetaData = {
-  /**
-   * An array of the full, unique string IDs (e.g., `"stateKey.arrayName.id:123"`)
-   * of the items that belong to the current derived "view" of an array.
-   * This is the primary mechanism for tracking the state of filtered or sorted lists.
-   *
-   * - `stateFilter` populates this with only the IDs of items that passed the filter.
-   * - `stateSort` reorders this list to match the new sort order.
-   * - All subsequent chained operations (like `.get()`, `.index()`, or `.cut()`)
-   *   MUST consult this list first to know which items they apply to and in what order.
-   */
-  validIds?: string[];
-
-  /**
-   * An array of the actual filter functions that have been applied in a chain.
-   * This is primarily used by reactive renderers like `$stateMap` to make predictions.
-   *
-   * For example, when a new item is inserted into the original source array, a
-   * `$stateMap` renderer on a filtered view can use these functions to test if the
-   * newly inserted item should be dynamically rendered in its view.
-   */
+type MetaData = {
+  // Map array paths to their filtered/sorted ID order
+  arrayViews?: {
+    [arrayPath: string]: string[]; // e.g. { "todos": ["id:xxx", "id:yyy"], "todos.id:xxx.subtasks": ["id:aaa"] }
+  };
   transforms?: Array<{
     type: 'filter' | 'sort';
     fn: Function;
+    path: string[]; // Which array this transform applies to
   }>;
 };
 
@@ -1826,30 +1724,34 @@ const applyTransforms = (
   path: string[],
   transforms?: Array<{ type: 'filter' | 'sort'; fn: Function }>
 ): string[] => {
-  let arrayKeys =
-    getGlobalStore.getState().getShadowMetadata(stateKey, path)?.arrayKeys ||
-    [];
+  const node = getShadowMetadata(stateKey, path);
+  let ids = Object.keys(node || {}).filter((k) => k.startsWith('id:'));
 
   if (!transforms || transforms.length === 0) {
-    return arrayKeys;
+    return ids;
   }
 
-  let itemsWithKeys = arrayKeys.map((key) => ({
-    key,
-    value: getGlobalStore.getState().getShadowValue(key),
-  }));
-
+  // Apply each transform using just IDs
   for (const transform of transforms) {
     if (transform.type === 'filter') {
-      itemsWithKeys = itemsWithKeys.filter(({ value }, index) =>
-        transform.fn(value, index)
-      );
+      const filtered: any[] = [];
+      ids.forEach((id, index) => {
+        const value = getShadowValue(stateKey, [...path, id]);
+        if (transform.fn(value, index)) {
+          filtered.push(id);
+        }
+      });
+      ids = filtered;
     } else if (transform.type === 'sort') {
-      itemsWithKeys.sort((a, b) => transform.fn(a.value, b.value));
+      ids.sort((a, b) => {
+        const aValue = getShadowValue(stateKey, [...path, a]);
+        const bValue = getShadowValue(stateKey, [...path, b]);
+        return transform.fn(aValue, bValue);
+      });
     }
   }
 
-  return itemsWithKeys.map(({ key }) => key);
+  return ids;
 };
 const registerComponentDependency = (
   stateKey: string,
@@ -1857,7 +1759,6 @@ const registerComponentDependency = (
   dependencyPath: string[]
 ) => {
   const fullComponentId = `${stateKey}////${componentId}`;
-  const { addPathComponent, getShadowMetadata } = getGlobalStore.getState();
 
   const rootMeta = getShadowMetadata(stateKey, []);
   const component = rootMeta?.components?.get(fullComponentId);
@@ -1921,34 +1822,18 @@ const notifySelectionComponents = (
     }
   }
 };
-
 function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
-  const store = getGlobalStore.getState();
-  const shadowMeta = store.getShadowMetadata(stateKey, path);
+  const shadowMeta = getShadowMetadata(stateKey, path);
 
-  // --- THE OPTIMIZATION (THE "CHEAP PATH") ---
-  // If the metadata node has a 'value' property, it's a primitive.
-  // We can return it directly without any expensive reconstruction.
-  if (shadowMeta?.value !== undefined) {
-    return {
-      store,
-      shadowMeta,
-      value: shadowMeta.value, // Directly return the primitive value
-      arrayKeys: undefined, // Primitives don't have array keys
-    };
-  }
-
-  // --- THE RECONSTRUCTION (THE "EXPENSIVE PATH") ---
-  // If no direct value exists, it's an object or array. Now we MUST
-  // call the expensive reconstruction function.
-  const arrayKeys = meta?.validIds ?? shadowMeta?.arrayKeys;
-  const value = store.getShadowValue([stateKey, ...path].join('.'), arrayKeys);
+  // Just get the value directly from getShadowValue
+  const arrayPathKey = path.join('.');
+  const arrayKeys = meta?.arrayViews?.[arrayPathKey];
+  const value = getShadowValue(stateKey, path, arrayKeys);
 
   return {
-    store,
     shadowMeta,
     value,
-    arrayKeys,
+    arrayKeys: shadowMeta?.arrayKeys, // Get arrayKeys from the metadata
   };
 }
 
@@ -1961,6 +1846,59 @@ function createProxyHandler<T>(
   const proxyCache = new Map<string, any>();
   let stateVersion = 0;
 
+  const methodNames = new Set([
+    'getDifferences',
+    'sync',
+    'getStatus',
+    'removeStorage',
+    'showValidationErrors',
+    'getSelected',
+    'getSelectedIndex',
+    'clearSelected',
+    'useVirtualView',
+    'stateMap',
+    '$stateMap',
+    'stateFind',
+    'stateFilter',
+    'stateSort',
+    'stream',
+    'stateList',
+    'stateFlattenOn',
+    'index',
+    'last',
+    'insert',
+    'uniqueInsert',
+    'cut',
+    'cutSelected',
+    'cutByValue',
+    'toggleByValue',
+    'findWith',
+    'cutThis',
+    'get',
+    'getState',
+    '$derive',
+    '$get',
+    'lastSynced',
+    'getLocalStorage',
+    'isSelected',
+    'setSelected',
+    'toggleSelected',
+    '_componentId',
+    'addZodValidation',
+    'clearZodValidation',
+    'applyJsonPatch',
+    'getComponents',
+    'getAllFormRefs',
+    'getFormRef',
+    'validationWrapper',
+    '_stateKey',
+    '_path',
+    'update',
+    'toggle',
+    'formElement',
+    // Add ANY other method names here
+  ]);
+
   function rebuildStateShape({
     path = [],
     meta,
@@ -1971,7 +1909,7 @@ function createProxyHandler<T>(
     meta?: MetaData;
   }): any {
     const derivationSignature = meta
-      ? JSON.stringify(meta.validIds || meta.transforms)
+      ? JSON.stringify(meta.arrayViews || meta.transforms)
       : '';
     const cacheKey = path.join('.') + ':' + derivationSignature;
     if (proxyCache.has(cacheKey)) {
@@ -1979,29 +1917,25 @@ function createProxyHandler<T>(
     }
     const stateKeyPathKey = [stateKey, ...path].join('.');
 
-    type CallableStateObject<T> = {
-      (): T;
-    } & {
-      [key: string]: any;
-    };
-
-    const baseFunction = function () {
-      return getGlobalStore().getShadowValue(stateKey, path);
-    } as unknown as CallableStateObject<T>;
-
     // We attach baseObj properties *inside* the get trap now to avoid recursion
     // This is a placeholder for the proxy.
 
     const handler = {
       get(target: any, prop: string) {
+        if (path.length === 0 && prop in rootLevelMethods) {
+          return rootLevelMethods[prop as keyof typeof rootLevelMethods];
+        }
+        if (!methodNames.has(prop)) {
+          const nextPath = [...path, prop];
+          return rebuildStateShape({
+            path: nextPath,
+            componentId: componentId!,
+            meta,
+          });
+        }
         if (prop === '_rebuildStateShape') {
           return rebuildStateShape;
         }
-        const baseObjProps = Object.getOwnPropertyNames(baseObj);
-        if (baseObjProps.includes(prop) && path.length === 0) {
-          return (baseObj as any)[prop];
-        }
-        // ^--------- END OF FIX ---------^
 
         if (prop === 'getDifferences') {
           return () => {
@@ -2056,7 +1990,7 @@ function createProxyHandler<T>(
                 const shadowMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, []);
-                getGlobalStore.getState().setShadowMetadata(stateKey, [], {
+                setShadowMetadata(stateKey, [], {
                   ...shadowMeta,
                   isDirty: false,
                   lastServerSync: Date.now(),
@@ -2152,55 +2086,77 @@ function createProxyHandler<T>(
 
         if (prop === 'getSelected') {
           return () => {
-            const fullKey = stateKey + '.' + path.join('.');
+            const arrayKey = [stateKey, ...path].join('.');
             registerComponentDependency(stateKey, componentId, [
               ...path,
               'getSelected',
             ]);
 
-            const selectedIndicesMap =
-              getGlobalStore.getState().selectedIndicesMap;
-            if (!selectedIndicesMap || !selectedIndicesMap.has(fullKey)) {
+            const selectedItemKey = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(arrayKey);
+            if (!selectedItemKey) {
               return undefined;
             }
 
-            const selectedItemKey = selectedIndicesMap.get(fullKey)!;
-            if (meta?.validIds) {
-              if (!meta.validIds.includes(selectedItemKey)) {
-                return undefined;
-              }
+            const viewKey = path.join('.');
+            const currentViewIds = meta?.arrayViews?.[viewKey];
+            const selectedItemId = selectedItemKey.split('.').pop();
+
+            // FIX: Only return the selected item if it exists in the current filtered/sorted view.
+            if (currentViewIds && !currentViewIds.includes(selectedItemId!)) {
+              return undefined;
             }
 
-            const value = getGlobalStore
-              .getState()
-              .getShadowValue(selectedItemKey);
-
-            if (!value) {
+            const value = getShadowValue(
+              stateKey,
+              selectedItemKey.split('.').slice(1)
+            );
+            if (value === undefined) {
               return undefined;
             }
 
             return rebuildStateShape({
               path: selectedItemKey.split('.').slice(1) as string[],
               componentId: componentId!,
+              meta,
             });
           };
         }
         if (prop === 'getSelectedIndex') {
           return () => {
-            const selectedIndex = getGlobalStore
-              .getState()
-              .getSelectedIndex(
-                stateKey + '.' + path.join('.'),
-                meta?.validIds
-              );
+            // Key for the array in the global selection map (e.g., "myState.products")
+            const arrayKey = stateKey + '.' + path.join('.');
+            // Key for this specific view in the meta object (e.g., "products")
+            const viewKey = path.join('.');
 
-            return selectedIndex;
+            // Get the full path of the selected item (e.g., "myState.products.id:abc")
+            const selectedItemKey = getGlobalStore
+              .getState()
+              .selectedIndicesMap.get(arrayKey);
+
+            if (!selectedItemKey) {
+              return -1; // Nothing is selected for this array.
+            }
+
+            // Get the list of item IDs for the current filtered/sorted view.
+            const { keys: viewIds } = getArrayData(stateKey, path, meta);
+
+            if (!viewIds) {
+              return -1; // Should not happen if it's an array, but a safe guard.
+            }
+
+            // FIX: Extract just the ID from the full selected item path.
+            const selectedId = selectedItemKey.split('.').pop();
+
+            // Return the index of that ID within the current view's list of IDs.
+            return (viewIds as string[]).indexOf(selectedId as string);
           };
         }
         if (prop === 'clearSelected') {
           notifySelectionComponents(stateKey, path);
           return () => {
-            getGlobalStore.getState().clearSelectedIndex({
+            clearSelectedIndex({
               arrayKey: stateKey + '.' + path.join('.'),
             });
           };
@@ -2532,9 +2488,7 @@ function createProxyHandler<T>(
             // Create virtual state
             const virtualState = useMemo(() => {
               const store = getGlobalStore.getState();
-              const sourceArray = store.getShadowValue(
-                [stateKey, ...path].join('.')
-              ) as any[];
+              const sourceArray = store.getShadowValue(stateKey, path) as any[];
               const currentKeys =
                 store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
 
@@ -2546,11 +2500,11 @@ function createProxyHandler<T>(
                 range.startIndex,
                 range.endIndex + 1
               );
-
+              const arrayPath = path.length > 0 ? path.join('.') : 'root';
               return rebuildStateShape({
                 path,
                 componentId: componentId!,
-                meta: { ...meta, validIds: slicedIds },
+                meta: { ...meta, arrayViews: { [arrayPath]: slicedIds } },
               });
             }, [range.startIndex, range.endIndex, arrayKeys.length]);
 
@@ -2597,165 +2551,129 @@ function createProxyHandler<T>(
         }
         if (prop === 'stateMap') {
           return (
-            callbackfn: (
-              setter: any,
-              index: number,
-
-              arraySetter: any
-            ) => void
+            callbackfn: (setter: any, index: number, arraySetter: any) => void
           ) => {
-            const { value: shadowValue, arrayKeys } = getScopedData(
+            // FIX: Use getArrayData to reliably get both the value and the keys of the current view.
+            const { value: shadowValue, keys: arrayKeys } = getArrayData(
               stateKey,
               path,
               meta
-            ) as {
-              value: any[];
-              arrayKeys: string[] | undefined;
-            };
+            );
 
-            if (!arrayKeys) {
-              throw new Error('No array keys found for mapping');
+            if (!arrayKeys || !Array.isArray(shadowValue)) {
+              return []; // It's valid to map over an empty array.
             }
+
             const arraySetter = rebuildStateShape({
               path,
               componentId: componentId!,
               meta,
             });
 
-            return shadowValue.map((item, index) => {
-              const itemPath = arrayKeys[index]?.split('.').slice(1);
+            return shadowValue.map((_item, index) => {
+              const itemKey = arrayKeys[index];
+              if (!itemKey) return undefined;
+
+              // FIX: Construct the correct path to the item in the original store.
+              // The path is the array's path plus the specific item's unique key.
+              const itemPath = [...path, itemKey];
+
               const itemSetter = rebuildStateShape({
-                path: itemPath as any,
+                path: itemPath, // This now correctly points to the item in the shadow store.
                 componentId: componentId!,
                 meta,
               });
 
-              return callbackfn(
-                itemSetter,
-                index,
-
-                arraySetter
-              );
+              return callbackfn(itemSetter, index, arraySetter);
             });
           };
         }
 
-        if (prop === '$stateMap') {
-          return (callbackfn: any) =>
-            createElement(SignalMapRenderer, {
-              proxy: {
-                _stateKey: stateKey,
-                _path: path,
-                _mapFn: callbackfn,
-                _meta: meta,
-              },
-              rebuildStateShape,
-            });
-        } // In createProxyHandler -> handler -> get -> if (Array.isArray(currentState))
-
-        if (prop === 'stateFind') {
-          return (
-            callbackfn: (value: any, index: number) => boolean
-          ): StateObject<any> | undefined => {
-            // 1. Use the correct set of keys: filtered/sorted from meta, or all keys from the store.
-            const { store, arrayKeys } = getScopedData(stateKey, path, meta);
-            if (!arrayKeys) {
-              return undefined;
-            }
-            // 2. Iterate through the keys, get the value for each, and run the callback.
-            for (let i = 0; i < arrayKeys.length; i++) {
-              const itemKey = arrayKeys[i];
-              if (!itemKey) continue; // Safety check
-
-              const itemValue = store.getShadowValue(itemKey);
-
-              // 3. If the callback returns true, we've found our item.
-              if (callbackfn(itemValue, i)) {
-                // Get the item's path relative to the stateKey (e.g., ['messages', '42'] -> ['42'])
-                const itemPath = itemKey.split('.').slice(1);
-
-                // 4. Rebuild a new, fully functional StateObject for just that item and return it.
-                return rebuildStateShape({
-                  path: itemPath,
-                  componentId: componentId,
-                  meta, // Pass along meta for potential further chaining
-                });
-              }
-            }
-
-            // 5. If the loop finishes without finding anything, return undefined.
-            return undefined;
-          };
-        }
         if (prop === 'stateFilter') {
           return (callbackfn: (value: any, index: number) => boolean) => {
-            const { value: currentState, arrayKeys } = getScopedData(
-              stateKey,
-              path,
-              meta
-            );
-            if (!arrayKeys) {
-              throw new Error('No array keys found for filtering.');
+            // --- CHANGED LOGIC START ---
+
+            const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
+            // Get the IDs for the current view of THIS array, or all keys if no view exists
+            const currentViewIds =
+              meta?.arrayViews?.[arrayPathKey] ??
+              Object.keys(getShadowMetadata(stateKey, path) || {}).filter((k) =>
+                k.startsWith('id:')
+              );
+
+            const array = getShadowValue(stateKey, path, currentViewIds);
+
+            if (!Array.isArray(array)) {
+              throw new Error('stateFilter can only be used on arrays');
             }
 
-            const newValidIds: string[] = [];
-            const filteredArray = currentState.filter(
-              (val: any, index: number) => {
-                const didPass = callbackfn(val, index);
-                if (didPass) {
-                  newValidIds.push(arrayKeys[index]!);
-                  return true;
+            // Filter the array and collect the IDs of the items that pass
+            const filteredIds: string[] = [];
+            array.forEach((item, index) => {
+              if (callbackfn(item, index)) {
+                // currentViewIds[index] is the original ID before filtering
+                const id = currentViewIds[index];
+                if (id) {
+                  filteredIds.push(id);
                 }
-                return false;
               }
-            );
-
+            });
+            const arrayPath = path.length > 0 ? path.join('.') : 'root';
             return rebuildStateShape({
               path,
               componentId: componentId!,
               meta: {
-                validIds: newValidIds,
+                ...meta,
+                // Create a new arrayViews object, preserving other views and setting the new one for this path
+                arrayViews: {
+                  ...(meta?.arrayViews || {}),
+                  [arrayPath]: filteredIds,
+                },
                 transforms: [
                   ...(meta?.transforms || []),
-                  {
-                    type: 'filter',
-                    fn: callbackfn,
-                  },
+                  { type: 'filter', fn: callbackfn, path },
                 ],
               },
             });
+
+            // --- CHANGED LOGIC END ---
           };
         }
         if (prop === 'stateSort') {
           return (compareFn: (a: any, b: any) => number) => {
-            const { value: currentState, arrayKeys } = getScopedData(
+            const arrayPathKey = path.join('.');
+
+            // FIX: Use the more robust `getArrayData` which always correctly resolves the keys for a view.
+            const { value: currentArray, keys: currentViewIds } = getArrayData(
               stateKey,
               path,
               meta
-            ) as {
-              value: any[];
-              arrayKeys: string[] | undefined;
-            };
-            if (!arrayKeys) {
+            );
+
+            if (!Array.isArray(currentArray) || !currentViewIds) {
               throw new Error('No array keys found for sorting');
             }
-            const itemsWithIds = currentState.map((item, index) => ({
-              item,
-              key: arrayKeys[index],
-            }));
 
-            itemsWithIds
-              .sort((a, b) => compareFn(a.item, b.item))
-              .filter(Boolean);
+            // ... (rest of the function is the same and now works)
+            const itemsWithIds = currentArray.map((item, index) => ({
+              item,
+              key: currentViewIds[index],
+            }));
+            itemsWithIds.sort((a, b) => compareFn(a.item, b.item));
+            const sortedIds = itemsWithIds.map((i) => i.key as string);
 
             return rebuildStateShape({
               path,
               componentId: componentId!,
               meta: {
-                validIds: itemsWithIds.map((i) => i.key) as string[],
+                ...meta,
+                arrayViews: {
+                  ...(meta?.arrayViews || {}),
+                  ['arrayPathKey']: sortedIds,
+                },
                 transforms: [
                   ...(meta?.transforms || []),
-                  { type: 'sort', fn: compareFn },
+                  { type: 'sort', fn: compareFn, path },
                 ],
               },
             });
@@ -2829,12 +2747,11 @@ function createProxyHandler<T>(
             }
 
             const streamId = uuidv4();
-            const currentMeta =
-              getGlobalStore.getState().getShadowMetadata(stateKey, path) || {};
+            const currentMeta = getShadowMetadata(stateKey, path) || {};
             const streams = currentMeta.streams || new Map();
             streams.set(streamId, { buffer, flushTimer });
 
-            getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+            setShadowMetadata(stateKey, path, {
               ...currentMeta,
               streams,
             });
@@ -2883,48 +2800,17 @@ function createProxyHandler<T>(
 
               const [updateTrigger, forceUpdate] = useState({});
 
-              const { validIds, arrayValues } = useMemo(() => {
-                const cached = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path)
-                  ?.transformCaches?.get(cacheKey);
-
-                let freshValidIds: string[];
-
-                if (cached && cached.validIds) {
-                  freshValidIds = cached.validIds;
-                } else {
-                  freshValidIds = applyTransforms(
-                    stateKey,
-                    path,
-                    meta?.transforms
-                  );
-
-                  getGlobalStore
-                    .getState()
-                    .setTransformCache(stateKey, path, cacheKey, {
-                      validIds: freshValidIds,
-                      computedAt: Date.now(),
-                      transforms: meta?.transforms || [],
-                    });
-                }
-
-                const freshValues = getGlobalStore
-                  .getState()
-                  .getShadowValue(stateKeyPathKey, freshValidIds);
-
-                return {
-                  validIds: freshValidIds,
-                  arrayValues: freshValues || [],
-                };
-              }, [cacheKey, updateTrigger]);
-
+              const { keys: validIds, value: arrayValues } = getArrayData(
+                stateKey,
+                path,
+                meta
+              );
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToPath(stateKeyPathKey, (e) => {
                     // A data change has occurred for the source array.
-
+                    console.log('changed array statelist  ', e);
                     if (e.type === 'GET_SELECTED') {
                       return;
                     }
@@ -2967,11 +2853,10 @@ function createProxyHandler<T>(
               const arraySetter = rebuildStateShape({
                 path,
                 componentId: componentId!,
-                meta: {
-                  ...meta,
-                  validIds: validIds,
-                },
+                meta,
               });
+
+              console.log('arrayValues', arrayValues);
 
               return (
                 <>
@@ -2988,7 +2873,7 @@ function createProxyHandler<T>(
                       componentIdsRef.current.set(itemKey, itemComponentId);
                     }
 
-                    const itemPath = itemKey.split('.').slice(1);
+                    const itemPath = [...path, itemKey];
 
                     return createElement(MemoizedCogsItemWrapper, {
                       key: itemKey,
@@ -3010,11 +2895,15 @@ function createProxyHandler<T>(
         }
         if (prop === 'stateFlattenOn') {
           return (fieldName: string) => {
+            // FIX: Get the definitive list of IDs for the current view from meta.arrayViews.
+            const arrayPathKey = path.join('.');
+            const viewIds = meta?.arrayViews?.[arrayPathKey];
+
             const currentState = getGlobalStore
               .getState()
-              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
-            if (!Array.isArray(currentState)) return []; // Guard clause
-            const arrayToMap = currentState as any[];
+              .getShadowValue(stateKey, path, viewIds);
+
+            if (!Array.isArray(currentState)) return [];
 
             stateVersion++;
 
@@ -3027,25 +2916,33 @@ function createProxyHandler<T>(
         }
         if (prop === 'index') {
           return (index: number) => {
-            const arrayKeys = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path)
-              ?.arrayKeys?.filter(
-                (key) =>
-                  !meta?.validIds ||
-                  (meta?.validIds && meta?.validIds?.includes(key))
-              );
-            const itemId = arrayKeys?.[index];
+            const arrayPathKey = path.join('.');
+            const viewIds = meta?.arrayViews?.[arrayPathKey];
+
+            if (viewIds) {
+              const itemId = viewIds[index];
+              if (!itemId) return undefined;
+
+              return rebuildStateShape({
+                path: [...path, itemId],
+                componentId: componentId!,
+                meta,
+              });
+            }
+
+            // No view, use natural order
+            const node = getShadowMetadata(stateKey, path);
+            if (!node) return undefined;
+
+            const idKeys = Object.keys(node).filter((k) => k.startsWith('id:'));
+            const itemId = idKeys[index];
             if (!itemId) return undefined;
-            const value = getGlobalStore
-              .getState()
-              .getShadowValue(itemId, meta?.validIds);
-            const state = rebuildStateShape({
-              path: itemId.split('.').slice(1) as string[],
+
+            return rebuildStateShape({
+              path: [...path, itemId],
               componentId: componentId!,
               meta,
             });
-            return state;
           };
         }
         if (prop === 'last') {
@@ -3068,11 +2965,6 @@ function createProxyHandler<T>(
             index?: number
           ) => {
             effectiveSetState(payload as any, path, { updateType: 'insert' });
-            return rebuildStateShape({
-              path,
-              componentId: componentId!,
-              meta,
-            });
           };
         }
         if (prop === 'uniqueInsert') {
@@ -3120,153 +3012,145 @@ function createProxyHandler<T>(
 
         if (prop === 'cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
-            const { value: currentState, arrayKeys: validKeys } = getScopedData(
-              stateKey,
-              path,
-              meta
-            );
-            if (!validKeys || validKeys.length === 0) return;
+            const array = getShadowValue(stateKey, path);
+
+            if (!Array.isArray(array) || array.length === 0) return;
+
+            const node = getShadowMetadata(stateKey, path);
+            if (!node) return;
+
+            // Get the ID keys in their natural order
+            const idKeys = Object.keys(node).filter((k) => k.startsWith('id:'));
 
             const indexToCut =
-              index == -1
-                ? validKeys.length - 1
+              index === -1
+                ? idKeys.length - 1
                 : index !== undefined
                   ? index
-                  : validKeys.length - 1;
+                  : idKeys.length - 1;
 
-            const fullIdToCut = validKeys[indexToCut];
-            if (!fullIdToCut) return; // Index out of bounds
+            const idToCut = idKeys[indexToCut];
+            if (!idToCut) return;
 
-            const pathForCut = fullIdToCut.split('.').slice(1);
-            effectiveSetState(currentState, pathForCut, {
+            // Cut uses the path with the id
+            effectiveSetState(null, [...path, idToCut], {
               updateType: 'cut',
             });
           };
         }
         if (prop === 'cutSelected') {
           return () => {
-            const validKeys = applyTransforms(stateKey, path, meta?.transforms);
-            const currentState = getGlobalStore
-              .getState()
-              .getShadowValue([stateKey, ...path].join('.'), meta?.validIds);
-            if (!validKeys || validKeys.length === 0) return;
+            const arrayKey = [stateKey, ...path].join('.');
 
-            const indexKeyToCut = getGlobalStore
-              .getState()
-              .selectedIndicesMap.get(stateKeyPathKey);
+            // FIX: Get the definitive list of IDs for the current view directly from meta.arrayViews.
+            const arrayPathKey = path.join('.');
+            const { keys: currentViewIds } = getArrayData(stateKey, path, meta);
 
-            let indexToCut = validKeys.findIndex(
-              (key) => key === indexKeyToCut
-            );
+            if (!currentViewIds || currentViewIds.length === 0) {
+              return;
+            }
 
-            const pathForCut = validKeys[
-              indexToCut == -1 ? validKeys.length - 1 : indexToCut
-            ]
-              ?.split('.')
-              .slice(1);
-            getGlobalStore
+            const selectedItemKey = getGlobalStore
               .getState()
-              .clearSelectedIndex({ arrayKey: stateKeyPathKey });
-            const parentPath = pathForCut?.slice(0, -1)!;
+              .selectedIndicesMap.get(arrayKey);
+
+            if (!selectedItemKey) {
+              return;
+            }
+
+            // Important: The original code was missing this check.
+            // We must ensure the selected item is part of the CURRENT view before cutting.
+            const selectedId = selectedItemKey.split('.').pop() as string;
+            if (!(currentViewIds as any[]).includes(selectedId!)) {
+              return;
+            }
+
+            // The rest of the logic remains untouched.
+            const pathForCut = selectedItemKey.split('.').slice(1);
+            getGlobalStore.getState().clearSelectedIndex({ arrayKey });
+
+            const parentPath = pathForCut.slice(0, -1);
             notifySelectionComponents(stateKey, parentPath);
-            effectiveSetState(currentState, pathForCut!, {
+
+            effectiveSetState(null, pathForCut, {
               updateType: 'cut',
             });
           };
         }
         if (prop === 'cutByValue') {
           return (value: string | number | boolean) => {
-            // Step 1: Get the list of all unique keys for the current view.
-            const { store, arrayKeys: relevantKeys } = getScopedData(
-              stateKey,
-              path,
-              meta
-            );
-            if (!relevantKeys) return;
+            const {
+              isArray,
+              value: array,
+              keys,
+            } = getArrayData(stateKey, path, meta);
 
-            let keyToCut: string | null = null;
+            if (!isArray) return;
 
-            // Step 2: Iterate through the KEYS, get the value for each, and find the match.
-            for (const key of relevantKeys) {
-              const itemValue = store.getShadowValue(key);
-              if (itemValue === value) {
-                keyToCut = key;
-                break; // We found the key, no need to search further.
-              }
-            }
-
-            // Step 3: If we found a matching key, use it to perform the cut.
-            if (keyToCut) {
-              const itemPath = keyToCut.split('.').slice(1);
-              effectiveSetState(null as any, itemPath, { updateType: 'cut' });
+            const found = findArrayItem(array, keys, (item) => item === value);
+            if (found) {
+              effectiveSetState(null, [...path, found.key], {
+                updateType: 'cut',
+              });
             }
           };
         }
 
         if (prop === 'toggleByValue') {
           return (value: string | number | boolean) => {
-            // Step 1: Get the list of all unique keys for the current view.
-            const arrayMeta = getGlobalStore
-              .getState()
-              .getShadowMetadata(stateKey, path);
-            const relevantKeys = meta?.validIds ?? arrayMeta?.arrayKeys;
+            const {
+              isArray,
+              value: array,
+              keys,
+            } = getArrayData(stateKey, path, meta);
 
-            if (!relevantKeys) return;
+            if (!isArray) return;
 
-            let keyToCut: string | null = null;
+            const found = findArrayItem(array, keys, (item) => item === value);
 
-            // Step 2: Iterate through the KEYS to find the one matching the value. This is the robust way.
-            for (const key of relevantKeys) {
-              const itemValue = getGlobalStore.getState().getShadowValue(key);
-              console.log('itemValue sdasdasdasd', itemValue);
-              if (itemValue === value) {
-                keyToCut = key;
-                break; // Found it!
-              }
-            }
-            console.log('itemValue keyToCut', keyToCut);
-            // Step 3: Act based on whether the key was found.
-            if (keyToCut) {
-              // Item exists, so we CUT it using its *actual* key.
-              const itemPath = keyToCut.split('.').slice(1);
-              console.log('itemValue keyToCut', keyToCut);
-              effectiveSetState(value as any, itemPath, {
+            if (found) {
+              const pathForItem = [...path, found.key];
+
+              effectiveSetState(null, pathForItem, {
                 updateType: 'cut',
               });
             } else {
-              // Item does not exist, so we INSERT it.
               effectiveSetState(value as any, path, { updateType: 'insert' });
             }
           };
         }
         if (prop === 'findWith') {
-          return (searchKey: keyof InferArrayElement<T>, searchValue: any) => {
-            const { store, arrayKeys } = getScopedData(stateKey, path, meta);
+          return (searchKey: string, searchValue: any) => {
+            const { isArray, value, keys } = getArrayData(stateKey, path, meta);
 
-            if (!arrayKeys) {
-              throw new Error('No array keys found for sorting');
+            if (!isArray) {
+              throw new Error('findWith can only be used on arrays');
             }
 
-            let value = null;
-            let foundPath: string[] = [];
+            const found = findArrayItem(
+              value,
+              keys,
+              (item) => item?.[searchKey] === searchValue
+            );
 
-            for (const fullPath of arrayKeys) {
-              let shadowValue = store.getShadowValue(fullPath, meta?.validIds);
-              if (shadowValue && shadowValue[searchKey] === searchValue) {
-                value = shadowValue;
-                foundPath = fullPath.split('.').slice(1);
-                break;
-              }
+            // FIX: If found, return a proxy to the item by appending its key to the current path.
+            if (found) {
+              return rebuildStateShape({
+                path: [...path, found.key], // e.g., ['itemInstances', 'inst-1', 'properties', 'prop-b']
+                componentId: componentId!,
+                meta,
+              });
             }
 
+            // If not found, return an 'empty' proxy that will resolve to undefined on .get()
+            // This prevents "cannot read property 'get' of undefined" errors.
             return rebuildStateShape({
-              path: foundPath,
+              path: [...path, `not_found_${uuidv4()}`],
               componentId: componentId!,
               meta,
             });
           };
         }
-
         if (prop === 'cutThis') {
           const { value: shadowValue } = getScopedData(stateKey, path, meta);
 
@@ -3300,32 +3184,27 @@ function createProxyHandler<T>(
         }
         if (prop === 'lastSynced') {
           const syncKey = `${stateKey}:${path.join('.')}`;
-          return getGlobalStore.getState().getSyncInfo(syncKey);
+          return getSyncInfo(syncKey);
         }
         if (prop == 'getLocalStorage') {
           return (key: string) =>
             loadFromLocalStorage(sessionId + '-' + stateKey + '-' + key);
         }
-
         if (prop === 'isSelected') {
-          const parentPath = [stateKey, ...path].slice(0, -1);
-          notifySelectionComponents(stateKey, path, undefined);
-          if (
-            Array.isArray(
-              getGlobalStore
-                .getState()
-                .getShadowValue(parentPath.join('.'), meta?.validIds)
-            )
-          ) {
-            const itemId = path[path.length - 1];
-            const fullParentKey = parentPath.join('.');
+          const parentPathArray = path.slice(0, -1);
+          const parentMeta = getShadowMetadata(stateKey, parentPathArray);
 
+          // FIX: Check if the parent is an array by looking for arrayKeys in its metadata.
+          if (parentMeta?.arrayKeys) {
+            const fullParentKey = stateKey + '.' + parentPathArray.join('.');
             const selectedItemKey = getGlobalStore
               .getState()
               .selectedIndicesMap.get(fullParentKey);
 
             const fullItemKey = stateKey + '.' + path.join('.');
 
+            // Logic remains the same.
+            notifySelectionComponents(stateKey, parentPathArray, undefined);
             return selectedItemKey === fullItemKey;
           }
           return undefined;
@@ -3412,11 +3291,9 @@ function createProxyHandler<T>(
                 throw new Error('clearZodValidation requires a path');
               }
 
-              const currentMeta =
-                getGlobalStore.getState().getShadowMetadata(stateKey, path) ||
-                {};
+              const currentMeta = getShadowMetadata(stateKey, path) || {};
 
-              getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+              setShadowMetadata(stateKey, path, {
                 ...currentMeta,
                 validation: {
                   status: 'NOT_VALIDATED',
@@ -3454,6 +3331,7 @@ function createProxyHandler<T>(
                       value: any;
                     };
                     store.updateShadowAtPath(stateKey, relativePath, value);
+
                     store.markAsDirty(stateKey, relativePath, { bubble: true });
 
                     // Bubble up - notify components at this path and all parent paths
@@ -3518,9 +3396,7 @@ function createProxyHandler<T>(
           }
 
           if (prop === 'getComponents')
-            return () =>
-              getGlobalStore.getState().getShadowMetadata(stateKey, [])
-                ?.components;
+            return () => getShadowMetadata(stateKey, [])?.components;
           if (prop === 'getAllFormRefs')
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);
@@ -3551,80 +3427,34 @@ function createProxyHandler<T>(
         if (prop === '_stateKey') return stateKey;
         if (prop === '_path') return path;
         if (prop === 'update') {
+          // This method is now greatly simplified.
+          // All the complex batching logic has been removed because our new,
+          // universal `createEffectiveSetState` function handles it automatically for all operations.
           return (payload: UpdateArg<T>) => {
-            // Check if we're in a React event handler
-            const error = new Error();
-            const stack = error.stack || '';
-            const inReactEvent =
-              stack.includes('onClick') ||
-              stack.includes('dispatchEvent') ||
-              stack.includes('batchedUpdates');
+            // Simply call effectiveSetState. It will automatically handle queuing
+            // this operation in the batch for efficient processing.
+            effectiveSetState(payload as any, path, { updateType: 'update' });
 
-            // Only batch if we're in a React event
-            if (inReactEvent) {
-              const batchKey = `${stateKey}.${path.join('.')}`;
-
-              // Schedule flush if not already scheduled
-              if (!batchFlushScheduled) {
-                updateBatchQueue.clear();
-                batchFlushScheduled = true;
-
-                queueMicrotask(() => {
-                  // Process all batched updates
-                  for (const [key, updates] of updateBatchQueue) {
-                    const parts = key.split('.');
-                    const batchStateKey = parts[0];
-                    const batchPath = parts.slice(1);
-
-                    // Compose all updates for this path
-                    const composedUpdate = updates.reduce(
-                      (composed, update) => {
-                        if (
-                          typeof update === 'function' &&
-                          typeof composed === 'function'
-                        ) {
-                          // Compose functions
-                          return (state: any) => update(composed(state));
-                        }
-                        // If not functions, last one wins
-                        return update;
-                      }
-                    );
-
-                    // Call effectiveSetState ONCE with composed update
-                    effectiveSetState(composedUpdate as any, batchPath, {
-                      updateType: 'update',
-                    });
-                  }
-
-                  updateBatchQueue.clear();
-                  batchFlushScheduled = false;
-                });
-              }
-
-              // Add to batch
-              const existing = updateBatchQueue.get(batchKey) || [];
-              existing.push(payload);
-              updateBatchQueue.set(batchKey, existing);
-            } else {
-              effectiveSetState(payload as any, path, { updateType: 'update' });
-            }
-
+            // The .synced() method is a useful feature that allows developers
+            // to manually mark a piece of state as "synced with the server"
+            // after an update. This part of the functionality is preserved.
             return {
               synced: () => {
                 const shadowMeta = getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, path);
 
-                getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+                // Update the metadata for this specific path
+                setShadowMetadata(stateKey, path, {
                   ...shadowMeta,
                   isDirty: false,
                   stateSource: 'server',
                   lastServerSync: Date.now(),
                 });
 
+                // Notify any components that might be subscribed to the sync status
                 const fullPath = [stateKey, ...path].join('.');
-                getGlobalStore.getState().notifyPathSubscribers(fullPath, {
+                notifyPathSubscribers(fullPath, {
                   type: 'SYNC_STATUS_CHANGE',
                   isDirty: false,
                 });
@@ -3632,7 +3462,6 @@ function createProxyHandler<T>(
             };
           };
         }
-
         if (prop === 'toggle') {
           const { value: currentValueAtPath } = getScopedData(
             stateKey,
@@ -3675,18 +3504,14 @@ function createProxyHandler<T>(
       },
     };
 
-    const proxyInstance = new Proxy(baseFunction, handler);
+    const proxyInstance = new Proxy({}, handler);
     proxyCache.set(cacheKey, proxyInstance);
 
     return proxyInstance;
   }
 
-  const baseObj = {
+  const rootLevelMethods = {
     revertToInitialState: (obj?: { validationKey?: string }) => {
-      const init = getGlobalStore
-        .getState()
-        .getInitialOptions(stateKey)?.validation;
-
       const shadowMeta = getGlobalStore
         .getState()
         .getShadowMetadata(stateKey, []);
@@ -3702,10 +3527,10 @@ function createProxyHandler<T>(
       const initialState =
         getGlobalStore.getState().initialStateGlobal[stateKey];
 
-      getGlobalStore.getState().clearSelectedIndexesForState(stateKey);
+      clearSelectedIndexesForState(stateKey);
 
       stateVersion++;
-      getGlobalStore.getState().initializeShadowState(stateKey, initialState);
+      initializeShadowState(stateKey, initialState);
       rebuildStateShape({
         path: [],
         componentId: componentId!,
@@ -3755,7 +3580,8 @@ function createProxyHandler<T>(
       }
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
-        getGlobalStore.getState().initializeShadowState(stateKey, newState);
+        initializeShadowState(stateKey, newState);
+        // initializeShadowStateNEW(stateKey, newState);
 
         const stateEntry = getGlobalStore
           .getState()
@@ -3773,6 +3599,7 @@ function createProxyHandler<T>(
       };
     },
   };
+
   const returnShape = rebuildStateShape({
     componentId,
     path: [],
@@ -3791,153 +3618,6 @@ export function $cogsSignal(proxy: {
   return createElement(SignalRenderer, { proxy });
 }
 
-function SignalMapRenderer({
-  proxy,
-  rebuildStateShape,
-}: {
-  proxy: {
-    _stateKey: string;
-    _path: string[];
-    _meta?: MetaData;
-    _mapFn: (
-      setter: any,
-      index: number,
-
-      arraySetter: any
-    ) => ReactNode;
-  };
-  rebuildStateShape: (stuff: {
-    currentState: any;
-    path: string[];
-    componentId: string;
-    meta?: MetaData;
-  }) => any;
-}): JSX.Element | null {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const instanceIdRef = useRef<string>(`map-${crypto.randomUUID()}`);
-  const isSetupRef = useRef(false);
-  const rootsMapRef = useRef<Map<string, any>>(new Map());
-
-  // Setup effect - store the map function in shadow metadata
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container || isSetupRef.current) return;
-
-    const timeoutId = setTimeout(() => {
-      // Store map wrapper in metadata
-      const currentMeta =
-        getGlobalStore
-          .getState()
-          .getShadowMetadata(proxy._stateKey, proxy._path) || {};
-
-      const mapWrappers = currentMeta.mapWrappers || [];
-      mapWrappers.push({
-        instanceId: instanceIdRef.current,
-        mapFn: proxy._mapFn,
-        containerRef: container,
-        rebuildStateShape: rebuildStateShape,
-        path: proxy._path,
-        componentId: instanceIdRef.current,
-        meta: proxy._meta,
-      });
-
-      getGlobalStore
-        .getState()
-        .setShadowMetadata(proxy._stateKey, proxy._path, {
-          ...currentMeta,
-          mapWrappers,
-        });
-
-      isSetupRef.current = true;
-
-      // Initial render
-      renderInitialItems();
-    }, 0);
-
-    // Cleanup
-    return () => {
-      clearTimeout(timeoutId);
-      if (instanceIdRef.current) {
-        const currentMeta =
-          getGlobalStore
-            .getState()
-            .getShadowMetadata(proxy._stateKey, proxy._path) || {};
-        if (currentMeta.mapWrappers) {
-          currentMeta.mapWrappers = currentMeta.mapWrappers.filter(
-            (w) => w.instanceId !== instanceIdRef.current
-          );
-          getGlobalStore
-            .getState()
-            .setShadowMetadata(proxy._stateKey, proxy._path, currentMeta);
-        }
-      }
-      rootsMapRef.current.forEach((root) => root.unmount());
-    };
-  }, []);
-
-  const renderInitialItems = () => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    const value = getGlobalStore
-      .getState()
-      .getShadowValue(
-        [proxy._stateKey, ...proxy._path].join('.'),
-        proxy._meta?.validIds
-      ) as any[];
-
-    if (!Array.isArray(value)) return;
-
-    // --- BUG FIX IS HERE ---
-    // Prioritize the filtered IDs from the meta object, just like the regular `stateMap`.
-    // This ensures the keys match the filtered data.
-    const arrayKeys =
-      proxy._meta?.validIds ??
-      getGlobalStore.getState().getShadowMetadata(proxy._stateKey, proxy._path)
-        ?.arrayKeys ??
-      [];
-    // --- END OF FIX ---
-
-    const arraySetter = rebuildStateShape({
-      currentState: value,
-      path: proxy._path,
-      componentId: instanceIdRef.current,
-      meta: proxy._meta,
-    });
-
-    value.forEach((item, index) => {
-      const itemKey = arrayKeys[index]!; // Now this will be the correct key for the filtered item
-      if (!itemKey) return; // Safeguard if there's a mismatch
-
-      const itemComponentId = uuidv4();
-      const itemElement = document.createElement('div');
-
-      itemElement.setAttribute('data-item-path', itemKey);
-      container.appendChild(itemElement);
-
-      const root = createRoot(itemElement);
-      rootsMapRef.current.set(itemKey, root);
-
-      const itemPath = itemKey.split('.').slice(1) as string[];
-
-      // Render CogsItemWrapper instead of direct render
-      root.render(
-        createElement(MemoizedCogsItemWrapper, {
-          stateKey: proxy._stateKey,
-          itemComponentId: itemComponentId,
-          itemPath: itemPath,
-          localIndex: index,
-          arraySetter: arraySetter,
-          rebuildStateShape: rebuildStateShape,
-          renderFn: proxy._mapFn,
-        })
-      );
-    });
-  };
-
-  return <div ref={containerRef} data-map-container={instanceIdRef.current} />;
-}
-
 function SignalRenderer({
   proxy,
 }: {
@@ -3952,12 +3632,10 @@ function SignalRenderer({
   const instanceIdRef = useRef<string | null>(null);
   const isSetupRef = useRef(false);
   const signalId = `${proxy._stateKey}-${proxy._path.join('.')}`;
-  const value = getGlobalStore
-    .getState()
-    .getShadowValue(
-      [proxy._stateKey, ...proxy._path].join('.'),
-      proxy._meta?.validIds
-    );
+  const arrayPathKey = proxy._path.join('.');
+  const viewIds = proxy._meta?.arrayViews?.[arrayPathKey];
+
+  const value = getShadowValue(proxy._stateKey, proxy._path, viewIds);
 
   // Setup effect - runs only once
   useEffect(() => {
@@ -4152,7 +3830,7 @@ function ListItemWrapper({
   );
 
   useEffect(() => {
-    getGlobalStore.getState().subscribeToPath(fullKey, (e) => {
+    subscribeToPath(fullKey, (e) => {
       forceUpdate({});
     });
   }, []);
@@ -4166,7 +3844,7 @@ function ListItemWrapper({
       hasReportedInitialHeight.current = true;
       const newHeight = element.offsetHeight;
 
-      getGlobalStore.getState().setShadowMetadata(stateKey, itemPath, {
+      setShadowMetadata(stateKey, itemPath, {
         virtualizer: {
           itemHeight: newHeight,
           domRef: element,
@@ -4175,7 +3853,7 @@ function ListItemWrapper({
 
       const arrayPath = itemPath.slice(0, -1);
       const arrayPathKey = [stateKey, ...arrayPath].join('.');
-      getGlobalStore.getState().notifyPathSubscribers(arrayPathKey, {
+      notifyPathSubscribers(arrayPathKey, {
         type: 'ITEMHEIGHT',
         itemKey: itemPath.join('.'),
 
@@ -4184,8 +3862,7 @@ function ListItemWrapper({
     }
   }, [inView, imagesLoaded, stateKey, itemPath]);
 
-  const fullItemPath = [stateKey, ...itemPath].join('.');
-  const itemValue = getGlobalStore.getState().getShadowValue(fullItemPath);
+  const itemValue = getShadowValue(stateKey, itemPath);
 
   if (itemValue === undefined) {
     return null;
@@ -4212,7 +3889,6 @@ function FormElementWrapper({
   stateKey: string;
   path: string[];
   rebuildStateShape: (options: {
-    currentState: any;
     path: string[];
     componentId: string;
     meta?: any;
@@ -4226,9 +3902,7 @@ function FormElementWrapper({
 
   const stateKeyPathKey = [stateKey, ...path].join('.');
   useRegisterComponent(stateKey, componentId, forceUpdate);
-  const globalStateValue = getGlobalStore
-    .getState()
-    .getShadowValue(stateKeyPathKey);
+  const globalStateValue = getShadowValue(stateKey, path);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -4284,14 +3958,12 @@ function FormElementWrapper({
           .getShadowMetadata(stateKey, []);
         if (!rootMeta?.features?.validationEnabled) return;
 
-        const { getInitialOptions, setShadowMetadata, getShadowMetadata } =
-          getGlobalStore.getState();
         const validationOptions = getInitialOptions(stateKey)?.validation;
         const zodSchema =
           validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
         if (zodSchema) {
-          const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+          const fullState = getShadowValue(stateKey, []);
           const result = zodSchema.safeParse(fullState);
           const currentMeta = getShadowMetadata(stateKey, path) || {};
 
@@ -4363,7 +4035,7 @@ function FormElementWrapper({
       isCurrentlyDebouncing.current = false;
       setState(localValue, path, { updateType: 'update' });
     }
-    const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+    const rootMeta = getShadowMetadata(stateKey, []);
     if (!rootMeta?.features?.validationEnabled) return;
     const { getInitialOptions } = getGlobalStore.getState();
     const validationOptions = getInitialOptions(stateKey)?.validation;
@@ -4375,11 +4047,9 @@ function FormElementWrapper({
     // Get the full path including stateKey
 
     // Update validation state to "validating"
-    const currentMeta = getGlobalStore
-      .getState()
-      .getShadowMetadata(stateKey, path);
+    const currentMeta = getShadowMetadata(stateKey, path);
 
-    getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+    setShadowMetadata(stateKey, path, {
       ...currentMeta,
       validation: {
         status: 'VALIDATING',
@@ -4390,7 +4060,7 @@ function FormElementWrapper({
     });
 
     // Validate full state
-    const fullState = getGlobalStore.getState().getShadowValue(stateKey);
+    const fullState = getShadowValue(stateKey, []);
     const result = zodSchema.safeParse(fullState);
     console.log('result ', result);
     if (!result.success) {
@@ -4454,7 +4124,7 @@ function FormElementWrapper({
 
       console.log('Filtered path errors:', pathErrors);
       // Update shadow metadata with validation result
-      getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+      setShadowMetadata(stateKey, path, {
         ...currentMeta,
         validation: {
           status: 'INVALID',
@@ -4469,7 +4139,7 @@ function FormElementWrapper({
       });
     } else {
       // Validation passed
-      getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+      setShadowMetadata(stateKey, path, {
         ...currentMeta,
         validation: {
           status: 'VALID',
@@ -4483,7 +4153,6 @@ function FormElementWrapper({
   }, [stateKey, path, localValue, setState]);
 
   const baseState = rebuildStateShape({
-    currentState: globalStateValue,
     path: path,
     componentId: componentId,
   });
@@ -4522,9 +4191,6 @@ function useRegisterComponent(
   const fullComponentId = `${stateKey}////${componentId}`;
 
   useLayoutEffect(() => {
-    const { registerComponent, unregisterComponent } =
-      getGlobalStore.getState();
-
     // Call the safe, centralized function to register
     registerComponent(stateKey, fullComponentId, {
       forceUpdate: () => forceUpdate({}),

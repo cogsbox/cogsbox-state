@@ -1,230 +1,193 @@
-import { getGlobalStore as w } from "./store.js";
-const c = (n) => n && typeof n == "object" && !Array.isArray(n) && n !== null, v = (n) => typeof n == "function", d = (n) => Array.isArray(n), g = (n, e, t = {}, r = []) => {
-  if (c(n) && c(e)) {
-    const i = Object.keys(n), s = Object.keys(e);
-    if (i.length !== s.length)
+const u = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, $ = (e) => typeof e == "function", y = (e) => Array.isArray(e), d = (e, n, i = {}, r = []) => {
+  if (u(e) && u(n)) {
+    const t = Object.keys(e), l = Object.keys(n);
+    if (t.length !== l.length)
       return !1;
-    for (let o of i) {
-      const f = n[o], l = e[o];
-      if (!(o in n) || !(o in e))
+    for (let s of t) {
+      const o = e[s], f = n[s];
+      if (!(s in e) || !(s in n))
         return !1;
-      const a = [...r, o];
-      if (!g(f, l, t, a))
+      const c = [...r, s];
+      if (!d(o, f, i, c))
         return !1;
     }
     return !0;
-  } else if (d(n) && d(e)) {
-    if (n.length !== e.length)
+  } else if (y(e) && y(n)) {
+    if (e.length !== n.length)
       return !1;
-    for (let i = 0; i < n.length; i++)
-      if (!g(n[i], e[i], t, [
+    for (let t = 0; t < e.length; t++)
+      if (!d(e[t], n[t], i, [
         ...r,
-        i.toString()
+        t.toString()
       ]))
         return !1;
     return !0;
   } else
-    return n === e || Number.isNaN(n) && Number.isNaN(e);
+    return e === n || Number.isNaN(e) && Number.isNaN(n);
 };
-function h(n, e, t) {
-  if (!n || n.length === 0) return t;
-  const r = n[0], i = n.slice(1);
-  if (Array.isArray(e)) {
-    const s = Number(r);
-    if (!isNaN(s) && s >= 0 && s < e.length)
+function g(e, n, i) {
+  if (!e || e.length === 0) return i;
+  const r = e[0], t = e.slice(1);
+  if (Array.isArray(n)) {
+    const l = Number(r);
+    if (!isNaN(l) && l >= 0 && l < n.length)
       return [
-        ...e.slice(0, s),
-        h(i, e[s], t),
-        ...e.slice(s + 1)
+        ...n.slice(0, l),
+        g(t, n[l], i),
+        ...n.slice(l + 1)
       ];
-    throw console.log("errorstate", e, n), new Error(
-      `Invalid array index "${s}" in path "${n.join(".")}".`
+    throw console.log("errorstate", n, e), new Error(
+      `Invalid array index "${l}" in path "${e.join(".")}".`
     );
-  } else if (typeof e == "object" && e !== null) {
-    if (r && r in e)
+  } else if (typeof n == "object" && n !== null) {
+    if (r && r in n)
       return {
-        ...e,
-        [r]: h(i, e[r], t)
+        ...n,
+        [r]: g(t, n[r], i)
       };
-    throw console.log("Invalid property", r, i, n), new Error(
-      `Invalid property "${r}" in path "${n.join(".")}".`
+    throw console.log("Invalid property", r, t, e), new Error(
+      `Invalid property "${r}" in path "${e.join(".")}".`
     );
   } else
     throw new Error(
-      `Cannot update nested property at path "${n.join(".")}". The path does not exist.`
+      `Cannot update nested property at path "${e.join(".")}". The path does not exist.`
     );
 }
-function p(n, e) {
-  if (!n || n.length === 0) return e;
-  const t = n[0], r = n.slice(1);
-  if (Array.isArray(e)) {
-    const i = Number(t);
-    if (!isNaN(i) && i >= 0 && i < e.length)
-      return r.length === 0 ? [...e.slice(0, i), ...e.slice(i + 1)] : [
-        ...e.slice(0, i),
-        p(r, e[i]),
-        ...e.slice(i + 1)
+function p(e, n) {
+  if (!e || e.length === 0) return n;
+  const i = e[0], r = e.slice(1);
+  if (Array.isArray(n)) {
+    const t = Number(i);
+    if (!isNaN(t) && t >= 0 && t < n.length)
+      return r.length === 0 ? [...n.slice(0, t), ...n.slice(t + 1)] : [
+        ...n.slice(0, t),
+        p(r, n[t]),
+        ...n.slice(t + 1)
       ];
     throw new Error(
-      `Invalid array index "${i}" in path "${n.join(".")}".`
+      `Invalid array index "${t}" in path "${e.join(".")}".`
     );
-  } else if (typeof e == "object" && e !== null)
+  } else if (typeof n == "object" && n !== null)
     if (r.length === 0) {
-      const { [t]: i, ...s } = e;
-      return s;
+      const { [i]: t, ...l } = n;
+      return l;
     } else {
-      if (t in e)
+      if (i in n)
         return {
-          ...e,
-          [t]: p(r, e[t])
+          ...n,
+          [i]: p(r, n[i])
         };
       throw new Error(
-        `Invalid property "${t}" in path "${n.join(".")}".`
+        `Invalid property "${i}" in path "${e.join(".")}".`
       );
     }
   else
     throw new Error(
-      `Cannot delete nested property at path "${n.join(".")}". The path does not exist.`
+      `Cannot delete nested property at path "${e.join(".")}". The path does not exist.`
     );
 }
-function N(n, e, t) {
-  let r = n;
-  for (let i = 0; i < e.length; i++) {
-    const s = e[i];
-    if (r == null)
-      return;
-    if (typeof s == "string" && s.startsWith("id:")) {
-      if (!Array.isArray(r)) {
-        console.error("Path segment with 'id:' requires an array.", {
-          path: e,
-          currentValue: r
-        });
-        return;
-      }
-      const o = e.slice(0, i), f = [t, ...o, s].join("."), l = [t, ...o].join("."), a = w.getState().shadowStateStore.get(l);
-      if (!a?.arrayKeys) {
-        console.error(
-          "No arrayKeys found in shadow state for parent path:",
-          l
-        );
-        return;
-      }
-      const y = a.arrayKeys.indexOf(f);
-      if (y === -1) {
-        console.error(
-          `Item key ${f} not found in parent's arrayKeys:`,
-          a.arrayKeys
-        );
-        return;
-      }
-      r = r[y];
-    } else Array.isArray(r) ? r = r[parseInt(s)] : r = r[s];
-  }
-  return r;
-}
-function u(n, e, t = "") {
+function a(e, n, i = "") {
   let r = [];
-  if (typeof n == "function" && typeof e == "function")
+  if (typeof e == "function" && typeof n == "function")
     return r;
-  if (n == null || e === null || e === void 0)
-    return n !== e ? [t] : r;
-  if (typeof n != "object" || typeof e != "object")
-    return n !== e ? [t] : r;
-  if (Array.isArray(n) && Array.isArray(e)) {
-    n.length !== e.length && r.push(`${t}`);
-    const f = Math.min(n.length, e.length);
-    for (let l = 0; l < f; l++)
-      n[l] !== e[l] && (r = r.concat(
-        u(
-          n[l],
-          e[l],
-          t ? `${t}.${l}` : `${l}`
+  if (e == null || n === null || n === void 0)
+    return e !== n ? [i] : r;
+  if (typeof e != "object" || typeof n != "object")
+    return e !== n ? [i] : r;
+  if (Array.isArray(e) && Array.isArray(n)) {
+    e.length !== n.length && r.push(`${i}`);
+    const o = Math.min(e.length, n.length);
+    for (let f = 0; f < o; f++)
+      e[f] !== n[f] && (r = r.concat(
+        a(
+          e[f],
+          n[f],
+          i ? `${i}.${f}` : `${f}`
         )
       ));
-    if (n.length !== e.length) {
-      const l = n.length > e.length ? n : e;
-      for (let a = f; a < l.length; a++)
-        r.push(t ? `${t}.${a}` : `${a}`);
+    if (e.length !== n.length) {
+      const f = e.length > n.length ? e : n;
+      for (let c = o; c < f.length; c++)
+        r.push(i ? `${i}.${c}` : `${c}`);
     }
     return r;
   }
-  const i = Object.keys(n), s = Object.keys(e);
-  return Array.from(/* @__PURE__ */ new Set([...i, ...s])).forEach((f) => {
-    const l = t ? `${t}.${f}` : f;
+  const t = Object.keys(e), l = Object.keys(n);
+  return Array.from(/* @__PURE__ */ new Set([...t, ...l])).forEach((o) => {
+    const f = i ? `${i}.${o}` : o;
     r = r.concat(
-      u(n[f], e[f], l)
+      a(e[o], n[o], f)
     );
   }), r;
 }
-function $(n, e) {
-  const t = { ...n };
-  return c(n) && c(e) && Object.keys(e).forEach((r) => {
-    c(e[r]) ? r in n ? t[r] = $(n[r], e[r]) : Object.assign(t, { [r]: e[r] }) : Object.assign(t, { [r]: e[r] });
-  }), t;
+function A(e, n) {
+  const i = { ...e };
+  return u(e) && u(n) && Object.keys(n).forEach((r) => {
+    u(n[r]) ? r in e ? i[r] = A(e[r], n[r]) : Object.assign(i, { [r]: n[r] }) : Object.assign(i, { [r]: n[r] });
+  }), i;
 }
-function S(n, e) {
-  return u(n, e).map(
+function w(e, n) {
+  return a(e, n).map(
     (r) => r.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean)
   );
 }
-function A(n, e, t = "") {
+function h(e, n, i = "") {
   let r = [];
-  if (n == null || e === null || e === void 0)
+  if (e == null || n === null || n === void 0)
     return r;
-  if (Array.isArray(n) && Array.isArray(e))
-    n.length !== e.length && r.push(t);
-  else if (typeof n == "object" && typeof e == "object") {
-    const i = /* @__PURE__ */ new Set([...Object.keys(n), ...Object.keys(e)]);
-    for (const s of i) {
-      const o = t ? `${t}.${s}` : s;
-      (Array.isArray(n[s]) || Array.isArray(e[s])) && (r = r.concat(
-        A(n[s], e[s], o)
+  if (Array.isArray(e) && Array.isArray(n))
+    e.length !== n.length && r.push(i);
+  else if (typeof e == "object" && typeof n == "object") {
+    const t = /* @__PURE__ */ new Set([...Object.keys(e), ...Object.keys(n)]);
+    for (const l of t) {
+      const s = i ? `${i}.${l}` : l;
+      (Array.isArray(e[l]) || Array.isArray(n[l])) && (r = r.concat(
+        h(e[l], n[l], s)
       ));
     }
   }
   return r;
 }
-function O(n, e) {
-  return A(n, e).map(
+function m(e, n) {
+  return h(e, n).map(
     (r) => r.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean)
   );
 }
-function I(n) {
-  const e = (s) => Object.values(s).some(
-    (o) => o?.hasOwnProperty("initialState")
+function N(e) {
+  const n = (l) => Object.values(l).some(
+    (s) => s?.hasOwnProperty("initialState")
   );
-  let t = {};
-  const r = (s) => {
-    const o = {};
-    return Object.entries(s).forEach(([f, l]) => {
-      l?.initialState ? (t = { ...t ?? {}, [f]: l }, o[f] = l.initialState) : o[f] = l;
-    }), o;
+  let i = {};
+  const r = (l) => {
+    const s = {};
+    return Object.entries(l).forEach(([o, f]) => {
+      f?.initialState ? (i = { ...i ?? {}, [o]: f }, s[o] = f.initialState) : s[o] = f;
+    }), s;
   };
-  return [e(n) ? r(n) : n, t];
+  return [n(e) ? r(e) : e, i];
 }
-function D(n, e) {
-  let t = null;
-  const r = (...i) => {
-    t && clearTimeout(t), t = setTimeout(() => n(...i), e);
+function O(e, n) {
+  let i = null;
+  const r = (...t) => {
+    i && clearTimeout(i), i = setTimeout(() => e(...t), n);
   };
   return r.cancel = () => {
-    t && (clearTimeout(t), t = null);
+    i && (clearTimeout(i), i = null);
   }, r;
 }
 export {
-  D as debounce,
-  $ as deepMerge,
+  O as debounce,
+  A as deepMerge,
   p as deleteNestedProperty,
-  A as getArrayLengthDifferences,
-  O as getArrayLengthDifferencesArray,
-  u as getDifferences,
-  S as getDifferencesArray,
-  N as getNestedValue,
-  d as isArray,
-  g as isDeepEqual,
-  v as isFunction,
-  c as isObject,
-  I as transformStateFunc,
-  h as updateNestedProperty
+  h as getArrayLengthDifferences,
+  m as getArrayLengthDifferencesArray,
+  a as getDifferences,
+  w as getDifferencesArray,
+  y as isArray,
+  d as isDeepEqual,
+  $ as isFunction,
+  u as isObject,
+  N as transformStateFunc,
+  g as updateNestedProperty
 };
 //# sourceMappingURL=utility.js.map

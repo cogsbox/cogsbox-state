@@ -125,12 +125,7 @@ export type ShadowMetadata = {
   };
   lastUpdated?: number;
   value?: any;
-  classSignals?: Array<{
-    id: string;
-    effect: string;
-    lastClasses: string;
-    deps: any[];
-  }>;
+
   signals?: Array<{
     instanceId: string;
     parentId: string;
@@ -175,13 +170,78 @@ export type CogsEvent =
   | { type: 'UPDATE'; path: string; newValue: any }
   | { type: 'ITEMHEIGHT'; itemKey: string; height: number }
   | { type: 'RELOAD'; path: string };
+
+type ShadowValueNEW = {
+  value: any;
+  // Metadata that can exist on any value
+  signals?: Array<{
+    instanceId: string;
+    parentId: string;
+    position: number;
+    effect?: string;
+  }>;
+  validation?: ValidationState;
+  virtualizer?: {
+    itemHeight?: number;
+    domRef?: HTMLElement | null;
+  };
+  pathComponents?: Set<string>;
+};
+
+type ShadowObjectNEW = {
+  [key: string]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
+};
+
+type ShadowArrayNEW = {
+  [key: `id:${string}`]: ShadowValueNEW | ShadowObjectNEW | ShadowArrayNEW;
+  // Array-specific metadata
+  arrayKeys: string[];
+  mapWrappers?: Array<{
+    instanceId: string;
+    path: string[];
+    componentId: string;
+    meta?: any;
+    mapFn: (setter: any, index: number, arraySetter: any) => ReactNode;
+    containerRef: HTMLDivElement | null;
+    rebuildStateShape: any;
+  }>;
+  transformCaches?: Map<
+    string,
+    {
+      validIds: string[];
+      computedAt: number;
+      transforms: Array<{ type: 'filter' | 'sort'; fn: Function }>;
+    }
+  >;
+};
+
+type ShadowRootNEW = ShadowObjectNEW | ShadowArrayNEW;
+
 export type CogsGlobalState = {
-  updateQueue: Set<() => void>;
-  isFlushScheduled: boolean;
+  // NEW shadow store
+  shadowStateStore: Map<string, ShadowRootNEW>;
 
-  flushUpdates: () => void;
-
-  // --- Shadow State and Subscription System ---
+  // NEW functions
+  initializeShadowState: (key: string, initialState: any) => void;
+  getShadowMetadata: (
+    key: string,
+    path: string[]
+  ) => ShadowMetadata | undefined;
+  setShadowMetadata: (key: string, path: string[], metadata: any) => void;
+  getShadowValue: (
+    key: string,
+    path: string[],
+    validArrayIds?: string[],
+    log?: boolean
+  ) => any;
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any,
+    index?: number
+  ) => void;
+  removeShadowArrayElement: (key: string, itemPath: string[]) => void;
   registerComponent: (
     stateKey: string,
     componentId: string,
@@ -193,7 +253,6 @@ export type CogsGlobalState = {
     dependencyPath: string[],
     fullComponentId: string
   ) => void;
-  shadowStateStore: Map<string, ShadowMetadata>;
 
   markAsDirty: (
     key: string,
@@ -201,35 +260,6 @@ export type CogsGlobalState = {
     options: { bubble: boolean }
   ) => void;
   // These method signatures stay the same
-  initializeShadowState: (key: string, initialState: any) => void;
-  updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
-  insertShadowArrayElement: (
-    key: string,
-    arrayPath: string[],
-    newItem: any
-  ) => void;
-  removeShadowArrayElement: (key: string, arrayPath: string[]) => void;
-  getShadowValue: (
-    key: string,
-
-    validArrayIds?: string[]
-  ) => any;
-
-  getShadowMetadata: (
-    key: string,
-    path: string[]
-  ) => ShadowMetadata | undefined;
-  setShadowMetadata: (
-    key: string,
-    path: string[],
-    metadata: Omit<ShadowMetadata, 'id'>
-  ) => void;
-  setTransformCache: (
-    key: string,
-    path: string[],
-    cacheKey: string,
-    cacheData: any
-  ) => void;
 
   pathSubscribers: Map<string, Set<(newValue: any) => void>>;
   subscribeToPath: (
@@ -268,7 +298,7 @@ export type CogsGlobalState = {
 
   stateLog: Map<string, Map<string, UpdateTypeDetail>>;
   syncInfoStore: Map<string, SyncInfo>;
-  addStateLog: (key: string, update: UpdateTypeDetail) => void;
+  addStateLog: (updates: UpdateTypeDetail[]) => void;
 
   setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
   getSyncInfo: (key: string) => SyncInfo | null;
@@ -286,133 +316,456 @@ const isSimpleObject = (value: any): boolean => {
   // Everything else is not simple
   return false;
 };
+
+// ✅ CHANGE 1: Add `arrayKeys` to the list of recognized metadata keys.
+export const METADATA_KEYS = new Set([
+  'arrayKeys',
+  'components',
+  'signals',
+  'mapWrappers',
+  'pathComponents',
+  'validation',
+  'features',
+  'virtualizer',
+  'transformCaches',
+  'lastServerSync',
+  'stateSource',
+  'baseServerState',
+  'isDirty',
+]);
+
+/**
+ * The single source of truth for converting a regular JS value/object
+ * into the shadow state tree format.
+ */
+// ✅ CHANGE 2: `buildShadowNode` now correctly handles all arrays.
+export function buildShadowNode(value: any): any {
+  // Primitives and null are wrapped.
+  if (value === null || typeof value !== 'object') {
+    return { value };
+  }
+
+  // Arrays are converted to an object with id-keyed children and an `arrayKeys` metadata property.
+  if (Array.isArray(value)) {
+    const arrayNode: any = { arrayKeys: [] }; // Initialize with arrayKeys
+    const idKeys: string[] = [];
+    value.forEach((item) => {
+      const itemId = `id:${ulid()}`;
+      arrayNode[itemId] = buildShadowNode(item); // Recurse for each item
+      idKeys.push(itemId);
+    });
+    arrayNode.arrayKeys = idKeys; // Set the final ordered keys
+    return arrayNode;
+  }
+
+  // Plain objects are recursively processed.
+  if (value.constructor === Object) {
+    const objectNode: any = {};
+    for (const key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        objectNode[key] = buildShadowNode(value[key]); // Recurse for each property
+      }
+    }
+    return objectNode;
+  }
+
+  // Fallback for other object types (Date, etc.) - treat them as primitives.
+  return { value };
+}
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
-  updateQueue: new Set<() => void>(),
-  // A flag to ensure we only schedule the flush once per event-loop tick.
-  isFlushScheduled: false,
+  // Add to CogsGlobalState in store.ts
 
-  // This function is called by queueMicrotask to execute all queued updates.
-  flushUpdates: () => {
-    const { updateQueue } = get();
+  shadowStateStore: new Map<string, ShadowRootNEW>(),
+  initializeShadowState: (key: string, initialState: any) => {
+    set((state) => {
+      const newShadowStoreNEW = new Map(state.shadowStateStore);
+      const existingRoot =
+        newShadowStoreNEW.get(key) || newShadowStoreNEW.get(`[${key}`);
+      let preservedMetadata: any = {};
+      if (existingRoot) {
+        const {
+          components,
+          features,
+          lastServerSync,
+          stateSource,
+          baseServerState,
+        } = existingRoot as any;
+        if (components) preservedMetadata.components = components;
+        if (features) preservedMetadata.features = features;
+        if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
+        if (stateSource) preservedMetadata.stateSource = stateSource;
+        if (baseServerState)
+          preservedMetadata.baseServerState = baseServerState;
+      }
+      newShadowStoreNEW.delete(key);
+      newShadowStoreNEW.delete(`[${key}`);
 
-    if (updateQueue.size > 0) {
-      startTransition(() => {
-        updateQueue.forEach((updateFn) => updateFn());
-      });
+      const newRoot = buildShadowNode(initialState);
+      Object.assign(newRoot, preservedMetadata);
+
+      const storageKey = Array.isArray(initialState) ? `[${key}` : key;
+      newShadowStoreNEW.set(storageKey, newRoot);
+      console.log('sssssssssssssssssssssssssssss', newShadowStoreNEW);
+      return { shadowStateStore: newShadowStoreNEW };
+    });
+  },
+  getShadowMetadata: (key: string, path: string[]) => {
+    const store = get().shadowStateStore;
+    let current: any = store.get(key) || store.get(`[${key}`);
+
+    if (!current) return undefined;
+    if (path.length === 0) return current;
+
+    // Correctly traverses the nested object property by property.
+    for (const segment of path) {
+      if (typeof current !== 'object' || current === null) return undefined;
+      current = current[segment];
+      if (current === undefined) return undefined;
+    }
+    return current;
+  },
+  setShadowMetadata: (key: string, path: string[], metadata: any) => {
+    set((state) => {
+      const newStore = new Map(state.shadowStateStore);
+      const rootKey = newStore.has(`[${key}`) ? `[${key}` : key;
+      let root = newStore.get(rootKey);
+
+      if (!root) {
+        root = {};
+        newStore.set(rootKey, root);
+      }
+
+      const clonedRoot: any = { ...root };
+      newStore.set(rootKey, clonedRoot);
+
+      if (path.length === 0) {
+        Object.assign(clonedRoot, metadata);
+      } else {
+        let current = clonedRoot;
+        const parentPath = path.slice(0, -1);
+
+        for (const segment of parentPath) {
+          const nextNode = current[segment] || {};
+          current[segment] = { ...nextNode }; // Clone for immutability
+          current = current[segment];
+        }
+
+        const lastSegment = path[path.length - 1]!;
+        const existingNode = current[lastSegment] || {};
+        current[lastSegment] = { ...existingNode, ...metadata }; // Merge metadata
+      }
+
+      return { shadowStateStore: newStore };
+    });
+  },
+
+  getShadowValue: (
+    key: string,
+    path: string[],
+    validArrayIds?: string[],
+    log?: boolean
+  ) => {
+    const node = get().getShadowMetadata(key, path);
+
+    if (node === null || node === undefined) return undefined;
+    if (log) {
+      console.log('getShadowValue', key, path, node);
+    }
+    const nodeKeys = Object.keys(node);
+
+    const isPrimitiveWrapper =
+      Object.prototype.hasOwnProperty.call(node, 'value') &&
+      nodeKeys.every((k) => k === 'value' || METADATA_KEYS.has(k));
+    if (log) {
+      console.log('isPrimitiveWrapper', isPrimitiveWrapper);
+    }
+    if (isPrimitiveWrapper) return node.value;
+
+    // A node is an array if it has the `arrayKeys` metadata property.
+    const isArrayNode = Object.prototype.hasOwnProperty.call(node, 'arrayKeys');
+    if (log) {
+      console.log('isArrayNode', isArrayNode);
+    }
+    if (isArrayNode) {
+      // Use the ordered list from `validArrayIds` (for filtered views) or the node's own `arrayKeys`.
+      const keysToIterate =
+        validArrayIds !== undefined && validArrayIds.length > 0
+          ? validArrayIds
+          : (node as any).arrayKeys;
+
+      if (log) {
+        console.log('keysToIterate', keysToIterate);
+      }
+      return keysToIterate.map((itemKey: string) =>
+        get().getShadowValue(key, [...path, itemKey])
+      );
     }
 
-    // Clear the queue and reset the flag for the next event loop tick.
-    set({ updateQueue: new Set(), isFlushScheduled: false });
+    const result: any = {};
+    for (const propKey of nodeKeys) {
+      if (!METADATA_KEYS.has(propKey) && !propKey.startsWith('id:')) {
+        result[propKey] = get().getShadowValue(key, [...path, propKey]);
+      }
+    }
+    return result;
+  },
+
+  updateShadowAtPath: (key: string, path: string[], newValue: any) => {
+    set((state) => {
+      const newStore = new Map(state.shadowStateStore);
+      const rootKey = newStore.has(`[${key}`) ? `[${key}` : key;
+      let root = newStore.get(rootKey);
+
+      if (!root) return state;
+
+      const clonedRoot: any = { ...root };
+      newStore.set(rootKey, clonedRoot);
+
+      if (path.length === 0) {
+        const newRootStructure = buildShadowNode(newValue);
+        for (const metaKey in clonedRoot) {
+          if (METADATA_KEYS.has(metaKey)) {
+            newRootStructure[metaKey] = clonedRoot[metaKey];
+          }
+        }
+        newStore.set(rootKey, newRootStructure);
+      } else {
+        let current = clonedRoot;
+        const parentPath = path.slice(0, -1);
+        for (const segment of parentPath) {
+          current[segment] = { ...current[segment] };
+          current = current[segment];
+        }
+
+        const lastSegment = path[path.length - 1]!;
+        const existingNode = current[lastSegment] || {};
+        const newNodeStructure = buildShadowNode(newValue);
+        // This merge is critical: it preserves metadata (like pathComponents) during an update.
+        current[lastSegment] = { ...existingNode, ...newNodeStructure };
+      }
+
+      get().notifyPathSubscribers([key, ...path].join('.'), {
+        type: 'UPDATE',
+        newValue,
+      });
+      return { shadowStateStore: newStore };
+    });
+  },
+
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any,
+    index?: number
+  ) => {
+    set((state) => {
+      // Get the array node. We need a mutable reference for this transaction.
+      const arrayNode = get().getShadowMetadata(key, arrayPath);
+      if (!arrayNode) {
+        console.error(
+          `Array not found at path: ${[key, ...arrayPath].join('.')}`
+        );
+        return state;
+      }
+      const newItemId = `id:${ulid()}`;
+      // Add the new item's data to the node
+      arrayNode[newItemId as keyof typeof arrayNode] = buildShadowNode(newItem);
+
+      // Update the `arrayKeys` metadata to include the new item ID in the correct position
+      const currentKeys = (arrayNode.arrayKeys as string[]) || [];
+      const newKeys = [...currentKeys];
+      if (index !== undefined && index >= 0 && index <= newKeys.length) {
+        newKeys.splice(index, 0, newItemId);
+      } else {
+        newKeys.push(newItemId);
+      }
+      arrayNode.arrayKeys = newKeys;
+      get().setShadowMetadata(key, arrayPath, arrayNode);
+      const arrayKey = [key, ...arrayPath].join('.');
+      get().notifyPathSubscribers(arrayKey, {
+        type: 'INSERT',
+        path: arrayKey,
+        itemKey: `${arrayKey}.${newItemId}`,
+        index: index ?? newKeys.length - 1,
+      });
+
+      // `setShadowMetadata` handles the state update, so we return an empty object.
+      return {};
+    });
+  },
+
+  // ✅ CHANGE 5: `removeShadowArrayElement` now updates the `arrayKeys` metadata.
+  removeShadowArrayElement: (key: string, itemPath: string[]) => {
+    set((state) => {
+      if (itemPath.length === 0) {
+        console.error('Cannot remove root');
+        return state;
+      }
+
+      const arrayPath = itemPath.slice(0, -1);
+      const itemId = itemPath[itemPath.length - 1];
+
+      if (!itemId?.startsWith('id:')) {
+        console.error('Invalid item ID for removal:', itemId);
+        return state;
+      }
+
+      const arrayNode = get().getShadowMetadata(key, arrayPath);
+
+      if (!arrayNode) {
+        console.error(
+          `Array not found at path: ${[key, ...arrayPath].join('.')}`
+        );
+        return state;
+      }
+
+      // Delete the item's data from the node
+      delete arrayNode[itemId as keyof typeof arrayNode];
+
+      // Also remove the item's ID from the `arrayKeys` metadata
+      if (Array.isArray(arrayNode.arrayKeys)) {
+        arrayNode.arrayKeys = arrayNode.arrayKeys.filter((k) => k !== itemId);
+      }
+
+      // Persist the modified array node back to the store
+      get().setShadowMetadata(key, arrayPath, arrayNode);
+
+      const arrayKey = [key, ...arrayPath].join('.');
+      get().notifyPathSubscribers(arrayKey, {
+        type: 'REMOVE',
+        path: arrayKey,
+        itemKey: `${arrayKey}.${itemId}`,
+      });
+
+      // `setShadowMetadata` handles the state update
+      return {};
+    });
   },
   addPathComponent: (stateKey, dependencyPath, fullComponentId) => {
-    set((state) => {
-      const newShadowStore = new Map(state.shadowStateStore);
-      const dependencyKey = [stateKey, ...dependencyPath].join('.');
+    const node = get().getShadowMetadata(stateKey, dependencyPath) || {};
 
-      // --- Part 1: Update the path's own metadata ---
-      const pathMeta = newShadowStore.get(dependencyKey) || {};
-      // Create a *new* Set to ensure immutability
-      const pathComponents = new Set(pathMeta.pathComponents);
-      pathComponents.add(fullComponentId);
-      // Update the metadata for the specific path
-      newShadowStore.set(dependencyKey, { ...pathMeta, pathComponents });
+    const newPathComponents = new Set(node.pathComponents);
+    newPathComponents.add(fullComponentId);
+    get().setShadowMetadata(stateKey, dependencyPath, {
+      pathComponents: newPathComponents,
+    });
 
-      // --- Part 2: Update the component's own list of paths ---
-      const rootMeta = newShadowStore.get(stateKey) || {};
-      const component = rootMeta.components?.get(fullComponentId);
-
-      // If the component exists, update its `paths` set immutably
+    // --- Part 2: Update the component's own list of paths it subscribes to ---
+    const rootNode = get().getShadowMetadata(stateKey, []);
+    if (rootNode?.components) {
+      const component = rootNode.components.get(fullComponentId);
       if (component) {
+        const fullPathKey = [stateKey, ...dependencyPath].join('.');
         const newPaths = new Set(component.paths);
-        newPaths.add(dependencyKey);
-
+        newPaths.add(fullPathKey);
         const newComponentRegistration = { ...component, paths: newPaths };
-        const newComponentsMap = new Map(rootMeta.components);
+        const newComponentsMap = new Map(rootNode.components);
         newComponentsMap.set(fullComponentId, newComponentRegistration);
-
-        // Update the root metadata with the new components map
-        newShadowStore.set(stateKey, {
-          ...rootMeta,
+        get().setShadowMetadata(stateKey, [], {
           components: newComponentsMap,
         });
       }
-
-      // Return the final, updated state
-      return { shadowStateStore: newShadowStore };
-    });
+    }
   },
   registerComponent: (stateKey, fullComponentId, registration) => {
-    set((state) => {
-      const newShadowStore = new Map(state.shadowStateStore);
-      const rootMeta = newShadowStore.get(stateKey) || {};
-      const components = new Map(rootMeta.components);
-      components.set(fullComponentId, registration);
-      newShadowStore.set(stateKey, { ...rootMeta, components });
-      return { shadowStateStore: newShadowStore };
-    });
-  },
+    // Get metadata from the NEW store.
+    const rootMeta = get().getShadowMetadata(stateKey, []);
+    const components = new Map(rootMeta?.components);
 
+    components.set(fullComponentId, registration);
+
+    // Set the updated components map back onto the root node of the NEW store.
+    get().setShadowMetadata(stateKey, [], { components });
+  },
+  // Replace the old unregisterComponent with this corrected version
   unregisterComponent: (stateKey, fullComponentId) => {
-    set((state) => {
-      const newShadowStore = new Map(state.shadowStateStore);
-      const rootMeta = newShadowStore.get(stateKey);
-      if (!rootMeta?.components) {
-        return state; // Return original state, no change needed
-      }
+    // Get metadata from the NEW store.
+    const rootMeta = get().getShadowMetadata(stateKey, []);
 
-      const components = new Map(rootMeta.components);
-      const wasDeleted = components.delete(fullComponentId);
+    if (!rootMeta?.components) {
+      return; // Nothing to do
+    }
 
-      // Only update state if something was actually deleted
-      if (wasDeleted) {
-        newShadowStore.set(stateKey, { ...rootMeta, components });
-        return { shadowStateStore: newShadowStore };
-      }
+    const components = new Map(rootMeta.components);
+    const wasDeleted = components.delete(fullComponentId);
 
-      return state; // Nothing changed
-    });
+    // Only update state if something was actually deleted
+    if (wasDeleted) {
+      // Set the updated components map back onto the root node of the NEW store.
+      get().setShadowMetadata(stateKey, [], { components });
+    }
   },
+
   markAsDirty: (key: string, path: string[], options = { bubble: true }) => {
-    const { shadowStateStore } = get();
-    const updates = new Map<string, ShadowMetadata>();
+    set((state) => {
+      // 1. Setup: Get the new store, find the root, and clone it to begin the update.
+      const newShadowStoreNEW = new Map(state.shadowStateStore);
+      const rootKey = newShadowStoreNEW.has(`[${key}`) ? `[${key}` : key;
+      const root = newShadowStoreNEW.get(rootKey);
 
-    const setDirty = (currentPath: string[]) => {
-      const fullKey = [key, ...currentPath].join('.');
-      const meta = shadowStateStore.get(fullKey) || {};
-
-      // If already dirty, no need to update
-      if (meta.isDirty === true) {
-        return true; // Return true to indicate parent is dirty
+      // Abort if the root state object doesn't exist.
+      if (!root) {
+        console.error(`State with key "${key}" not found for markAsDirty.`);
+        return state;
       }
 
-      updates.set(fullKey, { ...meta, isDirty: true });
-      return false; // Not previously dirty
-    };
+      const clonedRoot: any = { ...root };
+      newShadowStoreNEW.set(rootKey, clonedRoot);
 
-    // Mark the target path
-    setDirty(path);
+      // 2. This helper function translates your original `setDirty` logic.
+      //    It operates on the single `clonedRoot` object.
+      //    It returns 'true' if the node was already dirty, to stop the bubble.
+      const setDirtyOnNode = (pathToMark: string[]): boolean => {
+        // A. First, just navigate to the node to check its status without modifying anything.
+        let nodeToCheck = clonedRoot;
+        for (const segment of pathToMark) {
+          if (!nodeToCheck[segment]) {
+            // Path doesn't exist, so we can't mark it. Stop the process.
+            return true;
+          }
+          nodeToCheck = nodeToCheck[segment];
+        }
 
-    // Bubble up if requested
-    if (options.bubble) {
-      let parentPath = [...path];
-      while (parentPath.length > 0) {
-        parentPath.pop();
-        const wasDirty = setDirty(parentPath);
-        if (wasDirty) {
-          break; // Stop bubbling if parent was already dirty
+        // B. If it's already dirty, we don't need to do anything else. Signal to stop bubbling.
+        if (nodeToCheck.isDirty === true) {
+          return true;
+        }
+
+        // C. If it's NOT dirty, we now traverse again, this time cloning each
+        //    node on the path to ensure an immutable update.
+        let mutator = clonedRoot;
+        for (const segment of pathToMark) {
+          mutator[segment] = { ...mutator[segment] }; // This is the crucial clone.
+          mutator = mutator[segment];
+        }
+
+        // D. Set the flag on the final, cloned node.
+        mutator.isDirty = true;
+        return false; // Signal that the state was changed.
+      };
+
+      // 3. Execute the logic, identical to your original function's structure.
+
+      // Mark the target path first.
+      setDirtyOnNode(path);
+
+      // Bubble up the change if requested.
+      if (options.bubble) {
+        let parentPath = [...path];
+        while (parentPath.length > 0) {
+          parentPath.pop();
+          const wasParentAlreadyDirty = setDirtyOnNode(parentPath);
+          // If the parent was already dirty, all of its ancestors are also dirty,
+          // so we can stop bubbling.
+          if (wasParentAlreadyDirty) {
+            break;
+          }
         }
       }
-    }
 
-    // Apply all updates at once
-    if (updates.size > 0) {
-      set((state) => {
-        updates.forEach((meta, key) => {
-          state.shadowStateStore.set(key, meta);
-        });
-        return state;
-      });
-    }
+      // 4. Return the new state object containing the fully modified root.
+      return { shadowStateStore: newShadowStoreNEW };
+    });
   },
   serverStateUpdates: new Map(),
   setServerStateUpdate: (key, serverState) => {
@@ -423,12 +776,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
 
     // Notify all subscribers for this key
+
     get().notifyPathSubscribers(key, {
       type: 'SERVER_STATE_UPDATE',
       serverState,
     });
   },
-  shadowStateStore: new Map(),
+
   getShadowNode: (key: string) => get().shadowStateStore.get(key),
   pathSubscribers: new Map<string, Set<(newValue: any) => void>>(),
 
@@ -458,333 +812,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
   },
 
-  initializeShadowState: (key: string, initialState: any) => {
-    set((state) => {
-      // 1. Make a copy of the current store to modify it
-      const newShadowStore = new Map(state.shadowStateStore);
-      console.log('initializeShadowState');
-      // 2. PRESERVE the existing components map before doing anything else
-      const existingRootMeta = newShadowStore.get(key);
-      const preservedComponents = existingRootMeta?.components;
-
-      // 3. Wipe all old shadow entries for this state key
-      const prefixToDelete = key + '.';
-      for (const k of Array.from(newShadowStore.keys())) {
-        if (k === key || k.startsWith(prefixToDelete)) {
-          newShadowStore.delete(k);
-        }
-      }
-
-      // 4. Run your original logic to rebuild the state tree from scratch
-      const processValue = (value: any, path: string[]) => {
-        const nodeKey = [key, ...path].join('.');
-
-        if (Array.isArray(value)) {
-          const childIds: string[] = [];
-          value.forEach(() => {
-            const itemId = `id:${ulid()}`;
-            childIds.push(nodeKey + '.' + itemId);
-          });
-          newShadowStore.set(nodeKey, { arrayKeys: childIds });
-          value.forEach((item, index) => {
-            const itemId = childIds[index]!.split('.').pop();
-            processValue(item, [...path!, itemId!]);
-          });
-        } else if (isSimpleObject(value)) {
-          const fields = Object.fromEntries(
-            Object.keys(value).map((k) => [k, nodeKey + '.' + k])
-          );
-          newShadowStore.set(nodeKey, { fields });
-          Object.keys(value).forEach((k) => {
-            processValue(value[k], [...path, k]);
-          });
-        } else {
-          newShadowStore.set(nodeKey, { value });
-        }
-      };
-      processValue(initialState, []);
-
-      // 5. RESTORE the preserved components map onto the new root metadata
-      if (preservedComponents) {
-        const newRootMeta = newShadowStore.get(key) || {};
-        newShadowStore.set(key, {
-          ...newRootMeta,
-          components: preservedComponents,
-        });
-      }
-
-      // 6. Return the completely updated state
-      return { shadowStateStore: newShadowStore };
-    });
-  },
-
-  getShadowValue: (fullKey: string, validArrayIds?: string[]) => {
-    const memo = new Map<string, any>();
-    const reconstruct = (keyToBuild: string, ids?: string[]): any => {
-      if (memo.has(keyToBuild)) {
-        return memo.get(keyToBuild);
-      }
-
-      const shadowMeta = get().shadowStateStore.get(keyToBuild);
-      if (!shadowMeta) {
-        return undefined;
-      }
-
-      if (shadowMeta.value !== undefined) {
-        return shadowMeta.value;
-      }
-
-      let result: any; // The value we are about to build.
-
-      if (shadowMeta.arrayKeys) {
-        const keys = ids ?? shadowMeta.arrayKeys;
-        result = [];
-        memo.set(keyToBuild, result);
-        keys.forEach((itemKey) => {
-          result.push(reconstruct(itemKey));
-        });
-      } else if (shadowMeta.fields) {
-        result = {};
-        memo.set(keyToBuild, result);
-        Object.entries(shadowMeta.fields).forEach(([key, fieldPath]) => {
-          result[key] = reconstruct(fieldPath as string);
-        });
-      } else {
-        result = undefined;
-      }
-
-      // Return the final, fully populated result.
-      return result;
-    };
-
-    // Start the process by calling the inner function on the root key.
-    return reconstruct(fullKey, validArrayIds);
-  },
-  getShadowMetadata: (key: string, path: string[]) => {
-    const fullKey = [key, ...path].join('.');
-
-    return get().shadowStateStore.get(fullKey);
-  },
-
-  setShadowMetadata: (key, path, metadata) => {
-    const fullKey = [key, ...path].join('.');
-    const existingMeta = get().shadowStateStore.get(fullKey);
-
-    // --- THIS IS THE TRAP ---
-    // If the existing metadata HAS a components map, but the NEW metadata DOES NOT,
-    // it means we are about to wipe it out. This is the bug.
-    if (existingMeta?.components && !metadata.components) {
-      console.group(
-        '%c🚨 RACE CONDITION DETECTED! 🚨',
-        'color: red; font-size: 18px; font-weight: bold;'
-      );
-      console.error(
-        `An overwrite is about to happen on stateKey: "${key}" at path: [${path.join(', ')}]`
-      );
-      console.log(
-        'The EXISTING metadata had a components map:',
-        existingMeta.components
-      );
-      console.log(
-        'The NEW metadata is trying to save WITHOUT a components map:',
-        metadata
-      );
-      console.log(
-        '%cStack trace to the function that caused this overwrite:',
-        'font-weight: bold;'
-      );
-      console.trace(); // This prints the call stack, leading you to the bad code.
-      console.groupEnd();
-    }
-    // --- END OF TRAP ---
-
-    const newShadowStore = new Map(get().shadowStateStore);
-    const finalMeta = { ...(existingMeta || {}), ...metadata };
-    newShadowStore.set(fullKey, finalMeta);
-    set({ shadowStateStore: newShadowStore });
-  },
-  setTransformCache: (
-    key: string,
-    path: string[],
-    cacheKey: string,
-    cacheData: any
-  ) => {
-    const fullKey = [key, ...path].join('.');
-    const newShadowStore = new Map(get().shadowStateStore);
-    const existing = newShadowStore.get(fullKey) || {};
-
-    // Initialize transformCaches if it doesn't exist
-    if (!existing.transformCaches) {
-      existing.transformCaches = new Map();
-    }
-
-    // Update just the specific cache entry
-    existing.transformCaches.set(cacheKey, cacheData);
-
-    // Update shadow store WITHOUT notifying path subscribers
-    newShadowStore.set(fullKey, existing);
-    set({ shadowStateStore: newShadowStore });
-
-    // Don't call notifyPathSubscribers here - cache updates shouldn't trigger renders
-  },
-  insertShadowArrayElement: (
-    key: string,
-    arrayPath: string[],
-    newItem: any
-  ) => {
-    const newShadowStore = new Map(get().shadowStateStore);
-    const arrayKey = [key, ...arrayPath].join('.');
-    const parentMeta = newShadowStore.get(arrayKey);
-
-    if (!parentMeta || !parentMeta.arrayKeys) return;
-
-    const newItemId = `id:${ulid()}`;
-    const fullItemKey = arrayKey + '.' + newItemId;
-
-    // Just add to the end (or at a specific index if provided)
-    const newArrayKeys = [...parentMeta.arrayKeys];
-    newArrayKeys.push(fullItemKey); // Or use splice if you have an index
-    newShadowStore.set(arrayKey, { ...parentMeta, arrayKeys: newArrayKeys });
-
-    // Process the new item - but use the correct logic
-    const processNewItem = (value: any, path: string[]) => {
-      const nodeKey = [key, ...path].join('.');
-
-      if (Array.isArray(value)) {
-        // Handle arrays...
-      } else if (typeof value === 'object' && value !== null) {
-        // Create fields mapping
-        const fields = Object.fromEntries(
-          Object.keys(value).map((k) => [k, nodeKey + '.' + k])
-        );
-        newShadowStore.set(nodeKey, { fields });
-
-        // Process each field
-        Object.entries(value).forEach(([k, v]) => {
-          processNewItem(v, [...path, k]);
-        });
-      } else {
-        // Primitive value
-        newShadowStore.set(nodeKey, { value });
-      }
-    };
-
-    processNewItem(newItem, [...arrayPath, newItemId]);
-    set({ shadowStateStore: newShadowStore });
-
-    get().notifyPathSubscribers(arrayKey, {
-      type: 'INSERT',
-      path: arrayKey,
-      itemKey: fullItemKey,
-    });
-  },
-  removeShadowArrayElement: (key: string, itemPath: string[]) => {
-    const newShadowStore = new Map(get().shadowStateStore);
-
-    // Get the full item key (e.g., "stateKey.products.id:xxx")
-    const itemKey = [key, ...itemPath].join('.');
-
-    // Extract parent path and item ID
-    const parentPath = itemPath.slice(0, -1);
-    const parentKey = [key, ...parentPath].join('.');
-
-    // Get parent metadata
-    const parentMeta = newShadowStore.get(parentKey);
-
-    if (parentMeta && parentMeta.arrayKeys) {
-      // Find the index of the item to remove
-      const indexToRemove = parentMeta.arrayKeys.findIndex(
-        (arrayItemKey) => arrayItemKey === itemKey
-      );
-
-      if (indexToRemove !== -1) {
-        // Create new array keys with the item removed
-        const newArrayKeys = parentMeta.arrayKeys.filter(
-          (arrayItemKey) => arrayItemKey !== itemKey
-        );
-
-        // Update parent with new array keys
-        newShadowStore.set(parentKey, {
-          ...parentMeta,
-          arrayKeys: newArrayKeys,
-        });
-
-        // Delete all data associated with the removed item
-        const prefixToDelete = itemKey + '.';
-        for (const k of Array.from(newShadowStore.keys())) {
-          if (k === itemKey || k.startsWith(prefixToDelete)) {
-            newShadowStore.delete(k);
-          }
-        }
-      }
-    }
-
-    set({ shadowStateStore: newShadowStore });
-
-    get().notifyPathSubscribers(parentKey, {
-      type: 'REMOVE',
-      path: parentKey,
-      itemKey: itemKey, // The exact ID of the removed item
-    });
-  },
-
-  updateShadowAtPath: (key, path, newValue) => {
-    const fullKey = [key, ...path].join('.');
-
-    // Optimization: Only update if value actually changed
-    const existingMeta = get().shadowStateStore.get(fullKey);
-    if (existingMeta?.value === newValue && !isSimpleObject(newValue)) {
-      return; // Skip update for unchanged primitives
-    }
-
-    // CHANGE: Don't clone the entire Map, just update in place
-    set((state) => {
-      const store = state.shadowStateStore;
-
-      if (!isSimpleObject(newValue)) {
-        const meta = store.get(fullKey) || {};
-        store.set(fullKey, { ...meta, value: newValue });
-      } else {
-        // Handle objects by iterating
-        const processObject = (currentPath: string[], objectToSet: any) => {
-          const currentFullKey = [key, ...currentPath].join('.');
-          const meta = store.get(currentFullKey);
-
-          if (meta && meta.fields) {
-            for (const fieldKey in objectToSet) {
-              if (Object.prototype.hasOwnProperty.call(objectToSet, fieldKey)) {
-                const childValue = objectToSet[fieldKey];
-                const childFullPath = meta.fields[fieldKey];
-
-                if (childFullPath) {
-                  if (isSimpleObject(childValue)) {
-                    processObject(
-                      childFullPath.split('.').slice(1),
-                      childValue
-                    );
-                  } else {
-                    const existingChildMeta = store.get(childFullPath) || {};
-                    store.set(childFullPath, {
-                      ...existingChildMeta,
-                      value: childValue,
-                    });
-                  }
-                }
-              }
-            }
-          }
-        };
-
-        processObject(path, newValue);
-      }
-
-      // Only notify after all changes are made
-      get().notifyPathSubscribers(fullKey, { type: 'UPDATE', newValue });
-
-      // Return same reference if using Zustand's immer middleware
-      return state;
-    });
-  },
   selectedIndicesMap: new Map<string, string>(),
   getSelectedIndex: (arrayKey: string, validIds?: string[]): number => {
     const itemKey = get().selectedIndicesMap.get(arrayKey);
@@ -869,23 +896,36 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   initialStateGlobal: {},
 
   validationErrors: new Map(),
-  addStateLog: (key, update) => {
+  addStateLog: (updates) => {
+    if (!updates || updates.length === 0) {
+      return;
+    }
     set((state) => {
       const newLog = new Map(state.stateLog);
-      const stateLogForKey = new Map(newLog.get(key));
-      const uniquePathKey = JSON.stringify(update.path);
 
-      const existing = stateLogForKey.get(uniquePathKey);
-      if (existing) {
-        // If an update for this path already exists, just modify it. (Fast)
-        existing.newValue = update.newValue;
-        existing.timeStamp = update.timeStamp;
-      } else {
-        // Otherwise, add the new update. (Fast)
-        stateLogForKey.set(uniquePathKey, { ...update });
+      // Group all updates by their stateKey
+      const logsGroupedByKey = new Map<string, UpdateTypeDetail[]>();
+      for (const update of updates) {
+        if (!logsGroupedByKey.has(update.stateKey)) {
+          logsGroupedByKey.set(update.stateKey, []);
+        }
+        logsGroupedByKey.get(update.stateKey)!.push(update);
       }
 
-      newLog.set(key, stateLogForKey);
+      // Process each group efficiently
+      for (const [key, batchOfUpdates] of logsGroupedByKey.entries()) {
+        // Copy the map for this key only ONCE
+        const newStateLogForKey = new Map(newLog.get(key));
+
+        // Apply all updates for this key in a fast loop
+        for (const update of batchOfUpdates) {
+          const uniquePathKey = JSON.stringify(update.path);
+          newStateLogForKey.set(uniquePathKey, { ...update });
+        }
+
+        newLog.set(key, newStateLogForKey);
+      }
+
       return { stateLog: newLog };
     });
   },

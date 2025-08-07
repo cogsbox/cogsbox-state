@@ -207,6 +207,7 @@ describe('CogsState - Basic Functionality', () => {
   });
 
   it('should access an array item using .index()', () => {
+    console.log(setter.items.get());
     expect(setter.items.index(1).get()).toBe('b');
     expect(setter.tasks.index(0).text.get()).toBe('Task 1');
   });
@@ -589,7 +590,7 @@ describe('CogsState - Deeply Nested Array Operations', () => {
     // --- STEP 2: Test accessing the `.properties` array from the instance proxy ---
     const propertiesProxy = instanceProxy.properties;
     const propertiesArray = propertiesProxy.get();
-
+    console.log('propertiesArray', propertiesArray);
     // Assert that we have a proxy to the properties array and it has the correct length.
     expect(propertiesProxy).toBeDefined();
     expect(Array.isArray(propertiesArray)).toBe(true);
