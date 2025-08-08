@@ -304,7 +304,7 @@ export type StateObject<T> = (T extends any[]
     _isLoading: boolean;
     _serverState: T;
     revertToInitialState: (obj?: { validationKey?: string }) => T;
-    getDifferences: () => string[];
+
     middleware: (
       middles: ({
         updateLog,
@@ -505,24 +505,26 @@ const {
   subscribeToPath,
   // Note: The old functions are no longer imported under their original names
 } = getGlobalStore.getState();
-
 function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
-  const shadowNode = getShadowMetadata(stateKey, path);
-  console.log('shadowNode', shadowNode, meta);
-  if (shadowNode && 'value' in shadowNode) {
-    return { isArray: false, value: shadowNode.value, keys: [] };
+  const shadowMeta = getShadowMetadata(stateKey, path);
+  const isArray = !!shadowMeta?.arrayKeys;
+
+  if (!isArray) {
+    const value = getGlobalStore.getState().getShadowValue(stateKey, path);
+    return { isArray: false, value, keys: [] };
   }
 
   const arrayPathKey = path.join('.');
-  const viewIds = meta?.arrayViews?.[arrayPathKey] ?? shadowNode?.arrayKeys;
+  const viewIds = meta?.arrayViews?.[arrayPathKey] ?? shadowMeta.arrayKeys;
+
+  // FIX: If the derived view is empty, return an empty array and keys.
+  if (Array.isArray(viewIds) && viewIds.length === 0) {
+    return { isArray: true, value: [], keys: [] };
+  }
 
   const value = getGlobalStore
     .getState()
     .getShadowValue(stateKey, path, viewIds);
-
-  if (!Array.isArray(value)) {
-    return { isArray: false, value, keys: [] };
-  }
 
   return { isArray: true, value, keys: viewIds ?? [] };
 }
@@ -1014,33 +1016,23 @@ function handleUpdate(
   path: string[],
   payload: any
 ): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } {
-  // Get the full existing node, including its metadata
-  const existingNode = getShadowMetadata(stateKey, path) || {};
-  const currentValue = getGlobalStore.getState().getShadowValue(stateKey, path);
+  // ✅ FIX: Get the old value before the update.
+  const oldValue = getGlobalStore.getState().getShadowValue(stateKey, path);
 
-  const newValue = isFunction(payload) ? payload(currentValue) : payload;
+  const newValue = isFunction(payload) ? payload(oldValue) : payload;
 
-  const newNode = buildShadowNode(newValue);
-
-  if (Object.prototype.hasOwnProperty.call(newNode, 'value')) {
-    // Get all keys from the old node that are metadata keys
-    for (const key in existingNode) {
-      if (METADATA_KEYS.has(key)) {
-        newNode[key] = existingNode[key as keyof typeof existingNode];
-      }
-    }
-  }
-
-  updateShadowAtPath(stateKey, path, newValue); // The logic will be moved into this function
+  // ✅ FIX: The new `updateShadowAtPath` handles metadata preservation automatically.
+  // The manual loop has been removed.
+  updateShadowAtPath(stateKey, path, newValue);
 
   markAsDirty(stateKey, path, { bubble: true });
 
-  // Return the metadata of the node *after* the update
+  // Return the metadata of the node *after* the update.
   const newShadowMeta = getShadowMetadata(stateKey, path);
 
   return {
     type: 'update',
-    oldValue: currentValue,
+    oldValue: oldValue,
     newValue,
     shadowMeta: newShadowMeta,
   };
@@ -1719,14 +1711,14 @@ function hashTransforms(transforms: any[]) {
     )
     .join('');
 }
+
 const applyTransforms = (
   stateKey: string,
   path: string[],
   transforms?: Array<{ type: 'filter' | 'sort'; fn: Function }>
 ): string[] => {
-  const node = getShadowMetadata(stateKey, path);
-  let ids = Object.keys(node || {}).filter((k) => k.startsWith('id:'));
-
+  let ids = getShadowMetadata(stateKey, path)?.arrayKeys || [];
+  console.log('ids', ids);
   if (!transforms || transforms.length === 0) {
     return ids;
   }
@@ -1737,6 +1729,7 @@ const applyTransforms = (
       const filtered: any[] = [];
       ids.forEach((id, index) => {
         const value = getShadowValue(stateKey, [...path, id]);
+
         if (transform.fn(value, index)) {
           filtered.push(id);
         }
@@ -1824,16 +1817,24 @@ const notifySelectionComponents = (
 };
 function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
   const shadowMeta = getShadowMetadata(stateKey, path);
-
-  // Just get the value directly from getShadowValue
   const arrayPathKey = path.join('.');
   const arrayKeys = meta?.arrayViews?.[arrayPathKey];
+
+  // FIX: If the derived view is empty, return an empty array directly.
+  if (Array.isArray(arrayKeys) && arrayKeys.length === 0) {
+    return {
+      shadowMeta,
+      value: [],
+      arrayKeys: shadowMeta?.arrayKeys,
+    };
+  }
+
   const value = getShadowValue(stateKey, path, arrayKeys);
 
   return {
     shadowMeta,
     value,
-    arrayKeys: shadowMeta?.arrayKeys, // Get arrayKeys from the metadata
+    arrayKeys: shadowMeta?.arrayKeys,
   };
 }
 
@@ -1847,7 +1848,6 @@ function createProxyHandler<T>(
   let stateVersion = 0;
 
   const methodNames = new Set([
-    'getDifferences',
     'sync',
     'getStatus',
     'removeStorage',
@@ -1937,19 +1937,6 @@ function createProxyHandler<T>(
           return rebuildStateShape;
         }
 
-        if (prop === 'getDifferences') {
-          return () => {
-            const { value: currentState, shadowMeta } = getScopedData(
-              stateKey,
-              path,
-              meta
-            );
-            const baseState =
-              shadowMeta?.baseServerState ??
-              getGlobalStore.getState().initialStateGlobal[stateKey];
-            return getDifferences(currentState, baseState);
-          };
-        }
         if (prop === 'sync' && path.length === 0) {
           return async function () {
             const options = getGlobalStore
@@ -2591,17 +2578,14 @@ function createProxyHandler<T>(
 
         if (prop === 'stateFilter') {
           return (callbackfn: (value: any, index: number) => boolean) => {
-            // --- CHANGED LOGIC START ---
-
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
-            // Get the IDs for the current view of THIS array, or all keys if no view exists
-            const currentViewIds =
-              meta?.arrayViews?.[arrayPathKey] ??
-              Object.keys(getShadowMetadata(stateKey, path) || {}).filter((k) =>
-                k.startsWith('id:')
-              );
 
-            const array = getShadowValue(stateKey, path, currentViewIds);
+            // ✅ FIX: Get keys from `getArrayData` which correctly resolves them from meta or the full list.
+            const { keys: currentViewIds, value: array } = getArrayData(
+              stateKey,
+              path,
+              meta
+            );
 
             if (!Array.isArray(array)) {
               throw new Error('stateFilter can only be used on arrays');
@@ -2618,16 +2602,16 @@ function createProxyHandler<T>(
                 }
               }
             });
-            const arrayPath = path.length > 0 ? path.join('.') : 'root';
+
+            // The rest is the same...
             return rebuildStateShape({
               path,
               componentId: componentId!,
               meta: {
                 ...meta,
-                // Create a new arrayViews object, preserving other views and setting the new one for this path
                 arrayViews: {
                   ...(meta?.arrayViews || {}),
-                  [arrayPath]: filteredIds,
+                  [arrayPathKey]: filteredIds,
                 },
                 transforms: [
                   ...(meta?.transforms || []),
@@ -2635,8 +2619,6 @@ function createProxyHandler<T>(
                 ],
               },
             });
-
-            // --- CHANGED LOGIC END ---
           };
         }
         if (prop === 'stateSort') {
@@ -2669,7 +2651,7 @@ function createProxyHandler<T>(
                 ...meta,
                 arrayViews: {
                   ...(meta?.arrayViews || {}),
-                  ['arrayPathKey']: sortedIds,
+                  [arrayPathKey]: sortedIds,
                 },
                 transforms: [
                   ...(meta?.transforms || []),
@@ -2790,50 +2772,38 @@ function createProxyHandler<T>(
               arraySetter: any
             ) => ReactNode
           ) => {
+            console.log('meta outside', JSON.stringify(meta));
             const StateListWrapper = () => {
               const componentIdsRef = useRef<Map<string, string>>(new Map());
 
-              const cacheKey =
-                meta?.transforms && meta.transforms.length > 0
-                  ? `${componentId}-${hashTransforms(meta.transforms)}`
-                  : `${componentId}-base`;
-
               const [updateTrigger, forceUpdate] = useState({});
-              const { validIds, arrayValues } = useMemo(() => {
-                const cached = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path)
-                  ?.transformCaches?.get(cacheKey);
 
-                let freshValidIds: string[];
+              console.log('updateTrigger updateTrigger  updateTrigger');
 
-                if (cached && cached.validIds) {
-                  freshValidIds = cached.validIds;
-                } else {
-                  freshValidIds = applyTransforms(
-                    stateKey,
-                    path,
-                    meta?.transforms
-                  );
+              const validIds = applyTransforms(
+                stateKey,
+                path,
+                meta?.transforms
+              );
+              //the above get the new coorect valid ids i need ot udpate the meta object with this info
+              const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
+              const updatedMeta = {
+                ...meta,
+                arrayViews: {
+                  ...(meta?.arrayViews || {}),
+                  [arrayPathKey]: validIds, // Update the arrayViews with the new valid IDs
+                },
+              };
 
-                  getGlobalStore
-                    .getState()
-                    .setTransformCache(stateKey, path, cacheKey, {
-                      validIds: freshValidIds,
-                      computedAt: Date.now(),
-                      transforms: meta?.transforms || [],
-                    });
-                }
+              // Now use the updated meta when getting array data
+              const { value: arrayValues } = getArrayData(
+                stateKey,
+                path,
+                updatedMeta
+              );
 
-                const freshValues = getGlobalStore
-                  .getState()
-                  .getShadowValue(stateKey, path, freshValidIds);
-
-                return {
-                  validIds: freshValidIds,
-                  arrayValues: freshValues || [],
-                };
-              }, [cacheKey, updateTrigger]);
+              console.log('validIds', validIds);
+              console.log('arrayValues', arrayValues);
 
               useEffect(() => {
                 const unsubscribe = getGlobalStore
@@ -2880,12 +2850,12 @@ function createProxyHandler<T>(
                 return null;
               }
 
+              // Continue using updatedMeta for the rest of your logic instead of meta
               const arraySetter = rebuildStateShape({
                 path,
                 componentId: componentId!,
-                meta,
+                meta: updatedMeta, // Use updated meta here
               });
-
               console.log('arrayValues', arrayValues);
 
               return (
@@ -2952,7 +2922,6 @@ function createProxyHandler<T>(
             if (viewIds) {
               const itemId = viewIds[index];
               if (!itemId) return undefined;
-
               return rebuildStateShape({
                 path: [...path, itemId],
                 componentId: componentId!,
@@ -2960,12 +2929,11 @@ function createProxyHandler<T>(
               });
             }
 
-            // No view, use natural order
-            const node = getShadowMetadata(stateKey, path);
-            if (!node) return undefined;
+            // ✅ FIX: Get the metadata and use the `arrayKeys` property.
+            const shadowMeta = getShadowMetadata(stateKey, path);
+            if (!shadowMeta?.arrayKeys) return undefined;
 
-            const idKeys = Object.keys(node).filter((k) => k.startsWith('id:'));
-            const itemId = idKeys[index];
+            const itemId = shadowMeta.arrayKeys[index];
             if (!itemId) return undefined;
 
             return rebuildStateShape({
@@ -2977,11 +2945,26 @@ function createProxyHandler<T>(
         }
         if (prop === 'last') {
           return () => {
-            const { value: currentArray } = getScopedData(stateKey, path, meta);
-            if (currentArray.length === 0) return undefined;
-            const lastIndex = currentArray.length - 1;
-            const lastValue = currentArray[lastIndex];
-            const newPath = [...path, lastIndex.toString()];
+            // ✅ FIX: Use getArrayData to get the keys for the current view (filtered or not).
+            const { keys: currentViewIds } = getArrayData(stateKey, path, meta);
+
+            // If the array is empty, there is no last item.
+            if (!currentViewIds || currentViewIds.length === 0) {
+              return undefined;
+            }
+
+            // Get the unique ID of the last item in the current view.
+            const lastItemKey = currentViewIds[currentViewIds.length - 1];
+
+            // If for some reason the key is invalid, return undefined.
+            if (!lastItemKey) {
+              return undefined;
+            }
+
+            // ✅ FIX: The new path uses the item's unique key, not its numerical index.
+            const newPath = [...path, lastItemKey];
+
+            // Return a new proxy scoped to that specific item.
             return rebuildStateShape({
               path: newPath,
               componentId: componentId!,
@@ -3039,30 +3022,22 @@ function createProxyHandler<T>(
             }
           };
         }
-
         if (prop === 'cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
-            const array = getShadowValue(stateKey, path);
-
-            if (!Array.isArray(array) || array.length === 0) return;
-
-            const node = getShadowMetadata(stateKey, path);
-            if (!node) return;
-
-            // Get the ID keys in their natural order
-            const idKeys = Object.keys(node).filter((k) => k.startsWith('id:'));
+            const shadowMeta = getShadowMetadata(stateKey, path);
+            if (!shadowMeta?.arrayKeys || shadowMeta.arrayKeys.length === 0)
+              return;
 
             const indexToCut =
               index === -1
-                ? idKeys.length - 1
+                ? shadowMeta.arrayKeys.length - 1
                 : index !== undefined
                   ? index
-                  : idKeys.length - 1;
+                  : shadowMeta.arrayKeys.length - 1;
 
-            const idToCut = idKeys[indexToCut];
+            const idToCut = shadowMeta.arrayKeys[indexToCut];
             if (!idToCut) return;
 
-            // Cut uses the path with the id
             effectiveSetState(null, [...path, idToCut], {
               updateType: 'cut',
             });
@@ -3072,14 +3047,10 @@ function createProxyHandler<T>(
           return () => {
             const arrayKey = [stateKey, ...path].join('.');
 
-            // FIX: Get the definitive list of IDs for the current view directly from meta.arrayViews.
-            const arrayPathKey = path.join('.');
             const { keys: currentViewIds } = getArrayData(stateKey, path, meta);
-
             if (!currentViewIds || currentViewIds.length === 0) {
               return;
             }
-
             const selectedItemKey = getGlobalStore
               .getState()
               .selectedIndicesMap.get(arrayKey);
@@ -3087,15 +3058,10 @@ function createProxyHandler<T>(
             if (!selectedItemKey) {
               return;
             }
-
-            // Important: The original code was missing this check.
-            // We must ensure the selected item is part of the CURRENT view before cutting.
             const selectedId = selectedItemKey.split('.').pop() as string;
             if (!(currentViewIds as any[]).includes(selectedId!)) {
               return;
             }
-
-            // The rest of the logic remains untouched.
             const pathForCut = selectedItemKey.split('.').slice(1);
             getGlobalStore.getState().clearSelectedIndex({ arrayKey });
 

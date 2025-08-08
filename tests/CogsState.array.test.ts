@@ -146,6 +146,70 @@ const getComplexInitialState = (): ComplexAppState => ({
     },
   ],
 });
+interface OrderItem {
+  id: string;
+  name: string;
+  quantity: number;
+  price: number;
+}
+
+interface Order {
+  id: string;
+  customerName: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled';
+  items: OrderItem[];
+  total: number;
+}
+
+interface OrdersTestState {
+  orders: Order[];
+}
+
+// Add this function near other initial state functions
+const getOrdersInitialState = (): OrdersTestState => ({
+  orders: [
+    {
+      id: 'order-1',
+      customerName: 'Alice',
+      status: 'completed',
+      total: 125,
+      items: [
+        { id: 'item-1', name: 'Laptop', quantity: 1, price: 100 },
+        { id: 'item-2', name: 'Mouse', quantity: 2, price: 12.5 },
+      ],
+    },
+    {
+      id: 'order-2',
+      customerName: 'Bob',
+      status: 'pending',
+      total: 75,
+      items: [
+        { id: 'item-3', name: 'Book', quantity: 3, price: 15 },
+        { id: 'item-4', name: 'Pen', quantity: 5, price: 6 },
+      ],
+    },
+    {
+      id: 'order-3',
+      customerName: 'Charlie',
+      status: 'processing',
+      total: 200,
+      items: [
+        { id: 'item-5', name: 'Monitor', quantity: 1, price: 150 },
+        { id: 'item-6', name: 'Keyboard', quantity: 1, price: 50 },
+      ],
+    },
+    {
+      id: 'order-4',
+      customerName: 'Diana',
+      status: 'completed',
+      total: 90,
+      items: [
+        { id: 'item-7', name: 'Headphones', quantity: 1, price: 60 },
+        { id: 'item-8', name: 'Cable', quantity: 3, price: 10 },
+      ],
+    },
+  ],
+});
 
 // Update the createCogsState call to include this new state
 // You'll need to find the existing `createCogsState` call and add the `complexApp` key.
@@ -153,6 +217,7 @@ const { useCogsState } = createCogsState({
   basicTestState: { initialState: getBasicInitialState() }, // <-- ADDED FOR BASIC TESTS
   advancedTestState: { initialState: getInitialState() },
   complexApp: { initialState: getComplexInitialState() },
+  ordersTestState: { initialState: getOrdersInitialState() },
 });
 
 describe('CogsState - Basic Functionality', () => {
@@ -277,7 +342,50 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     setter = useCogsState('advancedTestState');
     setter.revertToInitialState();
   });
+  // Add this test case inside the "CogsState - Deeply Nested Array Operations" describe block
 
+  it('should get the last item of a derived (filtered and sorted) array using .last()', () => {
+    // --- STEP 1: Create a derived proxy ---
+    // Filter for electronics, then sort by price ascending.
+    // The list will be: Keyboard (p7, $75), Headphones (p4, $150), Laptop (p1, $1200)
+    const sortedElectronicsProxy = setter.products
+      .stateFilter((p) => p.category === 'electronics')
+      .stateSort((a, b) => a.price - b.price);
+
+    // Sanity check the order
+    expect(sortedElectronicsProxy.get().map((p) => p.id)).toEqual([
+      'p7',
+      'p4',
+      'p1',
+    ]);
+
+    // --- STEP 2: Get the last item from this DERIVED proxy ---
+    const lastItemProxy = sortedElectronicsProxy.last();
+    expect(lastItemProxy).toBeDefined();
+
+    // The last item should be the Laptop (p1)
+    expect(lastItemProxy?.get().id).toBe('p1');
+    expect(lastItemProxy?.price.get()).toBe(1200);
+
+    // --- STEP 3: Verify it's a live proxy by performing an update ---
+    // The laptop is initially in stock.
+    expect(lastItemProxy?.inStock.get()).toBe(true);
+    // Update it through the .last() proxy
+    lastItemProxy?.inStock.update(false);
+    expect(lastItemProxy?.inStock.get()).toBe(false);
+
+    // --- STEP 4: Verify the change is reflected in the original, global state ---
+    const finalState = setter.get();
+    const updatedLaptop = finalState.products.find((p) => p.id === 'p1');
+    expect(updatedLaptop?.inStock).toBe(false);
+
+    // --- STEP 5: Test edge case where the filter results in an empty array ---
+    const emptyProxy = setter.products.stateFilter((p) => !p.category);
+    console.log('emptyProxy', emptyProxy.get());
+    expect(emptyProxy.get().length).toBe(0);
+    // Calling .last() on an empty derived array should result in an undefined value
+    expect(emptyProxy?.last()?.get()).toBeUndefined();
+  });
   it('should filter by one key, then sort the result by another', () => {
     // 1. Filter for all 'electronics' products
     const electronicsProxy = setter.products.stateFilter(
@@ -547,7 +655,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
 
     // ASSERTION 3: The selection is correct in the DERIVED proxy's context.
     // The Laptop (p1) is at index 2 of the sorted electronics list.
-
+    console.log('sortedElectronicsProxy', sortedElectronicsProxy);
     expect(sortedElectronicsProxy.getSelectedIndex()).toBe(2);
     expect(sortedElectronicsProxy.getSelected()?.get().id).toBe('p1');
 
@@ -806,5 +914,178 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     expect(final.find((p) => p.id === 'p1')?.price).toBe(1080); // 1200 * 0.9
     expect(final.find((p) => p.id === 'p3')?.inStock).toBe(true);
     expect(final.find((p) => p.id === 'p2')?.name).toBe('Sale: T-Shirt');
+  });
+});
+
+// Update the createCogsState call to include the new state (add this to the existing call)
+// ordersTestState: { initialState: getOrdersInitialState() },
+
+// Add this new describe block at the very bottom
+describe('CogsState - Nested Arrays Filter and Sort', () => {
+  let setter: StateObject<OrdersTestState>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    setter = useCogsState('ordersTestState');
+    setter.revertToInitialState();
+  });
+
+  it('should filter and sort both outer and inner arrays independently', () => {
+    // OUTER ARRAY: Filter orders to only get high-value orders (total >= 100)
+    const highValueOrdersProxy = setter.orders.stateFilter(
+      (order) => order.total >= 100
+    );
+    const highValueOrders = highValueOrdersProxy.get();
+
+    // Should have 2 high-value orders: order-1 (Alice $125) and order-3 (Charlie $200)
+    expect(highValueOrders.length).toBe(2);
+    expect(highValueOrders.map((o) => o.customerName).sort()).toEqual([
+      'Alice',
+      'Charlie',
+    ]);
+
+    // OUTER ARRAY: Sort high-value orders by total (descending)
+    const sortedHighValueOrdersProxy = highValueOrdersProxy.stateSort(
+      (a, b) => b.total - a.total
+    );
+    const sortedHighValueOrders = sortedHighValueOrdersProxy.get();
+
+    // Should be ordered: Charlie ($200), Alice ($125)
+    expect(sortedHighValueOrders.map((o) => o.customerName)).toEqual([
+      'Charlie',
+      'Alice',
+    ]);
+    expect(sortedHighValueOrders.map((o) => o.total)).toEqual([200, 125]);
+
+    // INNER ARRAYS: Now filter each order's items independently
+    // For Charlie's order (first in sorted list), get expensive items (price >= 50)
+    const charlieExpensiveItemsProxy = sortedHighValueOrdersProxy
+      .index(0)
+      .items.stateFilter((item) => item.price >= 50);
+    const charlieExpensiveItems = charlieExpensiveItemsProxy.get();
+
+    // Should have 2 items: Monitor ($150) and Keyboard ($50)
+    expect(charlieExpensiveItems.length).toBe(2);
+    expect(charlieExpensiveItems.map((item) => item.name).sort()).toEqual([
+      'Keyboard',
+      'Monitor',
+    ]);
+
+    // Sort Charlie's expensive items by price (ascending)
+    const charlieSortedItemsProxy = charlieExpensiveItemsProxy.stateSort(
+      (a, b) => a.price - b.price
+    );
+    const charlieSortedItems = charlieSortedItemsProxy.get();
+
+    expect(charlieSortedItems.map((item) => item.name)).toEqual([
+      'Keyboard',
+      'Monitor',
+    ]);
+    expect(charlieSortedItems.map((item) => item.price)).toEqual([50, 150]);
+
+    // For Alice's order (second in sorted list), get bulk items (quantity >= 2)
+    const aliceBulkItemsProxy = sortedHighValueOrdersProxy
+      .index(1)
+      .items.stateFilter((item) => item.quantity >= 2);
+    const aliceBulkItems = aliceBulkItemsProxy.get();
+
+    // Should have 1 item: Mouse (quantity 2)
+    expect(aliceBulkItems.length).toBe(1);
+    expect(aliceBulkItems[0].name).toBe('Mouse');
+    expect(aliceBulkItems[0].quantity).toBe(2);
+
+    // Sort Alice's bulk items by quantity (descending) - only one item but test the chaining
+    const aliceSortedBulkItemsProxy = aliceBulkItemsProxy.stateSort(
+      (a, b) => b.quantity - a.quantity
+    );
+    const aliceSortedBulkItems = aliceSortedBulkItemsProxy.get();
+
+    expect(aliceSortedBulkItems[0].name).toBe('Mouse');
+
+    // Verify updates work through the deeply filtered/sorted chains
+    const keyboardProxy = charlieSortedItemsProxy.index(0); // Keyboard is first after sort
+    expect(keyboardProxy.name.get()).toBe('Keyboard');
+
+    keyboardProxy.price.update(65);
+
+    // Verify the change is reflected in the original state
+    const originalState = setter.get();
+    const updatedKeyboard = originalState.orders
+      .find((o) => o.customerName === 'Charlie')
+      ?.items.find((i) => i.name === 'Keyboard');
+    expect(updatedKeyboard?.price).toBe(65);
+
+    // Verify the change is also reflected through other proxy paths
+    expect(
+      charlieExpensiveItemsProxy.get().find((item) => item.name === 'Keyboard')
+        ?.price
+    ).toBe(65);
+  });
+});
+// Replace the previous helper methods tests with this corrected block
+describe('CogsState - Core Helper Methods & Edge Cases', () => {
+  let basicSetter: StateObject<BasicTestState>;
+  let advancedSetter: StateObject<AdvancedTestState>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    basicSetter = useCogsState('basicTestState');
+    advancedSetter = useCogsState('advancedTestState');
+    basicSetter.revertToInitialState();
+    advancedSetter.revertToInitialState();
+  });
+
+  it('should get the status of a value (fresh vs. dirty)', () => {
+    expect(basicSetter.counter.getStatus()).toBe('fresh');
+    basicSetter.counter.update(5);
+    expect(basicSetter.counter.getStatus()).toBe('dirty');
+  });
+
+  it('should update the entire initial state structure with updateInitialState', () => {
+    const newInitialState = { ...getBasicInitialState(), counter: 1000 };
+    basicSetter.updateInitialState(newInitialState);
+    expect(basicSetter.counter.get()).toBe(1000);
+  });
+
+  it('should find an object in an array using key-value with findWith', () => {
+    // Use the correct API method: findWith
+    const bookProxy = advancedSetter.products.findWith('price', 20);
+    expect(bookProxy?.id.get()).toBe('p6'); // 'Dune'
+  });
+
+  it('should prevent adding a duplicate with uniqueInsert', () => {
+    const initialLength = basicSetter.tasks.get().length;
+    // Insert a duplicate based on the 'id' field
+    basicSetter.tasks.uniqueInsert({ id: 1, text: 'This is a duplicate' }, [
+      'id',
+    ]);
+    expect(basicSetter.tasks.get().length).toBe(initialLength); // Should not change
+  });
+
+  it('should cut an item by its value from a primitive array with cutByValue', () => {
+    basicSetter.items.cutByValue('b');
+    expect(basicSetter.items.get()).toEqual(['a', 'c']);
+  });
+
+  it('should toggle an item in a primitive array with toggleByValue', () => {
+    basicSetter.items.toggleByValue('d'); // Add 'd'
+    expect(basicSetter.items.get()).toContain('d');
+    basicSetter.items.toggleByValue('d'); // Remove 'd'
+    expect(basicSetter.items.get()).not.toContain('d');
+  });
+
+  it('should clear a selection with clearSelected', () => {
+    advancedSetter.products.index(2).setSelected(true);
+    expect(advancedSetter.products.getSelected()?.get()).toBeDefined();
+    advancedSetter.products.clearSelected();
+    expect(advancedSetter.products.getSelected()).toBeUndefined();
+  });
+
+  it('should throw an error when using .toggle() on a non-boolean', () => {
+    // Expecting the function call inside to throw an error
+    //@ts-ignore
+    expect(() => basicSetter.counter.toggle()).toThrow(
+      'toggle() can only be used on boolean values'
+    );
   });
 });

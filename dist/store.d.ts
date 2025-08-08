@@ -65,7 +65,6 @@ export type ShadowMetadata = {
         localStorageEnabled: boolean;
     };
     lastUpdated?: number;
-    value?: any;
     signals?: Array<{
         instanceId: string;
         parentId: string;
@@ -95,31 +94,16 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
 } & ComponentsType;
-export type CogsEvent = {
-    type: 'INSERT';
-    path: string;
-    itemKey: string;
-    index: number;
-} | {
-    type: 'REMOVE';
-    path: string;
-    itemKey: string;
-} | {
-    type: 'UPDATE';
-    path: string;
-    newValue: any;
-} | {
-    type: 'ITEMHEIGHT';
-    itemKey: string;
-    height: number;
-} | {
-    type: 'RELOAD';
-    path: string;
+type ShadowNode = {
+    value?: any;
+    _meta?: ShadowMetadata;
+    [key: string]: any;
 };
 export type CogsGlobalState = {
-    shadowStateStore: Map<string, ShadowMetadata>;
+    shadowStateStore: Map<string, ShadowNode>;
     setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     initializeShadowState: (key: string, initialState: any) => void;
+    getShadowNode: (key: string, path: string[]) => ShadowNode | undefined;
     getShadowMetadata: (key: string, path: string[]) => ShadowMetadata | undefined;
     setShadowMetadata: (key: string, path: string[], metadata: any) => void;
     getShadowValue: (key: string, path: string[], validArrayIds?: string[], log?: boolean) => any;
@@ -166,9 +150,9 @@ export type CogsGlobalState = {
 export declare const METADATA_KEYS: Set<string>;
 /**
  * The single source of truth for converting a regular JS value/object
- * into the shadow state tree format.
+ * into the shadow state tree format with the new `_meta` structure.
  */
-export declare function buildShadowNode(value: any): any;
+export declare function buildShadowNode(value: any): ShadowNode;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};
 //# sourceMappingURL=store.d.ts.map

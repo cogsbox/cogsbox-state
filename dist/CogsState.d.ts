@@ -169,7 +169,6 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     revertToInitialState: (obj?: {
         validationKey?: string;
     }) => T;
-    getDifferences: () => string[];
     middleware: (middles: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;
