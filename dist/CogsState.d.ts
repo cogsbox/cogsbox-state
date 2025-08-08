@@ -352,6 +352,7 @@ type MetaData = {
         fn: Function;
         path: string[];
     }>;
+    serverStateIsUpStream?: boolean;
 };
 export declare function $cogsSignal(proxy: {
     _path: string[];

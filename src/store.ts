@@ -191,6 +191,18 @@ export type CogsGlobalState = {
     log?: boolean
   ) => any;
   updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
+  insertManyShadowArrayElements: (
+    key: string,
+    arrayPath: string[],
+    newItems: any[],
+    index?: number
+  ) => void;
+  addItemsToArrayNode: (
+    key: string,
+    arrayPath: string[],
+    newItems: any,
+    newKeys: string[]
+  ) => void;
   insertShadowArrayElement: (
     key: string,
     arrayPath: string[],
@@ -279,11 +291,13 @@ export function buildShadowNode(value: any): ShadowNode {
   if (Array.isArray(value)) {
     const arrayNode: ShadowNode = { _meta: { arrayKeys: [] } }; // Initialize with _meta and arrayKeys
     const idKeys: string[] = [];
+
     value.forEach((item) => {
       const itemId = `id:${ulid()}`;
       arrayNode[itemId] = buildShadowNode(item); // Recurse for each item
       idKeys.push(itemId);
     });
+
     arrayNode._meta!.arrayKeys = idKeys; // Set the final ordered keys
     return arrayNode;
   }
@@ -518,8 +532,39 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return { shadowStateStore: newStore };
     });
   },
+  addItemsToArrayNode: (key, arrayPath, newItems, newKeys) => {
+    set((state) => {
+      const newStore = new Map(state.shadowStateStore);
+      const rootKey = newStore.has(`[${key}`) ? `[${key}` : key;
+      let root = newStore.get(rootKey);
+      if (!root) {
+        console.error('Root not found for state key:', key);
+        return state;
+      }
 
+      const clonedRoot = { ...root };
+      newStore.set(rootKey, clonedRoot);
+
+      let current = clonedRoot;
+      for (const segment of arrayPath) {
+        const nextNode = current[segment] || {};
+        // Clone each node in the path for immutability
+        current[segment] = { ...nextNode };
+        current = current[segment];
+      }
+
+      // Atomically:
+      // 1. Add the new item data to the node
+      Object.assign(current, newItems);
+
+      // 2. Update the metadata with the new keys
+      current._meta = { ...(current._meta || {}), arrayKeys: newKeys };
+
+      return { shadowStateStore: newStore };
+    });
+  },
   // ✅ REFACTORED: Works with `_meta.arrayKeys`.
+
   insertShadowArrayElement: (key, arrayPath, newItem, index) => {
     const arrayNode = get().getShadowNode(key, arrayPath);
     if (!arrayNode?._meta?.arrayKeys) {
@@ -530,52 +575,70 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
 
     const newItemId = `id:${ulid()}`;
-    const newItemNode = buildShadowNode(newItem);
+    const itemsToAdd = { [newItemId]: buildShadowNode(newItem) };
 
-    // Update the `arrayKeys` in the metadata
     const currentKeys = arrayNode._meta.arrayKeys;
     const newKeys = [...currentKeys];
-    if (index !== undefined && index >= 0 && index <= newKeys.length) {
-      newKeys.splice(index, 0, newItemId);
-    } else {
-      newKeys.push(newItemId);
-    }
+    const insertionPoint =
+      index !== undefined && index >= 0 && index <= newKeys.length
+        ? index
+        : newKeys.length;
+    newKeys.splice(insertionPoint, 0, newItemId);
 
-    // Update transform caches if they exist
-    if (arrayNode._meta.transformCaches) {
-      arrayNode._meta.transformCaches.forEach((cache) => {
-        if (cache.validIds && Array.isArray(cache.validIds)) {
-          const matchesFilters = cache.transforms.every((transform) =>
-            transform.type === 'filter' ? transform.fn(newItem) : true
-          );
-          if (matchesFilters) {
-            cache.validIds = [...cache.validIds];
-            if (index !== undefined) {
-              cache.validIds.splice(index, 0, newItemId);
-            } else {
-              cache.validIds.push(newItemId);
-            }
-          }
-        }
-      });
-    }
+    // Use the same transactional helper for a single item
+    get().addItemsToArrayNode(key, arrayPath, itemsToAdd, newKeys);
 
-    // Directly set the new item and updated metadata on the node before setting state
-    arrayNode[newItemId] = newItemNode;
-    arrayNode._meta.arrayKeys = newKeys;
-
-    get().setShadowMetadata(key, arrayPath, { arrayKeys: newKeys });
-
-    // Trigger notifications
+    // Trigger notification
     const arrayKey = [key, ...arrayPath].join('.');
     get().notifyPathSubscribers(arrayKey, {
       type: 'INSERT',
       path: arrayKey,
       itemKey: `${arrayKey}.${newItemId}`,
-      index: index ?? newKeys.length - 1,
+      index: insertionPoint,
     });
   },
+  insertManyShadowArrayElements: (key, arrayPath, newItems, index) => {
+    if (!newItems || newItems.length === 0) {
+      return;
+    }
 
+    const arrayNode = get().getShadowNode(key, arrayPath);
+    if (!arrayNode?._meta?.arrayKeys) {
+      console.error(
+        `Array not found at path: ${[key, ...arrayPath].join('.')}`
+      );
+      return;
+    }
+
+    const itemsToAdd: Record<string, any> = {};
+    const newIds: string[] = [];
+
+    newItems.forEach((item) => {
+      const newItemId = `id:${ulid()}`;
+      newIds.push(newItemId);
+      itemsToAdd[newItemId] = buildShadowNode(item);
+    });
+
+    const currentKeys = arrayNode._meta.arrayKeys;
+    const finalKeys = [...currentKeys];
+    const insertionPoint =
+      index !== undefined && index >= 0 && index <= finalKeys.length
+        ? index
+        : finalKeys.length;
+    finalKeys.splice(insertionPoint, 0, ...newIds);
+
+    // Call the new transactional update function
+    get().addItemsToArrayNode(key, arrayPath, itemsToAdd, finalKeys);
+
+    // Notify subscribers with a single, more efficient event
+    const arrayKey = [key, ...arrayPath].join('.');
+    get().notifyPathSubscribers(arrayKey, {
+      type: 'INSERT_MANY',
+      path: arrayKey,
+      count: newItems.length,
+      index: insertionPoint,
+    });
+  },
   // ✅ REFACTORED: Works with `_meta.arrayKeys`.
   removeShadowArrayElement: (key, itemPath) => {
     if (itemPath.length === 0) return;

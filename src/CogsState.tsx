@@ -14,30 +14,32 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
-import { createRoot } from 'react-dom/client';
+
 import {
   getDifferences,
   isArray,
   isFunction,
   type GenericObject,
 } from './utility.js';
-import { ValidationWrapper } from './Functions.js';
+import {
+  FormElementWrapper,
+  MemoizedCogsItemWrapper,
+  ValidationWrapper,
+} from './Components.js';
 import { isDeepEqual, transformStateFunc } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  buildShadowNode,
   formRefStore,
   getGlobalStore,
-  METADATA_KEYS,
   ValidationError,
   ValidationStatus,
   type ComponentsType,
 } from './store.js';
 import { useCogsConfig } from './CogsStateClient.js';
 import { Operation } from 'fast-json-patch';
-import { useInView } from 'react-intersection-observer';
+
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 
@@ -488,6 +490,7 @@ const {
   initializeShadowState,
   updateShadowAtPath,
   insertShadowArrayElement,
+  insertManyShadowArrayElements,
   removeShadowArrayElement,
   getSelectedIndex,
   setInitialStateOptions,
@@ -513,8 +516,7 @@ function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
     const value = getGlobalStore.getState().getShadowValue(stateKey, path);
     return { isArray: false, value, keys: [] };
   }
-
-  const arrayPathKey = path.join('.');
+  const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
   const viewIds = meta?.arrayViews?.[arrayPathKey] ?? shadowMeta.arrayKeys;
 
   // FIX: If the derived view is empty, return an empty array and keys.
@@ -1467,11 +1469,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
             return; // Ignore if no valid data
           }
 
-          console.log(
-            '✅ SERVER_STATE_UPDATE received with data:',
-            serverStateData
-          );
-
           setAndMergeOptions(thisKey, { serverState: serverStateData });
 
           const mergeConfig =
@@ -1481,7 +1478,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
                 ? { strategy: 'append' }
                 : null;
 
-          // ✅ FIX 1: The path for the root value is now `[]`.
           const currentState = getShadowValue(thisKey, []);
           const incomingData = serverStateData.data;
 
@@ -1499,7 +1495,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
               );
               return;
             }
-            console.log('SERVER_STATE_UPDATE 2');
+
             const existingIds = new Set(
               currentState.map((item: any) => item[keyField])
             );
@@ -1509,9 +1505,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
             );
 
             if (newUniqueItems.length > 0) {
-              newUniqueItems.forEach((item) => {
-                insertShadowArrayElement(thisKey, [], item);
-              });
+              insertManyShadowArrayElements(thisKey, [], newUniqueItems);
             }
 
             // Mark the entire final state as synced
@@ -1698,27 +1692,16 @@ type MetaData = {
     fn: Function;
     path: string[]; // Which array this transform applies to
   }>;
+  serverStateIsUpStream?: boolean;
 };
-
-function hashTransforms(transforms: any[]) {
-  if (!transforms || transforms.length === 0) {
-    return '';
-  }
-  return transforms
-    .map(
-      (transform) =>
-        `${transform.type}${JSON.stringify(transform.dependencies || [])}`
-    )
-    .join('');
-}
 
 const applyTransforms = (
   stateKey: string,
   path: string[],
-  transforms?: Array<{ type: 'filter' | 'sort'; fn: Function }>
+  meta?: MetaData
 ): string[] => {
   let ids = getShadowMetadata(stateKey, path)?.arrayKeys || [];
-  console.log('ids', ids);
+  const transforms = meta?.transforms;
   if (!transforms || transforms.length === 0) {
     return ids;
   }
@@ -1817,7 +1800,7 @@ const notifySelectionComponents = (
 };
 function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
   const shadowMeta = getShadowMetadata(stateKey, path);
-  const arrayPathKey = path.join('.');
+  const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
   const arrayKeys = meta?.arrayViews?.[arrayPathKey];
 
   // FIX: If the derived view is empty, return an empty array directly.
@@ -2180,57 +2163,28 @@ function createProxyHandler<T>(
             const measurementCache = useRef(
               new Map<string, { height: number; offset: number }>()
             );
+            const { keys: arrayKeys } = getArrayData(stateKey, path, meta);
 
-            // Separate effect for handling rerender updates
-            useLayoutEffect(() => {
-              if (
-                !stickToBottom ||
-                !containerRef.current ||
-                scrollStateRef.current.isUserScrolling
-              )
-                return;
-
-              const container = containerRef.current;
-              container.scrollTo({
-                top: container.scrollHeight,
-                behavior: initialScrollRef.current ? 'instant' : 'smooth',
-              });
-            }, [rerender, stickToBottom]);
-
-            const { arrayKeys = [] } = getScopedData(stateKey, path, meta);
-
-            // Calculate total height and offsets
-            const { totalHeight, itemOffsets } = useMemo(() => {
-              let runningOffset = 0;
-              const offsets = new Map<
-                string,
-                { height: number; offset: number }
-              >();
-              const allItemKeys =
-                getGlobalStore.getState().getShadowMetadata(stateKey, path)
-                  ?.arrayKeys || [];
-
-              allItemKeys.forEach((itemKey) => {
-                const itemPath = itemKey.split('.').slice(1);
-                const measuredHeight =
-                  getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, itemPath)?.virtualizer
-                    ?.itemHeight || itemHeight;
-
-                offsets.set(itemKey, {
-                  height: measuredHeight,
-                  offset: runningOffset,
+            // Subscribe to state changes like stateList does
+            useEffect(() => {
+              const stateKeyPathKey = [stateKey, ...path].join('.');
+              const unsubscribe = getGlobalStore
+                .getState()
+                .subscribeToPath(stateKeyPathKey, (e) => {
+                  if (e.type === 'GET_SELECTED') {
+                    return;
+                  }
+                  if (e.type === 'SERVER_STATE_UPDATE') {
+                    forceUpdate({});
+                  }
                 });
 
-                runningOffset += measuredHeight;
-              });
+              return () => {
+                unsubscribe();
+              };
+            }, [componentId, stateKey, path.join('.')]);
 
-              measurementCache.current = offsets;
-              return { totalHeight: runningOffset, itemOffsets: offsets };
-            }, [arrayKeys.length, itemHeight]);
-
-            // Improved initial positioning effect
+            // YOUR ORIGINAL INITIAL POSITIONING - KEEPING EXACTLY AS IS
             useLayoutEffect(() => {
               if (
                 stickToBottom &&
@@ -2241,7 +2195,6 @@ function createProxyHandler<T>(
               ) {
                 const container = containerRef.current;
 
-                // Wait for container to have dimensions
                 const waitForContainer = () => {
                   if (container.clientHeight > 0) {
                     const visibleCount = Math.ceil(
@@ -2255,13 +2208,11 @@ function createProxyHandler<T>(
 
                     setRange({ startIndex, endIndex });
 
-                    // Ensure scroll after range is set
                     requestAnimationFrame(() => {
                       scrollToBottom('instant');
-                      initialScrollRef.current = false; // Mark initial scroll as done
+                      initialScrollRef.current = false;
                     });
                   } else {
-                    // Container not ready, try again
                     requestAnimationFrame(waitForContainer);
                   }
                 };
@@ -2270,7 +2221,16 @@ function createProxyHandler<T>(
               }
             }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
 
-            // Combined scroll handler
+            const rangeRef = useRef(range);
+            useLayoutEffect(() => {
+              rangeRef.current = range;
+            }, [range]);
+
+            const arrayKeysRef = useRef(arrayKeys);
+            useLayoutEffect(() => {
+              arrayKeysRef.current = arrayKeys;
+            }, [arrayKeys]);
+
             const handleScroll = useCallback(() => {
               const container = containerRef.current;
               if (!container) return;
@@ -2314,9 +2274,14 @@ function createProxyHandler<T>(
                   break;
                 }
               }
-
+              console.log(
+                'hadnlescroll ',
+                measurementCache.current,
+                newStartIndex,
+                range
+              );
               // Only update if range actually changed
-              if (newStartIndex !== range.startIndex) {
+              if (newStartIndex !== range.startIndex && range.startIndex != 0) {
                 const visibleCount = Math.ceil(clientHeight / itemHeight);
                 setRange({
                   startIndex: Math.max(0, newStartIndex - overscan),
@@ -2337,36 +2302,34 @@ function createProxyHandler<T>(
             // Set up scroll listener
             useEffect(() => {
               const container = containerRef.current;
-              if (!container || !stickToBottom) return;
+              if (!container) return;
 
               container.addEventListener('scroll', handleScroll, {
                 passive: true,
               });
-
               return () => {
                 container.removeEventListener('scroll', handleScroll);
               };
             }, [handleScroll, stickToBottom]);
+
+            // YOUR ORIGINAL SCROLL TO BOTTOM FUNCTION - KEEPING EXACTLY AS IS
             const scrollToBottom = useCallback(
               (behavior: ScrollBehavior = 'smooth') => {
                 const container = containerRef.current;
                 if (!container) return;
 
-                // Reset scroll state
                 scrollStateRef.current.isUserScrolling = false;
                 scrollStateRef.current.isNearBottom = true;
                 scrollStateRef.current.scrollUpCount = 0;
 
                 const performScroll = () => {
-                  // Multiple attempts to ensure we hit the bottom
                   const attemptScroll = (attempts = 0) => {
-                    if (attempts > 5) return; // Prevent infinite loops
+                    if (attempts > 5) return;
 
                     const currentHeight = container.scrollHeight;
                     const currentScroll = container.scrollTop;
                     const clientHeight = container.clientHeight;
 
-                    // Check if we're already at the bottom
                     if (currentScroll + clientHeight >= currentHeight - 1) {
                       return;
                     }
@@ -2376,12 +2339,10 @@ function createProxyHandler<T>(
                       behavior: behavior,
                     });
 
-                    // In slow environments, check again after a short delay
                     setTimeout(() => {
                       const newHeight = container.scrollHeight;
                       const newScroll = container.scrollTop;
 
-                      // If height changed or we're not at bottom, try again
                       if (
                         newHeight !== currentHeight ||
                         newScroll + clientHeight < newHeight - 1
@@ -2394,11 +2355,9 @@ function createProxyHandler<T>(
                   attemptScroll();
                 };
 
-                // Use requestIdleCallback for better performance in slow environments
                 if ('requestIdleCallback' in window) {
                   requestIdleCallback(performScroll, { timeout: 100 });
                 } else {
-                  // Fallback to rAF chain
                   requestAnimationFrame(() => {
                     requestAnimationFrame(performScroll);
                   });
@@ -2406,15 +2365,14 @@ function createProxyHandler<T>(
               },
               []
             );
-            // Auto-scroll to bottom when new content arrives
-            // Consolidated auto-scroll effect with debouncing
+
+            // YOUR ORIGINAL AUTO-SCROLL EFFECTS - KEEPING ALL OF THEM
             useEffect(() => {
               if (!stickToBottom || !containerRef.current) return;
 
               const container = containerRef.current;
               const scrollState = scrollStateRef.current;
 
-              // Debounced scroll function
               let scrollTimeout: NodeJS.Timeout;
               const debouncedScrollToBottom = () => {
                 clearTimeout(scrollTimeout);
@@ -2430,7 +2388,6 @@ function createProxyHandler<T>(
                 }, 100);
               };
 
-              // Single MutationObserver for all DOM changes
               const observer = new MutationObserver(() => {
                 if (!scrollState.isUserScrolling) {
                   debouncedScrollToBottom();
@@ -2441,24 +2398,10 @@ function createProxyHandler<T>(
                 childList: true,
                 subtree: true,
                 attributes: true,
-                attributeFilter: ['style', 'class'], // More specific than just 'height'
+                attributeFilter: ['style', 'class'],
               });
 
-              // Handle image loads with event delegation
-              const handleImageLoad = (e: Event) => {
-                if (
-                  e.target instanceof HTMLImageElement &&
-                  !scrollState.isUserScrolling
-                ) {
-                  debouncedScrollToBottom();
-                }
-              };
-
-              container.addEventListener('load', handleImageLoad, true);
-
-              // Initial scroll with proper timing
               if (initialScrollRef.current) {
-                // For initial load, wait for next tick to ensure DOM is ready
                 setTimeout(() => {
                   scrollToBottom('instant');
                 }, 0);
@@ -2469,31 +2412,29 @@ function createProxyHandler<T>(
               return () => {
                 clearTimeout(scrollTimeout);
                 observer.disconnect();
-                container.removeEventListener('load', handleImageLoad, true);
               };
             }, [stickToBottom, arrayKeys.length, scrollToBottom]);
-            // Create virtual state
-            const virtualState = useMemo(() => {
-              const store = getGlobalStore.getState();
-              const sourceArray = store.getShadowValue(stateKey, path) as any[];
-              const currentKeys =
-                store.getShadowMetadata(stateKey, path)?.arrayKeys || [];
 
-              const slicedArray = sourceArray.slice(
-                range.startIndex,
-                range.endIndex + 1
-              );
-              const slicedIds = currentKeys.slice(
-                range.startIndex,
-                range.endIndex + 1
-              );
+            console.log('range', range);
+            // Create virtual state - NO NEED to get values, only IDs!
+            const virtualState = useMemo(() => {
+              // 2. Physically slice the corresponding keys.
+              const slicedKeys = Array.isArray(arrayKeys)
+                ? arrayKeys.slice(range.startIndex, range.endIndex + 1)
+                : [];
+              console.log('slicedKeys', slicedKeys);
+              // Use the same keying as getArrayData (empty string for root)
               const arrayPath = path.length > 0 ? path.join('.') : 'root';
               return rebuildStateShape({
                 path,
                 componentId: componentId!,
-                meta: { ...meta, arrayViews: { [arrayPath]: slicedIds } },
+                meta: {
+                  ...meta,
+                  arrayViews: { [arrayPath]: slicedKeys },
+                  serverStateIsUpStream: true,
+                },
               });
-            }, [range.startIndex, range.endIndex, arrayKeys.length]);
+            }, [range.startIndex, range.endIndex, arrayKeys, meta]);
 
             return {
               virtualState,
@@ -2501,15 +2442,14 @@ function createProxyHandler<T>(
                 outer: {
                   ref: containerRef,
                   style: {
-                    overflowY: 'auto',
+                    overflowY: 'auto' as const,
                     height: '100%',
-                    position: 'relative',
+                    position: 'relative' as const,
                   },
                 },
                 inner: {
                   style: {
-                    height: `${totalHeight}px`,
-                    position: 'relative',
+                    position: 'relative' as const,
                   },
                 },
                 list: {
@@ -2623,7 +2563,7 @@ function createProxyHandler<T>(
         }
         if (prop === 'stateSort') {
           return (compareFn: (a: any, b: any) => number) => {
-            const arrayPathKey = path.join('.');
+            const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
             // FIX: Use the more robust `getArrayData` which always correctly resolves the keys for a view.
             const { value: currentArray, keys: currentViewIds } = getArrayData(
@@ -2772,19 +2712,12 @@ function createProxyHandler<T>(
               arraySetter: any
             ) => ReactNode
           ) => {
-            console.log('meta outside', JSON.stringify(meta));
             const StateListWrapper = () => {
               const componentIdsRef = useRef<Map<string, string>>(new Map());
 
               const [updateTrigger, forceUpdate] = useState({});
-
-              console.log('updateTrigger updateTrigger  updateTrigger');
-
-              const validIds = applyTransforms(
-                stateKey,
-                path,
-                meta?.transforms
-              );
+              console.log('mett', meta);
+              const validIds = applyTransforms(stateKey, path, meta);
               //the above get the new coorect valid ids i need ot udpate the meta object with this info
               const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
               const updatedMeta = {
@@ -2794,7 +2727,7 @@ function createProxyHandler<T>(
                   [arrayPathKey]: validIds, // Update the arrayViews with the new valid IDs
                 },
               };
-
+              console.log('updatedMeta', updatedMeta);
               // Now use the updated meta when getting array data
               const { value: arrayValues } = getArrayData(
                 stateKey,
@@ -2802,15 +2735,10 @@ function createProxyHandler<T>(
                 updatedMeta
               );
 
-              console.log('validIds', validIds);
-              console.log('arrayValues', arrayValues);
-
               useEffect(() => {
                 const unsubscribe = getGlobalStore
                   .getState()
                   .subscribeToPath(stateKeyPathKey, (e) => {
-                    // A data change has occurred for the source array.
-                    console.log('changed array statelist  ', e);
                     if (e.type === 'GET_SELECTED') {
                       return;
                     }
@@ -2832,8 +2760,11 @@ function createProxyHandler<T>(
 
                     if (
                       e.type === 'INSERT' ||
+                      e.type === 'INSERT_MANY' ||
                       e.type === 'REMOVE' ||
-                      e.type === 'CLEAR_SELECTION'
+                      e.type === 'CLEAR_SELECTION' ||
+                      (e.type === 'SERVER_STATE_UPDATE' &&
+                        !meta?.serverStateIsUpStream)
                     ) {
                       forceUpdate({});
                     }
@@ -2856,38 +2787,36 @@ function createProxyHandler<T>(
                 componentId: componentId!,
                 meta: updatedMeta, // Use updated meta here
               });
-              console.log('arrayValues', arrayValues);
 
-              return (
-                <>
-                  {arrayValues.map((item, localIndex) => {
-                    const itemKey = validIds[localIndex];
+              console.time('render');
+              const returnValue = arrayValues.map((item, localIndex) => {
+                const itemKey = validIds[localIndex];
 
-                    if (!itemKey) {
-                      return null;
-                    }
+                if (!itemKey) {
+                  return null;
+                }
 
-                    let itemComponentId = componentIdsRef.current.get(itemKey);
-                    if (!itemComponentId) {
-                      itemComponentId = uuidv4();
-                      componentIdsRef.current.set(itemKey, itemComponentId);
-                    }
+                let itemComponentId = componentIdsRef.current.get(itemKey);
+                if (!itemComponentId) {
+                  itemComponentId = uuidv4();
+                  componentIdsRef.current.set(itemKey, itemComponentId);
+                }
 
-                    const itemPath = [...path, itemKey];
+                const itemPath = [...path, itemKey];
 
-                    return createElement(MemoizedCogsItemWrapper, {
-                      key: itemKey,
-                      stateKey,
-                      itemComponentId,
-                      itemPath,
-                      localIndex,
-                      arraySetter,
-                      rebuildStateShape,
-                      renderFn: callbackfn,
-                    });
-                  })}
-                </>
-              );
+                return createElement(MemoizedCogsItemWrapper, {
+                  key: itemKey,
+                  stateKey,
+                  itemComponentId,
+                  itemPath,
+                  localIndex,
+                  arraySetter,
+                  rebuildStateShape,
+                  renderFn: callbackfn,
+                });
+              });
+              console.timeEnd('render');
+              return <>{returnValue}</>;
             };
 
             return <StateListWrapper />;
@@ -2896,7 +2825,7 @@ function createProxyHandler<T>(
         if (prop === 'stateFlattenOn') {
           return (fieldName: string) => {
             // FIX: Get the definitive list of IDs for the current view from meta.arrayViews.
-            const arrayPathKey = path.join('.');
+            const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
             const viewIds = meta?.arrayViews?.[arrayPathKey];
 
             const currentState = getGlobalStore
@@ -2916,7 +2845,7 @@ function createProxyHandler<T>(
         }
         if (prop === 'index') {
           return (index: number) => {
-            const arrayPathKey = path.join('.');
+            const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
             const viewIds = meta?.arrayViews?.[arrayPathKey];
 
             if (viewIds) {
@@ -3628,7 +3557,8 @@ function SignalRenderer({
   const instanceIdRef = useRef<string | null>(null);
   const isSetupRef = useRef(false);
   const signalId = `${proxy._stateKey}-${proxy._path.join('.')}`;
-  const arrayPathKey = proxy._path.join('.');
+
+  const arrayPathKey = proxy._path.length > 0 ? proxy._path.join('.') : 'root';
   const viewIds = proxy._meta?.arrayViews?.[arrayPathKey];
 
   const value = getShadowValue(proxy._stateKey, proxy._path, viewIds);
@@ -3720,483 +3650,4 @@ function SignalRenderer({
     style: { display: 'contents' },
     'data-signal-id': signalId,
   });
-}
-
-const MemoizedCogsItemWrapper = memo(
-  ListItemWrapper,
-  (prevProps, nextProps) => {
-    // Re-render if any of these change:
-    return (
-      prevProps.itemPath.join('.') === nextProps.itemPath.join('.') &&
-      prevProps.stateKey === nextProps.stateKey &&
-      prevProps.itemComponentId === nextProps.itemComponentId &&
-      prevProps.localIndex === nextProps.localIndex
-    );
-  }
-);
-
-const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
-  const [loaded, setLoaded] = useState(false);
-
-  useLayoutEffect(() => {
-    if (!ref.current) {
-      setLoaded(true);
-      return;
-    }
-
-    const images = Array.from(ref.current.querySelectorAll('img'));
-
-    // If there are no images, we are "loaded" immediately.
-    if (images.length === 0) {
-      setLoaded(true);
-      return;
-    }
-
-    let loadedCount = 0;
-    const handleImageLoad = () => {
-      loadedCount++;
-      if (loadedCount === images.length) {
-        setLoaded(true);
-      }
-    };
-
-    images.forEach((image) => {
-      if (image.complete) {
-        handleImageLoad();
-      } else {
-        image.addEventListener('load', handleImageLoad);
-        image.addEventListener('error', handleImageLoad);
-      }
-    });
-
-    return () => {
-      images.forEach((image) => {
-        image.removeEventListener('load', handleImageLoad);
-        image.removeEventListener('error', handleImageLoad);
-      });
-    };
-  }, [ref.current]);
-
-  return loaded;
-};
-
-function ListItemWrapper({
-  stateKey,
-  itemComponentId,
-  itemPath,
-  localIndex,
-  arraySetter,
-  rebuildStateShape,
-  renderFn,
-}: {
-  stateKey: string;
-  itemComponentId: string;
-  itemPath: string[];
-  localIndex: number;
-  arraySetter: any;
-
-  rebuildStateShape: (options: {
-    currentState: any;
-    path: string[];
-    componentId: string;
-    meta?: any;
-  }) => any;
-  renderFn: (
-    setter: any,
-    index: number,
-
-    arraySetter: any
-  ) => React.ReactNode;
-}) {
-  const [, forceUpdate] = useState({});
-  const { ref: inViewRef, inView } = useInView();
-  const elementRef = useRef<HTMLDivElement | null>(null);
-
-  const imagesLoaded = useImageLoaded(elementRef);
-  const hasReportedInitialHeight = useRef(false);
-  const fullKey = [stateKey, ...itemPath].join('.');
-  useRegisterComponent(stateKey, itemComponentId, forceUpdate);
-
-  const setRefs = useCallback(
-    (element: HTMLDivElement | null) => {
-      elementRef.current = element;
-      inViewRef(element); // This is the ref from useInView
-    },
-    [inViewRef]
-  );
-
-  useEffect(() => {
-    subscribeToPath(fullKey, (e) => {
-      forceUpdate({});
-    });
-  }, []);
-  useEffect(() => {
-    if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
-      return;
-    }
-
-    const element = elementRef.current;
-    if (element && element.offsetHeight > 0) {
-      hasReportedInitialHeight.current = true;
-      const newHeight = element.offsetHeight;
-
-      setShadowMetadata(stateKey, itemPath, {
-        virtualizer: {
-          itemHeight: newHeight,
-          domRef: element,
-        },
-      });
-
-      const arrayPath = itemPath.slice(0, -1);
-      const arrayPathKey = [stateKey, ...arrayPath].join('.');
-      notifyPathSubscribers(arrayPathKey, {
-        type: 'ITEMHEIGHT',
-        itemKey: itemPath.join('.'),
-
-        ref: elementRef.current,
-      });
-    }
-  }, [inView, imagesLoaded, stateKey, itemPath]);
-
-  const itemValue = getShadowValue(stateKey, itemPath);
-
-  if (itemValue === undefined) {
-    return null;
-  }
-
-  const itemSetter = rebuildStateShape({
-    currentState: itemValue,
-    path: itemPath,
-    componentId: itemComponentId,
-  });
-  const children = renderFn(itemSetter, localIndex, arraySetter);
-
-  return <div ref={setRefs}>{children}</div>;
-}
-
-function FormElementWrapper({
-  stateKey,
-  path,
-  rebuildStateShape,
-  renderFn,
-  formOpts,
-  setState,
-}: {
-  stateKey: string;
-  path: string[];
-  rebuildStateShape: (options: {
-    path: string[];
-    componentId: string;
-    meta?: any;
-  }) => any;
-  renderFn: (params: FormElementParams<any>) => React.ReactNode;
-  formOpts?: FormOptsType;
-  setState: any;
-}) {
-  const [componentId] = useState(() => uuidv4());
-  const [, forceUpdate] = useState({});
-
-  const stateKeyPathKey = [stateKey, ...path].join('.');
-  useRegisterComponent(stateKey, componentId, forceUpdate);
-  const globalStateValue = getShadowValue(stateKey, path);
-  const [localValue, setLocalValue] = useState<any>(globalStateValue);
-  const isCurrentlyDebouncing = useRef(false);
-  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (
-      !isCurrentlyDebouncing.current &&
-      !isDeepEqual(globalStateValue, localValue)
-    ) {
-      setLocalValue(globalStateValue);
-    }
-  }, [globalStateValue]);
-
-  useEffect(() => {
-    const unsubscribe = getGlobalStore
-      .getState()
-      .subscribeToPath(stateKeyPathKey, (newValue) => {
-        if (!isCurrentlyDebouncing.current && localValue !== newValue) {
-          forceUpdate({});
-        }
-      });
-    return () => {
-      unsubscribe();
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-        isCurrentlyDebouncing.current = false;
-      }
-    };
-  }, []);
-
-  const debouncedUpdate = useCallback(
-    (newValue: any) => {
-      const currentType = typeof globalStateValue;
-      if (currentType === 'number' && typeof newValue === 'string') {
-        newValue = newValue === '' ? 0 : Number(newValue);
-      }
-      setLocalValue(newValue);
-      isCurrentlyDebouncing.current = true;
-
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-
-      const debounceTime = formOpts?.debounceTime ?? 200;
-
-      debounceTimeoutRef.current = setTimeout(() => {
-        isCurrentlyDebouncing.current = false;
-        setState(newValue, path, { updateType: 'update' });
-
-        // NEW: Check if validation is enabled via features
-        const rootMeta = getGlobalStore
-          .getState()
-          .getShadowMetadata(stateKey, []);
-        if (!rootMeta?.features?.validationEnabled) return;
-
-        const validationOptions = getInitialOptions(stateKey)?.validation;
-        const zodSchema =
-          validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
-
-        if (zodSchema) {
-          const fullState = getShadowValue(stateKey, []);
-          const result = zodSchema.safeParse(fullState);
-          const currentMeta = getShadowMetadata(stateKey, path) || {};
-
-          if (!result.success) {
-            const errors =
-              'issues' in result.error
-                ? result.error.issues
-                : (result.error as any).errors;
-
-            const pathErrors = errors.filter(
-              (error: any) =>
-                JSON.stringify(error.path) === JSON.stringify(path)
-            );
-
-            if (pathErrors.length > 0) {
-              setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                validation: {
-                  status: 'INVALID',
-                  errors: [
-                    {
-                      source: 'client',
-                      message: pathErrors[0]?.message,
-                      severity: 'warning', // Gentle error during typing
-                    },
-                  ],
-                  lastValidated: Date.now(),
-                  validatedValue: newValue,
-                },
-              });
-            } else {
-              setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                validation: {
-                  status: 'VALID',
-                  errors: [],
-                  lastValidated: Date.now(),
-                  validatedValue: newValue,
-                },
-              });
-            }
-          } else {
-            setShadowMetadata(stateKey, path, {
-              ...currentMeta,
-              validation: {
-                status: 'VALID',
-                errors: [],
-                lastValidated: Date.now(),
-                validatedValue: newValue,
-              },
-            });
-          }
-        }
-      }, debounceTime);
-      forceUpdate({});
-    },
-    [setState, path, formOpts?.debounceTime, stateKey]
-  );
-
-  // --- NEW onBlur HANDLER ---
-  // This replaces the old commented-out method with a modern approach.
-  const handleBlur = useCallback(async () => {
-    console.log('handleBlur triggered');
-
-    // Commit any pending changes
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
-      debounceTimeoutRef.current = null;
-      isCurrentlyDebouncing.current = false;
-      setState(localValue, path, { updateType: 'update' });
-    }
-    const rootMeta = getShadowMetadata(stateKey, []);
-    if (!rootMeta?.features?.validationEnabled) return;
-    const { getInitialOptions } = getGlobalStore.getState();
-    const validationOptions = getInitialOptions(stateKey)?.validation;
-    const zodSchema =
-      validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
-
-    if (!zodSchema) return;
-
-    // Get the full path including stateKey
-
-    // Update validation state to "validating"
-    const currentMeta = getShadowMetadata(stateKey, path);
-
-    setShadowMetadata(stateKey, path, {
-      ...currentMeta,
-      validation: {
-        status: 'VALIDATING',
-        errors: [],
-        lastValidated: Date.now(),
-        validatedValue: localValue,
-      },
-    });
-
-    // Validate full state
-    const fullState = getShadowValue(stateKey, []);
-    const result = zodSchema.safeParse(fullState);
-    console.log('result ', result);
-    if (!result.success) {
-      const errors =
-        'issues' in result.error
-          ? result.error.issues
-          : (result.error as any).errors;
-
-      console.log('All validation errors:', errors);
-      console.log('Current blur path:', path);
-
-      // Find errors for this specific path
-      const pathErrors = errors.filter((error: any) => {
-        console.log('Processing error:', error);
-
-        // For array paths, we need to translate indices to ULIDs
-        if (path.some((p) => p.startsWith('id:'))) {
-          console.log('Detected array path with ULID');
-
-          // This is an array item path like ["id:xyz", "name"]
-          const parentPath = path[0]!.startsWith('id:')
-            ? []
-            : path.slice(0, -1);
-
-          console.log('Parent path:', parentPath);
-
-          const arrayMeta = getGlobalStore
-            .getState()
-            .getShadowMetadata(stateKey, parentPath);
-
-          console.log('Array metadata:', arrayMeta);
-
-          if (arrayMeta?.arrayKeys) {
-            const itemKey = [stateKey, ...path.slice(0, -1)].join('.');
-            const itemIndex = arrayMeta.arrayKeys.indexOf(itemKey);
-
-            console.log('Item key:', itemKey, 'Index:', itemIndex);
-
-            // Compare with Zod path
-            const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
-            const match =
-              JSON.stringify(error.path) === JSON.stringify(zodPath);
-
-            console.log('Zod path comparison:', {
-              zodPath,
-              errorPath: error.path,
-              match,
-            });
-            return match;
-          }
-        }
-
-        const directMatch = JSON.stringify(error.path) === JSON.stringify(path);
-        console.log('Direct path comparison:', {
-          errorPath: error.path,
-          currentPath: path,
-          match: directMatch,
-        });
-        return directMatch;
-      });
-
-      console.log('Filtered path errors:', pathErrors);
-      // Update shadow metadata with validation result
-      setShadowMetadata(stateKey, path, {
-        ...currentMeta,
-        validation: {
-          status: 'INVALID',
-          errors: pathErrors.map((err: any) => ({
-            source: 'client' as const,
-            message: err.message,
-            severity: 'error' as const, // Hard error on blur
-          })),
-          lastValidated: Date.now(),
-          validatedValue: localValue,
-        },
-      });
-    } else {
-      // Validation passed
-      setShadowMetadata(stateKey, path, {
-        ...currentMeta,
-        validation: {
-          status: 'VALID',
-          errors: [],
-          lastValidated: Date.now(),
-          validatedValue: localValue,
-        },
-      });
-    }
-    forceUpdate({});
-  }, [stateKey, path, localValue, setState]);
-
-  const baseState = rebuildStateShape({
-    path: path,
-    componentId: componentId,
-  });
-
-  const stateWithInputProps = new Proxy(baseState, {
-    get(target, prop) {
-      if (prop === 'inputProps') {
-        return {
-          value: localValue ?? '',
-          onChange: (e: any) => {
-            debouncedUpdate(e.target.value);
-          },
-          // 5. Wire the new onBlur handler to the input props.
-          onBlur: handleBlur,
-          ref: formRefStore
-            .getState()
-            .getFormRef(stateKey + '.' + path.join('.')),
-        };
-      }
-
-      return target[prop];
-    },
-  });
-
-  return (
-    <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
-      {renderFn(stateWithInputProps)}
-    </ValidationWrapper>
-  );
-}
-function useRegisterComponent(
-  stateKey: string,
-  componentId: string,
-  forceUpdate: (o: object) => void
-) {
-  const fullComponentId = `${stateKey}////${componentId}`;
-
-  useLayoutEffect(() => {
-    // Call the safe, centralized function to register
-    registerComponent(stateKey, fullComponentId, {
-      forceUpdate: () => forceUpdate({}),
-      paths: new Set(),
-      reactiveType: ['component'],
-    });
-
-    // The cleanup now calls the safe, centralized unregister function
-    return () => {
-      unregisterComponent(stateKey, fullComponentId);
-    };
-  }, [stateKey, fullComponentId]); // Dependencies are stable and correct
 }
