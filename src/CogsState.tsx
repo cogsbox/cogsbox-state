@@ -701,7 +701,7 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
   Object.keys(statePart).forEach((key) => {
     initializeShadowState(key, statePart[key]);
   });
-  console.log('new stateObject ', getGlobalStore.getState().shadowStateStore);
+
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
@@ -2722,15 +2722,7 @@ function createProxyHandler<T>(
 
               const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
-              const validIds = useMemo(() => {
-                return applyTransforms(stateKey, path, meta);
-              }, [
-                stateKey,
-                path.join('.'),
-                // Only recalculate if the underlying array keys or transforms change
-                getShadowMetadata(stateKey, path)?.arrayKeys,
-                meta?.transforms,
-              ]);
+              const validIds = applyTransforms(stateKey, path, meta);
 
               // Memoize the updated meta to prevent creating new objects on every render
               const updatedMeta = useMemo(() => {

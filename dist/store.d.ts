@@ -100,7 +100,6 @@ type ShadowNode = {
     [key: string]: any;
 };
 export type CogsGlobalState = {
-    shadowStateStore: Map<string, ShadowNode>;
     setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     initializeShadowState: (key: string, initialState: any) => void;
     getShadowNode: (key: string, path: string[]) => ShadowNode | undefined;
