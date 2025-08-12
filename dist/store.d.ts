@@ -149,11 +149,6 @@ export type CogsGlobalState = {
     setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
     getSyncInfo: (key: string) => SyncInfo | null;
 };
-export declare const METADATA_KEYS: Set<string>;
-/**
- * The single source of truth for converting a regular JS value/object
- * into the shadow state tree format with the new `_meta` structure.
- */
 export declare function buildShadowNode(value: any): ShadowNode;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};

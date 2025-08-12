@@ -281,7 +281,7 @@ todos.clearSelected();
 const isSelected = todos.index(0).isSelected;
 ```
 
-### Virtualization for Large Lists
+<!-- ### Virtualization for Large Lists
 
 For performance with large datasets:
 
@@ -309,7 +309,7 @@ function MessageList() {
     </div>
   );
 }
-```
+``` -->
 
 ### Streaming for Real-time Data
 
@@ -446,7 +446,7 @@ const { useCogsState } = createCogsState({
     initialState: { name: "", email: "", age: 18 },
     validation: {
       key: "userValidation",
-      zodSchema: userSchema,
+      zodSchemaV4: userSchema,
       onBlur: true // Validate on blur
     },
     formElements: {

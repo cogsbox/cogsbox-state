@@ -237,6 +237,34 @@ describe('CogsState - Basic Functionality', () => {
     expect(setter.isToggled.get()).toBe(false);
   });
 
+  it('should update a single object property without losing sibling properties', () => {
+    // Initial state: user has a name and details object
+    expect(setter.user.name.get()).toBe('Alice');
+    expect(setter.user.details.get()).toEqual({ age: 30, isAdmin: false });
+
+    // --- The problematic action ---
+    // Update only the 'name' property on the 'user' object.
+    // The bug would cause the 'details' property to be wiped out.
+    setter.user.update({
+      ...setter.user.get(), // Get current state
+      name: 'Bob', // Update one property
+    });
+
+    // --- Assertions ---
+    // 1. The name should be updated.
+    expect(setter.user.name.get()).toBe('Bob');
+
+    // 2. (CRUCIAL) The 'details' object, which was a sibling to 'name',
+    //    should still exist and have its original value.
+    const userDetails = setter.user.details.get();
+    expect(userDetails).toBeDefined();
+    expect(userDetails).toEqual({ age: 30, isAdmin: false });
+
+    // 3. Verify that the sub-properties of 'details' are still accessible.
+    expect(setter.user.details.age.get()).toBe(30);
+    expect(setter.user.details.isAdmin.get()).toBe(false);
+  });
+
   it('should update a primitive value with a new value and with a function', () => {
     setter.counter.update(10);
     expect(setter.counter.get()).toBe(10);

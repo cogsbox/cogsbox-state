@@ -1758,8 +1758,7 @@ const notifySelectionComponents = (
   parentPath: string[],
   currentSelected?: string | undefined
 ) => {
-  const store = getGlobalStore.getState();
-  const rootMeta = store.getShadowMetadata(stateKey, []);
+  const rootMeta = getShadowMetadata(stateKey, []);
   const notifiedComponents = new Set<string>();
 
   // Handle "all" reactive components first
@@ -1776,20 +1775,18 @@ const notifySelectionComponents = (
     });
   }
 
-  store
-    .getShadowMetadata(stateKey, [...parentPath, 'getSelected'])
-    ?.pathComponents?.forEach((componentId) => {
-      const thisComp = rootMeta?.components?.get(componentId);
-      thisComp?.forceUpdate();
-    });
+  getShadowMetadata(stateKey, [
+    ...parentPath,
+    'getSelected',
+  ])?.pathComponents?.forEach((componentId) => {
+    const thisComp = rootMeta?.components?.get(componentId);
+    thisComp?.forceUpdate();
+  });
 
-  const parentMeta = store.getShadowMetadata(stateKey, parentPath);
+  const parentMeta = getShadowMetadata(stateKey, parentPath);
   for (let arrayKey of parentMeta?.arrayKeys || []) {
     const key = arrayKey + '.selected';
-    const selectedItem = store.getShadowMetadata(
-      stateKey,
-      key.split('.').slice(1)
-    );
+    const selectedItem = getShadowMetadata(stateKey, key.split('.').slice(1));
     if (arrayKey == currentSelected) {
       selectedItem?.pathComponents?.forEach((componentId) => {
         const thisComp = rootMeta?.components?.get(componentId);
@@ -2151,6 +2148,13 @@ function createProxyHandler<T>(
             const [rerender, forceUpdate] = useState({});
             const initialScrollRef = useRef(true);
 
+            useEffect(() => {
+              const interval = setInterval(() => {
+                forceUpdate({});
+              }, 1000);
+              return () => clearInterval(interval);
+            }, []);
+
             // Scroll state management
             const scrollStateRef = useRef({
               isUserScrolling: false,
@@ -2175,7 +2179,7 @@ function createProxyHandler<T>(
                     return;
                   }
                   if (e.type === 'SERVER_STATE_UPDATE') {
-                    forceUpdate({});
+                    //  forceUpdate({});
                   }
                 });
 
@@ -2415,14 +2419,13 @@ function createProxyHandler<T>(
               };
             }, [stickToBottom, arrayKeys.length, scrollToBottom]);
 
-            console.log('range', range);
             // Create virtual state - NO NEED to get values, only IDs!
             const virtualState = useMemo(() => {
               // 2. Physically slice the corresponding keys.
               const slicedKeys = Array.isArray(arrayKeys)
                 ? arrayKeys.slice(range.startIndex, range.endIndex + 1)
                 : [];
-              console.log('slicedKeys', slicedKeys);
+
               // Use the same keying as getArrayData (empty string for root)
               const arrayPath = path.length > 0 ? path.join('.') : 'root';
               return rebuildStateShape({
@@ -2716,18 +2719,30 @@ function createProxyHandler<T>(
               const componentIdsRef = useRef<Map<string, string>>(new Map());
 
               const [updateTrigger, forceUpdate] = useState({});
-              console.log('mett', meta);
-              const validIds = applyTransforms(stateKey, path, meta);
-              //the above get the new coorect valid ids i need ot udpate the meta object with this info
+
               const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
-              const updatedMeta = {
-                ...meta,
-                arrayViews: {
-                  ...(meta?.arrayViews || {}),
-                  [arrayPathKey]: validIds, // Update the arrayViews with the new valid IDs
-                },
-              };
-              console.log('updatedMeta', updatedMeta);
+
+              const validIds = useMemo(() => {
+                return applyTransforms(stateKey, path, meta);
+              }, [
+                stateKey,
+                path.join('.'),
+                // Only recalculate if the underlying array keys or transforms change
+                getShadowMetadata(stateKey, path)?.arrayKeys,
+                meta?.transforms,
+              ]);
+
+              // Memoize the updated meta to prevent creating new objects on every render
+              const updatedMeta = useMemo(() => {
+                return {
+                  ...meta,
+                  arrayViews: {
+                    ...(meta?.arrayViews || {}),
+                    [arrayPathKey]: validIds,
+                  },
+                };
+              }, [meta, arrayPathKey, validIds]);
+
               // Now use the updated meta when getting array data
               const { value: arrayValues } = getArrayData(
                 stateKey,
@@ -2788,7 +2803,6 @@ function createProxyHandler<T>(
                 meta: updatedMeta, // Use updated meta here
               });
 
-              console.time('render');
               const returnValue = arrayValues.map((item, localIndex) => {
                 const itemKey = validIds[localIndex];
 
@@ -2815,7 +2829,7 @@ function createProxyHandler<T>(
                   renderFn: callbackfn,
                 });
               });
-              console.timeEnd('render');
+
               return <>{returnValue}</>;
             };
 
@@ -2988,6 +3002,7 @@ function createProxyHandler<T>(
               return;
             }
             const selectedId = selectedItemKey.split('.').pop() as string;
+
             if (!(currentViewIds as any[]).includes(selectedId!)) {
               return;
             }
@@ -3078,7 +3093,8 @@ function createProxyHandler<T>(
         }
         if (prop === 'cutThis') {
           const { value: shadowValue } = getScopedData(stateKey, path, meta);
-
+          const parentPath = path.slice(0, -1);
+          notifySelectionComponents(stateKey, parentPath);
           return () => {
             effectiveSetState(shadowValue, path, { updateType: 'cut' });
           };
@@ -3129,7 +3145,7 @@ function createProxyHandler<T>(
             const fullItemKey = stateKey + '.' + path.join('.');
 
             // Logic remains the same.
-            notifySelectionComponents(stateKey, parentPathArray, undefined);
+            //   notifySelectionComponents(stateKey, parentPathArray, undefined);
             return selectedItemKey === fullItemKey;
           }
           return undefined;
@@ -3175,6 +3191,7 @@ function createProxyHandler<T>(
                 .getState()
                 .setSelectedIndex(fullParentKey, fullItemKey);
             }
+            notifySelectionComponents(stateKey, parentPath);
           };
         }
         if (prop === '_componentId') {
@@ -3352,17 +3369,10 @@ function createProxyHandler<T>(
         if (prop === '_stateKey') return stateKey;
         if (prop === '_path') return path;
         if (prop === 'update') {
-          // This method is now greatly simplified.
-          // All the complex batching logic has been removed because our new,
-          // universal `createEffectiveSetState` function handles it automatically for all operations.
           return (payload: UpdateArg<T>) => {
-            // Simply call effectiveSetState. It will automatically handle queuing
-            // this operation in the batch for efficient processing.
+            console.log('udpating', payload, path);
             effectiveSetState(payload as any, path, { updateType: 'update' });
 
-            // The .synced() method is a useful feature that allows developers
-            // to manually mark a piece of state as "synced with the server"
-            // after an update. This part of the functionality is preserved.
             return {
               synced: () => {
                 const shadowMeta = getGlobalStore

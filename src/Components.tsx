@@ -144,10 +144,11 @@ export function ListItemWrapper({
   );
 
   useEffect(() => {
-    subscribeToPath(fullKey, (e) => {
+    const unsubscribe = subscribeToPath(fullKey, (e) => {
       forceUpdate({});
     });
-  }, []);
+    return () => unsubscribe();
+  }, [fullKey]);
   useEffect(() => {
     if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
       return;
