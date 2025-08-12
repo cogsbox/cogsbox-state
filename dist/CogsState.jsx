@@ -1450,7 +1450,7 @@ function Pe(e, r, l, a) {
         if (m === "_stateKey") return e;
         if (m === "_path") return t;
         if (m === "update")
-          return (o) => (console.log("udpating", o, t), r(o, t, { updateType: "update" }), {
+          return (o) => (r(o, t, { updateType: "update" }), {
             synced: () => {
               const n = T.getState().getShadowMetadata(e, t);
               J(e, t, {

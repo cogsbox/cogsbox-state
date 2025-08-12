@@ -308,14 +308,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       transformCaches: metadata.transformCaches,
     });
   },
-
   initializeShadowState: (key: string, initialState: any) => {
     set((state) => {
       const newShadowStore = new Map(state.shadowStateStore);
+
+      // Get existing metadata more efficiently
       const existingRoot =
         newShadowStore.get(key) || newShadowStore.get(`[${key}`);
-      let preservedMetadata: Partial<ShadowMetadata> = {};
 
+      // Only preserve necessary metadata
+      let preservedMetadata: Partial<ShadowMetadata> | undefined;
       if (existingRoot?._meta) {
         const {
           components,
@@ -324,22 +326,39 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
           stateSource,
           baseServerState,
         } = existingRoot._meta;
-        if (components) preservedMetadata.components = components;
-        if (features) preservedMetadata.features = features;
-        if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
-        if (stateSource) preservedMetadata.stateSource = stateSource;
-        if (baseServerState)
-          preservedMetadata.baseServerState = baseServerState;
+
+        // Only create object if we have something to preserve
+        if (
+          components ||
+          features ||
+          lastServerSync ||
+          stateSource ||
+          baseServerState
+        ) {
+          preservedMetadata = {};
+          if (components) preservedMetadata.components = components;
+          if (features) preservedMetadata.features = features;
+          if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
+          if (stateSource) preservedMetadata.stateSource = stateSource;
+          if (baseServerState)
+            preservedMetadata.baseServerState = baseServerState;
+        }
       }
 
+      // Clear old entries
       newShadowStore.delete(key);
       newShadowStore.delete(`[${key}`);
 
+      // Build new state
       const newRoot = buildShadowNode(initialState);
 
-      if (!newRoot._meta) newRoot._meta = {};
-      Object.assign(newRoot._meta, preservedMetadata);
+      // Only merge metadata if needed
+      if (preservedMetadata) {
+        if (!newRoot._meta) newRoot._meta = {};
+        Object.assign(newRoot._meta, preservedMetadata);
+      }
 
+      // Use correct key based on type
       const storageKey = Array.isArray(initialState) ? `[${key}` : key;
       newShadowStore.set(storageKey, newRoot);
 
@@ -349,19 +368,23 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
   getShadowNode: (key: string, path: string[]): ShadowNode | undefined => {
     const store = get().shadowStateStore;
+
+    // Fast path for root access (common case)
+    if (path.length === 0) {
+      return store.get(key) || store.get(`[${key}`);
+    }
+
     let current: any = store.get(key) || store.get(`[${key}`);
-
     if (!current) return undefined;
-    if (path.length === 0) return current;
 
-    for (const segment of path) {
+    // Use for loop instead of for...of for better performance
+    for (let i = 0; i < path.length; i++) {
       if (typeof current !== 'object' || current === null) return undefined;
-      current = current[segment];
+      current = current[path[i]!];
       if (current === undefined) return undefined;
     }
     return current;
   },
-
   getShadowMetadata: (
     key: string,
     path: string[]
@@ -381,21 +404,43 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       let root = newStore.get(rootKey);
 
       if (!root) {
-        root = {};
+        // Create root only if needed
+        root = { _meta: newMetadata };
         newStore.set(rootKey, root);
+        return { shadowStateStore: newStore };
       }
 
+      // Special case for root metadata (common)
+      if (path.length === 0) {
+        const clonedRoot = { ...root };
+        clonedRoot._meta = { ...(root._meta || {}), ...newMetadata };
+        newStore.set(rootKey, clonedRoot);
+        return { shadowStateStore: newStore };
+      }
+
+      // Clone path - optimized to only clone what changes
       const clonedRoot: any = { ...root };
       newStore.set(rootKey, clonedRoot);
 
       let current = clonedRoot;
-      for (const segment of path) {
-        const nextNode = current[segment] || {};
-        current[segment] = { ...nextNode };
+      for (let i = 0; i < path.length; i++) {
+        const segment = path[i]!;
+        // Only clone if exists, create minimal object otherwise
+        if (current[segment]) {
+          current[segment] = { ...current[segment] };
+        } else {
+          current[segment] =
+            i === path.length - 1
+              ? { _meta: {} } // Last segment, prepare for metadata
+              : {}; // Intermediate segment
+        }
         current = current[segment];
       }
 
-      current._meta = { ...(current._meta || {}), ...newMetadata };
+      // Merge metadata efficiently
+      current._meta = current._meta
+        ? { ...current._meta, ...newMetadata }
+        : newMetadata;
 
       return { shadowStateStore: newStore };
     });
@@ -412,6 +457,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     const nodeKeys = Object.keys(node);
 
+    // Check if it's a primitive wrapper - must match original logic exactly
     const isPrimitiveWrapper =
       Object.prototype.hasOwnProperty.call(node, 'value') &&
       nodeKeys.every((k) => k === 'value' || k === '_meta');
@@ -420,96 +466,131 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return node.value;
     }
 
-    // Array Check (This part is correct)
+    // Array check - more efficient with early check
     const isArrayNode =
       node._meta &&
       Object.prototype.hasOwnProperty.call(node._meta, 'arrayKeys');
+
     if (isArrayNode) {
       const keysToIterate =
         validArrayIds !== undefined && validArrayIds.length > 0
           ? validArrayIds
           : node._meta!.arrayKeys!;
 
-      return keysToIterate.map((itemKey: string) =>
-        get().getShadowValue(key, [...path, itemKey])
-      );
+      // Pre-allocate array for better performance
+      const result = new Array(keysToIterate.length);
+      for (let i = 0; i < keysToIterate.length; i++) {
+        result[i] = get().getShadowValue(key, [...path, keysToIterate[i]!]);
+      }
+      return result;
     }
 
+    // Object reconstruction - optimized with for...in
     const result: any = {};
-    for (const propKey of nodeKeys) {
-      if (propKey !== '_meta' && !propKey.startsWith('id:')) {
+    for (const propKey in node) {
+      if (
+        propKey !== '_meta' &&
+        !propKey.startsWith('id:') &&
+        Object.prototype.hasOwnProperty.call(node, propKey)
+      ) {
         result[propKey] = get().getShadowValue(key, [...path, propKey]);
       }
     }
     return result;
   },
+
   updateShadowAtPath: (key, path, newValue) => {
     set((state) => {
       const newStore = new Map(state.shadowStateStore);
       const rootKey = newStore.has(`[${key}`) ? `[${key}` : key;
       let root = newStore.get(rootKey);
       if (!root) return state;
+
+      // Clone the root and navigate to target
       const clonedRoot: any = { ...root };
       newStore.set(rootKey, clonedRoot);
-      let parentNode = clonedRoot;
-      for (let i = 0; i < path.length - 1; i++) {
-        parentNode[path[i]!] = { ...(parentNode[path[i]!] || {}) };
-        parentNode = parentNode[path[i]!];
-      }
-      const targetNode =
-        path.length === 0 ? parentNode : parentNode[path[path.length - 1]!];
 
-      if (!targetNode) {
-        parentNode[path[path.length - 1]!] = buildShadowNode(newValue);
+      // For root-level updates (path.length === 0)
+      if (path.length === 0) {
+        const oldMeta = root._meta;
+        const newRoot = buildShadowNode(newValue);
+        if (oldMeta) {
+          newRoot._meta = { ...oldMeta, ...(newRoot._meta || {}) };
+        }
+        newStore.set(rootKey, newRoot);
+
+        get().notifyPathSubscribers(key, {
+          type: 'UPDATE',
+          newValue,
+        });
         return { shadowStateStore: newStore };
       }
 
-      function intelligentMerge(nodeToUpdate: any, plainValue: any) {
-        if (
-          typeof plainValue !== 'object' ||
-          plainValue === null ||
-          Array.isArray(plainValue)
-        ) {
-          const oldMeta = nodeToUpdate._meta;
-          const newNode = buildShadowNode(plainValue);
-          if (oldMeta) {
-            newNode._meta = { ...oldMeta, ...(newNode._meta || {}) };
-          }
-          Object.keys(nodeToUpdate).forEach((key) => delete nodeToUpdate[key]);
-          Object.assign(nodeToUpdate, newNode);
-          return;
-        }
+      // Navigate to parent of target, cloning only what we need
+      let current = clonedRoot;
+      const pathLength = path.length;
 
-        const plainValueKeys = new Set(Object.keys(plainValue));
-
-        for (const propKey of plainValueKeys) {
-          const childValue = plainValue[propKey];
-          if (nodeToUpdate[propKey]) {
-            intelligentMerge(nodeToUpdate[propKey], childValue);
-          } else {
-            nodeToUpdate[propKey] = buildShadowNode(childValue);
-          }
-        }
-
-        for (const nodeKey in nodeToUpdate) {
-          if (
-            nodeKey === '_meta' ||
-            !Object.prototype.hasOwnProperty.call(nodeToUpdate, nodeKey)
-          )
-            continue;
-
-          if (!plainValueKeys.has(nodeKey)) {
-            delete nodeToUpdate[nodeKey];
-          }
-        }
+      for (let i = 0; i < pathLength - 1; i++) {
+        const segment = path[i]!;
+        current[segment] = current[segment] ? { ...current[segment] } : {};
+        current = current[segment];
       }
 
-      intelligentMerge(targetNode, newValue);
+      const lastSegment = path[pathLength - 1]!;
+      const targetNode = current[lastSegment];
+
+      // FAST PATH: Primitives, null, undefined, or arrays (no merge needed)
+      if (
+        newValue === null ||
+        newValue === undefined ||
+        typeof newValue !== 'object' ||
+        Array.isArray(newValue) ||
+        !targetNode ||
+        Array.isArray(targetNode._meta?.arrayKeys)
+      ) {
+        // Simple replacement - just preserve metadata
+        const oldMeta = targetNode?._meta;
+        const newNode = buildShadowNode(newValue);
+        if (oldMeta) {
+          if (newNode._meta) {
+            newNode._meta = { ...oldMeta, ...newNode._meta };
+          } else {
+            newNode._meta = oldMeta;
+          }
+        }
+        current[lastSegment] = newNode;
+      }
+      // MERGE PATH: Only for object-to-object updates
+      else {
+        const mergedNode = { ...targetNode };
+        current[lastSegment] = mergedNode;
+
+        // Preserve metadata
+        if (targetNode._meta) {
+          mergedNode._meta = targetNode._meta;
+        }
+
+        // Build a Set for O(1) lookups
+        const newKeysSet = new Set(Object.keys(newValue));
+
+        // Remove old keys not in newValue (single pass)
+        for (const key in mergedNode) {
+          if (key !== '_meta' && !newKeysSet.has(key)) {
+            delete mergedNode[key];
+          }
+        }
+
+        // Add/update new keys (single pass)
+        for (const key of newKeysSet) {
+          mergedNode[key] = buildShadowNode(newValue[key]);
+        }
+      }
 
       get().notifyPathSubscribers([key, ...path].join('.'), {
         type: 'UPDATE',
         newValue,
       });
+
       return { shadowStateStore: newStore };
     });
   },
@@ -570,10 +651,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       index: insertionPoint,
     });
   },
-  insertManyShadowArrayElements: (key, arrayPath, newItems, index) => {
-    if (!newItems || newItems.length === 0) {
-      return;
-    }
+  insertManyShadowArrayElements: (
+    key: string,
+    arrayPath: string[],
+    newItems: any[],
+    index?: number
+  ) => {
+    if (!newItems || newItems.length === 0) return;
 
     const arrayNode = get().getShadowNode(key, arrayPath);
     if (!arrayNode?._meta?.arrayKeys) {
@@ -583,25 +667,35 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return;
     }
 
-    const itemsToAdd: Record<string, any> = {};
-    const newIds: string[] = [];
+    // Pre-allocate objects for better performance
+    const itemsToAdd: Record<string, any> = Object.create(null);
+    const newIds = new Array(newItems.length);
 
-    newItems.forEach((item) => {
+    // Generate all IDs and build nodes in one pass
+    for (let i = 0; i < newItems.length; i++) {
       const newItemId = `id:${ulid()}`;
-      newIds.push(newItemId);
-      itemsToAdd[newItemId] = buildShadowNode(item);
-    });
+      newIds[i] = newItemId;
+      itemsToAdd[newItemId] = buildShadowNode(newItems[i]);
+    }
 
+    // Efficient array concatenation
     const currentKeys = arrayNode._meta.arrayKeys;
-    const finalKeys = [...currentKeys];
     const insertionPoint =
-      index !== undefined && index >= 0 && index <= finalKeys.length
+      index !== undefined && index >= 0 && index <= currentKeys.length
         ? index
-        : finalKeys.length;
-    finalKeys.splice(insertionPoint, 0, ...newIds);
+        : currentKeys.length;
+
+    // Use spread operator for better performance with small arrays
+    // For large arrays, consider using concat
+    const finalKeys = [
+      ...currentKeys.slice(0, insertionPoint),
+      ...newIds,
+      ...currentKeys.slice(insertionPoint),
+    ];
 
     get().addItemsToArrayNode(key, arrayPath, itemsToAdd, finalKeys);
 
+    // Single notification
     const arrayKey = [key, ...arrayPath].join('.');
     get().notifyPathSubscribers(arrayKey, {
       type: 'INSERT_MANY',
@@ -634,25 +728,43 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
 
-  addPathComponent: (stateKey, dependencyPath, fullComponentId) => {
+  addPathComponent: (
+    stateKey: string,
+    dependencyPath: string[],
+    fullComponentId: string
+  ) => {
     const metadata = get().getShadowMetadata(stateKey, dependencyPath) || {};
-    const newPathComponents = new Set(metadata.pathComponents);
-    newPathComponents.add(fullComponentId);
-    get().setShadowMetadata(stateKey, dependencyPath, {
-      pathComponents: newPathComponents,
-    });
 
-    const rootMeta = get().getShadowMetadata(stateKey, []);
-    if (rootMeta?.components) {
-      const component = rootMeta.components.get(fullComponentId);
-      if (component) {
-        const fullPathKey = [stateKey, ...dependencyPath].join('.');
-        const newPaths = new Set(component.paths);
-        newPaths.add(fullPathKey);
-        const newComponentRegistration = { ...component, paths: newPaths };
-        const newComponentsMap = new Map(rootMeta.components);
-        newComponentsMap.set(fullComponentId, newComponentRegistration);
-        get().setShadowMetadata(stateKey, [], { components: newComponentsMap });
+    // Only clone and update if component not already added
+    if (!metadata.pathComponents?.has(fullComponentId)) {
+      const newPathComponents = new Set(metadata.pathComponents);
+      newPathComponents.add(fullComponentId);
+
+      get().setShadowMetadata(stateKey, dependencyPath, {
+        pathComponents: newPathComponents,
+      });
+
+      // Update component's paths
+      const rootMeta = get().getShadowMetadata(stateKey, []);
+      if (rootMeta?.components) {
+        const component = rootMeta.components.get(fullComponentId);
+        if (
+          component &&
+          !component.paths.has([stateKey, ...dependencyPath].join('.'))
+        ) {
+          const newPaths = new Set(component.paths);
+          const fullPathKey = [stateKey, ...dependencyPath].join('.');
+          newPaths.add(fullPathKey);
+
+          const newComponentsMap = new Map(rootMeta.components);
+          newComponentsMap.set(fullComponentId, {
+            ...component,
+            paths: newPaths,
+          });
+          get().setShadowMetadata(stateKey, [], {
+            components: newComponentsMap,
+          });
+        }
       }
     }
   },

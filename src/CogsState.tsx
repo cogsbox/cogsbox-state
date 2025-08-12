@@ -3353,7 +3353,6 @@ function createProxyHandler<T>(
         if (prop === '_path') return path;
         if (prop === 'update') {
           return (payload: UpdateArg<T>) => {
-            console.log('udpating', payload, path);
             effectiveSetState(payload as any, path, { updateType: 'update' });
 
             return {
