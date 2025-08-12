@@ -1285,7 +1285,6 @@ function Pe(e, r, l, a) {
             );
             return c(g ? {
               path: [...t, g.key],
-              // e.g., ['itemInstances', 'inst-1', 'properties', 'prop-b']
               componentId: I,
               meta: u
             } : {

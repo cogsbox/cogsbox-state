@@ -2888,26 +2888,17 @@ function createProxyHandler<T>(
         }
         if (prop === 'last') {
           return () => {
-            // ✅ FIX: Use getArrayData to get the keys for the current view (filtered or not).
             const { keys: currentViewIds } = getArrayData(stateKey, path, meta);
-
-            // If the array is empty, there is no last item.
             if (!currentViewIds || currentViewIds.length === 0) {
               return undefined;
             }
-
-            // Get the unique ID of the last item in the current view.
             const lastItemKey = currentViewIds[currentViewIds.length - 1];
 
-            // If for some reason the key is invalid, return undefined.
             if (!lastItemKey) {
               return undefined;
             }
-
-            // ✅ FIX: The new path uses the item's unique key, not its numerical index.
             const newPath = [...path, lastItemKey];
 
-            // Return a new proxy scoped to that specific item.
             return rebuildStateShape({
               path: newPath,
               componentId: componentId!,
@@ -3073,17 +3064,14 @@ function createProxyHandler<T>(
               (item) => item?.[searchKey] === searchValue
             );
 
-            // FIX: If found, return a proxy to the item by appending its key to the current path.
             if (found) {
               return rebuildStateShape({
-                path: [...path, found.key], // e.g., ['itemInstances', 'inst-1', 'properties', 'prop-b']
+                path: [...path, found.key],
                 componentId: componentId!,
                 meta,
               });
             }
 
-            // If not found, return an 'empty' proxy that will resolve to undefined on .get()
-            // This prevents "cannot read property 'get' of undefined" errors.
             return rebuildStateShape({
               path: [...path, `not_found_${uuidv4()}`],
               componentId: componentId!,
@@ -3117,7 +3105,6 @@ function createProxyHandler<T>(
               _meta: meta,
             });
         }
-        // in CogsState.ts -> createProxyHandler -> handler -> get
 
         if (prop === '$get') {
           return () =>
@@ -3135,7 +3122,6 @@ function createProxyHandler<T>(
           const parentPathArray = path.slice(0, -1);
           const parentMeta = getShadowMetadata(stateKey, parentPathArray);
 
-          // FIX: Check if the parent is an array by looking for arrayKeys in its metadata.
           if (parentMeta?.arrayKeys) {
             const fullParentKey = stateKey + '.' + parentPathArray.join('.');
             const selectedItemKey = getGlobalStore
@@ -3144,14 +3130,11 @@ function createProxyHandler<T>(
 
             const fullItemKey = stateKey + '.' + path.join('.');
 
-            // Logic remains the same.
-            //   notifySelectionComponents(stateKey, parentPathArray, undefined);
             return selectedItemKey === fullItemKey;
           }
           return undefined;
         }
 
-        // Then use it in both:
         if (prop === 'setSelected') {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
