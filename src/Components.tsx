@@ -445,6 +445,7 @@ export function FormElementWrapper({
   const baseState = rebuildStateShape({
     path: path,
     componentId: componentId,
+    meta: undefined,
   });
 
   const stateWithInputProps = new Proxy(baseState, {

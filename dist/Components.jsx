@@ -20,11 +20,11 @@ function ne({
   stateKey: n,
   children: o
 }) {
-  const { getInitialOptions: f, getShadowMetadata: s, getShadowValue: l } = p.getState(), g = f(n), d = s(n, t)?.validation, a = d?.status || "NOT_VALIDATED", S = (d?.errors || []).map((c) => ({
+  const { getInitialOptions: f, getShadowMetadata: s, getShadowValue: l } = p.getState(), m = f(n), d = s(n, t)?.validation, a = d?.status || "NOT_VALIDATED", S = (d?.errors || []).map((c) => ({
     ...c,
     path: t
   })), u = S.filter((c) => c.severity === "error").map((c) => c.message), i = S.filter((c) => c.severity === "warning").map((c) => c.message), E = u[0] || i[0];
-  return /* @__PURE__ */ O($, { children: g?.formElements?.validation && !e?.validation?.disable ? g.formElements.validation({
+  return /* @__PURE__ */ O($, { children: m?.formElements?.validation && !e?.validation?.disable ? m.formElements.validation({
     children: /* @__PURE__ */ O(x.Fragment, { children: o }, t.toString()),
     status: a,
     // Now passes the new ValidationStatus type
@@ -36,7 +36,7 @@ function ne({
     getData: () => l(n, t)
   }) : /* @__PURE__ */ O(x.Fragment, { children: o }, t.toString()) });
 }
-const ge = k(
+const me = k(
   oe,
   (e, t) => e.itemPath.join(".") === t.itemPath.join(".") && e.stateKey === t.stateKey && e.itemComponentId === t.itemComponentId && e.localIndex === t.localIndex
 );
@@ -49,8 +49,8 @@ function oe({
   rebuildStateShape: s,
   renderFn: l
 }) {
-  const [, g] = A({}), { ref: M, inView: d } = Q(), a = C(null), S = ae(a), u = C(!1), i = [e, ...n].join(".");
-  B(e, t, g);
+  const [, m] = A({}), { ref: M, inView: d } = Q(), a = C(null), S = ae(a), u = C(!1), i = [e, ...n].join(".");
+  B(e, t, m);
   const E = J(
     (r) => {
       a.current = r, M(r);
@@ -58,8 +58,8 @@ function oe({
     [M]
   );
   j(() => {
-    const r = re(i, (m) => {
-      g({});
+    const r = re(i, (g) => {
+      m({});
     });
     return () => r();
   }, [i]), j(() => {
@@ -68,10 +68,10 @@ function oe({
     const r = a.current;
     if (r && r.offsetHeight > 0) {
       u.current = !0;
-      const m = r.offsetHeight;
+      const g = r.offsetHeight;
       h(e, n, {
         virtualizer: {
-          itemHeight: m,
+          itemHeight: g,
           domRef: r
         }
       });
@@ -93,7 +93,7 @@ function oe({
   }), y = l(z, o, f);
   return /* @__PURE__ */ O("div", { ref: E, children: y });
 }
-function me({
+function ge({
   stateKey: e,
   path: t,
   rebuildStateShape: n,
@@ -101,14 +101,14 @@ function me({
   formOpts: f,
   setState: s
 }) {
-  const [l] = A(() => X()), [, g] = A({}), M = [e, ...t].join(".");
-  B(e, l, g);
+  const [l] = A(() => X()), [, m] = A({}), M = [e, ...t].join(".");
+  B(e, l, m);
   const d = R(e, t), [a, S] = A(d), u = C(!1), i = C(null);
   j(() => {
     !u.current && !Y(d, a) && S(d);
   }, [d]), j(() => {
-    const r = p.getState().subscribeToPath(M, (m) => {
-      !u.current && a !== m && g({});
+    const r = p.getState().subscribeToPath(M, (g) => {
+      !u.current && a !== g && m({});
     });
     return () => {
       r(), i.current && (clearTimeout(i.current), u.current = !1);
@@ -163,12 +163,12 @@ function me({
             });
           }
         }
-      }, v), g({});
+      }, v), m({});
     },
     [s, t, f?.debounceTime, e]
   ), c = J(async () => {
     if (console.log("handleBlur triggered"), i.current && (clearTimeout(i.current), i.current = null, u.current = !1, s(a, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
-    const { getInitialOptions: m } = p.getState(), v = m(e)?.validation, T = v?.zodSchemaV4 || v?.zodSchemaV3;
+    const { getInitialOptions: g } = p.getState(), v = g(e)?.validation, T = v?.zodSchemaV4 || v?.zodSchemaV3;
     if (!T) return;
     const I = H(e, t);
     h(e, t, {
@@ -217,13 +217,14 @@ function me({
         }
       });
     }
-    g({});
+    m({});
   }, [e, t, a, s]), z = n({
     path: t,
-    componentId: l
+    componentId: l,
+    meta: void 0
   }), y = new Proxy(z, {
-    get(r, m) {
-      return m === "inputProps" ? {
+    get(r, g) {
+      return g === "inputProps" ? {
         value: a ?? "",
         onChange: (v) => {
           E(v.target.value);
@@ -231,7 +232,7 @@ function me({
         // 5. Wire the new onBlur handler to the input props.
         onBlur: c,
         ref: _.getState().getFormRef(e + "." + t.join("."))
-      } : r[m];
+      } : r[g];
     }
   });
   return /* @__PURE__ */ O(ne, { formOpts: f, path: t, stateKey: e, children: o(y) });
@@ -272,9 +273,9 @@ const ae = (e) => {
   }, [e.current]), t;
 };
 export {
-  me as FormElementWrapper,
+  ge as FormElementWrapper,
   oe as ListItemWrapper,
-  ge as MemoizedCogsItemWrapper,
+  me as MemoizedCogsItemWrapper,
   ne as ValidationWrapper,
   B as useRegisterComponent
 };

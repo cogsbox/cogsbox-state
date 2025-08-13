@@ -1821,7 +1821,7 @@ function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
 function createProxyHandler<T>(
   stateKey: string,
   effectiveSetState: EffectiveSetState<T>,
-  componentId: string,
+  outerComponentId: string,
   sessionId?: string
 ): StateObject<T> {
   const proxyCache = new Map<string, any>();
@@ -1891,7 +1891,8 @@ function createProxyHandler<T>(
     const derivationSignature = meta
       ? JSON.stringify(meta.arrayViews || meta.transforms)
       : '';
-    const cacheKey = path.join('.') + ':' + derivationSignature;
+    const cacheKey =
+      path.join('.') + ':' + componentId + ':' + derivationSignature;
     if (proxyCache.has(cacheKey)) {
       return proxyCache.get(cacheKey);
     }
@@ -3442,7 +3443,7 @@ function createProxyHandler<T>(
       initializeShadowState(stateKey, initialState);
       rebuildStateShape({
         path: [],
-        componentId: componentId!,
+        componentId: outerComponentId!,
       });
       const initalOptionsGet = getInitialOptions(stateKey as string);
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
@@ -3472,7 +3473,7 @@ function createProxyHandler<T>(
       const newUpdaterState = createProxyHandler(
         stateKey,
         effectiveSetState,
-        componentId,
+        outerComponentId,
         sessionId
       );
       const initialState =
@@ -3510,7 +3511,7 @@ function createProxyHandler<T>(
   };
 
   const returnShape = rebuildStateShape({
-    componentId,
+    componentId: outerComponentId,
     path: [],
   });
 
