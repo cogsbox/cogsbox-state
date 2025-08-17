@@ -588,6 +588,6 @@ export function IsolatedComponentWrapper({
     componentId: componentId,
     meta: undefined,
   });
-  console.log('baseState', baseState?.$get());
+
   return <>{renderFn(baseState)}</>;
 }
