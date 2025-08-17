@@ -2,7 +2,6 @@
 
 import {
   createElement,
-  memo,
   startTransition,
   useCallback,
   useEffect,
@@ -23,6 +22,7 @@ import {
 } from './utility.js';
 import {
   FormElementWrapper,
+  IsolatedComponentWrapper,
   MemoizedCogsItemWrapper,
   ValidationWrapper,
 } from './Components.js';
@@ -34,6 +34,7 @@ import {
   formRefStore,
   getGlobalStore,
   ValidationError,
+  ValidationSeverity,
   ValidationStatus,
   type ComponentsType,
 } from './store.js';
@@ -55,15 +56,7 @@ export type VirtualViewOptions = {
 
 // The result now returns a real StateObject
 export type VirtualStateObjectResult<T extends any[]> = {
-  /**
-   * A new, fully-functional StateObject that represents the virtualized slice.
-   * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
-   */
-
   virtualState: StateObject<T>;
-  /**
-   * Props to be spread onto your DOM elements to enable virtualization.
-   */
   virtualizerProps: {
     outer: { ref: RefObject<HTMLDivElement>; style: CSSProperties };
     inner: { style: CSSProperties };
@@ -83,7 +76,9 @@ export type FormElementParams<T> = StateObject<T> & {
     ref?: React.RefObject<any>;
     value?: T extends boolean ? never : T;
     onChange?: (
-      event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+      event: React.ChangeEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >
     ) => void;
     onBlur?: () => void;
   };
@@ -149,78 +144,75 @@ export type StreamHandle<T> = {
   pause: () => void;
   resume: () => void;
 };
+
 export type ArrayEndType<TShape extends unknown> = {
-  stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
+  $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
     options?: StreamOptions<T, R>
   ) => StreamHandle<T>;
-  findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
-  index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
-    insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
-    cut: CutFunctionType<TShape>;
-    _index: number;
+  $findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
+  $index: (index: number) => StateObject<
+    Prettify<InferArrayElement<TShape>>
+  > & {
+    $insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
+    $cut: CutFunctionType<TShape>;
+    $_index: number;
   } & EndType<Prettify<InferArrayElement<TShape>>>;
-  insert: InsertType<Prettify<InferArrayElement<TShape>>>;
-  cut: CutFunctionType<TShape>;
-  cutSelected: () => void;
-  cutByValue: (value: string | number | boolean) => void;
-  toggleByValue: (value: string | number | boolean) => void;
-  stateSort: (
+  $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+  $cut: CutFunctionType<TShape>;
+  $cutSelected: () => void;
+  $cutByValue: (value: string | number | boolean) => void;
+  $toggleByValue: (value: string | number | boolean) => void;
+  $stateSort: (
     compareFn: (
       a: Prettify<InferArrayElement<TShape>>,
       b: Prettify<InferArrayElement<TShape>>
     ) => number
   ) => ArrayEndType<TShape>;
-  useVirtualView: (
+  $useVirtualView: (
     options: VirtualViewOptions
   ) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
 
-  stateList: (
+  $stateList: (
     callbackfn: (
       setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
-  stateMap: <U>(
+  $stateMap: <U>(
     callbackfn: (
       setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
       arraySetter: StateObject<TShape>
     ) => U
   ) => U[];
-  $stateMap: (
-    callbackfn: (
-      setter: StateObject<Prettify<InferArrayElement<TShape>>>,
-      index: number,
-      arraySetter: StateObject<TShape>
-    ) => void
-  ) => any;
-  stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(
+
+  $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(
     field: K
   ) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
-  uniqueInsert: (
+  $uniqueInsert: (
     payload: InsertParams<Prettify<InferArrayElement<TShape>>>,
     fields?: (keyof Prettify<InferArrayElement<TShape>>)[],
     onMatch?: (existingItem: any) => any
   ) => void;
-  stateFind: (
+  $stateFind: (
     callbackfn: (
       value: Prettify<InferArrayElement<TShape>>,
       index: number
     ) => boolean
   ) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-  stateFilter: (
+  $stateFilter: (
     callbackfn: (
       value: Prettify<InferArrayElement<TShape>>,
       index: number
     ) => void
   ) => ArrayEndType<TShape>;
-  getSelected: () =>
+  $getSelected: () =>
     | StateObject<Prettify<InferArrayElement<TShape>>>
     | undefined;
-  clearSelected: () => void;
-  getSelectedIndex: () => number;
-  last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+  $clearSelected: () => void;
+  $getSelectedIndex: () => number;
+  $last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
 } & EndType<TShape>;
 
 export type FormOptsType = {
@@ -251,40 +243,40 @@ export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-  addZodValidation: (errors: ValidationError[]) => void;
-  clearZodValidation: (paths?: string[]) => void;
-  applyJsonPatch: (patches: any[]) => void;
-  update: UpdateType<T>;
-  _path: string[];
-  _stateKey: string;
-  formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
-  get: () => T;
-
+  $addZodValidation: (errors: ValidationError[]) => void;
+  $clearZodValidation: (paths?: string[]) => void;
+  $applyJsonPatch: (patches: any[]) => void;
+  $update: UpdateType<T>;
+  $_path: string[];
+  $_stateKey: string;
+  $isolate: (
+    renderFn: (state: StateObject<T>) => React.ReactNode
+  ) => JSX.Element;
+  $formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
   $get: () => T;
-  $derive: <R>(fn: EffectFunction<T, R>) => R;
-
-  _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-  getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-
-  showValidationErrors: () => string[];
-  setValidation: (ctx: string) => void;
-  removeValidation: (ctx: string) => void;
-  ignoreFields: (fields: string[]) => StateObject<T>;
-  isSelected: boolean;
-  setSelected: (value: boolean) => void;
-  toggleSelected: () => void;
-  getFormRef: () => React.RefObject<any> | undefined;
-  removeStorage: () => void;
-  sync: () => void;
-  validationWrapper: ({
+  $$get: () => T;
+  $$derive: <R>(fn: EffectFunction<T, R>) => R;
+  $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  $showValidationErrors: () => string[];
+  $setValidation: (ctx: string) => void;
+  $removeValidation: (ctx: string) => void;
+  $ignoreFields: (fields: string[]) => StateObject<T>;
+  $isSelected: boolean;
+  $setSelected: (value: boolean) => void;
+  $toggleSelected: () => void;
+  $getFormRef: () => React.RefObject<any> | undefined;
+  $removeStorage: () => void;
+  $sync: () => void;
+  $validationWrapper: ({
     children,
     hideMessage,
   }: {
     children: React.ReactNode;
     hideMessage?: boolean;
   }) => JSX.Element;
-  lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? { cutThis: () => void } : {});
+  $lastSynced?: SyncInfo;
+} & (IsArrayElement extends true ? { $cutThis: () => void } : {});
 
 export type StateObject<T> = (T extends any[]
   ? ArrayEndType<T>
@@ -294,20 +286,20 @@ export type StateObject<T> = (T extends any[]
       ? EndType<T, true>
       : never) &
   EndType<T, true> & {
-    toggle: T extends boolean ? () => void : never;
-    getAllFormRefs: () => Map<string, React.RefObject<any>>;
-    _componentId: string | null;
-    getComponents: () => ComponentsType;
+    $toggle: T extends boolean ? () => void : never;
+    $getAllFormRefs: () => Map<string, React.RefObject<any>>;
+    $_componentId: string | null;
+    $getComponents: () => ComponentsType;
 
-    _initialState: T;
-    updateInitialState: (newState: T | null) => {
+    $_initialState: T;
+    $updateInitialState: (newState: T | null) => {
       fetchId: (field: keyof T) => string | number;
     };
-    _isLoading: boolean;
-    _serverState: T;
-    revertToInitialState: (obj?: { validationKey?: string }) => T;
+    $_isLoading: boolean;
+    $_serverState: T;
+    $revertToInitialState: (obj?: { validationKey?: string }) => T;
 
-    middleware: (
+    $middleware: (
       middles: ({
         updateLog,
         update,
@@ -317,7 +309,7 @@ export type StateObject<T> = (T extends any[]
       }) => void
     ) => void;
 
-    getLocalStorage: (key: string) => LocalStorageData<T> | null;
+    $getLocalStorage: (key: string) => LocalStorageData<T> | null;
   };
 
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
@@ -448,8 +440,8 @@ export type SyncRenderOptions<T extends unknown = unknown> = {
 type FormsElementsType<T> = {
   validation?: (options: {
     children: React.ReactNode;
-    status: ValidationStatus; // Instead of 'active' boolean
-
+    status: ValidationStatus;
+    severity: ValidationSeverity;
     hasErrors: boolean;
     hasWarnings: boolean;
     allErrors: ValidationError[];
@@ -483,7 +475,6 @@ export type TransformedStateType<T> = {
 const {
   getInitialOptions,
   updateInitialStateGlobal,
-  // ALIAS THE NEW FUNCTIONS TO THE OLD NAMES
   getShadowMetadata,
   setShadowMetadata,
   getShadowValue,
@@ -492,12 +483,9 @@ const {
   insertShadowArrayElement,
   insertManyShadowArrayElements,
   removeShadowArrayElement,
-  getSelectedIndex,
   setInitialStateOptions,
   setServerStateUpdate,
   markAsDirty,
-  registerComponent,
-  unregisterComponent,
   addPathComponent,
   clearSelectedIndexesForState,
   addStateLog,
@@ -505,7 +493,6 @@ const {
   clearSelectedIndex,
   getSyncInfo,
   notifyPathSubscribers,
-  subscribeToPath,
   // Note: The old functions are no longer imported under their original names
 } = getGlobalStore.getState();
 function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
@@ -1827,58 +1814,6 @@ function createProxyHandler<T>(
   const proxyCache = new Map<string, any>();
   let stateVersion = 0;
 
-  const methodNames = new Set([
-    'sync',
-    'getStatus',
-    'removeStorage',
-    'showValidationErrors',
-    'getSelected',
-    'getSelectedIndex',
-    'clearSelected',
-    'useVirtualView',
-    'stateMap',
-    '$stateMap',
-    'stateFind',
-    'stateFilter',
-    'stateSort',
-    'stream',
-    'stateList',
-    'stateFlattenOn',
-    'index',
-    'last',
-    'insert',
-    'uniqueInsert',
-    'cut',
-    'cutSelected',
-    'cutByValue',
-    'toggleByValue',
-    'findWith',
-    'cutThis',
-    'get',
-    'getState',
-    '$derive',
-    '$get',
-    'lastSynced',
-    'getLocalStorage',
-    'isSelected',
-    'setSelected',
-    'toggleSelected',
-    '_componentId',
-    'addZodValidation',
-    'clearZodValidation',
-    'applyJsonPatch',
-    'getComponents',
-    'getAllFormRefs',
-    'getFormRef',
-    'validationWrapper',
-    '_stateKey',
-    '_path',
-    'update',
-    'toggle',
-    'formElement',
-    // Add ANY other method names here
-  ]);
-
   function rebuildStateShape({
     path = [],
     meta,
@@ -1906,7 +1841,7 @@ function createProxyHandler<T>(
         if (path.length === 0 && prop in rootLevelMethods) {
           return rootLevelMethods[prop as keyof typeof rootLevelMethods];
         }
-        if (!methodNames.has(prop)) {
+        if (!prop.startsWith('$')) {
           const nextPath = [...path, prop];
           return rebuildStateShape({
             path: nextPath,
@@ -1914,11 +1849,11 @@ function createProxyHandler<T>(
             meta,
           });
         }
-        if (prop === '_rebuildStateShape') {
+        if (prop === '$_rebuildStateShape') {
           return rebuildStateShape;
         }
 
-        if (prop === 'sync' && path.length === 0) {
+        if (prop === '$sync' && path.length === 0) {
           return async function () {
             const options = getGlobalStore
               .getState()
@@ -1980,7 +1915,7 @@ function createProxyHandler<T>(
           };
         }
         // Fixed getStatus function in createProxyHandler
-        if (prop === '_status' || prop === 'getStatus') {
+        if (prop === '$_status' || prop === '$getStatus') {
           const getStatusFunc = () => {
             // ✅ Use the optimized helper to get all data in one efficient call
             const { shadowMeta, value } = getScopedData(stateKey, path, meta);
@@ -2022,9 +1957,9 @@ function createProxyHandler<T>(
           };
 
           // This part remains the same
-          return prop === '_status' ? getStatusFunc() : getStatusFunc;
+          return prop === '$_status' ? getStatusFunc() : getStatusFunc;
         }
-        if (prop === 'removeStorage') {
+        if (prop === '$removeStorage') {
           return () => {
             const initialState =
               getGlobalStore.getState().initialStateGlobal[stateKey];
@@ -2036,7 +1971,7 @@ function createProxyHandler<T>(
             if (storageKey) localStorage.removeItem(storageKey);
           };
         }
-        if (prop === 'showValidationErrors') {
+        if (prop === '$showValidationErrors') {
           return () => {
             const { shadowMeta } = getScopedData(stateKey, path, meta);
             if (
@@ -2052,7 +1987,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'getSelected') {
+        if (prop === '$getSelected') {
           return () => {
             const arrayKey = [stateKey, ...path].join('.');
             registerComponentDependency(stateKey, componentId, [
@@ -2091,7 +2026,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'getSelectedIndex') {
+        if (prop === '$getSelectedIndex') {
           return () => {
             // Key for the array in the global selection map (e.g., "myState.products")
             const arrayKey = stateKey + '.' + path.join('.');
@@ -2121,7 +2056,7 @@ function createProxyHandler<T>(
             return (viewIds as string[]).indexOf(selectedId as string);
           };
         }
-        if (prop === 'clearSelected') {
+        if (prop === '$clearSelected') {
           notifySelectionComponents(stateKey, path);
           return () => {
             clearSelectedIndex({
@@ -2130,7 +2065,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'useVirtualView') {
+        if (prop === '$useVirtualView') {
           return (
             options: VirtualViewOptions
           ): VirtualStateObjectResult<any[]> => {
@@ -2480,7 +2415,7 @@ function createProxyHandler<T>(
             };
           };
         }
-        if (prop === 'stateMap') {
+        if (prop === '$stateMap') {
           return (
             callbackfn: (setter: any, index: number, arraySetter: any) => void
           ) => {
@@ -2520,7 +2455,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'stateFilter') {
+        if (prop === '$stateFilter') {
           return (callbackfn: (value: any, index: number) => boolean) => {
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
@@ -2565,7 +2500,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'stateSort') {
+        if (prop === '$stateSort') {
           return (compareFn: (a: any, b: any) => number) => {
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
@@ -2606,7 +2541,7 @@ function createProxyHandler<T>(
           };
         }
         // In createProxyHandler, inside the get trap where you have other array methods:
-        if (prop === 'stream') {
+        if (prop === '$stream') {
           return function <U = InferArrayElement<T>, R = U>(
             options: StreamOptions<U, R> = {}
           ): StreamHandle<U> {
@@ -2708,7 +2643,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'stateList') {
+        if (prop === '$stateList') {
           return (
             callbackfn: (
               setter: any,
@@ -2829,7 +2764,7 @@ function createProxyHandler<T>(
             return <StateListWrapper />;
           };
         }
-        if (prop === 'stateFlattenOn') {
+        if (prop === '$stateFlattenOn') {
           return (fieldName: string) => {
             // FIX: Get the definitive list of IDs for the current view from meta.arrayViews.
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
@@ -2850,7 +2785,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'index') {
+        if (prop === '$index') {
           return (index: number) => {
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
             const viewIds = meta?.arrayViews?.[arrayPathKey];
@@ -2879,7 +2814,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'last') {
+        if (prop === '$last') {
           return () => {
             const { keys: currentViewIds } = getArrayData(stateKey, path, meta);
             if (!currentViewIds || currentViewIds.length === 0) {
@@ -2899,7 +2834,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'insert') {
+        if (prop === '$insert') {
           return (
             payload: InsertParams<InferArrayElement<T>>,
             index?: number
@@ -2907,7 +2842,7 @@ function createProxyHandler<T>(
             effectiveSetState(payload as any, path, { updateType: 'insert' });
           };
         }
-        if (prop === 'uniqueInsert') {
+        if (prop === '$uniqueInsert') {
           return (
             payload: UpdateArg<T>,
             fields?: (keyof InferArrayElement<T>)[],
@@ -2949,7 +2884,7 @@ function createProxyHandler<T>(
             }
           };
         }
-        if (prop === 'cut') {
+        if (prop === '$cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
             const shadowMeta = getShadowMetadata(stateKey, path);
             if (!shadowMeta?.arrayKeys || shadowMeta.arrayKeys.length === 0)
@@ -2970,7 +2905,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'cutSelected') {
+        if (prop === '$cutSelected') {
           return () => {
             const arrayKey = [stateKey, ...path].join('.');
 
@@ -3001,7 +2936,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'cutByValue') {
+        if (prop === '$cutByValue') {
           return (value: string | number | boolean) => {
             const {
               isArray,
@@ -3020,7 +2955,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'toggleByValue') {
+        if (prop === '$toggleByValue') {
           return (value: string | number | boolean) => {
             const {
               isArray,
@@ -3043,7 +2978,7 @@ function createProxyHandler<T>(
             }
           };
         }
-        if (prop === 'findWith') {
+        if (prop === '$findWith') {
           return (searchKey: string, searchValue: any) => {
             const { isArray, value, keys } = getArrayData(stateKey, path, meta);
 
@@ -3072,7 +3007,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'cutThis') {
+        if (prop === '$cutThis') {
           const { value: shadowValue } = getScopedData(stateKey, path, meta);
           const parentPath = path.slice(0, -1);
           notifySelectionComponents(stateKey, parentPath);
@@ -3081,7 +3016,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'get') {
+        if (prop === '$get') {
           return () => {
             registerComponentDependency(stateKey, componentId, path);
             const { value } = getScopedData(stateKey, path, meta);
@@ -3089,7 +3024,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === '$derive') {
+        if (prop === '$$derive') {
           return (fn: any) =>
             $cogsSignal({
               _stateKey: stateKey,
@@ -3099,11 +3034,11 @@ function createProxyHandler<T>(
             });
         }
 
-        if (prop === '$get') {
+        if (prop === '$$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
         }
-        if (prop === 'lastSynced') {
+        if (prop === '$lastSynced') {
           const syncKey = `${stateKey}:${path.join('.')}`;
           return getSyncInfo(syncKey);
         }
@@ -3111,7 +3046,7 @@ function createProxyHandler<T>(
           return (key: string) =>
             loadFromLocalStorage(sessionId + '-' + stateKey + '-' + key);
         }
-        if (prop === 'isSelected') {
+        if (prop === '$isSelected') {
           const parentPathArray = path.slice(0, -1);
           const parentMeta = getShadowMetadata(stateKey, parentPathArray);
 
@@ -3128,7 +3063,7 @@ function createProxyHandler<T>(
           return undefined;
         }
 
-        if (prop === 'setSelected') {
+        if (prop === '$setSelected') {
           return (value: boolean) => {
             const parentPath = path.slice(0, -1);
             const fullParentKey = stateKey + '.' + parentPath.join('.');
@@ -3148,7 +3083,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === 'toggleSelected') {
+        if (prop === '$toggleSelected') {
           return () => {
             const parentPath = path.slice(0, -1);
             const fullParentKey = stateKey + '.' + parentPath.join('.');
@@ -3170,11 +3105,11 @@ function createProxyHandler<T>(
             notifySelectionComponents(stateKey, parentPath);
           };
         }
-        if (prop === '_componentId') {
+        if (prop === '$_componentId') {
           return componentId;
         }
         if (path.length == 0) {
-          if (prop === 'addZodValidation') {
+          if (prop === '$addZodValidation') {
             return (zodErrors: any[]) => {
               zodErrors.forEach((error) => {
                 const currentMeta =
@@ -3203,7 +3138,7 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === 'clearZodValidation') {
+          if (prop === '$clearZodValidation') {
             return (path?: string[]) => {
               if (!path) {
                 throw new Error('clearZodValidation requires a path');
@@ -3221,7 +3156,7 @@ function createProxyHandler<T>(
               });
             };
           }
-          if (prop === 'applyJsonPatch') {
+          if (prop === '$applyJsonPatch') {
             return (patches: Operation[]) => {
               const store = getGlobalStore.getState();
               const rootMeta = store.getShadowMetadata(stateKey, []);
@@ -3313,17 +3248,17 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === 'getComponents')
+          if (prop === '$getComponents')
             return () => getShadowMetadata(stateKey, [])?.components;
-          if (prop === 'getAllFormRefs')
+          if (prop === '$getAllFormRefs')
             return () =>
               formRefStore.getState().getFormRefsByStateKey(stateKey);
         }
-        if (prop === 'getFormRef') {
+        if (prop === '$getFormRef') {
           return () =>
             formRefStore.getState().getFormRef(stateKey + '.' + path.join('.'));
         }
-        if (prop === 'validationWrapper') {
+        if (prop === '$validationWrapper') {
           return ({
             children,
             hideMessage,
@@ -3342,9 +3277,9 @@ function createProxyHandler<T>(
             </ValidationWrapper>
           );
         }
-        if (prop === '_stateKey') return stateKey;
-        if (prop === '_path') return path;
-        if (prop === 'update') {
+        if (prop === '$_stateKey') return stateKey;
+        if (prop === '$_path') return path;
+        if (prop === '$update') {
           return (payload: UpdateArg<T>) => {
             effectiveSetState(payload as any, path, { updateType: 'update' });
 
@@ -3372,7 +3307,7 @@ function createProxyHandler<T>(
             };
           };
         }
-        if (prop === 'toggle') {
+        if (prop === '$toggle') {
           const { value: currentValueAtPath } = getScopedData(
             stateKey,
             path,
@@ -3388,7 +3323,19 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === 'formElement') {
+        if (prop === '$isolate') {
+          return (renderFn: (state: any) => React.ReactNode) => {
+            return (
+              <IsolatedComponentWrapper
+                stateKey={stateKey}
+                path={path}
+                rebuildStateShape={rebuildStateShape}
+                renderFn={renderFn}
+              />
+            );
+          };
+        }
+        if (prop === '$formElement') {
           return (child: FormControl<T>, formOpts?: FormOptsType) => {
             return (
               <FormElementWrapper
@@ -3403,9 +3350,6 @@ function createProxyHandler<T>(
           };
         }
         const nextPath = [...path, prop];
-        const nextValue = getGlobalStore
-          .getState()
-          .getShadowValue(stateKey, nextPath);
         return rebuildStateShape({
           path: nextPath,
           componentId: componentId!,
@@ -3421,53 +3365,49 @@ function createProxyHandler<T>(
   }
 
   const rootLevelMethods = {
-    revertToInitialState: (obj?: { validationKey?: string }) => {
+    $revertToInitialState: (obj?: { validationKey?: string }) => {
       const shadowMeta = getGlobalStore
         .getState()
         .getShadowMetadata(stateKey, []);
       let revertState;
 
+      // Determine the correct state to revert to (same logic as before)
       if (shadowMeta?.stateSource === 'server' && shadowMeta.baseServerState) {
-        // Revert to last known server state
         revertState = shadowMeta.baseServerState;
       } else {
-        // Revert to initial/default state
         revertState = getGlobalStore.getState().initialStateGlobal[stateKey];
       }
-      const initialState =
-        getGlobalStore.getState().initialStateGlobal[stateKey];
 
+      // Perform necessary cleanup
       clearSelectedIndexesForState(stateKey);
 
-      stateVersion++;
-      initializeShadowState(stateKey, initialState);
+      // FIX 1: Use the IMMEDIATE, SYNCHRONOUS state reset function.
+      // This is what your tests expect for a clean slate.
+      initializeShadowState(stateKey, revertState);
+
+      // Rebuild the proxy's internal shape after the reset
       rebuildStateShape({
         path: [],
         componentId: outerComponentId!,
       });
+
+      // Handle localStorage side-effects
       const initalOptionsGet = getInitialOptions(stateKey as string);
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
-        ? initalOptionsGet?.localStorage?.key(initialState)
+        ? initalOptionsGet?.localStorage?.key(revertState)
         : initalOptionsGet?.localStorage?.key;
-
       const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
       if (storageKey) {
         localStorage.removeItem(storageKey);
       }
 
-      const stateEntry = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, []);
-      if (stateEntry) {
-        stateEntry?.components?.forEach((component) => {
-          component.forceUpdate();
-        });
-      }
+      // FIX 2: Use the library's BATCHED notification system instead of a manual forceUpdate loop.
+      // This fixes the original infinite loop bug safely.
+      notifyComponents(stateKey);
 
-      return initialState;
+      return revertState;
     },
-    updateInitialState: (newState: T) => {
+    $updateInitialState: (newState: T) => {
       stateVersion++;
 
       const newUpdaterState = createProxyHandler(
@@ -3505,7 +3445,7 @@ function createProxyHandler<T>(
       });
 
       return {
-        fetchId: (field: keyof T) => (newUpdaterState.get() as any)[field],
+        fetchId: (field: keyof T) => (newUpdaterState.$get() as any)[field],
       };
     },
   };

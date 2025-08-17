@@ -36,4 +36,14 @@ export declare function FormElementWrapper({ stateKey, path, rebuildStateShape, 
     setState: any;
 }): import("react/jsx-runtime").JSX.Element;
 export declare function useRegisterComponent(stateKey: string, componentId: string, forceUpdate: (o: object) => void): void;
+export declare function IsolatedComponentWrapper({ stateKey, path, rebuildStateShape, renderFn, }: {
+    stateKey: string;
+    path: string[];
+    rebuildStateShape: (options: {
+        path: string[];
+        componentId: string;
+        meta?: any;
+    }) => any;
+    renderFn: (state: any) => React.ReactNode;
+}): import("react/jsx-runtime").JSX.Element;
 //# sourceMappingURL=Components.d.ts.map

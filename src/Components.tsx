@@ -8,7 +8,12 @@ import React, {
   useRef,
   useState,
 } from 'react';
-import { formRefStore, getGlobalStore, ValidationError } from './store';
+import {
+  formRefStore,
+  getGlobalStore,
+  ValidationError,
+  ValidationSeverity,
+} from './store';
 import { useInView } from 'react-intersection-observer';
 import { v4 as uuidv4 } from 'uuid';
 import { isDeepEqual } from './utility';
@@ -60,7 +65,12 @@ export function ValidationWrapper({
 
   // Use first error, or first warning if no errors
   const message = errorMessages[0] || warningMessages[0];
-
+  const primarySeverity: ValidationSeverity =
+    errorMessages.length > 0
+      ? 'error'
+      : warningMessages.length > 0
+        ? 'warning'
+        : undefined;
   return (
     <>
       {thisStateOpts?.formElements?.validation &&
@@ -73,7 +83,7 @@ export function ValidationWrapper({
           message: formOpts?.validation?.hideMessage
             ? ''
             : formOpts?.validation?.message || message || '',
-
+          severity: primarySeverity,
           hasErrors: errorMessages.length > 0,
           hasWarnings: warningMessages.length > 0,
           allErrors: errors,
@@ -540,3 +550,44 @@ const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
 
   return loaded;
 };
+// Components.tsx
+
+// Generic isolated component wrapper
+export function IsolatedComponentWrapper({
+  stateKey,
+  path,
+  rebuildStateShape,
+  renderFn,
+}: {
+  stateKey: string;
+  path: string[];
+  rebuildStateShape: (options: {
+    path: string[];
+    componentId: string;
+    meta?: any;
+  }) => any;
+  renderFn: (state: any) => React.ReactNode;
+}) {
+  const [componentId] = useState(() => uuidv4());
+  const [, forceUpdate] = useState({});
+
+  const stateKeyPathKey = [stateKey, ...path].join('.');
+  useRegisterComponent(stateKey, componentId, forceUpdate);
+
+  useEffect(() => {
+    const unsubscribe = getGlobalStore
+      .getState()
+      .subscribeToPath(stateKeyPathKey, () => {
+        forceUpdate({});
+      });
+    return () => unsubscribe();
+  }, [stateKeyPathKey]);
+
+  const baseState = rebuildStateShape({
+    path: path,
+    componentId: componentId,
+    meta: undefined,
+  });
+  console.log('baseState', baseState?.$get());
+  return <>{renderFn(baseState)}</>;
+}

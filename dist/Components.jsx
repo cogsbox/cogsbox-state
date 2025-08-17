@@ -1,42 +1,43 @@
-import { jsx as O, Fragment as $ } from "react/jsx-runtime";
-import x, { memo as k, useState as A, useRef as C, useCallback as J, useEffect as j, useLayoutEffect as U } from "react";
-import { getGlobalStore as p, formRefStore as _ } from "./store.js";
-import { useInView as Q } from "react-intersection-observer";
-import { v4 as X } from "uuid";
+import { jsx as w, Fragment as x } from "react/jsx-runtime";
+import U, { memo as _, useState as p, useRef as j, useCallback as J, useEffect as C, useLayoutEffect as B } from "react";
+import { getGlobalStore as b, formRefStore as Q } from "./store.js";
+import { useInView as X } from "react-intersection-observer";
+import { v4 as G } from "uuid";
 import { isDeepEqual as Y } from "./utility.js";
 const {
   getInitialOptions: Z,
   getShadowMetadata: H,
-  setShadowMetadata: h,
+  setShadowMetadata: I,
   getShadowValue: R,
   registerComponent: K,
   unregisterComponent: ee,
   notifyPathSubscribers: te,
   subscribeToPath: re
-} = p.getState();
+} = b.getState();
 function ne({
   formOpts: e,
   path: t,
   stateKey: n,
   children: o
 }) {
-  const { getInitialOptions: f, getShadowMetadata: s, getShadowValue: l } = p.getState(), m = f(n), d = s(n, t)?.validation, a = d?.status || "NOT_VALIDATED", S = (d?.errors || []).map((c) => ({
-    ...c,
+  const { getInitialOptions: l, getShadowMetadata: s, getShadowValue: a } = b.getState(), u = l(n), g = s(n, t)?.validation, i = g?.status || "NOT_VALIDATED", S = (g?.errors || []).map((f) => ({
+    ...f,
     path: t
-  })), u = S.filter((c) => c.severity === "error").map((c) => c.message), i = S.filter((c) => c.severity === "warning").map((c) => c.message), E = u[0] || i[0];
-  return /* @__PURE__ */ O($, { children: m?.formElements?.validation && !e?.validation?.disable ? m.formElements.validation({
-    children: /* @__PURE__ */ O(x.Fragment, { children: o }, t.toString()),
-    status: a,
+  })), d = S.filter((f) => f.severity === "error").map((f) => f.message), c = S.filter((f) => f.severity === "warning").map((f) => f.message), L = d[0] || c[0], V = d.length > 0 ? "error" : c.length > 0 ? "warning" : void 0;
+  return /* @__PURE__ */ w(x, { children: u?.formElements?.validation && !e?.validation?.disable ? u.formElements.validation({
+    children: /* @__PURE__ */ w(U.Fragment, { children: o }, t.toString()),
+    status: i,
     // Now passes the new ValidationStatus type
-    message: e?.validation?.hideMessage ? "" : e?.validation?.message || E || "",
-    hasErrors: u.length > 0,
-    hasWarnings: i.length > 0,
+    message: e?.validation?.hideMessage ? "" : e?.validation?.message || L || "",
+    severity: V,
+    hasErrors: d.length > 0,
+    hasWarnings: c.length > 0,
     allErrors: S,
     path: t,
-    getData: () => l(n, t)
-  }) : /* @__PURE__ */ O(x.Fragment, { children: o }, t.toString()) });
+    getData: () => a(n, t)
+  }) : /* @__PURE__ */ w(U.Fragment, { children: o }, t.toString()) });
 }
-const me = k(
+const ge = _(
   oe,
   (e, t) => e.itemPath.join(".") === t.itemPath.join(".") && e.stateKey === t.stateKey && e.itemComponentId === t.itemComponentId && e.localIndex === t.localIndex
 );
@@ -45,87 +46,87 @@ function oe({
   itemComponentId: t,
   itemPath: n,
   localIndex: o,
-  arraySetter: f,
+  arraySetter: l,
   rebuildStateShape: s,
-  renderFn: l
+  renderFn: a
 }) {
-  const [, m] = A({}), { ref: M, inView: d } = Q(), a = C(null), S = ae(a), u = C(!1), i = [e, ...n].join(".");
-  B(e, t, m);
-  const E = J(
+  const [, u] = p({}), { ref: h, inView: g } = X(), i = j(null), S = se(i), d = j(!1), c = [e, ...n].join(".");
+  F(e, t, u);
+  const L = J(
     (r) => {
-      a.current = r, M(r);
+      i.current = r, h(r);
     },
-    [M]
+    [h]
   );
-  j(() => {
-    const r = re(i, (g) => {
-      m({});
+  C(() => {
+    const r = re(c, (m) => {
+      u({});
     });
     return () => r();
-  }, [i]), j(() => {
-    if (!d || !S || u.current)
+  }, [c]), C(() => {
+    if (!g || !S || d.current)
       return;
-    const r = a.current;
+    const r = i.current;
     if (r && r.offsetHeight > 0) {
-      u.current = !0;
-      const g = r.offsetHeight;
-      h(e, n, {
+      d.current = !0;
+      const m = r.offsetHeight;
+      I(e, n, {
         virtualizer: {
-          itemHeight: g,
+          itemHeight: m,
           domRef: r
         }
       });
-      const v = n.slice(0, -1), T = [e, ...v].join(".");
-      te(T, {
+      const v = n.slice(0, -1), D = [e, ...v].join(".");
+      te(D, {
         type: "ITEMHEIGHT",
         itemKey: n.join("."),
-        ref: a.current
+        ref: i.current
       });
     }
-  }, [d, S, e, n]);
-  const c = R(e, n);
-  if (c === void 0)
+  }, [g, S, e, n]);
+  const V = R(e, n);
+  if (V === void 0)
     return null;
-  const z = s({
-    currentState: c,
+  const f = s({
+    currentState: V,
     path: n,
     componentId: t
-  }), y = l(z, o, f);
-  return /* @__PURE__ */ O("div", { ref: E, children: y });
+  }), z = a(f, o, l);
+  return /* @__PURE__ */ w("div", { ref: L, children: z });
 }
-function ge({
+function me({
   stateKey: e,
   path: t,
   rebuildStateShape: n,
   renderFn: o,
-  formOpts: f,
+  formOpts: l,
   setState: s
 }) {
-  const [l] = A(() => X()), [, m] = A({}), M = [e, ...t].join(".");
-  B(e, l, m);
-  const d = R(e, t), [a, S] = A(d), u = C(!1), i = C(null);
-  j(() => {
-    !u.current && !Y(d, a) && S(d);
-  }, [d]), j(() => {
-    const r = p.getState().subscribeToPath(M, (g) => {
-      !u.current && a !== g && m({});
+  const [a] = p(() => G()), [, u] = p({}), h = [e, ...t].join(".");
+  F(e, a, u);
+  const g = R(e, t), [i, S] = p(g), d = j(!1), c = j(null);
+  C(() => {
+    !d.current && !Y(g, i) && S(g);
+  }, [g]), C(() => {
+    const r = b.getState().subscribeToPath(h, (m) => {
+      !d.current && i !== m && u({});
     });
     return () => {
-      r(), i.current && (clearTimeout(i.current), u.current = !1);
+      r(), c.current && (clearTimeout(c.current), d.current = !1);
     };
   }, []);
-  const E = J(
+  const L = J(
     (r) => {
-      typeof d === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), S(r), u.current = !0, i.current && clearTimeout(i.current);
-      const v = f?.debounceTime ?? 200;
-      i.current = setTimeout(() => {
-        if (u.current = !1, s(r, t, { updateType: "update" }), !p.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
-        const I = Z(e)?.validation, N = I?.zodSchemaV4 || I?.zodSchemaV3;
+      typeof g === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), S(r), d.current = !0, c.current && clearTimeout(c.current);
+      const v = l?.debounceTime ?? 200;
+      c.current = setTimeout(() => {
+        if (d.current = !1, s(r, t, { updateType: "update" }), !b.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
+        const M = Z(e)?.validation, N = M?.zodSchemaV4 || M?.zodSchemaV3;
         if (N) {
-          const V = R(e, []), w = N.safeParse(V), L = H(e, t) || {};
-          if (w.success)
-            h(e, t, {
-              ...L,
+          const E = R(e, []), y = N.safeParse(E), O = H(e, t) || {};
+          if (y.success)
+            I(e, t, {
+              ...O,
               validation: {
                 status: "VALID",
                 errors: [],
@@ -134,11 +135,11 @@ function ge({
               }
             });
           else {
-            const W = ("issues" in w.error ? w.error.issues : w.error.errors).filter(
-              (b) => JSON.stringify(b.path) === JSON.stringify(t)
+            const W = ("issues" in y.error ? y.error.issues : y.error.errors).filter(
+              (T) => JSON.stringify(T.path) === JSON.stringify(t)
             );
-            W.length > 0 ? h(e, t, {
-              ...L,
+            W.length > 0 ? I(e, t, {
+              ...O,
               validation: {
                 status: "INVALID",
                 errors: [
@@ -152,8 +153,8 @@ function ge({
                 lastValidated: Date.now(),
                 validatedValue: r
               }
-            }) : h(e, t, {
-              ...L,
+            }) : I(e, t, {
+              ...O,
               validation: {
                 status: "VALID",
                 errors: [],
@@ -163,83 +164,83 @@ function ge({
             });
           }
         }
-      }, v), m({});
+      }, v), u({});
     },
-    [s, t, f?.debounceTime, e]
-  ), c = J(async () => {
-    if (console.log("handleBlur triggered"), i.current && (clearTimeout(i.current), i.current = null, u.current = !1, s(a, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
-    const { getInitialOptions: g } = p.getState(), v = g(e)?.validation, T = v?.zodSchemaV4 || v?.zodSchemaV3;
-    if (!T) return;
-    const I = H(e, t);
-    h(e, t, {
-      ...I,
+    [s, t, l?.debounceTime, e]
+  ), V = J(async () => {
+    if (console.log("handleBlur triggered"), c.current && (clearTimeout(c.current), c.current = null, d.current = !1, s(i, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
+    const { getInitialOptions: m } = b.getState(), v = m(e)?.validation, D = v?.zodSchemaV4 || v?.zodSchemaV3;
+    if (!D) return;
+    const M = H(e, t);
+    I(e, t, {
+      ...M,
       validation: {
         status: "VALIDATING",
         errors: [],
         lastValidated: Date.now(),
-        validatedValue: a
+        validatedValue: i
       }
     });
-    const N = R(e, []), V = T.safeParse(N);
-    if (V.success)
-      h(e, t, {
-        ...I,
+    const N = R(e, []), E = D.safeParse(N);
+    if (E.success)
+      I(e, t, {
+        ...M,
         validation: {
           status: "VALID",
           errors: [],
           lastValidated: Date.now(),
-          validatedValue: a
+          validatedValue: i
         }
       });
     else {
-      const L = ("issues" in V.error ? V.error.issues : V.error.errors).filter((D) => {
-        if (t.some((b) => b.startsWith("id:"))) {
-          const b = t[0].startsWith("id:") ? [] : t.slice(0, -1), F = p.getState().getShadowMetadata(e, b);
-          if (F?.arrayKeys) {
-            const G = [e, ...t.slice(0, -1)].join("."), P = F.arrayKeys.indexOf(G), q = [...b, P, ...t.slice(-1)];
-            return JSON.stringify(D.path) === JSON.stringify(q);
+      const O = ("issues" in E.error ? E.error.issues : E.error.errors).filter((A) => {
+        if (t.some((T) => T.startsWith("id:"))) {
+          const T = t[0].startsWith("id:") ? [] : t.slice(0, -1), P = b.getState().getShadowMetadata(e, T);
+          if (P?.arrayKeys) {
+            const $ = [e, ...t.slice(0, -1)].join("."), q = P.arrayKeys.indexOf($), k = [...T, q, ...t.slice(-1)];
+            return JSON.stringify(A.path) === JSON.stringify(k);
           }
         }
-        return JSON.stringify(D.path) === JSON.stringify(t);
+        return JSON.stringify(A.path) === JSON.stringify(t);
       });
-      h(e, t, {
-        ...I,
+      I(e, t, {
+        ...M,
         validation: {
           status: "INVALID",
-          errors: L.map((D) => ({
+          errors: O.map((A) => ({
             source: "client",
-            message: D.message,
+            message: A.message,
             severity: "error"
             // Hard error on blur
           })),
           lastValidated: Date.now(),
-          validatedValue: a
+          validatedValue: i
         }
       });
     }
-    m({});
-  }, [e, t, a, s]), z = n({
+    u({});
+  }, [e, t, i, s]), f = n({
     path: t,
-    componentId: l,
+    componentId: a,
     meta: void 0
-  }), y = new Proxy(z, {
-    get(r, g) {
-      return g === "inputProps" ? {
-        value: a ?? "",
+  }), z = new Proxy(f, {
+    get(r, m) {
+      return m === "inputProps" ? {
+        value: i ?? "",
         onChange: (v) => {
-          E(v.target.value);
+          L(v.target.value);
         },
         // 5. Wire the new onBlur handler to the input props.
-        onBlur: c,
-        ref: _.getState().getFormRef(e + "." + t.join("."))
-      } : r[g];
+        onBlur: V,
+        ref: Q.getState().getFormRef(e + "." + t.join("."))
+      } : r[m];
     }
   });
-  return /* @__PURE__ */ O(ne, { formOpts: f, path: t, stateKey: e, children: o(y) });
+  return /* @__PURE__ */ w(ne, { formOpts: l, path: t, stateKey: e, children: o(z) });
 }
-function B(e, t, n) {
+function F(e, t, n) {
   const o = `${e}////${t}`;
-  U(() => (K(e, o, {
+  B(() => (K(e, o, {
     forceUpdate: () => n({}),
     paths: /* @__PURE__ */ new Set(),
     reactiveType: ["component"]
@@ -247,9 +248,9 @@ function B(e, t, n) {
     ee(e, o);
   }), [e, o]);
 }
-const ae = (e) => {
-  const [t, n] = A(!1);
-  return U(() => {
+const se = (e) => {
+  const [t, n] = p(!1);
+  return B(() => {
     if (!e.current) {
       n(!0);
       return;
@@ -259,24 +260,45 @@ const ae = (e) => {
       n(!0);
       return;
     }
-    let f = 0;
+    let l = 0;
     const s = () => {
-      f++, f === o.length && n(!0);
+      l++, l === o.length && n(!0);
     };
-    return o.forEach((l) => {
-      l.complete ? s() : (l.addEventListener("load", s), l.addEventListener("error", s));
+    return o.forEach((a) => {
+      a.complete ? s() : (a.addEventListener("load", s), a.addEventListener("error", s));
     }), () => {
-      o.forEach((l) => {
-        l.removeEventListener("load", s), l.removeEventListener("error", s);
+      o.forEach((a) => {
+        a.removeEventListener("load", s), a.removeEventListener("error", s);
       });
     };
   }, [e.current]), t;
 };
+function Se({
+  stateKey: e,
+  path: t,
+  rebuildStateShape: n,
+  renderFn: o
+}) {
+  const [l] = p(() => G()), [, s] = p({}), a = [e, ...t].join(".");
+  F(e, l, s), C(() => {
+    const h = b.getState().subscribeToPath(a, () => {
+      s({});
+    });
+    return () => h();
+  }, [a]);
+  const u = n({
+    path: t,
+    componentId: l,
+    meta: void 0
+  });
+  return console.log("baseState", u?.$get()), /* @__PURE__ */ w(x, { children: o(u) });
+}
 export {
-  ge as FormElementWrapper,
+  me as FormElementWrapper,
+  Se as IsolatedComponentWrapper,
   oe as ListItemWrapper,
-  me as MemoizedCogsItemWrapper,
+  ge as MemoizedCogsItemWrapper,
   ne as ValidationWrapper,
-  B as useRegisterComponent
+  F as useRegisterComponent
 };
 //# sourceMappingURL=Components.jsx.map

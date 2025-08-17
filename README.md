@@ -46,9 +46,9 @@ function UserComponent() {
 
   return (
     <div>
-      <p>Name: {user.name.get()}</p>
-      <p>Counter: {user.stats.counter.get()}</p>
-      <button onClick={() => user.stats.counter.update(prev => prev + 1)}>
+      <p>Name: {user.name.$get()}</p>
+      <p>Counter: {user.stats.counter.$get()}</p>
+      <button onClick={() => user.stats.counter.$update(prev => prev + 1)}>
         Increment Counter
       </button>
     </div>
@@ -60,7 +60,7 @@ function TodoComponent() {
 
   return (
     <div>
-      <p>Todo count: {todos.get().length}</p>
+      <p>Todo count: {todos.$get().length}</p>
       <button onClick={() => todos.insert({ id: Date.now(), text: 'New todo', done: false })}>
         Add Todo
       </button>
@@ -77,16 +77,16 @@ Every state property gets these core methods:
 
 #### Primitives (strings, numbers, booleans)
 
-- `.get()` - read values reactively
-- `.update()` - set values
-- `.toggle()` - flip booleans
+- `.$get()` - read values reactively
+- `.$update()` - set values
+- `.$toggle()` - flip booleans
 - `.$get()` - non-reactive read (signals)
 - `.$derive()` - computed signals
 
 #### Objects
 
 - All primitive methods plus access to nested properties
-- `.update()` can do partial updates
+- `.$update()` can do partial updates
 
 #### Arrays
 
@@ -101,19 +101,19 @@ const todos = useCogsState('todos');
 const settings = useCogsState('settings');
 
 // Reactive reads (triggers re-renders)
-const userName = user.name.get();
-const allTodos = todos.get();
-const isDarkMode = settings.darkMode.get();
+const userName = user.name.$get();
+const allTodos = todos.$get();
+const isDarkMode = settings.darkMode.$get();
 
 // Access nested properties
-const counterValue = user.stats.counter.get();
-const firstTodo = todos.index(0)?.get();
+const counterValue = user.stats.counter.$get();
+const firstTodo = todos.$index(0)?.$get();
 
 // Non-reactive reads (no re-renders, for signals)
-const userNameStatic = user.name.$get();
+const userNameStatic = user.name.$$get();
 
 // Computed signals (transforms value without re-renders)
-const todoCount = todos.$derive((todos) => todos.length);
+const todoCount = todos.$$derive((todos) => todos.length);
 ```
 
 ### Updating State
@@ -124,17 +124,17 @@ const settings = useCogsState('settings');
 const todos = useCogsState('todos');
 
 // Direct updates
-user.name.update('Jane');
-settings.darkMode.toggle();
+user.name.$update('Jane');
+settings.darkMode.$toggle();
 
 // Functional updates
-user.stats.counter.update((prev) => prev + 1);
+user.stats.counter.$update((prev) => prev + 1);
 
 // Object updates
-user.update((prev) => ({ ...prev, name: 'Jane', age: 30 }));
+user.$update((prev) => ({ ...prev, name: 'Jane', age: 30 }));
 
 // Deep nested updates
-todos.index(0).text.update('Updated todo text');
+todos.$index(0).text.$update('Updated todo text');
 ```
 
 ## Working with Arrays
@@ -147,20 +147,20 @@ Arrays are first-class citizens with powerful built-in operations:
 const todos = useCogsState('todos');
 
 // Add items
-todos.insert({ id: 'uuid', text: 'New todo', done: false });
-todos.insert(({ uuid }) => ({
+todos.$insert({ id: 'uuid', text: 'New todo', done: false });
+todos.$insert(({ uuid }) => ({
   id: uuid,
   text: 'Auto-generated ID',
   done: false,
 }));
 
 // Remove items
-todos.cut(2); // Remove at index 2
-todos.cutSelected(); // Remove currently selected item
+todos.$cut(2); // Remove at index 2
+todos.$cutSelected(); // Remove currently selected item
 
 // Access items
-const firstTodo = todos.index(0);
-const lastTodo = todos.last();
+const firstTodo = todos.$index(0);
+const lastTodo = todos.$last();
 ```
 
 ### Array Iteration and Rendering
@@ -171,12 +171,12 @@ const lastTodo = todos.last();
 const todos = useCogsState('todos');
 
 // Returns transformed array, each item is a full state object
-const todoElements = todos.stateMap((todoState, index, arrayState) => (
+const todoElements = todos.$stateMap((todoState, index, arrayState) => (
   <TodoItem
-    key={todoState.id.get()}
+    key={todoState.id.$get()}
     todo={todoState}
-    onToggle={() => todoState.done.toggle()}
-    onDelete={() => arrayState.cut(index)}
+    onToggle={() => todoState.done.$toggle()}
+    onDelete={() => arrayState.$cut(index)}
   />
 ));
 ```
@@ -187,10 +187,10 @@ const todoElements = todos.stateMap((todoState, index, arrayState) => (
 const todos = useCogsState('todos');
 
 // Renders directly in place with automatic key management
-{todos.stateList((todoState, index, arrayState) => (
-  <div key={todoState.id.get()}>
-    <span>{todoState.text.get()}</span>
-    <button onClick={() => todoState.done.toggle()}>Toggle</button>
+{todos.$stateList((todoState, index, arrayState) => (
+  <div key={todoState.id.$get()}>
+    <span>{todoState.text.$get()}</span>
+    <button onClick={() => todoState.done.$toggle()}>Toggle</button>
     <button onClick={() => arrayState.cut(index)}>Delete</button>
   </div>
 ))}
@@ -215,16 +215,16 @@ const todos = useCogsState('todos');
 const todos = useCogsState('todos');
 
 // Filter items (returns new state object with filtered view)
-const completedTodos = todos.stateFilter((todo) => todo.done);
-const incompleteTodos = todos.stateFilter((todo) => !todo.done);
+const completedTodos = todos.$stateFilter((todo) => todo.done);
+const incompleteTodos = todos.$stateFilter((todo) => !todo.done);
 
 // Sort items (returns new state object with sorted view)
-const sortedTodos = todos.stateSort((a, b) => a.text.localeCompare(b.text));
+const sortedTodos = todos.$stateSort((a, b) => a.text.localeCompare(b.text));
 
 // Chain operations
 const sortedCompletedTodos = todos
-  .stateFilter((todo) => todo.done)
-  .stateSort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  .$stateFilter((todo) => todo.done)
+  .$stateSort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 ```
 
 #### Finding and Searching
@@ -233,13 +233,13 @@ const sortedCompletedTodos = todos
 const todos = useCogsState('todos');
 
 // Find by property value
-const todoById = todos.findWith('id', 'some-id');
+const todoById = todos.$findWith('id', 'some-id');
 if (todoById) {
-  todoById.text.update('Updated text');
+  todoById.text.$update('Updated text');
 }
 
 // Find with custom function
-const firstIncompleteTodo = todos.stateFind((todo) => !todo.done);
+const firstIncompleteTodo = todos.$stateFind((todo) => !todo.done);
 ```
 
 #### Unique Operations
@@ -248,7 +248,7 @@ const firstIncompleteTodo = todos.stateFind((todo) => !todo.done);
 const todos = useCogsState('todos');
 
 // Insert only if unique (prevents duplicates)
-todos.uniqueInsert(
+todos.$uniqueInsert(
   { id: 'new-id', text: 'New todo', done: false },
   ['id'], // Fields to check for uniqueness
   (existingItem) => {
@@ -258,7 +258,7 @@ todos.uniqueInsert(
 );
 
 // Toggle presence (insert if missing, remove if present)
-todos.toggleByValue('some-id');
+todos.$toggleByValue('some-id');
 ```
 
 #### Selection Management
@@ -267,18 +267,18 @@ todos.toggleByValue('some-id');
 const todos = useCogsState('todos');
 
 // Built-in selection tracking
-const selectedTodo = todos.getSelected();
-const selectedIndex = todos.getSelectedIndex();
+const selectedTodo = todos.$getSelected();
+const selectedIndex = todos.$getSelectedIndex();
 
 // Set selection on individual items
-todos.index(0).setSelected(true);
-todos.index(0).toggleSelected();
+todos.$index(0).$setSelected(true);
+todos.$index(0).$toggleSelected();
 
 // Clear all selections
-todos.clearSelected();
+todos.$clearSelected();
 
 // Check if item is selected
-const isSelected = todos.index(0).isSelected;
+const isSelected = todos.$index(0).isSelected;
 ```
 
 <!-- ### Virtualization for Large Lists
@@ -302,7 +302,7 @@ function MessageList() {
       <div style={virtualizerProps.inner.style}>
         <div style={virtualizerProps.list.style}>
           {virtualState.stateList((messageState, index) => (
-            <MessageItem key={messageState.id.get()} message={messageState} />
+            <MessageItem key={messageState.id.$get()} message={messageState} />
           ))}
         </div>
       </div>
@@ -310,37 +310,6 @@ function MessageList() {
   );
 }
 ``` -->
-
-### Streaming for Real-time Data
-
-```typescript
-const messages = useCogsState('messages');
-
-// Create a stream for efficient batch operations
-const messageStream = messages.stream({
-  bufferSize: 100, // Buffer size before auto-flush
-  flushInterval: 100, // Auto-flush interval (ms)
-  bufferStrategy: 'sliding', // 'sliding' | 'dropping' | 'accumulate'
-  store: (buffer) => buffer, // Transform buffered items before insertion
-  onFlush: (buffer) => console.log('Flushed', buffer.length, 'items'),
-});
-
-// Write individual items
-messageStream.write(newMessage);
-
-// Write multiple items
-messageStream.writeMany([msg1, msg2, msg3]);
-
-// Manual flush
-messageStream.flush();
-
-// Pause/resume
-messageStream.pause();
-messageStream.resume();
-
-// Close stream
-messageStream.close();
-```
 
 ## Reactivity Control
 
@@ -409,14 +378,14 @@ function PerformantComponent() {
       {todos.$stateMap((todo, index) => (
         <div key={todo.id.$get()}>
           <span>{todo.text.$get()}</span>
-          <button onClick={() => todo.done.toggle()}>Toggle</button>
+          <button onClick={() => todo.done.$toggle()}>Toggle</button>
         </div>
       ))}
 
       {/* Wrap with formElement for isolated reactivity */}
       {user.stats.counter.formElement((obj) => (
-        <button onClick={() => obj.update(prev => prev + 1)}>
-          Increment: {obj.get()}
+        <button onClick={() => obj.$update(prev => prev + 1)}>
+          Increment: {obj.$get()}
         </button>
       ))}
     </div>
@@ -474,246 +443,28 @@ function UserForm() {
       ))}
 
       {/* Custom debounce time */}
-      {userForm.email.formElement(({ inputProps, get, update }) => (
+      {userForm.email.formElement(({ inputProps, $get, $update }) => (
         <>
           <label>Email</label>
           <input {...inputProps} />
-          <small>Current: {get()}</small>
+          <small>Current: {$get()}</small>
         </>
       ), { debounceTime: 500 })}
 
       {/* Custom form control */}
-      {userForm.age.formElement(({ get, update }) => (
+      {userForm.age.formElement(({ $get, $update }) => (
         <>
           <label>Age</label>
           <input
             type="number"
-            value={get()}
-            onChange={e => update(parseInt(e.target.value))}
+            value={$get()}
+            onChange={e => $update(parseInt(e.target.value))}
           />
         </>
       ))}
 
-      <button onClick={() => {
-        if (userForm.validateZodSchema()) {
-          console.log('Valid!', userForm.get());
-        }
-      }}>
-        Submit
-      </button>
+
     </form>
   );
 }
 ```
-
-## Advanced Features
-
-### Server Synchronization
-
-```typescript
-const { useCogsState } = createCogsState({
-  userProfile: {
-    initialState: { name: "", email: "" },
-    sync: {
-      action: async (state) => {
-        const response = await fetch('/api/user', {
-          method: 'PUT',
-          body: JSON.stringify(state)
-        });
-        return response.ok
-          ? { success: true, data: await response.json() }
-          : { success: false, error: 'Failed to save' };
-      },
-      onSuccess: (data) => console.log('Saved!', data),
-      onError: (error) => console.error('Save failed:', error)
-    }
-  }
-});
-
-function UserProfile() {
-  const userProfile = useCogsState('userProfile');
-
-  return (
-    <div>
-      <div>Status: {userProfile.getStatus()}</div> {/* 'fresh' | 'dirty' | 'synced' | 'restored' */}
-      <input
-        value={userProfile.name.get()}
-        onChange={e => userProfile.name.update(e.target.value)}
-      />
-      <button onClick={() => userProfile.sync()}>Save to Server</button>
-    </div>
-  );
-}
-```
-
-### Local Storage Integration
-
-```typescript
-const { useCogsState } = createCogsState({
-  userPrefs: {
-    initialState: { theme: 'dark', language: 'en' },
-    localStorage: {
-      key: 'user-preferences',
-      onChange: (state) => console.log('Saved to localStorage:', state),
-    },
-  },
-});
-
-function PreferencesComponent() {
-  const userPrefs = useCogsState('userPrefs');
-
-  return (
-    <div>
-      <select
-        value={userPrefs.theme.get()}
-        onChange={e => userPrefs.theme.update(e.target.value)}
-      >
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-      </select>
-    </div>
-  );
-}
-```
-
-### State Status and History
-
-```typescript
-const user = useCogsState('user');
-
-// Check what changed from initial state
-const differences = user.getDifferences();
-
-// Get current status
-const status = user.getStatus(); // 'fresh' | 'dirty' | 'synced' | 'restored'
-
-// Revert to initial state
-user.revertToInitialState();
-
-// Update initial state (useful for findign diffs and server-synced data)
-const newServerData = {
-  name: 'Jane Doe',
-  age: 31,
-  stats: { counter: 100, lastUpdated: new Date() },
-};
-user.updateInitialState(newServerData);
-```
-
-### Component Isolation
-
-```typescript
-// Each component can have its own reactive settings
-function ComponentA() {
-  const user = useCogsState('user', {
-    reactiveType: 'deps',
-    reactiveDeps: (state) => [state.name],
-  });
-  // Only re-renders when user.name changes
-}
-
-function ComponentB() {
-  const user = useCogsState('user', {
-    reactiveType: 'all',
-  });
-  // Re-renders on any change to 'user' state
-}
-```
-
-## Performance Tips
-
-1. **Use signals for high-frequency updates**: `.$get()` and `.$derive()` don't trigger React re-renders
-2. **Use `reactiveType: 'none'` with signals**: Maximum performance for signal-heavy components
-3. **Use virtualization for large lists**: `useVirtualView()` handles thousands of items efficiently
-4. **Use streaming for real-time data**: Batch operations with `stream()` for better performance
-5. **Chain filter/sort operations**: `stateFilter().stateSort()` creates efficient views
-6. **Use `formElement` for forms**: Automatic debouncing and validation handling
-
-## Common Patterns
-
-### Master-Detail Interface
-
-```typescript
-function TodoApp() {
-  const todos = useCogsState('todos');
-  const selectedTodo = todos.getSelected();
-
-  return (
-    <div className="flex">
-      <div className="list">
-        {todos.stateList((todo, index) => (
-          <div
-            key={todo.id.get()}
-            className={todo.isSelected ? 'selected' : ''}
-            onClick={() => todo.toggleSelected()}
-          >
-            {todo.text.get()}
-          </div>
-        ))}
-      </div>
-
-      <div className="detail">
-        {selectedTodo ? (
-          <TodoDetail todo={selectedTodo} />
-        ) : (
-          <p>Select a todo</p>
-        )}
-      </div>
-    </div>
-  );
-}
-```
-
-### Real-time Chat with Virtualization
-
-```typescript
-function ChatRoom() {
-  const messages = useCogsState('messages', { reactiveType: 'none' });
-
-  const { virtualState, virtualizerProps, scrollToBottom } =
-    messages.useVirtualView({
-      itemHeight: 65,
-      overscan: 10,
-      stickToBottom: true,
-    });
-
-  return (
-    <div {...virtualizerProps.outer} className="chat-container">
-      <div style={virtualizerProps.inner.style}>
-        <div style={virtualizerProps.list.style}>
-          {virtualState.stateList((message) => (
-            <MessageItem key={message.id.$get()} message={message} />
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-```
-
-### Multiple State Slices in One Component
-
-```typescript
-function Dashboard() {
-  const user = useCogsState('user');
-  const todos = useCogsState('todos');
-  const settings = useCogsState('settings');
-
-  return (
-    <div>
-      <header>
-        <h1>Welcome, {user.name.get()}</h1>
-        <button onClick={() => settings.darkMode.toggle()}>
-          Toggle Theme
-        </button>
-      </header>
-
-      <main>
-        <p>You have {todos.get().length} todos</p>
-        <p>Counter: {user.stats.counter.get()}</p>
-      </main>
-    </div>
-  );
-}
-```
-
-This library provides a unique approach to React state management by creating a proxy that mirrors your data structure while adding powerful methods for manipulation, rendering, and performance optimization.

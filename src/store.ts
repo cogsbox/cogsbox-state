@@ -85,11 +85,11 @@ export type ValidationStatus =
   | 'VALIDATING'
   | 'VALID'
   | 'INVALID';
-
+export type ValidationSeverity = 'warning' | 'error' | undefined;
 export type ValidationError = {
   source: 'client' | 'sync_engine' | 'api';
   message: string;
-  severity: 'warning' | 'error';
+  severity: ValidationSeverity;
   code?: string;
 };
 

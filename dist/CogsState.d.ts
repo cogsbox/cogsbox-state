@@ -1,6 +1,6 @@
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
-import { ValidationError, ValidationStatus, ComponentsType } from './store.js';
+import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
@@ -15,14 +15,7 @@ export type VirtualViewOptions = {
     scrollStickTolerance?: number;
 };
 export type VirtualStateObjectResult<T extends any[]> = {
-    /**
-     * A new, fully-functional StateObject that represents the virtualized slice.
-     * You can use `.get()`, `.stateMap()`, `.insert()`, `.cut()` etc. on this object.
-     */
     virtualState: StateObject<T>;
-    /**
-     * Props to be spread onto your DOM elements to enable virtualization.
-     */
     virtualizerProps: {
         outer: {
             ref: RefObject<HTMLDivElement>;
@@ -46,7 +39,7 @@ export type FormElementParams<T> = StateObject<T> & {
     inputProps: {
         ref?: React.RefObject<any>;
         value?: T extends boolean ? never : T;
-        onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+        onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
         onBlur?: () => void;
     };
 };
@@ -72,31 +65,30 @@ export type StreamHandle<T> = {
     resume: () => void;
 };
 export type ArrayEndType<TShape extends unknown> = {
-    stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
-    findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
-    index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
-        insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
-        cut: CutFunctionType<TShape>;
-        _index: number;
+    $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
+    $findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
+    $index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
+        $insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
+        $cut: CutFunctionType<TShape>;
+        $_index: number;
     } & EndType<Prettify<InferArrayElement<TShape>>>;
-    insert: InsertType<Prettify<InferArrayElement<TShape>>>;
-    cut: CutFunctionType<TShape>;
-    cutSelected: () => void;
-    cutByValue: (value: string | number | boolean) => void;
-    toggleByValue: (value: string | number | boolean) => void;
-    stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape>;
-    useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
-    stateList: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
-    stateMap: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
-    $stateMap: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
-    stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
-    uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
-    stateFind: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape>;
-    getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    clearSelected: () => void;
-    getSelectedIndex: () => number;
-    last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+    $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+    $cut: CutFunctionType<TShape>;
+    $cutSelected: () => void;
+    $cutByValue: (value: string | number | boolean) => void;
+    $toggleByValue: (value: string | number | boolean) => void;
+    $stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape>;
+    $useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
+    $stateList: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
+    $stateMap: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
+    $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
+    $uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
+    $stateFind: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+    $stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape>;
+    $getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+    $clearSelected: () => void;
+    $getSelectedIndex: () => number;
+    $last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
 } & EndType<TShape>;
 export type FormOptsType = {
     validation?: {
@@ -123,57 +115,58 @@ export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-    addZodValidation: (errors: ValidationError[]) => void;
-    clearZodValidation: (paths?: string[]) => void;
-    applyJsonPatch: (patches: any[]) => void;
-    update: UpdateType<T>;
-    _path: string[];
-    _stateKey: string;
-    formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
-    get: () => T;
+    $addZodValidation: (errors: ValidationError[]) => void;
+    $clearZodValidation: (paths?: string[]) => void;
+    $applyJsonPatch: (patches: any[]) => void;
+    $update: UpdateType<T>;
+    $_path: string[];
+    $_stateKey: string;
+    $isolate: (renderFn: (state: StateObject<T>) => React.ReactNode) => JSX.Element;
+    $formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
     $get: () => T;
-    $derive: <R>(fn: EffectFunction<T, R>) => R;
-    _status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-    getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-    showValidationErrors: () => string[];
-    setValidation: (ctx: string) => void;
-    removeValidation: (ctx: string) => void;
-    ignoreFields: (fields: string[]) => StateObject<T>;
-    isSelected: boolean;
-    setSelected: (value: boolean) => void;
-    toggleSelected: () => void;
-    getFormRef: () => React.RefObject<any> | undefined;
-    removeStorage: () => void;
-    sync: () => void;
-    validationWrapper: ({ children, hideMessage, }: {
+    $$get: () => T;
+    $$derive: <R>(fn: EffectFunction<T, R>) => R;
+    $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+    $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+    $showValidationErrors: () => string[];
+    $setValidation: (ctx: string) => void;
+    $removeValidation: (ctx: string) => void;
+    $ignoreFields: (fields: string[]) => StateObject<T>;
+    $isSelected: boolean;
+    $setSelected: (value: boolean) => void;
+    $toggleSelected: () => void;
+    $getFormRef: () => React.RefObject<any> | undefined;
+    $removeStorage: () => void;
+    $sync: () => void;
+    $validationWrapper: ({ children, hideMessage, }: {
         children: React.ReactNode;
         hideMessage?: boolean;
     }) => JSX.Element;
-    lastSynced?: SyncInfo;
+    $lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? {
-    cutThis: () => void;
+    $cutThis: () => void;
 } : {});
 export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K]>;
 } : T extends string | number | boolean | null ? EndType<T, true> : never) & EndType<T, true> & {
-    toggle: T extends boolean ? () => void : never;
-    getAllFormRefs: () => Map<string, React.RefObject<any>>;
-    _componentId: string | null;
-    getComponents: () => ComponentsType;
-    _initialState: T;
-    updateInitialState: (newState: T | null) => {
+    $toggle: T extends boolean ? () => void : never;
+    $getAllFormRefs: () => Map<string, React.RefObject<any>>;
+    $_componentId: string | null;
+    $getComponents: () => ComponentsType;
+    $_initialState: T;
+    $updateInitialState: (newState: T | null) => {
         fetchId: (field: keyof T) => string | number;
     };
-    _isLoading: boolean;
-    _serverState: T;
-    revertToInitialState: (obj?: {
+    $_isLoading: boolean;
+    $_serverState: T;
+    $revertToInitialState: (obj?: {
         validationKey?: string;
     }) => T;
-    middleware: (middles: ({ updateLog, update, }: {
+    $middleware: (middles: ({ updateLog, update, }: {
         updateLog: UpdateTypeDetail[] | undefined;
         update: UpdateTypeDetail;
     }) => void) => void;
-    getLocalStorage: (key: string) => LocalStorageData<T> | null;
+    $getLocalStorage: (key: string) => LocalStorageData<T> | null;
 };
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 export type UpdateTypeDetail = {
@@ -265,6 +258,7 @@ type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
         status: ValidationStatus;
+        severity: ValidationSeverity;
         hasErrors: boolean;
         hasWarnings: boolean;
         allErrors: ValidationError[];
