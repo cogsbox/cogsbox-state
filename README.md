@@ -196,17 +196,6 @@ const todos = useCogsState('todos');
 ))}
 ```
 
-#### `$stateMap()` - Signal-Based Rendering
-
-```typescript
-const todos = useCogsState('todos');
-
-// Most efficient - updates only changed items, no React re-renders
-{todos.$stateMap((todoState, index, arrayState) => (
-  <TodoItem todo={todoState} />
-))}
-```
-
 ### Advanced Array Methods
 
 #### Filtering and Sorting
@@ -356,41 +345,6 @@ const user = useCogsState('user', {
   reactiveType: ['component', 'deps'],
   reactiveDeps: (state) => [state.online],
 });
-```
-
-## Signal-Based Updates
-
-The most efficient rendering method - bypasses React entirely:
-
-```typescript
-function PerformantComponent() {
-  const user = useCogsState('user', { reactiveType: 'none' });
-  const todos = useCogsState('todos', { reactiveType: 'none' });
-
-  return (
-    <div>
-      {/* These update DOM directly, no React re-renders */}
-      <div>Name: {user.name.$get()}</div>
-      <div>Counter: {user.stats.counter.$get()}</div>
-      <div>Todo Count: {todos.$derive(todos => todos.length)}</div>
-
-      {/* Signal-based list rendering */}
-      {todos.$stateMap((todo, index) => (
-        <div key={todo.id.$get()}>
-          <span>{todo.text.$get()}</span>
-          <button onClick={() => todo.done.$toggle()}>Toggle</button>
-        </div>
-      ))}
-
-      {/* Wrap with formElement for isolated reactivity */}
-      {user.stats.counter.formElement((obj) => (
-        <button onClick={() => obj.$update(prev => prev + 1)}>
-          Increment: {obj.$get()}
-        </button>
-      ))}
-    </div>
-  );
-}
 ```
 
 ## Form Management
