@@ -245,9 +245,6 @@ todos.$uniqueInsert(
     return { ...existingItem, text: 'Updated existing' };
   }
 );
-
-// Toggle presence (insert if missing, remove if present)
-todos.$toggleByValue('some-id');
 ```
 
 #### Selection Management
