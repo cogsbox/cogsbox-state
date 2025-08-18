@@ -438,7 +438,7 @@ function UserForm() {
       {userForm.name.formElement(({ inputProps }) => (
         <>
           <label>Name</label>
-          <input {...inputProps} />
+          <input {...$inputProps} />
         </>
       ))}
 
@@ -446,7 +446,7 @@ function UserForm() {
       {userForm.email.formElement(({ inputProps, $get, $update }) => (
         <>
           <label>Email</label>
-          <input {...inputProps} />
+          <input {...$inputProps} />
           <small>Current: {$get()}</small>
         </>
       ), { debounceTime: 500 })}

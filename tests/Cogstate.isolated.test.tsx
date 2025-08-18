@@ -178,7 +178,7 @@ describe('$formElement method', () => {
       return (
         <div>
           {state.name.$formElement((params) => (
-            <input data-testid="name-input" {...params.inputProps} />
+            <input data-testid="name-input" {...params.$inputProps} />
           ))}
         </div>
       );
@@ -196,7 +196,7 @@ describe('$formElement method', () => {
       return (
         <div>
           {state.name.$formElement((params) => (
-            <input data-testid="name-input" {...params.inputProps} />
+            <input data-testid="name-input" {...params.$inputProps} />
           ))}
           {state.name.$isolate((nameState) => (
             <span data-testid="name-display">{nameState.$get()}</span>
@@ -231,7 +231,7 @@ describe('$formElement method', () => {
             <input
               data-testid="age-input"
               type="number"
-              {...params.inputProps}
+              {...params.$inputProps}
             />
           ))}
           {state.age.$isolate((ageState) => (
@@ -302,7 +302,7 @@ describe('$formElement method', () => {
         <div>
           {state.name.$formElement(
             (params) => (
-              <input data-testid="debounced-input" {...params.inputProps} />
+              <input data-testid="debounced-input" {...params.$inputProps} />
             ),
             { debounceTime: 100 }
           )}
@@ -340,7 +340,7 @@ describe('$formElement method', () => {
       return (
         <div>
           {state.settings.theme.$formElement((params) => (
-            <select data-testid="theme-select" {...params.inputProps}>
+            <select data-testid="theme-select" {...params.$inputProps}>
               <option value="dark">Dark</option>
               <option value="light">Light</option>
             </select>
@@ -376,7 +376,7 @@ describe('$formElement method', () => {
       return (
         <div>
           {state.users.$index(1).email.$formElement((params) => (
-            <input data-testid="email-input" {...params.inputProps} />
+            <input data-testid="email-input" {...params.$inputProps} />
           ))}
           {state.users.$index(1).email.$isolate((emailState) => (
             <span data-testid="email-display">{emailState.$get()}</span>
@@ -417,7 +417,7 @@ describe('$isolate and $formElement interaction', () => {
       return (
         <div>
           {state.name.$formElement((params) => (
-            <input data-testid="form-input" {...params.inputProps} />
+            <input data-testid="form-input" {...params.$inputProps} />
           ))}
           {state.name.$isolate((nameState) => (
             <div data-testid="isolated-display">Name: {nameState.$get()}</div>
@@ -454,7 +454,7 @@ describe('$isolate and $formElement interaction', () => {
       return (
         <div>
           {state.users.$index(0).name.$formElement((params) => (
-            <input data-testid="user0-input" {...params.inputProps} />
+            <input data-testid="user0-input" {...params.$inputProps} />
           ))}
 
           {state.users.$index(1).$isolate((user) => (
@@ -505,7 +505,7 @@ describe('$isolate and $formElement interaction', () => {
               {user.name.$formElement((params) => (
                 <input
                   data-testid={`active-user-${index}`}
-                  {...params.inputProps}
+                  {...params.$inputProps}
                 />
               ))}
               {user.$isolate((u) => (
@@ -546,7 +546,7 @@ describe('$isolate and $formElement interaction', () => {
             <input
               data-testid="nested-input"
               type="number"
-              {...params.inputProps}
+              {...params.$inputProps}
             />
           ))}
           {state.nested.items.$index(0).$isolate((item) => (
@@ -599,7 +599,7 @@ describe('$isolate and $formElement interaction', () => {
               {tag.$formElement((params) => (
                 <input
                   data-testid={`tag-input-${index}`}
-                  {...params.inputProps}
+                  {...params.$inputProps}
                 />
               ))}
             </div>

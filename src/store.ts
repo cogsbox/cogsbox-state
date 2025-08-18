@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { ulid } from 'ulid';
+
 import type {
   OptionsType,
   ReactivityType,
@@ -266,7 +266,7 @@ export function buildShadowNode(value: any): ShadowNode {
     const idKeys: string[] = [];
 
     value.forEach((item) => {
-      const itemId = `id:${ulid()}`;
+      const itemId = `id:${generateId()}`;
       arrayNode[itemId] = buildShadowNode(item);
       idKeys.push(itemId);
     });
@@ -292,6 +292,11 @@ export function buildShadowNode(value: any): ShadowNode {
 
 // Module-level mutable store
 const shadowStateStore = new Map<string, ShadowNode>();
+let globalCounter = 0;
+
+export function generateId(prefix = 'id'): string {
+  return `${prefix}:${(globalCounter++).toString(36)}`;
+}
 
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   // Remove shadowStateStore from Zustand state
@@ -550,7 +555,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return;
     }
 
-    const newItemId = `id:${ulid()}`;
+    const newItemId = `id:${generateId()}`;
     const itemsToAdd = { [newItemId]: buildShadowNode(newItem) };
 
     // Mutate the array directly
@@ -595,7 +600,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newIds: string[] = [];
 
     newItems.forEach((item) => {
-      const newItemId = `id:${ulid()}`;
+      const newItemId = `id:${generateId()}`;
       newIds.push(newItemId);
       itemsToAdd[newItemId] = buildShadowNode(item);
     });

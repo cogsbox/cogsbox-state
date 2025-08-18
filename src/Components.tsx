@@ -460,7 +460,7 @@ export function FormElementWrapper({
 
   const stateWithInputProps = new Proxy(baseState, {
     get(target, prop) {
-      if (prop === 'inputProps') {
+      if (prop === '$inputProps') {
         return {
           value: localValue ?? '',
           onChange: (e: any) => {

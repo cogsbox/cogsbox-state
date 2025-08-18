@@ -150,6 +150,7 @@ export type CogsGlobalState = {
     getSyncInfo: (key: string) => SyncInfo | null;
 };
 export declare function buildShadowNode(value: any): ShadowNode;
+export declare function generateId(prefix?: string): string;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};
 //# sourceMappingURL=store.d.ts.map

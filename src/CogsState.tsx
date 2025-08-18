@@ -72,7 +72,7 @@ export type SyncInfo = {
 };
 
 export type FormElementParams<T> = StateObject<T> & {
-  inputProps: {
+  $inputProps: {
     ref?: React.RefObject<any>;
     value?: T extends boolean ? never : T;
     onChange?: (

@@ -1,11 +1,11 @@
 import { $cogsSignal as r, addStateOptions as o, createCogsState as a, createCogsStateFromSync as s, useCogsStateFn as n } from "./CogsState.jsx";
-import { CogsStateClient as g, config as i, useCogsConfig as c } from "./CogsStateClient.jsx";
+import { CogsStateClient as f, config as i, useCogsConfig as c } from "./CogsStateClient.jsx";
 import { debounce as p, deepMerge as S, deleteNestedProperty as u, getArrayLengthDifferences as l, getArrayLengthDifferencesArray as m, getDifferences as y, getDifferencesArray as C, isArray as x, isDeepEqual as A, isFunction as D, isObject as b, transformStateFunc as F, updateNestedProperty as h } from "./utility.js";
 import { useCogsTrpcValidationLink as N } from "./TRPCValidationLink.js";
-import { buildShadowNode as P, formRefStore as j, getGlobalStore as k } from "./store.js";
+import { buildShadowNode as P, formRefStore as j, generateId as k, getGlobalStore as q } from "./store.js";
 export {
   r as $cogsSignal,
-  g as CogsStateClient,
+  f as CogsStateClient,
   o as addStateOptions,
   P as buildShadowNode,
   i as config,
@@ -15,11 +15,12 @@ export {
   S as deepMerge,
   u as deleteNestedProperty,
   j as formRefStore,
+  k as generateId,
   l as getArrayLengthDifferences,
   m as getArrayLengthDifferencesArray,
   y as getDifferences,
   C as getDifferencesArray,
-  k as getGlobalStore,
+  q as getGlobalStore,
   x as isArray,
   A as isDeepEqual,
   D as isFunction,

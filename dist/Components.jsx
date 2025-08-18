@@ -197,7 +197,7 @@ function ge({
         if (t.some((T) => T.startsWith("id:"))) {
           const T = t[0].startsWith("id:") ? [] : t.slice(0, -1), P = b.getState().getShadowMetadata(e, T);
           if (P?.arrayKeys) {
-            const q = [e, ...t.slice(0, -1)].join("."), $ = P.arrayKeys.indexOf(q), k = [...T, $, ...t.slice(-1)];
+            const $ = [e, ...t.slice(0, -1)].join("."), q = P.arrayKeys.indexOf($), k = [...T, q, ...t.slice(-1)];
             return JSON.stringify(A.path) === JSON.stringify(k);
           }
         }
@@ -225,7 +225,7 @@ function ge({
     meta: void 0
   }), z = new Proxy(d, {
     get(r, g) {
-      return g === "inputProps" ? {
+      return g === "$inputProps" ? {
         value: i ?? "",
         onChange: (S) => {
           L(S.target.value);

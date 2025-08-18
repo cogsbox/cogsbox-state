@@ -1,5 +1,4 @@
 import { create as w } from "zustand";
-import { ulid as y } from "ulid";
 const _ = w((l, a) => ({
   formRefs: /* @__PURE__ */ new Map(),
   registerFormRef: (e, t) => l((o) => {
@@ -18,25 +17,30 @@ const _ = w((l, a) => ({
     }), n;
   }
 }));
-function m(l) {
+function h(l) {
   if (l === null || typeof l != "object")
     return { value: l };
   if (Array.isArray(l)) {
     const a = { _meta: { arrayKeys: [] } }, e = [];
     return l.forEach((t) => {
-      const o = `id:${y()}`;
-      a[o] = m(t), e.push(o);
+      const o = `id:${b()}`;
+      a[o] = h(t), e.push(o);
     }), a._meta.arrayKeys = e, a;
   }
   if (l.constructor === Object) {
     const a = { _meta: {} };
     for (const e in l)
-      Object.prototype.hasOwnProperty.call(l, e) && (a[e] = m(l[e]));
+      Object.prototype.hasOwnProperty.call(l, e) && (a[e] = h(l[e]));
     return a;
   }
   return { value: l };
 }
-const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
+const p = /* @__PURE__ */ new Map();
+let M = 0;
+function b(l = "id") {
+  return `${l}:${(M++).toString(36)}`;
+}
+const E = w((l, a) => ({
   // Remove shadowStateStore from Zustand state
   setTransformCache: (e, t, o, n) => {
     const s = a().getShadowMetadata(e, t) || {};
@@ -58,7 +62,7 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
       i && (n.components = i), f && (n.features = f), c && (n.lastServerSync = c), d && (n.stateSource = d), u && (n.baseServerState = u);
     }
     p.delete(e), p.delete(`[${e}`);
-    const s = m(t);
+    const s = h(t);
     s._meta || (s._meta = {}), Object.assign(s._meta, n);
     const r = Array.isArray(t) ? `[${e}` : e;
     p.set(r, s);
@@ -109,7 +113,7 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
       r[t[c]] || (r[t[c]] = {}), r = r[t[c]];
     const i = t.length === 0 ? r : r[t[t.length - 1]];
     if (!i) {
-      r[t[t.length - 1]] = m(o), a().notifyPathSubscribers([e, ...t].join("."), {
+      r[t[t.length - 1]] = h(o), a().notifyPathSubscribers([e, ...t].join("."), {
         type: "UPDATE",
         newValue: o
       });
@@ -118,16 +122,16 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
     function f(c, d) {
       if (typeof d != "object" || d === null || Array.isArray(d)) {
         const S = c._meta;
-        for (const b in c)
-          b !== "_meta" && delete c[b];
-        const h = m(d);
-        Object.assign(c, h), S && (c._meta = { ...S, ...c._meta || {} });
+        for (const y in c)
+          y !== "_meta" && delete c[y];
+        const m = h(d);
+        Object.assign(c, m), S && (c._meta = { ...S, ...c._meta || {} });
         return;
       }
       const u = new Set(Object.keys(d));
       for (const S of u) {
-        const h = d[S];
-        c[S] ? f(c[S], h) : c[S] = m(h);
+        const m = d[S];
+        c[S] ? f(c[S], m) : c[S] = h(m);
       }
       for (const S in c)
         S === "_meta" || !Object.prototype.hasOwnProperty.call(c, S) || u.has(S) || delete c[S];
@@ -157,7 +161,7 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
       );
       return;
     }
-    const r = `id:${y()}`, i = { [r]: m(o) }, f = s._meta.arrayKeys, c = n !== void 0 && n >= 0 && n <= f.length ? n : f.length;
+    const r = `id:${b()}`, i = { [r]: h(o) }, f = s._meta.arrayKeys, c = n !== void 0 && n >= 0 && n <= f.length ? n : f.length;
     c >= f.length ? f.push(r) : f.splice(c, 0, r), a().addItemsToArrayNode(e, t, i, f);
     const d = [e, ...t].join(".");
     a().notifyPathSubscribers(d, {
@@ -179,8 +183,8 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
     }
     const r = {}, i = [];
     o.forEach((u) => {
-      const S = `id:${y()}`;
-      i.push(S), r[S] = m(u);
+      const S = `id:${b()}`;
+      i.push(S), r[S] = h(u);
     });
     const f = s._meta.arrayKeys, c = n !== void 0 && n >= 0 && n <= f.length ? n : f.length;
     c >= f.length ? f.push(...i) : f.splice(c, 0, ...i), a().addItemsToArrayNode(e, t, r, f);
@@ -348,8 +352,9 @@ const p = /* @__PURE__ */ new Map(), E = w((l, a) => ({
   getSyncInfo: (e) => a().syncInfoStore.get(e) || null
 }));
 export {
-  m as buildShadowNode,
+  h as buildShadowNode,
   _ as formRefStore,
+  b as generateId,
   E as getGlobalStore
 };
 //# sourceMappingURL=store.js.map
