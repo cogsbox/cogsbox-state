@@ -1,4 +1,4 @@
-# Cogsbox State: A Comprehensive Guide
+# Cogsbox State
 
 > **🚨 DANGER: DO NOT USE - UNSTABLE & EXPERIMENTAL 🚨**
 >
