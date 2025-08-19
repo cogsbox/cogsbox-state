@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.471",
+  "version": "0.5.470",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
@@ -68,6 +68,10 @@
     "vite-plugin-dts": "^3.7.0",
     "vitest": "^3.2.4",
     "zod": "^3.25.0 || ^4.0.0"
+  }, 
+  "overrides": {
+    "prismjs": "^1.30.0",
+    "esbuild": "^0.25.0"
   },
   "keywords": [
     "react",

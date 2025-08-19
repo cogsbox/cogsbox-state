@@ -2,7 +2,7 @@
 
 > **🚨 DANGER: DO NOT USE - UNSTABLE & EXPERIMENTAL 🚨**
 >
-> This library is in extremely early development and constantly changing.
+> This library is in early development and constantly changing.
 >
 > **DO NOT USE IN ANY PROJECT YET - ONLY FOR TESTING AND PROVIDING FEEDBACK.**
 
