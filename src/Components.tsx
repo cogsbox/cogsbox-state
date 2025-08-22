@@ -287,7 +287,7 @@ export function FormElementWrapper({
         const zodSchema =
           validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
-        if (zodSchema) {
+        if (zodSchema && validationOptions?.onChange) {
           const fullState = getShadowValue(stateKey, []);
           const result = zodSchema.safeParse(fullState);
           const currentMeta = getShadowMetadata(stateKey, path) || {};
@@ -312,7 +312,7 @@ export function FormElementWrapper({
                     {
                       source: 'client',
                       message: pathErrors[0]?.message,
-                      severity: 'warning', // Gentle error during typing
+                      severity: validationOptions?.onChange || 'warning',
                     },
                   ],
                   lastValidated: Date.now(),
@@ -365,8 +365,7 @@ export function FormElementWrapper({
     const zodSchema =
       validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
-    if (!zodSchema) return;
-
+    if (!zodSchema || !validationOptions?.onBlur) return;
     // Get the full path including stateKey
 
     // Update validation state to "validating"
@@ -431,7 +430,7 @@ export function FormElementWrapper({
           errors: pathErrors.map((err: any) => ({
             source: 'client' as const,
             message: err.message,
-            severity: 'error' as const, // Hard error on blur
+            severity: validationOptions.onBlur as 'error' | 'warning',
           })),
           lastValidated: Date.now(),
           validatedValue: localValue,

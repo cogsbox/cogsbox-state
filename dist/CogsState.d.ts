@@ -40,7 +40,7 @@ export type FormElementParams<T> = StateObject<T> & {
         ref?: React.RefObject<any>;
         value?: T extends boolean ? never : T;
         onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-        onBlur?: () => void;
+        onBlur?: (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     };
 };
 export type StateKeys = string;
@@ -193,7 +193,9 @@ type ValidationOptionsType = {
     key?: string;
     zodSchemaV3?: z3.ZodType<any, any, any>;
     zodSchemaV4?: z4.ZodType<any, any, any>;
-    onBlur?: boolean;
+    onBlur?: 'error' | 'warning';
+    onChange?: 'error' | 'warning';
+    blockSync?: boolean;
 };
 type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
 type SyncOptionsType<TApiParams> = {

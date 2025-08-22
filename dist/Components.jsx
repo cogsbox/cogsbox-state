@@ -1,43 +1,43 @@
-import { jsx as w, Fragment as x } from "react/jsx-runtime";
-import U, { memo as _, useState as p, useRef as j, useCallback as J, useEffect as C, useLayoutEffect as B } from "react";
-import { getGlobalStore as b, formRefStore as Q } from "./store.js";
+import { jsx as w, Fragment as U } from "react/jsx-runtime";
+import P, { memo as _, useState as V, useRef as j, useCallback as J, useEffect as A, useLayoutEffect as x } from "react";
+import { getGlobalStore as p, formRefStore as Q } from "./store.js";
 import { useInView as X } from "react-intersection-observer";
 import { v4 as G } from "uuid";
 import { isDeepEqual as Y } from "./utility.js";
 const {
   getInitialOptions: Z,
   getShadowMetadata: H,
-  setShadowMetadata: I,
+  setShadowMetadata: b,
   getShadowValue: R,
   registerComponent: K,
   unregisterComponent: ee,
   notifyPathSubscribers: te,
   subscribeToPath: re
-} = b.getState();
+} = p.getState();
 function ne({
   formOpts: e,
   path: t,
   stateKey: n,
   children: o
 }) {
-  const { getInitialOptions: l, getShadowMetadata: s, getShadowValue: a } = b.getState(), f = l(n), m = s(n, t)?.validation, i = m?.status || "NOT_VALIDATED", v = (m?.errors || []).map((d) => ({
+  const { getInitialOptions: l, getShadowMetadata: a, getShadowValue: s } = p.getState(), f = l(n), g = a(n, t)?.validation, i = g?.status || "NOT_VALIDATED", S = (g?.errors || []).map((d) => ({
     ...d,
     path: t
-  })), u = v.filter((d) => d.severity === "error").map((d) => d.message), c = v.filter((d) => d.severity === "warning").map((d) => d.message), L = u[0] || c[0], V = u.length > 0 ? "error" : c.length > 0 ? "warning" : void 0;
-  return /* @__PURE__ */ w(x, { children: f?.formElements?.validation && !e?.validation?.disable ? f.formElements.validation({
-    children: /* @__PURE__ */ w(U.Fragment, { children: o }, t.toString()),
+  })), u = S.filter((d) => d.severity === "error").map((d) => d.message), c = S.filter((d) => d.severity === "warning").map((d) => d.message), L = u[0] || c[0], M = u.length > 0 ? "error" : c.length > 0 ? "warning" : void 0;
+  return /* @__PURE__ */ w(U, { children: f?.formElements?.validation && !e?.validation?.disable ? f.formElements.validation({
+    children: /* @__PURE__ */ w(P.Fragment, { children: o }, t.toString()),
     status: i,
     // Now passes the new ValidationStatus type
     message: e?.validation?.hideMessage ? "" : e?.validation?.message || L || "",
-    severity: V,
+    severity: M,
     hasErrors: u.length > 0,
     hasWarnings: c.length > 0,
-    allErrors: v,
+    allErrors: S,
     path: t,
-    getData: () => a(n, t)
-  }) : /* @__PURE__ */ w(U.Fragment, { children: o }, t.toString()) });
+    getData: () => s(n, t)
+  }) : /* @__PURE__ */ w(P.Fragment, { children: o }, t.toString()) });
 }
-const me = _(
+const ge = _(
   oe,
   (e, t) => e.itemPath.join(".") === t.itemPath.join(".") && e.stateKey === t.stateKey && e.itemComponentId === t.itemComponentId && e.localIndex === t.localIndex
 );
@@ -47,69 +47,69 @@ function oe({
   itemPath: n,
   localIndex: o,
   arraySetter: l,
-  rebuildStateShape: s,
-  renderFn: a
+  rebuildStateShape: a,
+  renderFn: s
 }) {
-  const [, f] = p({}), { ref: h, inView: m } = X(), i = j(null), v = se(i), u = j(!1), c = [e, ...n].join(".");
-  F(e, t, f);
+  const [, f] = V({}), { ref: I, inView: g } = X(), i = j(null), S = ae(i), u = j(!1), c = [e, ...n].join(".");
+  B(e, t, f);
   const L = J(
     (r) => {
-      i.current = r, h(r);
+      i.current = r, I(r);
     },
-    [h]
+    [I]
   );
-  C(() => {
-    const r = re(c, (g) => {
+  A(() => {
+    const r = re(c, (m) => {
       f({});
     });
     return () => r();
-  }, [c]), C(() => {
-    if (!m || !v || u.current)
+  }, [c]), A(() => {
+    if (!g || !S || u.current)
       return;
     const r = i.current;
     if (r && r.offsetHeight > 0) {
       u.current = !0;
-      const g = r.offsetHeight;
-      I(e, n, {
+      const m = r.offsetHeight;
+      b(e, n, {
         virtualizer: {
-          itemHeight: g,
+          itemHeight: m,
           domRef: r
         }
       });
-      const S = n.slice(0, -1), D = [e, ...S].join(".");
+      const v = n.slice(0, -1), D = [e, ...v].join(".");
       te(D, {
         type: "ITEMHEIGHT",
         itemKey: n.join("."),
         ref: i.current
       });
     }
-  }, [m, v, e, n]);
-  const V = R(e, n);
-  if (V === void 0)
+  }, [g, S, e, n]);
+  const M = R(e, n);
+  if (M === void 0)
     return null;
-  const d = s({
-    currentState: V,
+  const d = a({
+    currentState: M,
     path: n,
     componentId: t
-  }), z = a(d, o, l);
+  }), z = s(d, o, l);
   return /* @__PURE__ */ w("div", { ref: L, children: z });
 }
-function ge({
+function me({
   stateKey: e,
   path: t,
   rebuildStateShape: n,
   renderFn: o,
   formOpts: l,
-  setState: s
+  setState: a
 }) {
-  const [a] = p(() => G()), [, f] = p({}), h = [e, ...t].join(".");
-  F(e, a, f);
-  const m = R(e, t), [i, v] = p(m), u = j(!1), c = j(null);
-  C(() => {
-    !u.current && !Y(m, i) && v(m);
-  }, [m]), C(() => {
-    const r = b.getState().subscribeToPath(h, (g) => {
-      !u.current && i !== g && f({});
+  const [s] = V(() => G()), [, f] = V({}), I = [e, ...t].join(".");
+  B(e, s, f);
+  const g = R(e, t), [i, S] = V(g), u = j(!1), c = j(null);
+  A(() => {
+    !u.current && !Y(g, i) && S(g);
+  }, [g]), A(() => {
+    const r = p.getState().subscribeToPath(I, (m) => {
+      !u.current && i !== m && f({});
     });
     return () => {
       r(), c.current && (clearTimeout(c.current), u.current = !1);
@@ -117,16 +117,16 @@ function ge({
   }, []);
   const L = J(
     (r) => {
-      typeof m === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), v(r), u.current = !0, c.current && clearTimeout(c.current);
-      const S = l?.debounceTime ?? 200;
+      typeof g === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), S(r), u.current = !0, c.current && clearTimeout(c.current);
+      const v = l?.debounceTime ?? 200;
       c.current = setTimeout(() => {
-        if (u.current = !1, s(r, t, { updateType: "update" }), !b.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
-        const M = Z(e)?.validation, N = M?.zodSchemaV4 || M?.zodSchemaV3;
-        if (N) {
-          const E = R(e, []), y = N.safeParse(E), O = H(e, t) || {};
-          if (y.success)
-            I(e, t, {
-              ...O,
+        if (u.current = !1, a(r, t, { updateType: "update" }), !p.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
+        const h = Z(e)?.validation, N = h?.zodSchemaV4 || h?.zodSchemaV3;
+        if (N && h?.onChange) {
+          const E = R(e, []), C = N.safeParse(E), y = H(e, t) || {};
+          if (C.success)
+            b(e, t, {
+              ...y,
               validation: {
                 status: "VALID",
                 errors: [],
@@ -135,26 +135,25 @@ function ge({
               }
             });
           else {
-            const W = ("issues" in y.error ? y.error.issues : y.error.errors).filter(
+            const W = ("issues" in C.error ? C.error.issues : C.error.errors).filter(
               (T) => JSON.stringify(T.path) === JSON.stringify(t)
             );
-            W.length > 0 ? I(e, t, {
-              ...O,
+            W.length > 0 ? b(e, t, {
+              ...y,
               validation: {
                 status: "INVALID",
                 errors: [
                   {
                     source: "client",
                     message: W[0]?.message,
-                    severity: "warning"
-                    // Gentle error during typing
+                    severity: h?.onChange || "warning"
                   }
                 ],
                 lastValidated: Date.now(),
                 validatedValue: r
               }
-            }) : I(e, t, {
-              ...O,
+            }) : b(e, t, {
+              ...y,
               validation: {
                 status: "VALID",
                 errors: [],
@@ -164,16 +163,16 @@ function ge({
             });
           }
         }
-      }, S), f({});
+      }, v), f({});
     },
-    [s, t, l?.debounceTime, e]
-  ), V = J(async () => {
-    if (console.log("handleBlur triggered"), c.current && (clearTimeout(c.current), c.current = null, u.current = !1, s(i, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
-    const { getInitialOptions: g } = b.getState(), S = g(e)?.validation, D = S?.zodSchemaV4 || S?.zodSchemaV3;
-    if (!D) return;
-    const M = H(e, t);
-    I(e, t, {
-      ...M,
+    [a, t, l?.debounceTime, e]
+  ), M = J(async () => {
+    if (console.log("handleBlur triggered"), c.current && (clearTimeout(c.current), c.current = null, u.current = !1, a(i, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
+    const { getInitialOptions: m } = p.getState(), v = m(e)?.validation, D = v?.zodSchemaV4 || v?.zodSchemaV3;
+    if (!D || !v?.onBlur) return;
+    const h = H(e, t);
+    b(e, t, {
+      ...h,
       validation: {
         status: "VALIDATING",
         errors: [],
@@ -183,8 +182,8 @@ function ge({
     });
     const N = R(e, []), E = D.safeParse(N);
     if (E.success)
-      I(e, t, {
-        ...M,
+      b(e, t, {
+        ...h,
         validation: {
           status: "VALID",
           errors: [],
@@ -193,25 +192,24 @@ function ge({
         }
       });
     else {
-      const O = ("issues" in E.error ? E.error.issues : E.error.errors).filter((A) => {
+      const y = ("issues" in E.error ? E.error.issues : E.error.errors).filter((O) => {
         if (t.some((T) => T.startsWith("id:"))) {
-          const T = t[0].startsWith("id:") ? [] : t.slice(0, -1), P = b.getState().getShadowMetadata(e, T);
-          if (P?.arrayKeys) {
-            const $ = [e, ...t.slice(0, -1)].join("."), q = P.arrayKeys.indexOf($), k = [...T, q, ...t.slice(-1)];
-            return JSON.stringify(A.path) === JSON.stringify(k);
+          const T = t[0].startsWith("id:") ? [] : t.slice(0, -1), F = p.getState().getShadowMetadata(e, T);
+          if (F?.arrayKeys) {
+            const $ = [e, ...t.slice(0, -1)].join("."), q = F.arrayKeys.indexOf($), k = [...T, q, ...t.slice(-1)];
+            return JSON.stringify(O.path) === JSON.stringify(k);
           }
         }
-        return JSON.stringify(A.path) === JSON.stringify(t);
+        return JSON.stringify(O.path) === JSON.stringify(t);
       });
-      I(e, t, {
-        ...M,
+      b(e, t, {
+        ...h,
         validation: {
           status: "INVALID",
-          errors: O.map((A) => ({
+          errors: y.map((O) => ({
             source: "client",
-            message: A.message,
-            severity: "error"
-            // Hard error on blur
+            message: O.message,
+            severity: v.onBlur
           })),
           lastValidated: Date.now(),
           validatedValue: i
@@ -219,28 +217,28 @@ function ge({
       });
     }
     f({});
-  }, [e, t, i, s]), d = n({
+  }, [e, t, i, a]), d = n({
     path: t,
-    componentId: a,
+    componentId: s,
     meta: void 0
   }), z = new Proxy(d, {
-    get(r, g) {
-      return g === "$inputProps" ? {
+    get(r, m) {
+      return m === "$inputProps" ? {
         value: i ?? "",
-        onChange: (S) => {
-          L(S.target.value);
+        onChange: (v) => {
+          L(v.target.value);
         },
         // 5. Wire the new onBlur handler to the input props.
-        onBlur: V,
+        onBlur: M,
         ref: Q.getState().getFormRef(e + "." + t.join("."))
-      } : r[g];
+      } : r[m];
     }
   });
   return /* @__PURE__ */ w(ne, { formOpts: l, path: t, stateKey: e, children: o(z) });
 }
-function F(e, t, n) {
+function B(e, t, n) {
   const o = `${e}////${t}`;
-  B(() => (K(e, o, {
+  x(() => (K(e, o, {
     forceUpdate: () => n({}),
     paths: /* @__PURE__ */ new Set(),
     reactiveType: ["component"]
@@ -248,9 +246,9 @@ function F(e, t, n) {
     ee(e, o);
   }), [e, o]);
 }
-const se = (e) => {
-  const [t, n] = p(!1);
-  return B(() => {
+const ae = (e) => {
+  const [t, n] = V(!1);
+  return x(() => {
     if (!e.current) {
       n(!0);
       return;
@@ -261,14 +259,14 @@ const se = (e) => {
       return;
     }
     let l = 0;
-    const s = () => {
+    const a = () => {
       l++, l === o.length && n(!0);
     };
-    return o.forEach((a) => {
-      a.complete ? s() : (a.addEventListener("load", s), a.addEventListener("error", s));
+    return o.forEach((s) => {
+      s.complete ? a() : (s.addEventListener("load", a), s.addEventListener("error", a));
     }), () => {
-      o.forEach((a) => {
-        a.removeEventListener("load", s), a.removeEventListener("error", s);
+      o.forEach((s) => {
+        s.removeEventListener("load", a), s.removeEventListener("error", a);
       });
     };
   }, [e.current]), t;
@@ -279,26 +277,26 @@ function ve({
   rebuildStateShape: n,
   renderFn: o
 }) {
-  const [l] = p(() => G()), [, s] = p({}), a = [e, ...t].join(".");
-  F(e, l, s), C(() => {
-    const h = b.getState().subscribeToPath(a, () => {
-      s({});
+  const [l] = V(() => G()), [, a] = V({}), s = [e, ...t].join(".");
+  B(e, l, a), A(() => {
+    const I = p.getState().subscribeToPath(s, () => {
+      a({});
     });
-    return () => h();
-  }, [a]);
+    return () => I();
+  }, [s]);
   const f = n({
     path: t,
     componentId: l,
     meta: void 0
   });
-  return /* @__PURE__ */ w(x, { children: o(f) });
+  return /* @__PURE__ */ w(U, { children: o(f) });
 }
 export {
-  ge as FormElementWrapper,
+  me as FormElementWrapper,
   ve as IsolatedComponentWrapper,
   oe as ListItemWrapper,
-  me as MemoizedCogsItemWrapper,
+  ge as MemoizedCogsItemWrapper,
   ne as ValidationWrapper,
-  F as useRegisterComponent
+  B as useRegisterComponent
 };
 //# sourceMappingURL=Components.jsx.map

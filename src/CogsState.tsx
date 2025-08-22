@@ -80,7 +80,11 @@ export type FormElementParams<T> = StateObject<T> & {
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >
     ) => void;
-    onBlur?: () => void;
+    onBlur?: (
+      event: React.FocusEvent<
+        HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      >
+    ) => void;
   };
 };
 
@@ -366,8 +370,9 @@ type ValidationOptionsType = {
   key?: string;
   zodSchemaV3?: z3.ZodType<any, any, any>;
   zodSchemaV4?: z4.ZodType<any, any, any>;
-
-  onBlur?: boolean;
+  onBlur?: 'error' | 'warning';
+  onChange?: 'error' | 'warning';
+  blockSync?: boolean;
 };
 type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
 type SyncOptionsType<TApiParams> = {
@@ -542,6 +547,7 @@ function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
     ...newOptions,
   });
 }
+
 function setOptions<StateKey, Opt>({
   stateKey,
   options,
@@ -554,42 +560,61 @@ function setOptions<StateKey, Opt>({
   const initialOptions = getInitialOptions(stateKey as string) || {};
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
 
-  const mergedOptions = { ...initialOptionsPartState, ...initialOptions };
-
+  // Start with the base options
+  let mergedOptions = { ...initialOptionsPartState, ...initialOptions };
   let needToAdd = false;
+
   if (options) {
-    for (const key in options) {
-      if (!mergedOptions.hasOwnProperty(key)) {
-        needToAdd = true;
-        mergedOptions[key] = options[key as keyof typeof options];
-      } else {
-        if (
-          key == 'localStorage' &&
-          options[key] &&
-          mergedOptions[key].key !== options[key]?.key
-        ) {
-          needToAdd = true;
-          mergedOptions[key] = options[key];
-        }
-        if (
-          key == 'defaultState' &&
-          options[key] &&
-          mergedOptions[key] !== options[key] &&
-          !isDeepEqual(mergedOptions[key], options[key])
-        ) {
-          needToAdd = true;
-          mergedOptions[key] = options[key];
+    // A function to recursively merge properties
+    const deepMerge = (target: any, source: any) => {
+      for (const key in source) {
+        if (source.hasOwnProperty(key)) {
+          // If the property is an object (and not an array), recurse
+          if (
+            source[key] instanceof Object &&
+            !Array.isArray(source[key]) &&
+            target[key] instanceof Object
+          ) {
+            // Check for changes before merging to set `needToAdd`
+            if (!isDeepEqual(target[key], source[key])) {
+              deepMerge(target[key], source[key]);
+              needToAdd = true;
+            }
+          } else {
+            // Overwrite if the value is different
+            if (target[key] !== source[key]) {
+              target[key] = source[key];
+              needToAdd = true;
+            }
+          }
         }
       }
-    }
+      return target;
+    };
+
+    // Perform a deep merge
+    mergedOptions = deepMerge(mergedOptions, options);
   }
 
-  // Always preserve syncOptions if it exists in mergedOptions but not in options
+  // Your existing logic for defaults and preservation can follow
   if (
     mergedOptions.syncOptions &&
     (!options || !options.hasOwnProperty('syncOptions'))
   ) {
     needToAdd = true;
+  }
+  if (
+    (mergedOptions.validation && mergedOptions?.validation?.zodSchemaV4) ||
+    mergedOptions?.validation?.zodSchemaV3
+  ) {
+    if (!mergedOptions?.validation?.onBlur) {
+      // This default will now only apply if onBlur is not explicitly set to something else (including undefined)
+      if (mergedOptions.validation.onBlur === undefined) {
+        // It was explicitly set to undefined, respect that.
+      } else {
+        mergedOptions.validation.onBlur = 'error'; // Default to error on blur
+      }
+    }
   }
 
   if (needToAdd) {
@@ -1438,9 +1463,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   // Effect 1: When this component's serverState prop changes, broadcast it
   useEffect(() => {
-    setServerStateUpdate(thisKey, serverState);
-  }, [serverState, thisKey]);
+    if (!serverState) return;
 
+    // Only broadcast if we have valid server data
+    if (serverState.status === 'success' && serverState.data !== undefined) {
+      setServerStateUpdate(thisKey, serverState);
+    }
+  }, [serverState, thisKey]);
   // Effect 2: Listen for server state updates from ANY component
   useEffect(() => {
     const unsubscribe = getGlobalStore
@@ -1456,13 +1485,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
             return; // Ignore if no valid data
           }
 
+          // Store the server state in options for future reference
           setAndMergeOptions(thisKey, { serverState: serverStateData });
 
           const mergeConfig =
             typeof serverStateData.merge === 'object'
               ? serverStateData.merge
               : serverStateData.merge === true
-                ? { strategy: 'append' }
+                ? { strategy: 'append' as const, key: 'id' }
                 : null;
 
           const currentState = getShadowValue(thisKey, []);
@@ -1471,7 +1501,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
           if (
             mergeConfig &&
             mergeConfig.strategy === 'append' &&
-            'key' in mergeConfig && // Type guard for key
+            'key' in mergeConfig &&
             Array.isArray(currentState) &&
             Array.isArray(incomingData)
           ) {
@@ -1483,49 +1513,57 @@ export function useCogsStateFn<TStateObject extends unknown>(
               return;
             }
 
+            // Get existing IDs to check for duplicates
             const existingIds = new Set(
               currentState.map((item: any) => item[keyField])
             );
 
+            // Filter out duplicates from incoming data
             const newUniqueItems = incomingData.filter(
               (item: any) => !existingIds.has(item[keyField])
             );
 
             if (newUniqueItems.length > 0) {
+              // Insert only the new unique items
               insertManyShadowArrayElements(thisKey, [], newUniqueItems);
             }
 
-            // Mark the entire final state as synced
+            // Mark the entire merged state as synced
             const finalState = getShadowValue(thisKey, []);
             markEntireStateAsServerSynced(
               thisKey,
               [],
               finalState,
-              serverStateData.timestamp
+              serverStateData.timestamp || Date.now()
             );
           } else {
-            // This handles the "replace" strategy (initial load)
+            // Replace strategy (default) - completely replace the state
             initializeShadowState(thisKey, incomingData);
 
+            // Mark as synced from server
             markEntireStateAsServerSynced(
               thisKey,
               [],
               incomingData,
-              serverStateData.timestamp
+              serverStateData.timestamp || Date.now()
             );
           }
+
+          // Notify all components subscribed to this state
+          notifyComponents(thisKey);
         }
       });
 
     return unsubscribe;
-  }, [thisKey, resolveInitialState]);
-
+  }, [thisKey]);
   useEffect(() => {
     const existingMeta = getGlobalStore
       .getState()
       .getShadowMetadata(thisKey, []);
+
+    // Skip if already initialized
     if (existingMeta && existingMeta.stateSource) {
-      return; // Already initialized, bail out.
+      return;
     }
 
     const options = getInitialOptions(thisKey as string);
@@ -1537,34 +1575,35 @@ export function useCogsStateFn<TStateObject extends unknown>(
       ),
       localStorageEnabled: !!options?.localStorage?.key,
     };
+
     setShadowMetadata(thisKey, [], {
       ...existingMeta,
       features,
     });
+
     if (options?.defaultState !== undefined || defaultState !== undefined) {
       const finalDefaultState = options?.defaultState || defaultState;
-
-      // Only set defaultState if it's not already set
       if (!options?.defaultState) {
         setAndMergeOptions(thisKey as string, {
           defaultState: finalDefaultState,
         });
       }
-
-      const { value: resolvedState, source, timestamp } = resolveInitialState();
-
-      initializeShadowState(thisKey, resolvedState);
-
-      // Set shadow metadata with the correct source info
-      setShadowMetadata(thisKey, [], {
-        stateSource: source,
-        lastServerSync: source === 'server' ? timestamp : undefined,
-        isDirty: false,
-        baseServerState: source === 'server' ? resolvedState : undefined,
-      });
-
-      notifyComponents(thisKey);
     }
+
+    const { value: resolvedState, source, timestamp } = resolveInitialState();
+    initializeShadowState(thisKey, resolvedState);
+    setShadowMetadata(thisKey, [], {
+      stateSource: source,
+      lastServerSync: source === 'server' ? timestamp : undefined,
+      isDirty: source === 'server' ? false : undefined,
+      baseServerState: source === 'server' ? resolvedState : undefined,
+    });
+
+    if (source === 'server' && serverState) {
+      setServerStateUpdate(thisKey, serverState);
+    }
+
+    notifyComponents(thisKey);
   }, [thisKey, ...(dependencies || [])]);
 
   useLayoutEffect(() => {
