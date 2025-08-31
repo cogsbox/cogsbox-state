@@ -175,6 +175,7 @@ export type CogsGlobalState = {
     cacheKey: string,
     cacheData: any
   ) => void;
+  initializeAndMergeShadowState: (key: string, initialState: any) => void;
   initializeShadowState: (key: string, initialState: any) => void;
   getShadowNode: (key: string, path: string[]) => ShadowNode | undefined;
   getShadowMetadata: (
@@ -206,7 +207,8 @@ export type CogsGlobalState = {
     key: string,
     arrayPath: string[],
     newItem: any,
-    index?: number
+    index?: number,
+    itemId?: string
   ) => string;
   removeShadowArrayElement: (key: string, itemPath: string[]) => void;
   registerComponent: (
@@ -706,21 +708,17 @@ export function buildShadowNode(
   return { value };
 }
 
-// store.ts - Replace the shadow store methods with mutable versions
-// store.ts - Replace the shadow store methods with mutable versions
-
-// Module-level mutable store
-const shadowStateStore = new Map<string, ShadowNode>();
+export const shadowStateStore = new Map<string, ShadowNode>();
 let globalCounter = 0;
+const instanceId = Date.now().toString(36);
 
 export function generateId(stateKey: string): string {
   const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
   const prefix = rootMeta?.syncArrayIdPrefix || 'local';
-  return `id:${prefix}_${(globalCounter++).toString(36)}`;
+
+  return `id:${prefix}_${instanceId}_${(globalCounter++).toString(36)}`;
 }
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
-  // Remove shadowStateStore from Zustand state
-
   setTransformCache: (
     key: string,
     path: string[],
@@ -736,12 +734,148 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       transformCaches: metadata.transformCaches,
     });
   },
+  initializeAndMergeShadowState: (key: string, shadowState: any) => {
+    const isArrayState = shadowState?._meta?.arrayKeys !== undefined;
+    const storageKey = isArrayState ? `[${key}` : key;
+
+    const existingRoot =
+      shadowStateStore.get(storageKey) ||
+      shadowStateStore.get(key) ||
+      shadowStateStore.get(`[${key}`);
+
+    let preservedMetadata: Partial<ShadowMetadata> = {};
+
+    if (existingRoot?._meta) {
+      const {
+        components,
+        features,
+        lastServerSync,
+        stateSource,
+        baseServerState,
+        pathComponents,
+        signals,
+        validation,
+        syncArrayIdPrefix,
+      } = existingRoot._meta;
+
+      if (components) preservedMetadata.components = components;
+      if (features) preservedMetadata.features = features;
+      if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
+      if (stateSource) preservedMetadata.stateSource = stateSource;
+      if (baseServerState) preservedMetadata.baseServerState = baseServerState;
+      if (pathComponents) preservedMetadata.pathComponents = pathComponents;
+      if (signals) preservedMetadata.signals = signals;
+      if (validation) preservedMetadata.validation = validation;
+      if (syncArrayIdPrefix)
+        preservedMetadata.syncArrayIdPrefix = syncArrayIdPrefix;
+    }
+
+    // Deep merge function that preserves shadow node structure
+    function deepMergeShadowNodes(
+      target: ShadowNode,
+      source: ShadowNode
+    ): ShadowNode {
+      // If source has a primitive value in _meta, use it
+      if (source._meta?.hasOwnProperty('value')) {
+        if (!target._meta) target._meta = {};
+        target._meta.value = source._meta.value;
+        // Clear any non-meta properties since this is a primitive
+        for (const key in target) {
+          if (key !== '_meta') {
+            delete target[key];
+          }
+        }
+        return target;
+      }
+
+      // Handle array nodes
+      if (source._meta?.arrayKeys) {
+        // For arrays, completely replace with new array structure
+        // but preserve non-array metadata
+        const preservedMeta = { ...target._meta };
+        delete preservedMeta.arrayKeys;
+
+        // Clear old array items
+        if (target._meta?.arrayKeys) {
+          target._meta.arrayKeys.forEach((itemKey) => {
+            delete target[itemKey];
+          });
+        }
+
+        // Copy new array structure
+        target._meta = { ...preservedMeta, ...source._meta };
+        source._meta.arrayKeys.forEach((itemKey) => {
+          target[itemKey] = source[itemKey];
+        });
+
+        return target;
+      }
+
+      // Handle object nodes - merge properties
+      for (const key in source) {
+        if (key === '_meta') {
+          // Merge metadata
+          target._meta = { ...(target._meta || {}), ...(source._meta || {}) };
+        } else {
+          // Recursively merge or set property
+          if (
+            target[key] &&
+            typeof target[key] === 'object' &&
+            typeof source[key] === 'object'
+          ) {
+            deepMergeShadowNodes(target[key], source[key]);
+          } else {
+            target[key] = source[key];
+          }
+        }
+      }
+
+      // Remove any keys in target that don't exist in source (for object nodes)
+      if (!source._meta?.arrayKeys && !source._meta?.hasOwnProperty('value')) {
+        for (const key in target) {
+          if (key !== '_meta' && !source.hasOwnProperty(key)) {
+            delete target[key];
+          }
+        }
+      }
+
+      return target;
+    }
+
+    if (existingRoot) {
+      // Merge the new shadow state into the existing one
+      deepMergeShadowNodes(existingRoot, shadowState);
+
+      // Restore preserved metadata (these should override what came from shadowState)
+      if (!existingRoot._meta) existingRoot._meta = {};
+      Object.assign(existingRoot._meta, preservedMetadata);
+
+      // Update the store with merged state
+      shadowStateStore.set(storageKey, existingRoot);
+    } else {
+      // No existing state, just use the provided shadowState
+      // But still preserve any metadata if it somehow exists
+      if (preservedMetadata && Object.keys(preservedMetadata).length > 0) {
+        if (!shadowState._meta) shadowState._meta = {};
+        Object.assign(shadowState._meta, preservedMetadata);
+      }
+
+      shadowStateStore.set(storageKey, shadowState);
+    }
+
+    // Clear any incorrect keys if they exist
+    if (storageKey === key) {
+      shadowStateStore.delete(`[${key}`);
+    } else {
+      shadowStateStore.delete(key);
+    }
+  },
 
   initializeShadowState: (key: string, initialState: any) => {
     const existingRoot =
       shadowStateStore.get(key) || shadowStateStore.get(`[${key}`);
     let preservedMetadata: Partial<ShadowMetadata> = {};
-
+    console.log('existingRoot initializeShadowState', existingRoot);
     if (existingRoot?._meta) {
       const {
         components,
@@ -779,7 +913,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     if (!newRoot._meta) newRoot._meta = {};
     Object.assign(newRoot._meta, preservedMetadata);
-
+    console.log('existingRoot newRoot', newRoot);
     const storageKey = Array.isArray(initialState) ? `[${key}` : key;
     shadowStateStore.set(storageKey, newRoot);
   },
@@ -981,8 +1115,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     if (!current._meta) current._meta = {};
     current._meta.arrayKeys = newKeys; // Direct assignment!
   },
-
-  insertShadowArrayElement: (key, arrayPath, newItem, index) => {
+  insertShadowArrayElement: (
+    key: string,
+    arrayPath: string[],
+    newItem: any,
+    index?: number,
+    itemId?: string // Add optional itemId parameter
+  ) => {
     const arrayNode = get().getShadowNode(key, arrayPath);
     if (!arrayNode?._meta?.arrayKeys) {
       throw new Error(
@@ -990,10 +1129,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       );
     }
 
-    const newItemId = `${generateId(key)}`;
+    // Use provided itemId or generate a new one
+    const newItemId = itemId || generateId(key);
     const itemsToAdd = { [newItemId]: buildShadowNode(key, newItem) };
 
-    // Mutate the array directly
+    // Rest of the function remains the same...
     const currentKeys = arrayNode._meta.arrayKeys;
     const insertionPoint =
       index !== undefined && index >= 0 && index <= currentKeys.length
@@ -1001,12 +1141,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         : currentKeys.length;
 
     if (insertionPoint >= currentKeys.length) {
-      currentKeys.push(newItemId); // O(1)
+      currentKeys.push(newItemId);
     } else {
-      currentKeys.splice(insertionPoint, 0, newItemId); // O(n) only for middle
+      currentKeys.splice(insertionPoint, 0, newItemId);
     }
 
-    // Pass the mutated array
     get().addItemsToArrayNode(key, arrayPath, itemsToAdd, currentKeys);
 
     const arrayKey = [key, ...arrayPath].join('.');

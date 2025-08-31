@@ -33,6 +33,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   formRefStore,
   getGlobalStore,
+  shadowStateStore,
   ValidationError,
   ValidationSeverity,
   ValidationStatus,
@@ -303,6 +304,7 @@ export type StateObject<T> = (T extends any[]
     $updateInitialState: (newState: T | null) => {
       fetchId: (field: keyof T) => string | number;
     };
+    $initializeAndMergeShadowState: (newState: any | null) => void;
     $_isLoading: boolean;
     $_serverState: T;
     $revertToInitialState: (obj?: { validationKey?: string }) => T;
@@ -331,7 +333,7 @@ type EffectiveSetStateArg<
   : UpdateArg<T>;
 type UpdateOptions = {
   updateType: 'insert' | 'cut' | 'update';
-
+  itemId?: string;
   sync?: boolean;
 };
 type EffectiveSetState<TStateObject> = (
@@ -340,7 +342,7 @@ type EffectiveSetState<TStateObject> = (
     | EffectiveSetStateArg<TStateObject, 'insert'>
     | null,
   path: string[],
-  updateObj: UpdateOptions,
+  updateObj: UpdateOptions, // Now includes itemId
   validationKey?: string
 ) => void;
 
@@ -489,6 +491,7 @@ const {
   setShadowMetadata,
   getShadowValue,
   initializeShadowState,
+  initializeAndMergeShadowState,
   updateShadowAtPath,
   insertShadowArrayElement,
   insertManyShadowArrayElements,
@@ -1174,12 +1177,12 @@ function getComponentNotifications(
 
   return componentsToNotify;
 }
-
 function handleInsert(
   stateKey: string,
   path: string[],
   payload: any,
-  index?: number
+  index?: number,
+  itemId?: string // Add optional itemId parameter
 ): {
   type: 'insert';
   newValue: any;
@@ -1196,12 +1199,18 @@ function handleInsert(
     newValue = payload;
   }
 
-  const itemId = insertShadowArrayElement(stateKey, path, newValue, index);
+  // Pass itemId to insertShadowArrayElement
+  const actualItemId = insertShadowArrayElement(
+    stateKey,
+    path,
+    newValue,
+    index,
+    itemId
+  );
   markAsDirty(stateKey, path, { bubble: true });
 
   const updatedMeta = getShadowMetadata(stateKey, path);
 
-  // Find the ID that comes before this insertion point
   let insertAfterId: string | undefined;
   if (updatedMeta?.arrayKeys && index !== undefined && index > 0) {
     insertAfterId = updatedMeta.arrayKeys[index - 1];
@@ -1211,11 +1220,12 @@ function handleInsert(
     type: 'insert',
     newValue,
     shadowMeta: updatedMeta,
-    path: path, // Just the array path now
-    itemId: itemId,
+    path: path,
+    itemId: actualItemId,
     insertAfterId: insertAfterId,
   };
 }
+
 function handleCut(
   stateKey: string,
   path: string[]
@@ -1274,41 +1284,39 @@ function flushQueue() {
   updateBatchQueue = [];
   isFlushScheduled = false;
 }
-
 function createEffectiveSetState<T>(
   thisKey: string,
   syncApiRef: React.MutableRefObject<any>,
   sessionId: string | undefined,
   latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
 ): EffectiveSetState<T> {
-  // The returned function is the core setter that gets called by all state operations.
-  // It is now much simpler, delegating all work to the executeUpdate function.
   return (newStateOrFunction, path, updateObj, validationKey?) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
   };
 
-  // This inner function handles the logic for a single state update.
   function executeUpdate(
     stateKey: string,
     path: string[],
     payload: any,
-    options: UpdateOptions
+    options: UpdateOptions // Now includes itemId
   ) {
-    // --- Step 1: Execute the core state change (Synchronous & Fast) ---
-    // This part modifies the in-memory state representation immediately.
     let result: any;
     switch (options.updateType) {
       case 'update':
         result = handleUpdate(stateKey, path, payload);
-
         break;
       case 'insert':
-        result = handleInsert(stateKey, path, payload);
-
+        // Pass itemId to handleInsert if it exists
+        result = handleInsert(
+          stateKey,
+          path,
+          payload,
+          undefined,
+          options.itemId
+        );
         break;
       case 'cut':
         result = handleCut(stateKey, path);
-
         break;
     }
 
@@ -1691,7 +1699,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   const cogsSyncFn = __useSync;
   const syncOpt = latestInitialOptionsRef.current?.syncOptions;
-  console.log('syncOpt', syncOpt);
+
   if (cogsSyncFn) {
     syncApiRef.current = cogsSyncFn(
       updaterFinal as any,
@@ -3198,11 +3206,11 @@ function createProxyHandler<T>(
 
               const updatePath = operation.path;
 
+              // Handle validation...
               const currentMeta =
                 getGlobalStore
                   .getState()
                   .getShadowMetadata(stateKey, updatePath) || {};
-
               const newErrors: ValidationError[] =
                 validationErrorsFromServer.map((err) => ({
                   source: 'sync_engine',
@@ -3211,7 +3219,6 @@ function createProxyHandler<T>(
                   code: err.code,
                 }));
 
-              console.log('updatePath', updatePath);
               getGlobalStore
                 .getState()
                 .setShadowMetadata(stateKey, updatePath, {
@@ -3222,9 +3229,11 @@ function createProxyHandler<T>(
                     lastValidated: Date.now(),
                   },
                 });
+
               effectiveSetState(operation.newValue, updatePath, {
                 updateType: operation.updateType,
                 sync: false,
+                itemId: operation.itemId,
               });
             };
           }
@@ -3435,6 +3444,10 @@ function createProxyHandler<T>(
   }
 
   const rootLevelMethods = {
+    $test: () => {
+      const shadow = shadowStateStore.get(stateKey);
+      console.log('test', shadow); //does nto ahve the data
+    },
     $revertToInitialState: (obj?: { validationKey?: string }) => {
       const shadowMeta = getGlobalStore
         .getState()
@@ -3468,6 +3481,9 @@ function createProxyHandler<T>(
       notifyComponents(stateKey);
 
       return revertState;
+    },
+    $initializeAndMergeShadowState: (newState: T) => {
+      initializeAndMergeShadowState(stateKey, newState);
     },
     $updateInitialState: (newState: T) => {
       stateVersion++;

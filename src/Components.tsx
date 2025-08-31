@@ -11,6 +11,7 @@ import React, {
 import {
   formRefStore,
   getGlobalStore,
+  shadowStateStore,
   ValidationError,
   ValidationSeverity,
 } from './store';
@@ -430,7 +431,9 @@ export function FormElementWrapper({
   const debouncedUpdate = useCallback(
     (newValue: any) => {
       // Use typeInfo to properly convert the value
-
+      const root = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+      const fullShadow = shadowStateStore.get(stateKey);
+      console.log('update root', root, fullShadow);
       if (typeInfo) {
         if (typeInfo.type === 'number' && typeof newValue === 'string') {
           newValue =
