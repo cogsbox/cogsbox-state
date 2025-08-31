@@ -115,8 +115,9 @@ export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-    $addZodValidation: (errors: ValidationError[]) => void;
+    $addZodValidation: (errors: ValidationError[], source?: 'client' | 'sync_engine' | 'api') => void;
     $clearZodValidation: (paths?: string[]) => void;
+    $applyOperation: (operation: UpdateTypeDetail) => void;
     $applyJsonPatch: (patches: any[]) => void;
     $update: UpdateType<T>;
     $_path: string[];
@@ -178,6 +179,8 @@ export type UpdateTypeDetail = {
     oldValue: any;
     newValue: any;
     userId?: number;
+    itemId?: string;
+    insertAfterId?: string;
 };
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
@@ -312,8 +315,9 @@ type GetParamType<SchemaEntry> = SchemaEntry extends {
 export declare function createCogsStateFromSync<TSyncSchema extends {
     schemas: Record<string, {
         schemas: {
-            defaultValues: any;
+            defaults: any;
         };
+        relations?: any;
         api?: {
             queryData?: any;
         };
@@ -321,7 +325,11 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
     }>;
     notifications: Record<string, any>;
 }>(syncSchema: TSyncSchema, useSync: UseSyncType<any>): CogsApi<{
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['relations'] extends object ? TSyncSchema['schemas'][K] extends {
+        schemas: {
+            defaults: infer D;
+        };
+    } ? D : TSyncSchema['schemas'][K]['schemas']['defaults'] : TSyncSchema['schemas'][K]['schemas']['defaults'];
 }, {
     [K in keyof TSyncSchema['schemas']]: GetParamType<TSyncSchema['schemas'][K]>;
 }>;

@@ -247,8 +247,12 @@ export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
-  $addZodValidation: (errors: ValidationError[]) => void;
+  $addZodValidation: (
+    errors: ValidationError[],
+    source?: 'client' | 'sync_engine' | 'api'
+  ) => void;
   $clearZodValidation: (paths?: string[]) => void;
+  $applyOperation: (operation: UpdateTypeDetail) => void;
   $applyJsonPatch: (patches: any[]) => void;
   $update: UpdateType<T>;
   $_path: string[];
@@ -349,8 +353,9 @@ export type UpdateTypeDetail = {
   oldValue: any;
   newValue: any;
   userId?: number;
+  itemId?: string; // For insert: the new item's ID
+  insertAfterId?: string; // For insert: ID to insert after (null = beginning)
 };
-
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType =
   | 'none'
@@ -607,16 +612,15 @@ function setOptions<StateKey, Opt>({
     (mergedOptions.validation && mergedOptions?.validation?.zodSchemaV4) ||
     mergedOptions?.validation?.zodSchemaV3
   ) {
-    if (!mergedOptions?.validation?.onBlur) {
-      // This default will now only apply if onBlur is not explicitly set to something else (including undefined)
-      if (mergedOptions.validation.onBlur === undefined) {
-        // It was explicitly set to undefined, respect that.
-      } else {
-        mergedOptions.validation.onBlur = 'error'; // Default to error on blur
-      }
+    // Only set default if onBlur wasn't explicitly provided
+    const wasOnBlurProvided =
+      options?.validation?.hasOwnProperty('onBlur') ||
+      initialOptions?.validation?.hasOwnProperty('onBlur');
+
+    if (!wasOnBlurProvided) {
+      mergedOptions.validation.onBlur = 'error'; // Default to error on blur
     }
   }
-
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
@@ -806,7 +810,8 @@ export function createCogsStateFromSync<
     schemas: Record<
       string,
       {
-        schemas: { defaultValues: any };
+        schemas: { defaults: any };
+        relations?: any;
         api?: {
           queryData?: any;
         };
@@ -820,7 +825,13 @@ export function createCogsStateFromSync<
   useSync: UseSyncType<any>
 ): CogsApi<
   {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['schemas']['defaultValues'];
+    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['relations'] extends object
+      ? TSyncSchema['schemas'][K] extends {
+          schemas: { defaults: infer D };
+        }
+        ? D
+        : TSyncSchema['schemas'][K]['schemas']['defaults']
+      : TSyncSchema['schemas'][K]['schemas']['defaults'];
   },
   {
     [K in keyof TSyncSchema['schemas']]: GetParamType<
@@ -835,7 +846,16 @@ export function createCogsStateFromSync<
   // Extract defaultValues AND apiParams from each entry
   for (const key in schemas) {
     const entry = schemas[key];
-    initialState[key] = entry?.schemas?.defaultValues || {};
+
+    // Check if we have relations and thus view defaults
+    if (entry?.relations && entry?.schemas?.defaults) {
+      // Use the view defaults when relations are present
+      initialState[key] = entry.schemas.defaults;
+    } else {
+      // Fall back to regular defaultValues
+      initialState[key] = entry?.schemas?.defaults || {};
+    }
+    console.log('initialState', initialState);
 
     // Extract apiParams from the api.queryData._paramType
     if (entry?.api?.queryData?._paramType) {
@@ -1094,78 +1114,34 @@ function getComponentNotifications(
 
   const componentsToNotify = new Set<any>();
 
-  // --- PASS 1: Notify specific subscribers based on update type ---
+  // For insert operations, use the array path not the item path
+  let notificationPath = path;
+  if (result.type === 'insert' && result.itemId) {
+    // We have the new structure with itemId separate
+    notificationPath = path; // Already the array path
+  }
 
-  if (result.type === 'update') {
-    // --- Bubble-up Notification ---
-    // An update to `user.address.street` notifies listeners of `street`, `address`, and `user`.
-    let currentPath = [...path];
-    while (true) {
-      const pathMeta = getShadowMetadata(stateKey, currentPath);
+  // BUBBLE UP: Notify components at this path and all parent paths
+  let currentPath = [...notificationPath];
+  while (true) {
+    const pathMeta = getShadowMetadata(stateKey, currentPath);
 
-      if (pathMeta?.pathComponents) {
-        pathMeta.pathComponents.forEach((componentId: string) => {
-          const component = rootMeta.components?.get(componentId);
-          // NEW: Add component to the set instead of calling forceUpdate()
-          if (component) {
-            const reactiveTypes = Array.isArray(component.reactiveType)
-              ? component.reactiveType
-              : [component.reactiveType || 'component'];
-            if (!reactiveTypes.includes('none')) {
-              componentsToNotify.add(component);
-            }
-          }
-        });
-      }
-
-      if (currentPath.length === 0) break;
-      currentPath.pop(); // Go up one level
-    }
-
-    // --- Deep Object Change Notification ---
-    // If the new value is an object, notify components subscribed to sub-paths that changed.
-    if (
-      result.newValue &&
-      typeof result.newValue === 'object' &&
-      !isArray(result.newValue)
-    ) {
-      const changedSubPaths = getDifferences(result.newValue, result.oldValue);
-
-      changedSubPaths.forEach((subPathString: string) => {
-        const subPath = subPathString.split('.');
-        const fullSubPath = [...path, ...subPath];
-        const subPathMeta = getShadowMetadata(stateKey, fullSubPath);
-
-        if (subPathMeta?.pathComponents) {
-          subPathMeta.pathComponents.forEach((componentId: string) => {
-            const component = rootMeta.components?.get(componentId);
-            // NEW: Add component to the set
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
-              if (!reactiveTypes.includes('none')) {
-                componentsToNotify.add(component);
-              }
-            }
-          });
-        }
-      });
-    }
-  } else if (result.type === 'insert' || result.type === 'cut') {
-    // For array structural changes (add/remove), notify components listening to the parent array.
-    const parentArrayPath = result.type === 'insert' ? path : path.slice(0, -1);
-    const parentMeta = getShadowMetadata(stateKey, parentArrayPath);
-
-    if (parentMeta?.pathComponents) {
-      parentMeta.pathComponents.forEach((componentId: string) => {
+    if (pathMeta?.pathComponents) {
+      pathMeta.pathComponents.forEach((componentId: string) => {
         const component = rootMeta.components?.get(componentId);
-        // NEW: Add component to the set
         if (component) {
-          componentsToNotify.add(component);
+          const reactiveTypes = Array.isArray(component.reactiveType)
+            ? component.reactiveType
+            : [component.reactiveType || 'component'];
+          if (!reactiveTypes.includes('none')) {
+            componentsToNotify.add(component);
+          }
         }
       });
     }
+
+    if (currentPath.length === 0) break;
+    currentPath.pop(); // Go up one level
   }
 
   // --- PASS 2: Handle 'all' and 'deps' reactivity types ---
@@ -1202,8 +1178,16 @@ function getComponentNotifications(
 function handleInsert(
   stateKey: string,
   path: string[],
-  payload: any
-): { type: 'insert'; newValue: any; shadowMeta: any } {
+  payload: any,
+  index?: number
+): {
+  type: 'insert';
+  newValue: any;
+  shadowMeta: any;
+  path: string[];
+  itemId: string;
+  insertAfterId?: string;
+} {
   let newValue;
   if (isFunction(payload)) {
     const { value: currentValue } = getScopedData(stateKey, path);
@@ -1212,21 +1196,26 @@ function handleInsert(
     newValue = payload;
   }
 
-  insertShadowArrayElement(stateKey, path, newValue);
+  const itemId = insertShadowArrayElement(stateKey, path, newValue, index);
   markAsDirty(stateKey, path, { bubble: true });
 
   const updatedMeta = getShadowMetadata(stateKey, path);
-  if (updatedMeta?.arrayKeys) {
-    const newItemKey = updatedMeta.arrayKeys[updatedMeta.arrayKeys.length - 1];
-    if (newItemKey) {
-      const newItemPath = newItemKey.split('.').slice(1);
-      markAsDirty(stateKey, newItemPath, { bubble: false });
-    }
+
+  // Find the ID that comes before this insertion point
+  let insertAfterId: string | undefined;
+  if (updatedMeta?.arrayKeys && index !== undefined && index > 0) {
+    insertAfterId = updatedMeta.arrayKeys[index - 1];
   }
 
-  return { type: 'insert', newValue, shadowMeta: updatedMeta };
+  return {
+    type: 'insert',
+    newValue,
+    shadowMeta: updatedMeta,
+    path: path, // Just the array path now
+    itemId: itemId,
+    insertAfterId: insertAfterId,
+  };
 }
-
 function handleCut(
   stateKey: string,
   path: string[]
@@ -1311,12 +1300,15 @@ function createEffectiveSetState<T>(
     switch (options.updateType) {
       case 'update':
         result = handleUpdate(stateKey, path, payload);
+
         break;
       case 'insert':
         result = handleInsert(stateKey, path, payload);
+
         break;
       case 'cut':
         result = handleCut(stateKey, path);
+
         break;
     }
 
@@ -1333,6 +1325,8 @@ function createEffectiveSetState<T>(
       status: 'new',
       oldValue: result.oldValue,
       newValue: result.newValue ?? null,
+      itemId: result.itemId,
+      insertAfterId: result.insertAfterId,
     };
 
     updateBatchQueue.push(newUpdate);
@@ -1697,7 +1691,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
   const cogsSyncFn = __useSync;
   const syncOpt = latestInitialOptionsRef.current?.syncOptions;
-
+  console.log('syncOpt', syncOpt);
   if (cogsSyncFn) {
     syncApiRef.current = cogsSyncFn(
       updaterFinal as any,
@@ -1958,15 +1952,11 @@ function createProxyHandler<T>(
           const getStatusFunc = () => {
             // ✅ Use the optimized helper to get all data in one efficient call
             const { shadowMeta, value } = getScopedData(stateKey, path, meta);
-
-            // Priority 1: Explicitly dirty items. This is the most important status.
+            console.log('getStatusFunc', path, shadowMeta, value);
             if (shadowMeta?.isDirty === true) {
               return 'dirty';
             }
 
-            // ✅ Priority 2: Synced items. This condition is now cleaner.
-            // An item is considered synced if it came from the server OR was explicitly
-            // marked as not dirty (isDirty: false), covering all sync-related cases.
             if (
               shadowMeta?.stateSource === 'server' ||
               shadowMeta?.isDirty === false
@@ -1974,20 +1964,15 @@ function createProxyHandler<T>(
               return 'synced';
             }
 
-            // Priority 3: Items restored from localStorage.
             if (shadowMeta?.stateSource === 'localStorage') {
               return 'restored';
             }
 
-            // Priority 4: Items from default/initial state.
             if (shadowMeta?.stateSource === 'default') {
               return 'fresh';
             }
 
-            // ✅ REMOVED the redundant "root" check. The item's own `stateSource` is sufficient.
-
-            // Priority 5: A value exists but has no metadata. This is a fallback.
-            if (value !== undefined && !shadowMeta) {
+            if (value !== undefined) {
               return 'fresh';
             }
 
@@ -2464,7 +2449,7 @@ function createProxyHandler<T>(
               path,
               meta
             );
-
+            registerComponentDependency(stateKey, componentId, path);
             if (!arrayKeys || !Array.isArray(shadowValue)) {
               return []; // It's valid to map over an empty array.
             }
@@ -3149,7 +3134,10 @@ function createProxyHandler<T>(
         }
         if (path.length == 0) {
           if (prop === '$addZodValidation') {
-            return (zodErrors: any[]) => {
+            return (
+              zodErrors: any[],
+              source: 'client' | 'sync_engine' | 'api'
+            ) => {
               zodErrors.forEach((error) => {
                 const currentMeta =
                   getGlobalStore
@@ -3164,7 +3152,7 @@ function createProxyHandler<T>(
                       status: 'INVALID',
                       errors: [
                         {
-                          source: 'client',
+                          source: source || 'client',
                           message: error.message,
                           severity: 'error',
                           code: error.code,
@@ -3192,6 +3180,51 @@ function createProxyHandler<T>(
                   errors: [],
                   lastValidated: Date.now(),
                 },
+              });
+            };
+          }
+
+          if (prop === '$applyOperation') {
+            return (operation: UpdateTypeDetail & { validation?: any[] }) => {
+              const validationErrorsFromServer = operation.validation || [];
+
+              if (!operation || !operation.path) {
+                console.error(
+                  'Invalid operation received by $applyOperation:',
+                  operation
+                );
+                return;
+              }
+
+              const updatePath = operation.path;
+
+              const currentMeta =
+                getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, updatePath) || {};
+
+              const newErrors: ValidationError[] =
+                validationErrorsFromServer.map((err) => ({
+                  source: 'sync_engine',
+                  message: err.message,
+                  severity: 'warning',
+                  code: err.code,
+                }));
+
+              console.log('updatePath', updatePath);
+              getGlobalStore
+                .getState()
+                .setShadowMetadata(stateKey, updatePath, {
+                  ...currentMeta,
+                  validation: {
+                    status: newErrors.length > 0 ? 'INVALID' : 'VALID',
+                    errors: newErrors,
+                    lastValidated: Date.now(),
+                  },
+                });
+              effectiveSetState(operation.newValue, updatePath, {
+                updateType: operation.updateType,
+                sync: false,
               });
             };
           }
@@ -3328,7 +3361,6 @@ function createProxyHandler<T>(
                   .getState()
                   .getShadowMetadata(stateKey, path);
 
-                // Update the metadata for this specific path
                 setShadowMetadata(stateKey, path, {
                   ...shadowMeta,
                   isDirty: false,
@@ -3336,7 +3368,6 @@ function createProxyHandler<T>(
                   lastServerSync: Date.now(),
                 });
 
-                // Notify any components that might be subscribed to the sync status
                 const fullPath = [stateKey, ...path].join('.');
                 notifyPathSubscribers(fullPath, {
                   type: 'SYNC_STATUS_CHANGE',
@@ -3410,21 +3441,15 @@ function createProxyHandler<T>(
         .getShadowMetadata(stateKey, []);
       let revertState;
 
-      // Determine the correct state to revert to (same logic as before)
       if (shadowMeta?.stateSource === 'server' && shadowMeta.baseServerState) {
         revertState = shadowMeta.baseServerState;
       } else {
         revertState = getGlobalStore.getState().initialStateGlobal[stateKey];
       }
 
-      // Perform necessary cleanup
       clearSelectedIndexesForState(stateKey);
-
-      // FIX 1: Use the IMMEDIATE, SYNCHRONOUS state reset function.
-      // This is what your tests expect for a clean slate.
       initializeShadowState(stateKey, revertState);
 
-      // Rebuild the proxy's internal shape after the reset
       rebuildStateShape({
         path: [],
         componentId: outerComponentId!,
@@ -3440,8 +3465,6 @@ function createProxyHandler<T>(
         localStorage.removeItem(storageKey);
       }
 
-      // FIX 2: Use the library's BATCHED notification system instead of a manual forceUpdate loop.
-      // This fixes the original infinite loop bug safely.
       notifyComponents(stateKey);
 
       return revertState;
@@ -3527,7 +3550,6 @@ function SignalRenderer({
 
   const value = getShadowValue(proxy._stateKey, proxy._path, viewIds);
 
-  // Setup effect - runs only once
   useEffect(() => {
     const element = elementRef.current;
     if (!element || isSetupRef.current) return;
@@ -3550,7 +3572,6 @@ function SignalRenderer({
 
       instanceIdRef.current = `instance-${crypto.randomUUID()}`;
 
-      // Store signal info in shadow metadata
       const currentMeta =
         getGlobalStore
           .getState()

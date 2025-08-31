@@ -1,5 +1,4 @@
 import { OptionsType, ReactivityType, SyncInfo, UpdateTypeDetail } from './CogsState.js';
-import { ReactNode } from 'react';
 
 export type FreshValuesObject = {
     pathsToValues?: string[];
@@ -44,8 +43,19 @@ export type ValidationState = {
     lastValidated?: number;
     validatedValue?: any;
 };
+export type TypeInfo = {
+    type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'date' | 'unknown';
+    schema: any;
+    source: 'sync' | 'zod4' | 'zod3' | 'runtime' | 'default';
+    default: any;
+    nullable?: boolean;
+    optional?: boolean;
+};
 export type ShadowMetadata = {
+    value?: any;
+    syncArrayIdPrefix?: string;
     id?: string;
+    typeInfo?: TypeInfo;
     stateSource?: 'default' | 'server' | 'localStorage';
     lastServerSync?: number;
     isDirty?: boolean;
@@ -65,21 +75,11 @@ export type ShadowMetadata = {
         validationEnabled: boolean;
         localStorageEnabled: boolean;
     };
-    lastUpdated?: number;
     signals?: Array<{
         instanceId: string;
         parentId: string;
         position: number;
         effect?: string;
-    }>;
-    mapWrappers?: Array<{
-        instanceId: string;
-        path: string[];
-        componentId: string;
-        meta?: any;
-        mapFn: (setter: any, index: number, arraySetter: any) => ReactNode;
-        containerRef: HTMLDivElement | null;
-        rebuildStateShape: any;
     }>;
     transformCaches?: Map<string, {
         validIds: string[];
@@ -96,7 +96,6 @@ export type ShadowMetadata = {
     }>;
 } & ComponentsType;
 type ShadowNode = {
-    value?: any;
     _meta?: ShadowMetadata;
     [key: string]: any;
 };
@@ -110,7 +109,7 @@ export type CogsGlobalState = {
     updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
     insertManyShadowArrayElements: (key: string, arrayPath: string[], newItems: any[], index?: number) => void;
     addItemsToArrayNode: (key: string, arrayPath: string[], newItems: any, newKeys: string[]) => void;
-    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any, index?: number) => void;
+    insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any, index?: number) => string;
     removeShadowArrayElement: (key: string, itemPath: string[]) => void;
     registerComponent: (stateKey: string, componentId: string, registration: any) => void;
     unregisterComponent: (stateKey: string, componentId: string) => void;
@@ -149,8 +148,17 @@ export type CogsGlobalState = {
     setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
     getSyncInfo: (key: string) => SyncInfo | null;
 };
-export declare function buildShadowNode(value: any): ShadowNode;
-export declare function generateId(prefix?: string): string;
+type BuildContext = {
+    stateKey: string;
+    path: string[];
+    schemas: {
+        sync?: any;
+        zodV4?: any;
+        zodV3?: any;
+    };
+};
+export declare function buildShadowNode(stateKey: string, value: any, context?: BuildContext): ShadowNode;
+export declare function generateId(stateKey: string): string;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export {};
 //# sourceMappingURL=store.d.ts.map

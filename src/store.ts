@@ -99,9 +99,28 @@ export type ValidationState = {
   lastValidated?: number;
   validatedValue?: any;
 };
+export type TypeInfo = {
+  type:
+    | 'string'
+    | 'number'
+    | 'boolean'
+    | 'array'
+    | 'object'
+    | 'date'
+    | 'unknown';
+  schema: any; // Store the actual Zod schema object
+  source: 'sync' | 'zod4' | 'zod3' | 'runtime' | 'default';
+  default: any;
+  nullable?: boolean;
+  optional?: boolean;
+};
 
+// Update ShadowMetadata to include typeInfo
 export type ShadowMetadata = {
+  value?: any;
+  syncArrayIdPrefix?: string;
   id?: string;
+  typeInfo?: TypeInfo;
   stateSource?: 'default' | 'server' | 'localStorage';
   lastServerSync?: number;
   isDirty?: boolean;
@@ -119,22 +138,13 @@ export type ShadowMetadata = {
     validationEnabled: boolean;
     localStorageEnabled: boolean;
   };
-  lastUpdated?: number;
   signals?: Array<{
     instanceId: string;
     parentId: string;
     position: number;
     effect?: string;
   }>;
-  mapWrappers?: Array<{
-    instanceId: string;
-    path: string[];
-    componentId: string;
-    meta?: any;
-    mapFn: (setter: any, index: number, arraySetter: any) => ReactNode;
-    containerRef: HTMLDivElement | null;
-    rebuildStateShape: any;
-  }>;
+
   transformCaches?: Map<
     string,
     {
@@ -154,7 +164,6 @@ export type ShadowMetadata = {
 } & ComponentsType;
 
 type ShadowNode = {
-  value?: any;
   _meta?: ShadowMetadata;
   [key: string]: any;
 };
@@ -198,7 +207,7 @@ export type CogsGlobalState = {
     arrayPath: string[],
     newItem: any,
     index?: number
-  ) => void;
+  ) => string;
   removeShadowArrayElement: (key: string, itemPath: string[]) => void;
   registerComponent: (
     stateKey: string,
@@ -256,37 +265,447 @@ export type CogsGlobalState = {
   getSyncInfo: (key: string) => SyncInfo | null;
 };
 
-export function buildShadowNode(value: any): ShadowNode {
-  if (value === null || typeof value !== 'object') {
-    return { value };
+function getTypeFromZodSchema(
+  schema: any,
+  source: 'zod4' | 'zod3' | 'sync' = 'zod4'
+): TypeInfo | null {
+  if (!schema) return null;
+
+  let baseSchema = schema;
+  let isNullable = false;
+  let isOptional = false;
+  let defaultValue: any = undefined;
+  let hasDefault = false;
+
+  // Zod v4 unwrapping
+  if (schema._def) {
+    let current = schema;
+
+    // Keep unwrapping until we get to the base type
+    while (current._def) {
+      const typeName = current._def.typeName;
+
+      if (typeName === 'ZodOptional') {
+        isOptional = true;
+        current = current._def.innerType || current.unwrap();
+      } else if (typeName === 'ZodNullable') {
+        isNullable = true;
+        current = current._def.innerType || current.unwrap();
+      } else if (typeName === 'ZodDefault') {
+        hasDefault = true;
+        defaultValue = current._def.defaultValue();
+        current = current._def.innerType;
+      } else if (typeName === 'ZodEffects') {
+        // Handle .refine(), .transform() etc
+        current = current._def.schema;
+      } else {
+        // We've reached the base type
+        break;
+      }
+    }
+
+    baseSchema = current;
+    const typeName = baseSchema._def?.typeName;
+
+    if (typeName === 'ZodNumber') {
+      return {
+        type: 'number',
+        schema: schema, // Store the original schema with wrappers
+        source,
+        default: hasDefault ? defaultValue : 0,
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (typeName === 'ZodString') {
+      return {
+        type: 'string',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : '',
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (typeName === 'ZodBoolean') {
+      return {
+        type: 'boolean',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : false,
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (typeName === 'ZodArray') {
+      return {
+        type: 'array',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : [],
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (typeName === 'ZodObject') {
+      return {
+        type: 'object',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : {},
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (typeName === 'ZodDate') {
+      return {
+        type: 'date',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : new Date(),
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    }
   }
 
+  // Zod v3 unwrapping
+  if (schema._type) {
+    let current = schema;
+
+    // Check for wrappers in v3
+    while (current) {
+      if (current._type === 'optional') {
+        isOptional = true;
+        current = current._def?.innerType || current._inner;
+      } else if (current._type === 'nullable') {
+        isNullable = true;
+        current = current._def?.innerType || current._inner;
+      } else if (current._def?.defaultValue !== undefined) {
+        hasDefault = true;
+        defaultValue =
+          typeof current._def.defaultValue === 'function'
+            ? current._def.defaultValue()
+            : current._def.defaultValue;
+        break;
+      } else {
+        break;
+      }
+    }
+
+    baseSchema = current;
+
+    if (baseSchema._type === 'number') {
+      return {
+        type: 'number',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : 0,
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (baseSchema._type === 'string') {
+      return {
+        type: 'string',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : '',
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (baseSchema._type === 'boolean') {
+      return {
+        type: 'boolean',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : false,
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (baseSchema._type === 'array') {
+      return {
+        type: 'array',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : [],
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (baseSchema._type === 'object') {
+      return {
+        type: 'object',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : {},
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    } else if (baseSchema._type === 'date') {
+      return {
+        type: 'date',
+        schema: schema,
+        source,
+        default: hasDefault ? defaultValue : new Date(),
+        nullable: isNullable,
+        optional: isOptional,
+      };
+    }
+  }
+
+  return null;
+}
+
+// Helper to get type info from runtime value
+function getTypeFromValue(value: any): TypeInfo {
+  if (value === null) {
+    return {
+      type: 'unknown',
+      schema: null,
+      source: 'default',
+      default: null,
+      nullable: true,
+    };
+  }
+
+  if (value === undefined) {
+    return {
+      type: 'unknown',
+      schema: null,
+      source: 'default',
+      default: undefined,
+      optional: true,
+    };
+  }
+
+  const valueType = typeof value;
+
+  if (valueType === 'number') {
+    return { type: 'number', schema: null, source: 'runtime', default: value };
+  } else if (valueType === 'string') {
+    return { type: 'string', schema: null, source: 'runtime', default: value };
+  } else if (valueType === 'boolean') {
+    return { type: 'boolean', schema: null, source: 'runtime', default: value };
+  } else if (Array.isArray(value)) {
+    return { type: 'array', schema: null, source: 'runtime', default: [] };
+  } else if (value instanceof Date) {
+    return { type: 'date', schema: null, source: 'runtime', default: value };
+  } else if (valueType === 'object') {
+    return { type: 'object', schema: null, source: 'runtime', default: {} };
+  }
+
+  return { type: 'unknown', schema: null, source: 'runtime', default: value };
+}
+type BuildContext = {
+  stateKey: string;
+  path: string[];
+  schemas: {
+    sync?: any;
+    zodV4?: any;
+    zodV3?: any;
+  };
+};
+// Update buildShadowNode to use the new schema storage
+export function buildShadowNode(
+  stateKey: string,
+  value: any,
+  context?: BuildContext
+): ShadowNode {
+  // For primitive values
+  if (value === null || value === undefined || typeof value !== 'object') {
+    const node: ShadowNode = { _meta: {} };
+    node._meta!.value = value;
+    if (context) {
+      let typeInfo: TypeInfo | null = null;
+
+      // 1. Try to get type from sync schema
+      if (context.schemas.sync && context.schemas.sync[context.stateKey]) {
+        const syncEntry = context.schemas.sync[context.stateKey];
+        if (syncEntry.schemas?.validation) {
+          // Navigate to the field in the validation schema
+          let fieldSchema = syncEntry.schemas.validation;
+          for (const segment of context.path) {
+            if (fieldSchema?.shape) {
+              fieldSchema = fieldSchema.shape[segment];
+            } else if (fieldSchema?._def?.shape) {
+              fieldSchema = fieldSchema._def.shape()[segment];
+            }
+          }
+
+          if (fieldSchema) {
+            typeInfo = getTypeFromZodSchema(fieldSchema, 'sync');
+            if (typeInfo) {
+              // Use the default from sync schema if available
+              if (syncEntry.schemas.defaults) {
+                let defaultValue = syncEntry.schemas.defaults;
+                for (const segment of context.path) {
+                  if (defaultValue && typeof defaultValue === 'object') {
+                    defaultValue = defaultValue[segment];
+                  }
+                }
+                if (defaultValue !== undefined) {
+                  typeInfo.default = defaultValue;
+                  // If no value provided and not optional, use the default
+                  if (
+                    (value === undefined || value === null) &&
+                    !typeInfo.optional
+                  ) {
+                    node._meta!.value = defaultValue;
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      // 2. If no sync schema, try Zod v4
+      if (!typeInfo && context.schemas.zodV4) {
+        let fieldSchema = context.schemas.zodV4;
+        for (const segment of context.path) {
+          if (fieldSchema?.shape) {
+            fieldSchema = fieldSchema.shape[segment];
+          } else if (fieldSchema?._def?.shape) {
+            fieldSchema = fieldSchema._def.shape()[segment];
+          }
+        }
+
+        if (fieldSchema) {
+          typeInfo = getTypeFromZodSchema(fieldSchema, 'zod4');
+          if (typeInfo && (value === undefined || value === null)) {
+            // Only use default if the field is not optional/nullable
+            if (!typeInfo.optional && !typeInfo.nullable) {
+              node.value = typeInfo.default;
+            }
+          }
+        }
+      }
+
+      // 3. If no Zod v4, try Zod v3
+      if (!typeInfo && context.schemas.zodV3) {
+        let fieldSchema = context.schemas.zodV3;
+        for (const segment of context.path) {
+          if (fieldSchema?.shape) {
+            fieldSchema = fieldSchema.shape[segment];
+          } else if (fieldSchema?._shape) {
+            fieldSchema = fieldSchema._shape[segment];
+          }
+        }
+
+        if (fieldSchema) {
+          typeInfo = getTypeFromZodSchema(fieldSchema, 'zod3');
+          if (typeInfo && (value === undefined || value === null)) {
+            // Only use default if the field is not optional/nullable
+            if (!typeInfo.optional && !typeInfo.nullable) {
+              node.value = typeInfo.default;
+            }
+          }
+        }
+      }
+
+      // 4. Fall back to runtime type
+      if (!typeInfo) {
+        typeInfo = getTypeFromValue(node._meta!.value);
+      }
+
+      // Store the type info
+      if (typeInfo) {
+        if (!node._meta) node._meta = {};
+        node._meta.typeInfo = typeInfo;
+      }
+    } else {
+      // No context, just use runtime type
+      const typeInfo = getTypeFromValue(value);
+      if (!node._meta) node._meta = {};
+      node._meta.typeInfo = typeInfo;
+    }
+
+    return node;
+  }
+
+  // For arrays
   if (Array.isArray(value)) {
     const arrayNode: ShadowNode = { _meta: { arrayKeys: [] } };
     const idKeys: string[] = [];
 
-    value.forEach((item) => {
-      const itemId = `id:${generateId()}`;
-      arrayNode[itemId] = buildShadowNode(item);
+    value.forEach((item, index) => {
+      const itemId = `${generateId(stateKey)}`;
+      // Pass context down for array items
+      const itemContext = context
+        ? {
+            ...context,
+            path: [...context.path, index.toString()],
+          }
+        : undefined;
+      arrayNode[itemId] = buildShadowNode(stateKey, item, itemContext);
       idKeys.push(itemId);
     });
 
     arrayNode._meta!.arrayKeys = idKeys;
+    if (context) {
+      // Try to get the array schema
+      let arraySchema = null;
+
+      if (context.schemas.zodV4) {
+        let fieldSchema = context.schemas.zodV4;
+        for (const segment of context.path) {
+          if (fieldSchema?.shape) {
+            fieldSchema = fieldSchema.shape[segment];
+          } else if (fieldSchema?._def?.shape) {
+            fieldSchema = fieldSchema._def.shape()[segment];
+          }
+        }
+        arraySchema = fieldSchema;
+      }
+
+      arrayNode._meta!.typeInfo = {
+        type: 'array',
+        schema: arraySchema,
+        source: arraySchema ? 'zod4' : 'runtime',
+        default: [],
+      };
+    }
     return arrayNode;
   }
 
+  // For objects
   if (value.constructor === Object) {
     const objectNode: ShadowNode = { _meta: {} };
     for (const key in value) {
       if (Object.prototype.hasOwnProperty.call(value, key)) {
-        objectNode[key] = buildShadowNode(value[key]);
+        // Pass context down for object properties
+        const propContext = context
+          ? {
+              ...context,
+              path: [...context.path, key],
+            }
+          : undefined;
+        objectNode[key] = buildShadowNode(stateKey, value[key], propContext);
       }
+    }
+    if (context) {
+      // Try to get the object schema
+      let objectSchema = null;
+
+      if (context.schemas.zodV4) {
+        let fieldSchema = context.schemas.zodV4;
+        for (const segment of context.path) {
+          if (fieldSchema?.shape) {
+            fieldSchema = fieldSchema.shape[segment];
+          } else if (fieldSchema?._def?.shape) {
+            fieldSchema = fieldSchema._def.shape()[segment];
+          }
+        }
+        objectSchema = fieldSchema;
+      }
+
+      objectNode._meta!.typeInfo = {
+        type: 'object',
+        schema: objectSchema,
+        source: objectSchema ? 'zod4' : 'runtime',
+        default: {},
+      };
     }
     return objectNode;
   }
 
   return { value };
 }
+
 // store.ts - Replace the shadow store methods with mutable versions
 // store.ts - Replace the shadow store methods with mutable versions
 
@@ -294,10 +713,11 @@ export function buildShadowNode(value: any): ShadowNode {
 const shadowStateStore = new Map<string, ShadowNode>();
 let globalCounter = 0;
 
-export function generateId(prefix = 'id'): string {
-  return `${prefix}:${(globalCounter++).toString(36)}`;
+export function generateId(stateKey: string): string {
+  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
+  const prefix = rootMeta?.syncArrayIdPrefix || 'local';
+  return `id:${prefix}_${(globalCounter++).toString(36)}`;
 }
-
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   // Remove shadowStateStore from Zustand state
 
@@ -340,14 +760,29 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     shadowStateStore.delete(key);
     shadowStateStore.delete(`[${key}`);
 
-    const newRoot = buildShadowNode(initialState);
+    // Get all available schemas for this state
+    const options = get().getInitialOptions(key);
+    const syncSchemas = get().getInitialOptions('__syncSchemas');
+
+    const context: BuildContext = {
+      stateKey: key,
+      path: [],
+      schemas: {
+        sync: syncSchemas,
+        zodV4: options?.validation?.zodSchemaV4,
+        zodV3: options?.validation?.zodSchemaV3,
+      },
+    };
+
+    // Build with context so type info is stored
+    const newRoot = buildShadowNode(key, initialState, context);
+
     if (!newRoot._meta) newRoot._meta = {};
     Object.assign(newRoot._meta, preservedMetadata);
 
     const storageKey = Array.isArray(initialState) ? `[${key}` : key;
     shadowStateStore.set(storageKey, newRoot);
   },
-
   getShadowNode: (key: string, path: string[]): ShadowNode | undefined => {
     let current: any =
       shadowStateStore.get(key) || shadowStateStore.get(`[${key}`);
@@ -413,12 +848,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     const nodeKeys = Object.keys(node);
 
-    const isPrimitiveWrapper =
-      Object.prototype.hasOwnProperty.call(node, 'value') &&
-      nodeKeys.every((k) => k === 'value' || k === '_meta');
-
-    if (isPrimitiveWrapper) {
-      return node.value;
+    if (
+      node._meta &&
+      Object.prototype.hasOwnProperty.call(node._meta, 'value') &&
+      nodeKeys.length === 1 &&
+      nodeKeys[0] === '_meta'
+    ) {
+      return node._meta.value;
     }
 
     const isArrayNode =
@@ -463,7 +899,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       path.length === 0 ? parentNode : parentNode[path[path.length - 1]!];
 
     if (!targetNode) {
-      parentNode[path[path.length - 1]!] = buildShadowNode(newValue);
+      parentNode[path[path.length - 1]!] = buildShadowNode(key, newValue);
       get().notifyPathSubscribers([key, ...path].join('.'), {
         type: 'UPDATE',
         newValue,
@@ -482,7 +918,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         for (const key in nodeToUpdate) {
           if (key !== '_meta') delete nodeToUpdate[key];
         }
-        const newNode = buildShadowNode(plainValue);
+        const newNode = buildShadowNode(key, plainValue);
         Object.assign(nodeToUpdate, newNode);
         if (oldMeta) {
           nodeToUpdate._meta = { ...oldMeta, ...(nodeToUpdate._meta || {}) };
@@ -497,7 +933,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         if (nodeToUpdate[propKey]) {
           intelligentMerge(nodeToUpdate[propKey], childValue);
         } else {
-          nodeToUpdate[propKey] = buildShadowNode(childValue);
+          nodeToUpdate[propKey] = buildShadowNode(key, childValue);
         }
       }
 
@@ -549,14 +985,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   insertShadowArrayElement: (key, arrayPath, newItem, index) => {
     const arrayNode = get().getShadowNode(key, arrayPath);
     if (!arrayNode?._meta?.arrayKeys) {
-      console.error(
+      throw new Error(
         `Array not found at path: ${[key, ...arrayPath].join('.')}`
       );
-      return;
     }
 
-    const newItemId = `id:${generateId()}`;
-    const itemsToAdd = { [newItemId]: buildShadowNode(newItem) };
+    const newItemId = `${generateId(key)}`;
+    const itemsToAdd = { [newItemId]: buildShadowNode(key, newItem) };
 
     // Mutate the array directly
     const currentKeys = arrayNode._meta.arrayKeys;
@@ -581,6 +1016,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       itemKey: `${arrayKey}.${newItemId}`,
       index: insertionPoint,
     });
+
+    return newItemId;
   },
 
   insertManyShadowArrayElements: (key, arrayPath, newItems, index) => {
@@ -600,9 +1037,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const newIds: string[] = [];
 
     newItems.forEach((item) => {
-      const newItemId = `id:${generateId()}`;
+      const newItemId = `${generateId(key)}`;
       newIds.push(newItemId);
-      itemsToAdd[newItemId] = buildShadowNode(item);
+      itemsToAdd[newItemId] = buildShadowNode(key, item);
     });
 
     // Mutate directly

@@ -1,302 +1,295 @@
-import { jsx as w, Fragment as U } from "react/jsx-runtime";
-import P, { memo as _, useState as V, useRef as j, useCallback as J, useEffect as A, useLayoutEffect as x } from "react";
-import { getGlobalStore as p, formRefStore as Q } from "./store.js";
-import { useInView as X } from "react-intersection-observer";
-import { v4 as G } from "uuid";
-import { isDeepEqual as Y } from "./utility.js";
+import { jsx as N, Fragment as X } from "react/jsx-runtime";
+import Q, { memo as ne, useState as R, useRef as D, useCallback as z, useEffect as w, useLayoutEffect as Y } from "react";
+import { getGlobalStore as y, formRefStore as oe } from "./store.js";
+import { useInView as se } from "react-intersection-observer";
+import { v4 as Z } from "uuid";
+import { isDeepEqual as ie } from "./utility.js";
 const {
-  getInitialOptions: Z,
-  getShadowMetadata: H,
-  setShadowMetadata: b,
-  getShadowValue: R,
-  registerComponent: K,
-  unregisterComponent: ee,
-  notifyPathSubscribers: te,
-  subscribeToPath: re
-} = p.getState();
-function ne({
-  formOpts: e,
-  path: t,
+  getInitialOptions: ae,
+  getShadowMetadata: ce,
+  setShadowMetadata: U,
+  getShadowValue: x,
+  registerComponent: le,
+  unregisterComponent: ue,
+  notifyPathSubscribers: de,
+  subscribeToPath: fe
+} = y.getState();
+function ge({
+  formOpts: t,
+  path: e,
   stateKey: n,
-  children: o
+  children: s
 }) {
-  const { getInitialOptions: l, getShadowMetadata: a, getShadowValue: s } = p.getState(), f = l(n), g = a(n, t)?.validation, i = g?.status || "NOT_VALIDATED", S = (g?.errors || []).map((d) => ({
-    ...d,
-    path: t
-  })), u = S.filter((d) => d.severity === "error").map((d) => d.message), c = S.filter((d) => d.severity === "warning").map((d) => d.message), L = u[0] || c[0], M = u.length > 0 ? "error" : c.length > 0 ? "warning" : void 0;
-  return /* @__PURE__ */ w(U, { children: f?.formElements?.validation && !e?.validation?.disable ? f.formElements.validation({
-    children: /* @__PURE__ */ w(P.Fragment, { children: o }, t.toString()),
-    status: i,
+  const { getInitialOptions: l, getShadowMetadata: i, getShadowValue: a } = y.getState(), f = l(n), T = i(n, e)?.validation, c = T?.status || "NOT_VALIDATED", g = (T?.errors || []).map((o) => ({
+    ...o,
+    path: e
+  })), u = g.filter((o) => o.severity === "error").map((o) => o.message), d = g.filter((o) => o.severity === "warning").map((o) => o.message), E = u[0] || d[0], m = u.length > 0 ? "error" : d.length > 0 ? "warning" : void 0;
+  return /* @__PURE__ */ N(X, { children: f?.formElements?.validation && !t?.validation?.disable ? f.formElements.validation({
+    children: /* @__PURE__ */ N(Q.Fragment, { children: s }, e.toString()),
+    status: c,
     // Now passes the new ValidationStatus type
-    message: e?.validation?.hideMessage ? "" : e?.validation?.message || L || "",
-    severity: M,
+    message: t?.validation?.hideMessage ? "" : t?.validation?.message || E || "",
+    severity: m,
     hasErrors: u.length > 0,
-    hasWarnings: c.length > 0,
-    allErrors: S,
-    path: t,
-    getData: () => s(n, t)
-  }) : /* @__PURE__ */ w(P.Fragment, { children: o }, t.toString()) });
+    hasWarnings: d.length > 0,
+    allErrors: g,
+    path: e,
+    getData: () => a(n, e)
+  }) : /* @__PURE__ */ N(Q.Fragment, { children: s }, e.toString()) });
 }
-const ge = _(
-  oe,
-  (e, t) => e.itemPath.join(".") === t.itemPath.join(".") && e.stateKey === t.stateKey && e.itemComponentId === t.itemComponentId && e.localIndex === t.localIndex
+const Te = ne(
+  me,
+  (t, e) => t.itemPath.join(".") === e.itemPath.join(".") && t.stateKey === e.stateKey && t.itemComponentId === e.itemComponentId && t.localIndex === e.localIndex
 );
-function oe({
-  stateKey: e,
-  itemComponentId: t,
+function me({
+  stateKey: t,
+  itemComponentId: e,
   itemPath: n,
-  localIndex: o,
+  localIndex: s,
   arraySetter: l,
-  rebuildStateShape: a,
-  renderFn: s
+  rebuildStateShape: i,
+  renderFn: a
 }) {
-  const [, f] = V({}), { ref: I, inView: g } = X(), i = j(null), S = ae(i), u = j(!1), c = [e, ...n].join(".");
-  B(e, t, f);
-  const L = J(
-    (r) => {
-      i.current = r, I(r);
+  const [, f] = R({}), { ref: I, inView: T } = se(), c = D(null), g = Se(c), u = D(!1), d = [t, ...n].join(".");
+  $(t, e, f);
+  const E = z(
+    (S) => {
+      c.current = S, I(S);
     },
     [I]
   );
-  A(() => {
-    const r = re(c, (m) => {
+  w(() => {
+    const S = fe(d, (O) => {
       f({});
     });
-    return () => r();
-  }, [c]), A(() => {
-    if (!g || !S || u.current)
+    return () => S();
+  }, [d]), w(() => {
+    if (!T || !g || u.current)
       return;
-    const r = i.current;
-    if (r && r.offsetHeight > 0) {
+    const S = c.current;
+    if (S && S.offsetHeight > 0) {
       u.current = !0;
-      const m = r.offsetHeight;
-      b(e, n, {
+      const O = S.offsetHeight;
+      U(t, n, {
         virtualizer: {
-          itemHeight: m,
-          domRef: r
+          itemHeight: O,
+          domRef: S
         }
       });
-      const v = n.slice(0, -1), D = [e, ...v].join(".");
-      te(D, {
+      const B = n.slice(0, -1), F = [t, ...B].join(".");
+      de(F, {
         type: "ITEMHEIGHT",
         itemKey: n.join("."),
-        ref: i.current
+        ref: c.current
       });
     }
-  }, [g, S, e, n]);
-  const M = R(e, n);
-  if (M === void 0)
+  }, [T, g, t, n]);
+  const m = x(t, n);
+  if (m === void 0)
     return null;
-  const d = a({
-    currentState: M,
+  const o = i({
+    currentState: m,
     path: n,
-    componentId: t
-  }), z = s(d, o, l);
-  return /* @__PURE__ */ w("div", { ref: L, children: z });
+    componentId: e
+  }), M = a(o, s, l);
+  return /* @__PURE__ */ N("div", { ref: E, children: M });
 }
-function me({
-  stateKey: e,
-  path: t,
+function Ee({
+  stateKey: t,
+  path: e,
   rebuildStateShape: n,
-  renderFn: o,
+  renderFn: s,
   formOpts: l,
-  setState: a
+  setState: i
 }) {
-  const [s] = V(() => G()), [, f] = V({}), I = [e, ...t].join(".");
-  B(e, s, f);
-  const g = R(e, t), [i, S] = V(g), u = j(!1), c = j(null);
-  A(() => {
-    !u.current && !Y(g, i) && S(g);
-  }, [g]), A(() => {
-    const r = p.getState().subscribeToPath(I, (m) => {
-      !u.current && i !== m && f({});
+  const a = D(Z()).current, [, f] = R({}), I = [t, ...e].join(".");
+  $(t, a, f);
+  const c = y.getState().getShadowNode(t, e)?._meta?.typeInfo, g = c?.schema, u = x(t, e), [d, E] = R(u), m = D(!1), o = D(null);
+  w(() => {
+    !m.current && !ie(u, d) && E(u);
+  }, [u]), w(() => {
+    const r = y.getState().subscribeToPath(I, (b) => {
+      !m.current && d !== b && f({});
     });
     return () => {
-      r(), c.current && (clearTimeout(c.current), u.current = !1);
+      r(), o.current && (clearTimeout(o.current), m.current = !1);
     };
   }, []);
-  const L = J(
-    (r) => {
-      typeof g === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), S(r), u.current = !0, c.current && clearTimeout(c.current);
-      const v = l?.debounceTime ?? 200;
-      c.current = setTimeout(() => {
-        if (u.current = !1, a(r, t, { updateType: "update" }), !p.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
-        const h = Z(e)?.validation, N = h?.zodSchemaV4 || h?.zodSchemaV3;
-        if (N && h?.onChange) {
-          const E = R(e, []), C = N.safeParse(E), y = H(e, t) || {};
-          if (C.success)
-            b(e, t, {
-              ...y,
-              validation: {
-                status: "VALID",
-                errors: [],
-                lastValidated: Date.now(),
-                validatedValue: r
+  const M = z(
+    (r, b) => {
+      if (!y.getState().getShadowMetadata(t, [])?.features?.validationEnabled) return;
+      const h = ae(t)?.validation;
+      if (!h) return;
+      const V = ce(t, e) || {}, K = V?.validation?.status;
+      let C = !1, W;
+      if (console.log("trigger", b, h), b === "onBlur" && h.onBlur ? (C = !0, W = h.onBlur ?? "error") : b === "onChange" && (h.onChange ? (C = !0, W = h.onChange) : K === "INVALID" && (C = !0, W = "warning")), !C) return;
+      let v = null;
+      if (console.log(
+        "shouldValidate 33",
+        e,
+        g,
+        C,
+        r,
+        typeof r
+      ), g && C) {
+        const p = g.safeParse(r);
+        p.success ? v = { success: !0 } : v = {
+          success: !1,
+          message: ("issues" in p.error ? p.error.issues : p.error.errors)[0]?.message || "Invalid value"
+        };
+      } else {
+        const p = h.zodSchemaV4 || h.zodSchemaV3;
+        if (!p) return;
+        const q = x(t, []), P = JSON.parse(JSON.stringify(q));
+        let j = P;
+        for (let L = 0; L < e.length - 1; L++)
+          j[e[L]] || (j[e[L]] = {}), j = j[e[L]];
+        e.length > 0 ? j[e[e.length - 1]] = r : Object.assign(P, r);
+        const A = p.safeParse(P);
+        if (A.success)
+          v = { success: !0 };
+        else {
+          const G = ("issues" in A.error ? A.error.issues : A.error.errors).filter((_) => {
+            if (e.some((H) => H.startsWith("id:"))) {
+              const H = e[0].startsWith("id:") ? [] : e.slice(0, -1), k = y.getState().getShadowMetadata(t, H);
+              if (k?.arrayKeys) {
+                e.slice(0, -1).join(".");
+                const ee = k.arrayKeys.findIndex(
+                  (re) => re === e[e.length - 2]
+                ), te = [...H, ee, ...e.slice(-1)];
+                return JSON.stringify(_.path) === JSON.stringify(te);
               }
-            });
-          else {
-            const W = ("issues" in C.error ? C.error.issues : C.error.errors).filter(
-              (T) => JSON.stringify(T.path) === JSON.stringify(t)
-            );
-            W.length > 0 ? b(e, t, {
-              ...y,
-              validation: {
-                status: "INVALID",
-                errors: [
-                  {
-                    source: "client",
-                    message: W[0]?.message,
-                    severity: h?.onChange || "warning"
-                  }
-                ],
-                lastValidated: Date.now(),
-                validatedValue: r
-              }
-            }) : b(e, t, {
-              ...y,
-              validation: {
-                status: "VALID",
-                errors: [],
-                lastValidated: Date.now(),
-                validatedValue: r
-              }
-            });
-          }
+            }
+            return JSON.stringify(_.path) === JSON.stringify(e);
+          });
+          G.length > 0 ? v = {
+            success: !1,
+            message: G[0]?.message
+          } : v = { success: !0 };
         }
-      }, v), f({});
-    },
-    [a, t, l?.debounceTime, e]
-  ), M = J(async () => {
-    if (console.log("handleBlur triggered"), c.current && (clearTimeout(c.current), c.current = null, u.current = !1, a(i, t, { updateType: "update" })), !H(e, [])?.features?.validationEnabled) return;
-    const { getInitialOptions: m } = p.getState(), v = m(e)?.validation, D = v?.zodSchemaV4 || v?.zodSchemaV3;
-    if (!D || !v?.onBlur) return;
-    const h = H(e, t);
-    b(e, t, {
-      ...h,
-      validation: {
-        status: "VALIDATING",
-        errors: [],
-        lastValidated: Date.now(),
-        validatedValue: i
       }
-    });
-    const N = R(e, []), E = D.safeParse(N);
-    if (E.success)
-      b(e, t, {
-        ...h,
+      v && (v.success ? U(t, e, {
+        ...V,
         validation: {
           status: "VALID",
           errors: [],
           lastValidated: Date.now(),
-          validatedValue: i
+          validatedValue: r
         }
-      });
-    else {
-      const y = ("issues" in E.error ? E.error.issues : E.error.errors).filter((O) => {
-        if (t.some((T) => T.startsWith("id:"))) {
-          const T = t[0].startsWith("id:") ? [] : t.slice(0, -1), F = p.getState().getShadowMetadata(e, T);
-          if (F?.arrayKeys) {
-            const $ = [e, ...t.slice(0, -1)].join("."), q = F.arrayKeys.indexOf($), k = [...T, q, ...t.slice(-1)];
-            return JSON.stringify(O.path) === JSON.stringify(k);
-          }
-        }
-        return JSON.stringify(O.path) === JSON.stringify(t);
-      });
-      b(e, t, {
-        ...h,
+      }) : U(t, e, {
+        ...V,
         validation: {
           status: "INVALID",
-          errors: y.map((O) => ({
-            source: "client",
-            message: O.message,
-            severity: v.onBlur
-          })),
+          errors: [
+            {
+              source: "client",
+              message: v.message,
+              severity: W
+            }
+          ],
           lastValidated: Date.now(),
-          validatedValue: i
+          validatedValue: r
         }
-      });
-    }
-    f({});
-  }, [e, t, i, a]), d = n({
-    path: t,
-    componentId: s,
+      })), f({});
+    },
+    [t, e, g]
+  ), S = z(
+    (r) => {
+      c ? c.type === "number" && typeof r == "string" ? r = r === "" ? c.nullable ? null : c.default ?? 0 : Number(r) : c.type === "boolean" && typeof r == "string" ? r = r === "true" || r === "1" : c.type === "date" && typeof r == "string" && (r = new Date(r)) : typeof u === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), E(r), M(r, "onChange"), m.current = !0, o.current && clearTimeout(o.current);
+      const b = l?.debounceTime ?? 200;
+      o.current = setTimeout(() => {
+        m.current = !1, i(r, e, { updateType: "update" });
+      }, b);
+    },
+    [
+      i,
+      e,
+      l?.debounceTime,
+      M,
+      c,
+      u
+    ]
+  ), O = z(() => {
+    o.current && (clearTimeout(o.current), o.current = null, m.current = !1, i(d, e, { updateType: "update" })), M(d, "onBlur");
+  }, [d, i, e, M]), B = n({
+    path: e,
+    componentId: a,
     meta: void 0
-  }), z = new Proxy(d, {
-    get(r, m) {
-      return m === "$inputProps" ? {
-        value: i ?? "",
-        onChange: (v) => {
-          L(v.target.value);
+  }), F = new Proxy(B, {
+    get(r, b) {
+      return b === "$inputProps" ? {
+        value: d ?? "",
+        onChange: (J) => {
+          S(J.target.value);
         },
-        // 5. Wire the new onBlur handler to the input props.
-        onBlur: M,
-        ref: Q.getState().getFormRef(e + "." + t.join("."))
-      } : r[m];
+        onBlur: O,
+        ref: oe.getState().getFormRef(t + "." + e.join("."))
+      } : r[b];
     }
   });
-  return /* @__PURE__ */ w(ne, { formOpts: l, path: t, stateKey: e, children: o(z) });
+  return /* @__PURE__ */ N(ge, { formOpts: l, path: e, stateKey: t, children: s(F) });
 }
-function B(e, t, n) {
-  const o = `${e}////${t}`;
-  x(() => (K(e, o, {
+function $(t, e, n) {
+  const s = `${t}////${e}`;
+  Y(() => (le(t, s, {
     forceUpdate: () => n({}),
     paths: /* @__PURE__ */ new Set(),
     reactiveType: ["component"]
   }), () => {
-    ee(e, o);
-  }), [e, o]);
+    ue(t, s);
+  }), [t, s]);
 }
-const ae = (e) => {
-  const [t, n] = V(!1);
-  return x(() => {
-    if (!e.current) {
+const Se = (t) => {
+  const [e, n] = R(!1);
+  return Y(() => {
+    if (!t.current) {
       n(!0);
       return;
     }
-    const o = Array.from(e.current.querySelectorAll("img"));
-    if (o.length === 0) {
+    const s = Array.from(t.current.querySelectorAll("img"));
+    if (s.length === 0) {
       n(!0);
       return;
     }
     let l = 0;
-    const a = () => {
-      l++, l === o.length && n(!0);
+    const i = () => {
+      l++, l === s.length && n(!0);
     };
-    return o.forEach((s) => {
-      s.complete ? a() : (s.addEventListener("load", a), s.addEventListener("error", a));
+    return s.forEach((a) => {
+      a.complete ? i() : (a.addEventListener("load", i), a.addEventListener("error", i));
     }), () => {
-      o.forEach((s) => {
-        s.removeEventListener("load", a), s.removeEventListener("error", a);
+      s.forEach((a) => {
+        a.removeEventListener("load", i), a.removeEventListener("error", i);
       });
     };
-  }, [e.current]), t;
+  }, [t.current]), e;
 };
-function ve({
-  stateKey: e,
-  path: t,
+function Me({
+  stateKey: t,
+  path: e,
   rebuildStateShape: n,
-  renderFn: o
+  renderFn: s
 }) {
-  const [l] = V(() => G()), [, a] = V({}), s = [e, ...t].join(".");
-  B(e, l, a), A(() => {
-    const I = p.getState().subscribeToPath(s, () => {
-      a({});
+  const [l] = R(() => Z()), [, i] = R({}), a = [t, ...e].join(".");
+  $(t, l, i), w(() => {
+    const I = y.getState().subscribeToPath(a, () => {
+      i({});
     });
     return () => I();
-  }, [s]);
+  }, [a]);
   const f = n({
-    path: t,
+    path: e,
     componentId: l,
     meta: void 0
   });
-  return /* @__PURE__ */ w(U, { children: o(f) });
+  return /* @__PURE__ */ N(X, { children: s(f) });
 }
 export {
-  me as FormElementWrapper,
-  ve as IsolatedComponentWrapper,
-  oe as ListItemWrapper,
-  ge as MemoizedCogsItemWrapper,
-  ne as ValidationWrapper,
-  B as useRegisterComponent
+  Ee as FormElementWrapper,
+  Me as IsolatedComponentWrapper,
+  me as ListItemWrapper,
+  Te as MemoizedCogsItemWrapper,
+  ge as ValidationWrapper,
+  $ as useRegisterComponent
 };
 //# sourceMappingURL=Components.jsx.map

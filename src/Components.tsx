@@ -222,11 +222,17 @@ export function FormElementWrapper({
   formOpts?: FormOptsType;
   setState: any;
 }) {
-  const [componentId] = useState(() => uuidv4());
+  const componentId = useRef(uuidv4()).current;
   const [, forceUpdate] = useState({});
 
   const stateKeyPathKey = [stateKey, ...path].join('.');
   useRegisterComponent(stateKey, componentId, forceUpdate);
+
+  // Get the shadow node to access typeInfo and schema
+  const shadowNode = getGlobalStore.getState().getShadowNode(stateKey, path);
+  const typeInfo = shadowNode?._meta?.typeInfo;
+  const fieldSchema = typeInfo?.schema; // The actual Zod schema for this field
+
   const globalStateValue = getShadowValue(stateKey, path);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
@@ -258,13 +264,204 @@ export function FormElementWrapper({
     };
   }, []);
 
+  // Separate validation function that uses the field's schema
+  const validateField = useCallback(
+    (value: any, trigger: 'onChange' | 'onBlur') => {
+      const rootMeta = getGlobalStore
+        .getState()
+        .getShadowMetadata(stateKey, []);
+      if (!rootMeta?.features?.validationEnabled) return;
+
+      const validationOptions = getInitialOptions(stateKey)?.validation;
+
+      if (!validationOptions) return;
+
+      const currentMeta = getShadowMetadata(stateKey, path) || {};
+      const currentStatus = currentMeta?.validation?.status;
+
+      let shouldValidate = false;
+      let severity: 'error' | 'warning' | undefined;
+      console.log('trigger', trigger, validationOptions);
+      if (trigger === 'onBlur' && validationOptions.onBlur) {
+        shouldValidate = true;
+        severity = validationOptions.onBlur ?? 'error';
+      } else if (trigger === 'onChange') {
+        if (validationOptions.onChange) {
+          shouldValidate = true;
+          severity = validationOptions.onChange;
+        } else if (currentStatus === 'INVALID') {
+          shouldValidate = true;
+          severity = 'warning';
+        }
+      }
+
+      if (!shouldValidate) return;
+
+      let validationResult: { success: boolean; message?: string } | null =
+        null;
+      console.log(
+        'shouldValidate 33',
+        path,
+        fieldSchema,
+        shouldValidate,
+        value,
+        typeof value
+      );
+      if (fieldSchema && shouldValidate) {
+        // Direct field validation using its own schema
+        const result = fieldSchema.safeParse(value);
+
+        if (!result.success) {
+          const errors =
+            'issues' in result.error
+              ? result.error.issues
+              : (result.error as any).errors;
+
+          validationResult = {
+            success: false,
+            message: errors[0]?.message || 'Invalid value',
+          };
+        } else {
+          validationResult = { success: true };
+        }
+      } else {
+        // Fallback: validate using the entire schema
+        const zodSchema =
+          validationOptions.zodSchemaV4 || validationOptions.zodSchemaV3;
+        if (!zodSchema) return;
+
+        // Create a test state with the new value at the correct path
+        const fullState = getShadowValue(stateKey, []);
+        const testState = JSON.parse(JSON.stringify(fullState)); // Deep clone
+
+        // Set the value at the correct path
+        let current = testState;
+        for (let i = 0; i < path.length - 1; i++) {
+          if (!current[path[i]!]) current[path[i]!] = {};
+          current = current[path[i]!];
+        }
+        if (path.length > 0) {
+          current[path[path.length - 1]!] = value;
+        } else {
+          // Root level update
+          Object.assign(testState, value);
+        }
+
+        const result = zodSchema.safeParse(testState);
+
+        if (!result.success) {
+          const errors =
+            'issues' in result.error
+              ? result.error.issues
+              : (result.error as any).errors;
+
+          // Find errors for this specific path
+          const pathErrors = errors.filter((error: any) => {
+            // Handle array paths with id: prefixes
+            if (path.some((p) => p.startsWith('id:'))) {
+              const parentPath = path[0]!.startsWith('id:')
+                ? []
+                : path.slice(0, -1);
+              const arrayMeta = getGlobalStore
+                .getState()
+                .getShadowMetadata(stateKey, parentPath);
+
+              if (arrayMeta?.arrayKeys) {
+                const itemKey = path.slice(0, -1).join('.');
+                const itemIndex = arrayMeta.arrayKeys.findIndex(
+                  (k) => k === path[path.length - 2]
+                );
+                const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
+                return JSON.stringify(error.path) === JSON.stringify(zodPath);
+              }
+            }
+
+            return JSON.stringify(error.path) === JSON.stringify(path);
+          });
+
+          if (pathErrors.length > 0) {
+            validationResult = {
+              success: false,
+              message: pathErrors[0]?.message,
+            };
+          } else {
+            validationResult = { success: true };
+          }
+        } else {
+          validationResult = { success: true };
+        }
+      }
+
+      // Update validation state based on result
+      if (validationResult) {
+        if (!validationResult.success) {
+          setShadowMetadata(stateKey, path, {
+            ...currentMeta,
+            validation: {
+              status: 'INVALID',
+              errors: [
+                {
+                  source: 'client' as const,
+                  message: validationResult.message!,
+                  severity: severity!,
+                },
+              ],
+              lastValidated: Date.now(),
+              validatedValue: value,
+            },
+          });
+        } else {
+          setShadowMetadata(stateKey, path, {
+            ...currentMeta,
+            validation: {
+              status: 'VALID',
+              errors: [],
+              lastValidated: Date.now(),
+              validatedValue: value,
+            },
+          });
+        }
+      }
+      forceUpdate({});
+    },
+    [stateKey, path, fieldSchema]
+  );
+
   const debouncedUpdate = useCallback(
     (newValue: any) => {
-      const currentType = typeof globalStateValue;
-      if (currentType === 'number' && typeof newValue === 'string') {
-        newValue = newValue === '' ? 0 : Number(newValue);
+      // Use typeInfo to properly convert the value
+
+      if (typeInfo) {
+        if (typeInfo.type === 'number' && typeof newValue === 'string') {
+          newValue =
+            newValue === ''
+              ? typeInfo.nullable
+                ? null
+                : (typeInfo.default ?? 0)
+              : Number(newValue);
+        } else if (
+          typeInfo.type === 'boolean' &&
+          typeof newValue === 'string'
+        ) {
+          newValue = newValue === 'true' || newValue === '1';
+        } else if (typeInfo.type === 'date' && typeof newValue === 'string') {
+          newValue = new Date(newValue);
+        }
+      } else {
+        // Fallback to old behavior if no typeInfo
+
+        const currentType = typeof globalStateValue;
+
+        if (currentType === 'number' && typeof newValue === 'string') {
+          newValue = newValue === '' ? 0 : Number(newValue);
+        }
       }
+
       setLocalValue(newValue);
+
+      // Validate immediately on change (will only run if configured or clearing errors)
+      validateField(newValue, 'onChange');
+
       isCurrentlyDebouncing.current = true;
 
       if (debounceTimeoutRef.current) {
@@ -273,183 +470,34 @@ export function FormElementWrapper({
 
       const debounceTime = formOpts?.debounceTime ?? 200;
 
+      // Debounce only the state update, not the validation
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
         setState(newValue, path, { updateType: 'update' });
-
-        // NEW: Check if validation is enabled via features
-        const rootMeta = getGlobalStore
-          .getState()
-          .getShadowMetadata(stateKey, []);
-        if (!rootMeta?.features?.validationEnabled) return;
-
-        const validationOptions = getInitialOptions(stateKey)?.validation;
-        const zodSchema =
-          validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
-
-        if (zodSchema && validationOptions?.onChange) {
-          const fullState = getShadowValue(stateKey, []);
-          const result = zodSchema.safeParse(fullState);
-          const currentMeta = getShadowMetadata(stateKey, path) || {};
-
-          if (!result.success) {
-            const errors =
-              'issues' in result.error
-                ? result.error.issues
-                : (result.error as any).errors;
-
-            const pathErrors = errors.filter(
-              (error: any) =>
-                JSON.stringify(error.path) === JSON.stringify(path)
-            );
-
-            if (pathErrors.length > 0) {
-              setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                validation: {
-                  status: 'INVALID',
-                  errors: [
-                    {
-                      source: 'client',
-                      message: pathErrors[0]?.message,
-                      severity: validationOptions?.onChange || 'warning',
-                    },
-                  ],
-                  lastValidated: Date.now(),
-                  validatedValue: newValue,
-                },
-              });
-            } else {
-              setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                validation: {
-                  status: 'VALID',
-                  errors: [],
-                  lastValidated: Date.now(),
-                  validatedValue: newValue,
-                },
-              });
-            }
-          } else {
-            setShadowMetadata(stateKey, path, {
-              ...currentMeta,
-              validation: {
-                status: 'VALID',
-                errors: [],
-                lastValidated: Date.now(),
-                validatedValue: newValue,
-              },
-            });
-          }
-        }
       }, debounceTime);
-      forceUpdate({});
     },
-    [setState, path, formOpts?.debounceTime, stateKey]
+    [
+      setState,
+      path,
+      formOpts?.debounceTime,
+      validateField,
+      typeInfo,
+      globalStateValue,
+    ]
   );
 
-  const handleBlur = useCallback(async () => {
-    console.log('handleBlur triggered');
-
-    // Commit any pending changes
+  const handleBlur = useCallback(() => {
+    // Commit any pending changes immediately
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
       setState(localValue, path, { updateType: 'update' });
     }
-    const rootMeta = getShadowMetadata(stateKey, []);
-    if (!rootMeta?.features?.validationEnabled) return;
-    const { getInitialOptions } = getGlobalStore.getState();
-    const validationOptions = getInitialOptions(stateKey)?.validation;
-    const zodSchema =
-      validationOptions?.zodSchemaV4 || validationOptions?.zodSchemaV3;
 
-    if (!zodSchema || !validationOptions?.onBlur) return;
-    // Get the full path including stateKey
-
-    // Update validation state to "validating"
-    const currentMeta = getShadowMetadata(stateKey, path);
-
-    setShadowMetadata(stateKey, path, {
-      ...currentMeta,
-      validation: {
-        status: 'VALIDATING',
-        errors: [],
-        lastValidated: Date.now(),
-        validatedValue: localValue,
-      },
-    });
-
-    // Validate full state
-    const fullState = getShadowValue(stateKey, []);
-    const result = zodSchema.safeParse(fullState);
-
-    if (!result.success) {
-      const errors =
-        'issues' in result.error
-          ? result.error.issues
-          : (result.error as any).errors;
-
-      // Find errors for this specific path
-      const pathErrors = errors.filter((error: any) => {
-        // For array paths, we need to translate indices to ULIDs
-        if (path.some((p) => p.startsWith('id:'))) {
-          // This is an array item path like ["id:xyz", "name"]
-          const parentPath = path[0]!.startsWith('id:')
-            ? []
-            : path.slice(0, -1);
-
-          const arrayMeta = getGlobalStore
-            .getState()
-            .getShadowMetadata(stateKey, parentPath);
-
-          if (arrayMeta?.arrayKeys) {
-            const itemKey = [stateKey, ...path.slice(0, -1)].join('.');
-            const itemIndex = arrayMeta.arrayKeys.indexOf(itemKey);
-
-            // Compare with Zod path
-            const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
-            const match =
-              JSON.stringify(error.path) === JSON.stringify(zodPath);
-
-            return match;
-          }
-        }
-
-        const directMatch = JSON.stringify(error.path) === JSON.stringify(path);
-
-        return directMatch;
-      });
-
-      // Update shadow metadata with validation result
-      setShadowMetadata(stateKey, path, {
-        ...currentMeta,
-        validation: {
-          status: 'INVALID',
-          errors: pathErrors.map((err: any) => ({
-            source: 'client' as const,
-            message: err.message,
-            severity: validationOptions.onBlur as 'error' | 'warning',
-          })),
-          lastValidated: Date.now(),
-          validatedValue: localValue,
-        },
-      });
-    } else {
-      // Validation passed
-      setShadowMetadata(stateKey, path, {
-        ...currentMeta,
-        validation: {
-          status: 'VALID',
-          errors: [],
-          lastValidated: Date.now(),
-          validatedValue: localValue,
-        },
-      });
-    }
-    forceUpdate({});
-  }, [stateKey, path, localValue, setState]);
+    // Validate on blur
+    validateField(localValue, 'onBlur');
+  }, [localValue, setState, path, validateField]);
 
   const baseState = rebuildStateShape({
     path: path,
@@ -465,7 +513,6 @@ export function FormElementWrapper({
           onChange: (e: any) => {
             debouncedUpdate(e.target.value);
           },
-          // 5. Wire the new onBlur handler to the input props.
           onBlur: handleBlur,
           ref: formRefStore
             .getState()
