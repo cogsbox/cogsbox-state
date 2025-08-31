@@ -1,0 +1,1 @@
+{"version":3,"file":"TRPCValidationLink.d.ts","sourceRoot":"","sources":["../src/TRPCValidationLink.ts"],"names":[],"mappings":"AAEA,OAAO,KAAK,EAAE,SAAS,EAAE,MAAM,cAAc,CAAC;AAC9C,OAAO,KAAK,EAAE,QAAQ,EAAE,MAAM,cAAc,CAAC;AAK7C,eAAO,MAAM,yBAAyB,GACpC,OAAO,SAAS,SAAS,EACzB,aAAa;IACb,GAAG,CAAC,EAAE,OAAO,CAAC;CACf,WAEgC,QAAQ,CAAC,OAAO,CAuDhD,CAAC"}
