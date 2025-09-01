@@ -153,7 +153,16 @@ function m(e, n) {
     (r) => r.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean)
   );
 }
-function N(e) {
+function N(e, n) {
+  let i = null;
+  const r = (...t) => {
+    i && clearTimeout(i), i = setTimeout(() => e(...t), n);
+  };
+  return r.cancel = () => {
+    i && (clearTimeout(i), i = null);
+  }, r;
+}
+function O(e) {
   const n = (l) => Object.values(l).some(
     (s) => s?.hasOwnProperty("initialState")
   );
@@ -166,17 +175,8 @@ function N(e) {
   };
   return [n(e) ? r(e) : e, i];
 }
-function O(e, n) {
-  let i = null;
-  const r = (...t) => {
-    i && clearTimeout(i), i = setTimeout(() => e(...t), n);
-  };
-  return r.cancel = () => {
-    i && (clearTimeout(i), i = null);
-  }, r;
-}
 export {
-  O as debounce,
+  N as debounce,
   A as deepMerge,
   p as deleteNestedProperty,
   h as getArrayLengthDifferences,
@@ -187,7 +187,7 @@ export {
   d as isDeepEqual,
   $ as isFunction,
   u as isObject,
-  N as transformStateFunc,
+  O as transformStateFunc,
   g as updateNestedProperty
 };
 //# sourceMappingURL=utility.js.map

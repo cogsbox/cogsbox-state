@@ -1,5 +1,5 @@
 'use client';
-
+import type { CogsPlugin, PluginData } from './plugins';
 import {
   createElement,
   startTransition,
@@ -15,8 +15,7 @@ import {
 } from 'react';
 
 import {
-  getDifferences,
-  isArray,
+  transformStateFunc,
   isFunction,
   type GenericObject,
 } from './utility.js';
@@ -26,7 +25,7 @@ import {
   MemoizedCogsItemWrapper,
   ValidationWrapper,
 } from './Components.js';
-import { isDeepEqual, transformStateFunc } from './utility.js';
+import { isDeepEqual } from './utility.js';
 import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -102,37 +101,7 @@ type CutFunctionType<T> = (
 ) => StateObject<T>;
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
-type ArraySpecificPrototypeKeys =
-  | 'concat'
-  | 'copyWithin'
-  | 'fill'
-  | 'find'
-  | 'findIndex'
-  | 'flat'
-  | 'flatMap'
-  | 'includes'
-  | 'indexOf'
-  | 'join'
-  | 'keys'
-  | 'lastIndexOf'
-  | 'map'
-  | 'pop'
-  | 'push'
-  | 'reduce'
-  | 'reduceRight'
-  | 'reverse'
-  | 'shift'
-  | 'slice'
-  | 'some'
-  | 'sort'
-  | 'splice'
-  | 'unshift'
-  | 'values'
-  | 'entries'
-  | 'every'
-  | 'filter'
-  | 'forEach'
-  | 'with';
+
 export type StreamOptions<T, R = T> = {
   bufferSize?: number;
   flushInterval?: number;
@@ -367,12 +336,7 @@ export type ReactivityType =
   | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
 
 // Define the return type of the sync hook locally
-type SyncApi = {
-  updateState: (data: { operation: any }) => void;
-  connected: boolean;
-  clientId: string | null;
-  subscribers: string[];
-};
+
 type ValidationOptionsType = {
   key?: string;
   zodSchemaV3?: z3.ZodType<any, any, any>;
@@ -381,7 +345,30 @@ type ValidationOptionsType = {
   onChange?: 'error' | 'warning';
   blockSync?: boolean;
 };
-type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
+
+type UseSyncReturnType = Readonly<{
+  state: any;
+  connected: boolean;
+  clientId: string | null;
+  schemaRegistered: boolean;
+  updateState: (data: UpdateTypeDetail) => void;
+  subscribers: string[];
+}>;
+
+type UseSyncType = (
+  stateObject: any,
+  options: {
+    stateKey?: string;
+    stateRoom:
+      | number
+      | string
+      | (({ clientId }: { clientId: string }) => string | null);
+    connect?: boolean;
+    inMemoryState?: boolean;
+    apiParams?: Record<string, any>;
+  }
+) => UseSyncReturnType;
+
 type SyncOptionsType<TApiParams> = {
   apiParams: TApiParams;
   stateKey?: string;
@@ -392,12 +379,24 @@ type SyncOptionsType<TApiParams> = {
   connect?: boolean;
   inMemoryState?: boolean;
 };
-export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
+
+export type CreateStateOptionsType<
+  T extends unknown = unknown,
+  TPluginOptions = {},
+> = {
+  formElements?: FormsElementsType<T>;
+  validation?: ValidationOptionsType;
+  plugins?: CogsPlugin<T, TPluginOptions>[];
+};
+export type OptionsType<
+  T extends unknown = unknown,
+  TApiParams = never,
+  TPluginOptions = {},
+> = CreateStateOptionsType & {
   log?: boolean;
   componentId?: string;
   syncOptions?: SyncOptionsType<TApiParams>;
 
-  validation?: ValidationOptionsType;
   serverState?: {
     id?: string | number;
     data?: T;
@@ -426,12 +425,10 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   };
   middleware?: ({ update }: { update: UpdateTypeDetail }) => void;
 
-  modifyState?: (state: T) => T;
   localStorage?: {
     key: string | ((state: T) => string);
     onChange?: (state: T) => void;
   };
-  formElements?: FormsElementsType<T>;
 
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType;
@@ -440,14 +437,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
   defaultState?: T;
 
   dependencies?: any[];
-};
-
-export type SyncRenderOptions<T extends unknown = unknown> = {
-  children: React.ReactNode;
-  time: number;
-  data?: T;
-  key?: string;
-};
+} & TPluginOptions;
 
 type FormsElementsType<T> = {
   validation?: (options: {
@@ -462,23 +452,19 @@ type FormsElementsType<T> = {
     message?: string;
     getData?: () => T;
   }) => React.ReactNode;
-  syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
+  syncRender?: (options: {
+    children: React.ReactNode;
+    time: number;
+    data?: T;
+    key?: string;
+  }) => React.ReactNode;
 };
 
-export type InitialStateInnerType<T extends unknown = unknown> = {
-  initialState: T;
-} & OptionsType<T>;
-
-export type InitialStateType<T> = {
-  [key: string]: InitialStateInnerType<T>;
-};
-
-export type AllStateTypes<T extends unknown> = Record<string, T>;
-
-export type CogsInitialState<T> = {
-  initialState: T;
-  formElements?: FormsElementsType<T>;
-};
+export type CogsInitialState<T> =
+  | {
+      initialState: T;
+    }
+  | CreateStateOptionsType<T>;
 
 export type TransformedStateType<T> = {
   [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
@@ -629,48 +615,37 @@ function setOptions<StateKey, Opt>({
   }
 }
 
-export function addStateOptions<T extends unknown>(
+export function addStateOptions<T>(
   initialState: T,
-  { formElements, validation }: OptionsType<T>
+  options: CreateStateOptionsType<T>
 ) {
-  return { initialState: initialState, formElements, validation } as T;
+  return {
+    ...options,
+    initialState,
+    _addStateOptions: true,
+  };
 }
-
-// Define the type for the options setter using the Transformed state
-type SetCogsOptionsFunc<T extends Record<string, any>> = <
-  StateKey extends keyof TransformedStateType<T>,
+export const createCogsState = <
+  State extends Record<StateKeys, unknown>,
+  TPlugins extends CogsPlugin<any, any, any>[] = [],
 >(
-  stateKey: StateKey,
-  options: OptionsType<TransformedStateType<T>[StateKey]>
-) => void;
-
-export const createCogsState = <State extends Record<StateKeys, unknown>>(
   initialState: State,
   opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
+    plugins?: TPlugins;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
-    __useSync?: UseSyncType<State>;
+    __useSync?: UseSyncType;
     __syncSchemas?: Record<string, any>;
   }
 ) => {
-  let newInitialState = initialState;
+  type PluginOptions = TPlugins extends CogsPlugin<any, infer O, any>[]
+    ? O
+    : {};
   const [statePart, initialOptionsPart] =
-    transformStateFunc<State>(newInitialState);
-
-  if (opt?.__fromSyncSchema && opt?.__syncNotifications) {
-    getGlobalStore
-      .getState()
-      .setInitialStateOptions('__notifications', opt.__syncNotifications);
-  }
-
-  if (opt?.__fromSyncSchema && opt?.__apiParamsMap) {
-    getGlobalStore
-      .getState()
-      .setInitialStateOptions('__apiParamsMap', opt.__apiParamsMap);
-  }
+    transformStateFunc<State>(initialState);
 
   Object.keys(statePart).forEach((key) => {
     let existingOptions = initialOptionsPart[key] || {};
@@ -725,22 +700,22 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: Prettify<OptionsType<(typeof statePart)[StateKey]>>
+    options?: Prettify<
+      OptionsType<(typeof statePart)[StateKey], never, PluginOptions>
+    >
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-
+    const pluginDataRef = useRef<PluginData[]>([]);
     setOptions({
       stateKey,
       options,
       initialOptionsPart,
     });
+
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
-    const partialState = options?.modifyState
-      ? options.modifyState(thiState)
-      : thiState;
 
-    const updater = useCogsStateFn<(typeof statePart)[StateKey]>(partialState, {
+    const updater = useCogsStateFn<(typeof statePart)[StateKey]>(thiState, {
       stateKey: stateKey as string,
       syncUpdate: options?.syncUpdate,
       componentId,
@@ -752,9 +727,61 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
       dependencies: options?.dependencies,
       serverState: options?.serverState,
       syncOptions: options?.syncOptions,
-      __useSync: opt?.__useSync as UseSyncType<(typeof statePart)[StateKey]>,
+      __useSync: opt?.__useSync as UseSyncType,
+      __pluginDataRef: pluginDataRef,
     });
+    useLayoutEffect(() => {
+      if (!opt?.plugins) return;
 
+      const pluginData: PluginData[] = opt.plugins.map((plugin) => {
+        let hookData = undefined;
+        if (plugin.useHook) {
+          hookData = plugin.useHook(updater as any, options as PluginOptions);
+        }
+        return {
+          plugin,
+          options,
+          hookData,
+        };
+      });
+
+      // Store in ref for access during updates
+      pluginDataRef.current = pluginData;
+    }, []); // Run once on mount
+
+    // Apply transformState from plugins
+    useLayoutEffect(() => {
+      if (
+        !opt?.plugins?.some((p) => p.transformState) ||
+        pluginDataRef.current.length === 0
+      ) {
+        return;
+      }
+
+      const currentValue = updater.$get() as any;
+      let transformedValue = currentValue;
+      let hasChanges = false;
+
+      pluginDataRef.current.forEach((pluginData) => {
+        if (pluginData.plugin.transformState) {
+          const previousValue = transformedValue;
+          const newValue = pluginData.plugin.transformState(
+            transformedValue,
+            pluginData.options,
+            pluginData.hookData
+          );
+
+          if (newValue !== undefined && !isDeepEqual(previousValue, newValue)) {
+            transformedValue = newValue;
+            hasChanges = true;
+          }
+        }
+      });
+
+      if (hasChanges) {
+        updater.$update(transformedValue);
+      }
+    }, [updater, options, ...(options?.dependencies || [])]);
     return updater;
   };
 
@@ -770,8 +797,14 @@ export const createCogsState = <State extends Record<StateKeys, unknown>>(
 
     notifyComponents(stateKey as string);
   }
-
-  return { useCogsState, setCogsOptions } as CogsApi<State, never>;
+  type ExtractedPluginOptions = TPlugins extends CogsPlugin<any, infer O, any>[]
+    ? O
+    : {};
+  return { useCogsState, setCogsOptions } as CogsApi<
+    State,
+    never,
+    ExtractedPluginOptions
+  >;
 };
 type UseCogsStateHook<
   T extends Record<string, any>,
@@ -794,12 +827,25 @@ type UseCogsStateHook<
       : Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
 ) => StateObject<TransformedStateType<T>[StateKey]>;
 
-// Update CogsApi to default to never instead of Record<string, never>
+// Define the type for the options setter using the Transformed state
+type SetCogsOptionsFunc<T extends Record<string, any>> = <
+  StateKey extends keyof TransformedStateType<T>,
+>(
+  stateKey: StateKey,
+  options: OptionsType<TransformedStateType<T>[StateKey]>
+) => void;
+
 type CogsApi<
   T extends Record<string, any>,
   TApiParamsMap extends Record<string, any> = never,
+  TPluginOptions = {},
 > = {
-  useCogsState: UseCogsStateHook<T, TApiParamsMap>;
+  useCogsState: <StateKey extends keyof TransformedStateType<T> & string>(
+    stateKey: StateKey,
+    options?: Prettify<
+      OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
+    >
+  ) => StateObject<TransformedStateType<T>[StateKey]>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
 type GetParamType<SchemaEntry> = SchemaEntry extends {
@@ -825,7 +871,7 @@ export function createCogsStateFromSync<
   },
 >(
   syncSchema: TSyncSchema,
-  useSync: UseSyncType<any>
+  useSync: UseSyncType
 ): CogsApi<
   {
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['relations'] extends object
@@ -1288,7 +1334,8 @@ function createEffectiveSetState<T>(
   thisKey: string,
   syncApiRef: React.MutableRefObject<any>,
   sessionId: string | undefined,
-  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
+  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>,
+  pluginDataRef?: React.MutableRefObject<PluginData[]>
 ): EffectiveSetState<T> {
   return (newStateOrFunction, path, updateObj, validationKey?) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
@@ -1351,7 +1398,21 @@ function createEffectiveSetState<T>(
     if (latestInitialOptionsRef.current?.middleware) {
       latestInitialOptionsRef.current.middleware({ update: newUpdate });
     }
-
+    if (pluginDataRef?.current && pluginDataRef.current.length > 0) {
+      pluginDataRef.current.forEach((pluginData) => {
+        if (pluginData.plugin.onUpdate) {
+          try {
+            pluginData.plugin.onUpdate(
+              newUpdate,
+              pluginData.options,
+              pluginData.hookData
+            );
+          } catch (error) {
+            console.error('Plugin onUpdate error:', error);
+          }
+        }
+      });
+    }
     if (options.sync !== false && syncApiRef.current?.connected) {
       syncApiRef.current.updateState({ operation: newUpdate });
     }
@@ -1373,12 +1434,14 @@ export function useCogsStateFn<TStateObject extends unknown>(
     dependencies,
     serverState,
     __useSync,
+    __pluginDataRef,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    __useSync?: UseSyncType<TStateObject>;
+    __useSync?: UseSyncType;
     syncOptions?: SyncOptionsType<any>;
+    __pluginDataRef?: React.MutableRefObject<PluginData[]>;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -1391,16 +1454,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
   );
   latestInitialOptionsRef.current = (getInitialOptions(thisKey as string) ??
     null) as OptionsType<TStateObject> | null;
-
-  useEffect(() => {
-    if (syncUpdate && syncUpdate.stateKey === thisKey && syncUpdate.path?.[0]) {
-      const syncKey = `${syncUpdate.stateKey}:${syncUpdate.path.join('.')}`;
-      setSyncInfo(syncKey, {
-        timeStamp: syncUpdate.timeStamp!,
-        userId: syncUpdate.userId!,
-      });
-    }
-  }, [syncUpdate]);
 
   const resolveInitialState = useCallback(
     (
@@ -1674,12 +1727,13 @@ export function useCogsStateFn<TStateObject extends unknown>(
     };
   }, []);
 
-  const syncApiRef = useRef<SyncApi | null>(null);
+  const syncApiRef = useRef<UseSyncReturnType | null>(null);
   const effectiveSetState = createEffectiveSetState(
     thisKey,
     syncApiRef,
     sessionId,
-    latestInitialOptionsRef
+    latestInitialOptionsRef,
+    __pluginDataRef
   );
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
@@ -3204,13 +3258,6 @@ function createProxyHandler<T>(
                 return;
               }
 
-              const updatePath = operation.path;
-
-              // Handle validation...
-              const currentMeta =
-                getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, updatePath) || {};
               const newErrors: ValidationError[] =
                 validationErrorsFromServer.map((err) => ({
                   source: 'sync_engine',
@@ -3221,8 +3268,7 @@ function createProxyHandler<T>(
 
               getGlobalStore
                 .getState()
-                .setShadowMetadata(stateKey, updatePath, {
-                  ...currentMeta,
+                .setShadowMetadata(stateKey, operation.path, {
                   validation: {
                     status: newErrors.length > 0 ? 'INVALID' : 'VALID',
                     errors: newErrors,
@@ -3230,7 +3276,7 @@ function createProxyHandler<T>(
                   },
                 });
 
-              effectiveSetState(operation.newValue, updatePath, {
+              effectiveSetState(operation.newValue, operation.path, {
                 updateType: operation.updateType,
                 sync: false,
                 itemId: operation.itemId,

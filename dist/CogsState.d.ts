@@ -1,3 +1,4 @@
+import { CogsPlugin, PluginData } from './plugins';
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
@@ -185,14 +186,6 @@ export type UpdateTypeDetail = {
 };
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
-type SyncApi = {
-    updateState: (data: {
-        operation: any;
-    }) => void;
-    connected: boolean;
-    clientId: string | null;
-    subscribers: string[];
-};
 type ValidationOptionsType = {
     key?: string;
     zodSchemaV3?: z3.ZodType<any, any, any>;
@@ -201,7 +194,23 @@ type ValidationOptionsType = {
     onChange?: 'error' | 'warning';
     blockSync?: boolean;
 };
-type UseSyncType<T> = (state: T, a: SyncOptionsType<any>) => SyncApi;
+type UseSyncReturnType = Readonly<{
+    state: any;
+    connected: boolean;
+    clientId: string | null;
+    schemaRegistered: boolean;
+    updateState: (data: UpdateTypeDetail) => void;
+    subscribers: string[];
+}>;
+type UseSyncType = (stateObject: any, options: {
+    stateKey?: string;
+    stateRoom: number | string | (({ clientId }: {
+        clientId: string;
+    }) => string | null);
+    connect?: boolean;
+    inMemoryState?: boolean;
+    apiParams?: Record<string, any>;
+}) => UseSyncReturnType;
 type SyncOptionsType<TApiParams> = {
     apiParams: TApiParams;
     stateKey?: string;
@@ -211,11 +220,15 @@ type SyncOptionsType<TApiParams> = {
     connect?: boolean;
     inMemoryState?: boolean;
 };
-export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
+export type CreateStateOptionsType<T extends unknown = unknown, TPluginOptions = {}> = {
+    formElements?: FormsElementsType<T>;
+    validation?: ValidationOptionsType;
+    plugins?: CogsPlugin<T, TPluginOptions>[];
+};
+export type OptionsType<T extends unknown = unknown, TApiParams = never, TPluginOptions = {}> = CreateStateOptionsType & {
     log?: boolean;
     componentId?: string;
     syncOptions?: SyncOptionsType<TApiParams>;
-    validation?: ValidationOptionsType;
     serverState?: {
         id?: string | number;
         data?: T;
@@ -242,24 +255,16 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = {
     middleware?: ({ update }: {
         update: UpdateTypeDetail;
     }) => void;
-    modifyState?: (state: T) => T;
     localStorage?: {
         key: string | ((state: T) => string);
         onChange?: (state: T) => void;
     };
-    formElements?: FormsElementsType<T>;
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType;
     syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
     dependencies?: any[];
-};
-export type SyncRenderOptions<T extends unknown = unknown> = {
-    children: React.ReactNode;
-    time: number;
-    data?: T;
-    key?: string;
-};
+} & TPluginOptions;
 type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
@@ -272,38 +277,39 @@ type FormsElementsType<T> = {
         message?: string;
         getData?: () => T;
     }) => React.ReactNode;
-    syncRender?: (options: SyncRenderOptions<T>) => React.ReactNode;
+    syncRender?: (options: {
+        children: React.ReactNode;
+        time: number;
+        data?: T;
+        key?: string;
+    }) => React.ReactNode;
 };
-export type InitialStateInnerType<T extends unknown = unknown> = {
-    initialState: T;
-} & OptionsType<T>;
-export type InitialStateType<T> = {
-    [key: string]: InitialStateInnerType<T>;
-};
-export type AllStateTypes<T extends unknown> = Record<string, T>;
 export type CogsInitialState<T> = {
     initialState: T;
-    formElements?: FormsElementsType<T>;
-};
+} | CreateStateOptionsType<T>;
 export type TransformedStateType<T> = {
     [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
 };
-export declare function addStateOptions<T extends unknown>(initialState: T, { formElements, validation }: OptionsType<T>): T;
-type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
-export declare const createCogsState: <State extends Record<StateKeys, unknown>>(initialState: State, opt?: {
+export declare function addStateOptions<T>(initialState: T, options: CreateStateOptionsType<T>): {
+    initialState: T;
+    _addStateOptions: boolean;
+    formElements?: FormsElementsType<T> | undefined;
+    validation?: ValidationOptionsType;
+    plugins?: CogsPlugin<T, {}>[] | undefined;
+};
+export declare const createCogsState: <State extends Record<StateKeys, unknown>, TPlugins extends CogsPlugin<any, any, any>[] = []>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
+    plugins?: TPlugins;
     __fromSyncSchema?: boolean;
     __syncNotifications?: Record<string, Function>;
     __apiParamsMap?: Record<string, any>;
-    __useSync?: UseSyncType<State>;
+    __useSync?: UseSyncType;
     __syncSchemas?: Record<string, any>;
-}) => CogsApi<State, never>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: [TApiParamsMap] extends [never] ? Prettify<OptionsType<TransformedStateType<T>[StateKey]>> : StateKey extends keyof TApiParamsMap ? Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
-    syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
-}> : Prettify<OptionsType<TransformedStateType<T>[StateKey]>>) => StateObject<TransformedStateType<T>[StateKey]>;
-type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never> = {
-    useCogsState: UseCogsStateHook<T, TApiParamsMap>;
+}) => CogsApi<State, never, TPlugins extends CogsPlugin<any, infer O, any>[] ? O : {}>;
+type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
+type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = {
+    useCogsState: <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>>) => StateObject<TransformedStateType<T>[StateKey]>;
     setCogsOptions: SetCogsOptionsFunc<T>;
 };
 type GetParamType<SchemaEntry> = SchemaEntry extends {
@@ -325,7 +331,7 @@ export declare function createCogsStateFromSync<TSyncSchema extends {
         [key: string]: any;
     }>;
     notifications: Record<string, any>;
-}>(syncSchema: TSyncSchema, useSync: UseSyncType<any>): CogsApi<{
+}>(syncSchema: TSyncSchema, useSync: UseSyncType): CogsApi<{
     [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['relations'] extends object ? TSyncSchema['schemas'][K] extends {
         schemas: {
             defaults: infer D;
@@ -341,12 +347,13 @@ type LocalStorageData<T> = {
     baseServerState?: T;
     stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, __useSync, __pluginDataRef, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    __useSync?: UseSyncType<TStateObject>;
+    __useSync?: UseSyncType;
     syncOptions?: SyncOptionsType<any>;
+    __pluginDataRef?: React.MutableRefObject<PluginData[]>;
 } & OptionsType<TStateObject>): StateObject<TStateObject>;
 type MetaData = {
     arrayViews?: {
