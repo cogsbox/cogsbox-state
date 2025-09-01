@@ -3,7 +3,7 @@ import { renderHook, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { getGlobalStore } from '../src/store';
 import { createCogsState } from '../src/CogsState';
-import { createPluginWrapper } from '../src/plugins';
+import { createPluginContext } from '../src/plugins';
 
 // --- Mocks ---
 vi.mock('../src/CogsStateClient.js', () => ({
@@ -32,7 +32,7 @@ describe('Plugin System', () => {
     let hookDataInTransform: any = null;
     let hookDataInUpdate: any = null;
 
-    const testPlugin = createPluginWrapper<{ count: number; label: string }>()
+    const testPlugin = createPluginContext<{ count: number; label: string }>()
       .createPlugin<{ multiplier: number }>()
       .useHook((state, options) => {
         events.push(`useHook called with multiplier: ${options.multiplier}`);

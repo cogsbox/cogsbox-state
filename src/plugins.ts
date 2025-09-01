@@ -31,7 +31,7 @@ export type PluginData = {
 // ===================================================================
 // CORRECTED PLUGIN BUILDER
 // ===================================================================
-export function createPluginWrapper<TState extends Record<string, any>>() {
+export function createPluginContext<TState extends Record<string, any>>() {
   return {
     createPlugin<TOptions>() {
       const createBuilder = <THookReturn = never>(
@@ -94,7 +94,7 @@ export function createPluginWrapper<TState extends Record<string, any>>() {
     },
   };
 }
-const test = createPluginWrapper<{ test: 'fsdafsdfds' }>()
+const test = createPluginContext<{ test: 'fsdafsdfds' }>()
   .createPlugin<{
     test: string;
     test2: number;

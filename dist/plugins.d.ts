@@ -10,7 +10,7 @@ export type PluginData = {
     options: any;
     hookData?: any;
 };
-export declare function createPluginWrapper<TState extends Record<string, any>>(): {
+export declare function createPluginContext<TState extends Record<string, any>>(): {
     createPlugin<TOptions>(): {
         transformState(transformFn: (state: StateObject<TState>, options: TOptions, ...args: never) => void): {
             onUpdate(updateHandler: (update: UpdateTypeDetail, options: TOptions, ...args: never) => void): CogsPlugin<TState, TOptions, never>;
