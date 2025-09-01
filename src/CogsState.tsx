@@ -800,31 +800,37 @@ export const createCogsState = <
   type ExtractedPluginOptions = TPlugins extends CogsPlugin<any, infer O, any>[]
     ? O
     : {};
-  return { useCogsState, setCogsOptions } as CogsApi<
-    State,
-    never,
-    ExtractedPluginOptions
-  >;
+
+  return {
+    useCogsState,
+    setCogsOptions,
+  } as CogsApi<State, never, ExtractedPluginOptions>;
 };
 type UseCogsStateHook<
   T extends Record<string, any>,
   TApiParamsMap extends Record<string, any> = never,
+  TPluginOptions = {},
 > = <StateKey extends keyof TransformedStateType<T> & string>(
   stateKey: StateKey,
   options?: [TApiParamsMap] extends [never]
     ? // When TApiParamsMap is never (no sync)
-      Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
+      Prettify<
+        OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
+      >
     : // When TApiParamsMap exists (sync enabled)
       StateKey extends keyof TApiParamsMap
       ? Prettify<
           OptionsType<
             TransformedStateType<T>[StateKey],
-            TApiParamsMap[StateKey]
+            TApiParamsMap[StateKey],
+            TPluginOptions
           > & {
             syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
           }
         >
-      : Prettify<OptionsType<TransformedStateType<T>[StateKey]>>
+      : Prettify<
+          OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
+        >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
 
 // Define the type for the options setter using the Transformed state
@@ -840,12 +846,7 @@ type CogsApi<
   TApiParamsMap extends Record<string, any> = never,
   TPluginOptions = {},
 > = {
-  useCogsState: <StateKey extends keyof TransformedStateType<T> & string>(
-    stateKey: StateKey,
-    options?: Prettify<
-      OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
-    >
-  ) => StateObject<TransformedStateType<T>[StateKey]>;
+  useCogsState: UseCogsStateHook<T, TApiParamsMap, TPluginOptions>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
 type GetParamType<SchemaEntry> = SchemaEntry extends {

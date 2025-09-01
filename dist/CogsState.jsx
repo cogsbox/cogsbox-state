@@ -156,7 +156,10 @@ const Qe = (e, r) => {
   function l(u, c) {
     Me({ stateKey: u, options: c, initialOptionsPart: i }), c.localStorage && Ke(u, c), ce(u);
   }
-  return { useCogsState: g, setCogsOptions: l };
+  return {
+    useCogsState: g,
+    setCogsOptions: l
+  };
 };
 function At(e, r) {
   const S = e.schemas, i = {}, g = {};
