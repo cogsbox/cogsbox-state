@@ -1,4 +1,4 @@
-import { CogsPlugin, PluginData } from './plugins';
+import { CogsPlugin } from './plugins';
 import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
@@ -225,7 +225,7 @@ export type CreateStateOptionsType<T extends unknown = unknown, TPluginOptions =
     validation?: ValidationOptionsType;
     plugins?: CogsPlugin<T, TPluginOptions>[];
 };
-export type OptionsType<T extends unknown = unknown, TApiParams = never, TPluginOptions = {}> = CreateStateOptionsType & {
+export type OptionsType<T extends unknown = unknown, TApiParams = never> = CreateStateOptionsType & {
     log?: boolean;
     componentId?: string;
     syncOptions?: SyncOptionsType<TApiParams>;
@@ -264,7 +264,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never, TPlugin
     syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
     dependencies?: any[];
-} & TPluginOptions;
+};
 type FormsElementsType<T> = {
     validation?: (options: {
         children: React.ReactNode;
@@ -297,7 +297,12 @@ export declare function addStateOptions<T>(initialState: T, options: CreateState
     validation?: ValidationOptionsType;
     plugins?: CogsPlugin<T, {}>[] | undefined;
 };
-export declare const createCogsState: <State extends Record<StateKeys, unknown>, TPlugins extends CogsPlugin<any, any, any>[] = []>(initialState: State, opt?: {
+export type PluginData = {
+    plugin: CogsPlugin;
+    options: any;
+    hookData?: any;
+};
+export declare const createCogsState: <State extends Record<string, unknown>, TPlugins extends readonly CogsPlugin<State, any, any>[] = []>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     plugins?: TPlugins;
@@ -306,10 +311,10 @@ export declare const createCogsState: <State extends Record<StateKeys, unknown>,
     __apiParamsMap?: Record<string, any>;
     __useSync?: UseSyncType;
     __syncSchemas?: Record<string, any>;
-}) => CogsApi<State, never, TPlugins extends CogsPlugin<any, infer O, any>[] ? O : {}>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: [TApiParamsMap] extends [never] ? Prettify<OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>> : StateKey extends keyof TApiParamsMap ? Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey], TPluginOptions> & {
+}) => CogsApi<State, never, { [K in TPlugins[number] as K["name"]]?: (K extends CogsPlugin<State, infer O, any> ? O : never) | undefined; }>;
+type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: [TApiParamsMap] extends [never] ? Prettify<OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions> : StateKey extends keyof TApiParamsMap ? Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
     syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
-}> : Prettify<OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>>) => StateObject<TransformedStateType<T>[StateKey]>;
+} & TPluginOptions> : Prettify<OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
 type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = {
     useCogsState: UseCogsStateHook<T, TApiParamsMap, TPluginOptions>;

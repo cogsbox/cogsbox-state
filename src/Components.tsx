@@ -282,7 +282,7 @@ export function FormElementWrapper({
 
       let shouldValidate = false;
       let severity: 'error' | 'warning' | undefined;
-      console.log('trigger', trigger, validationOptions);
+
       if (trigger === 'onBlur' && validationOptions.onBlur) {
         shouldValidate = true;
         severity = validationOptions.onBlur ?? 'error';
@@ -300,14 +300,7 @@ export function FormElementWrapper({
 
       let validationResult: { success: boolean; message?: string } | null =
         null;
-      console.log(
-        'shouldValidate 33',
-        path,
-        fieldSchema,
-        shouldValidate,
-        value,
-        typeof value
-      );
+
       if (fieldSchema && shouldValidate) {
         // Direct field validation using its own schema
         const result = fieldSchema.safeParse(value);
@@ -430,10 +423,6 @@ export function FormElementWrapper({
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
-      // Use typeInfo to properly convert the value
-      const root = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-      const fullShadow = shadowStateStore.get(stateKey);
-      console.log('update root', root, fullShadow);
       if (typeInfo) {
         if (typeInfo.type === 'number' && typeof newValue === 'string') {
           newValue =

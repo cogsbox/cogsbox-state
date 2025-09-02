@@ -1,25 +1,37 @@
 import { UpdateTypeDetail, StateObject } from './CogsState';
 
-export type CogsPlugin<TState extends unknown = any, TOptions = any, THookReturn = any> = {
-    useHook?: (state: StateObject<TState>, options: TOptions) => THookReturn;
-    transformState?: (state: StateObject<TState>, options: TOptions, hookData?: THookReturn) => void;
-    onUpdate?: (update: UpdateTypeDetail, options: TOptions, hookData?: THookReturn) => void;
+type PluginContext<TState> = {
+    [K in keyof TState]: {
+        stateKey: K;
+        cogsState: StateObject<TState[K]>;
+    };
+}[keyof TState];
+export type CogsPlugin<TState = any, TOptions = any, THookReturn = any> = {
+    name: string;
+    useHook?: (context: PluginContext<TState>, options: TOptions) => THookReturn;
+    transformState?: (context: PluginContext<TState>, options: TOptions, hook?: THookReturn) => void;
+    onUpdate?: (stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn) => void;
 };
-export type PluginData = {
-    plugin: CogsPlugin;
-    options: any;
-    hookData?: any;
+export type ExtractPluginOptions<TPlugins extends readonly CogsPlugin<any, any, any>[]> = {
+    [P in TPlugins[number] as P['name']]?: P extends CogsPlugin<any, infer O, any> ? O : never;
 };
-export declare function createPluginContext<TState extends Record<string, any>>(): {
-    createPlugin<TOptions>(): {
-        transformState(transformFn: (state: StateObject<TState>, options: TOptions, ...args: never) => void): {
-            onUpdate(updateHandler: (update: UpdateTypeDetail, options: TOptions, ...args: never) => void): CogsPlugin<TState, TOptions, never>;
-        };
-        useHook<THookReturn>(hookFn: (state: StateObject<TState>, options: TOptions) => THookReturn): {
-            transformState(transformFn: (state: StateObject<TState>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
-                onUpdate(updateHandler: (update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): CogsPlugin<TState, TOptions, THookReturn>;
+export type PluginInstance<TState = any, TOptions = any, THookReturn = any> = {
+    plugin: CogsPlugin<TState, TOptions, THookReturn>;
+    options: TOptions;
+};
+export declare function createPluginContext<TState extends Record<string, any> = any>(): {
+    createPlugin: <TOptions = any>(name: string) => CogsPlugin<TState, TOptions, any> & {
+        useHook<THookReturn>(hookFn: (context: PluginContext<TState>, options: TOptions) => THookReturn): CogsPlugin<TState, TOptions, THookReturn> & {
+            transformState(transformFn: (context: PluginContext<TState>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): CogsPlugin<TState, TOptions, THookReturn> & {
+                onUpdate(updateHandler: (context: PluginContext<TState>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): CogsPlugin<TState, TOptions, THookReturn>;
             };
+            onUpdate(updateHandler: (context: PluginContext<TState>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): CogsPlugin<TState, TOptions, THookReturn>;
         };
+        transformState(transformFn: (context: PluginContext<TState>, options: TOptions) => void): CogsPlugin<TState, TOptions, any> & {
+            onUpdate(updateHandler: (context: PluginContext<TState>, update: UpdateTypeDetail, options: TOptions) => void): CogsPlugin<TState, TOptions, any>;
+        };
+        onUpdate(updateHandler: (context: PluginContext<TState>, update: UpdateTypeDetail, options: TOptions) => void): CogsPlugin<TState, TOptions, any>;
     };
 };
+export {};
 //# sourceMappingURL=plugins.d.ts.map

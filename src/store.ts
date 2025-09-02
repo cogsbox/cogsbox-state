@@ -875,7 +875,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const existingRoot =
       shadowStateStore.get(key) || shadowStateStore.get(`[${key}`);
     let preservedMetadata: Partial<ShadowMetadata> = {};
-    console.log('existingRoot initializeShadowState', existingRoot);
+
     if (existingRoot?._meta) {
       const {
         components,
@@ -913,7 +913,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     if (!newRoot._meta) newRoot._meta = {};
     Object.assign(newRoot._meta, preservedMetadata);
-    console.log('existingRoot newRoot', newRoot);
+
     const storageKey = Array.isArray(initialState) ? `[${key}` : key;
     shadowStateStore.set(storageKey, newRoot);
   },

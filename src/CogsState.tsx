@@ -1,9 +1,5 @@
 'use client';
-import {
-  createPluginContext,
-  type CogsPlugin,
-  type PluginData,
-} from './plugins';
+import { type CogsPlugin, type ExtractPluginOptions } from './plugins';
 import {
   createElement,
   startTransition,
@@ -395,7 +391,6 @@ export type CreateStateOptionsType<
 export type OptionsType<
   T extends unknown = unknown,
   TApiParams = never,
-  TPluginOptions = {},
 > = CreateStateOptionsType & {
   log?: boolean;
   componentId?: string;
@@ -441,7 +436,7 @@ export type OptionsType<
   defaultState?: T;
 
   dependencies?: any[];
-} & TPluginOptions;
+};
 
 type FormsElementsType<T> = {
   validation?: (options: {
@@ -629,9 +624,17 @@ export function addStateOptions<T>(
     _addStateOptions: true,
   };
 }
+export type PluginData = {
+  plugin: CogsPlugin;
+  options: any;
+  hookData?: any;
+};
+
+////////////////////////////////
+
 export const createCogsState = <
-  State extends Record<StateKeys, unknown>,
-  TPlugins extends CogsPlugin<any, any, any>[] = [],
+  State extends Record<string, unknown>,
+  TPlugins extends readonly CogsPlugin<State, any, any>[] = [],
 >(
   initialState: State,
   opt?: {
@@ -645,9 +648,16 @@ export const createCogsState = <
     __syncSchemas?: Record<string, any>;
   }
 ) => {
-  type PluginOptions = TPlugins extends CogsPlugin<any, infer O, any>[]
-    ? O
-    : {};
+  type PluginOptions = {
+    [K in TPlugins[number] as K['name']]?: K extends CogsPlugin<
+      State,
+      infer O,
+      any
+    >
+      ? O
+      : never;
+  };
+
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(initialState);
 
@@ -704,12 +714,12 @@ export const createCogsState = <
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: Prettify<
-      OptionsType<(typeof statePart)[StateKey], never, PluginOptions>
-    >
+    options?: Prettify<OptionsType<(typeof statePart)[StateKey], never>> &
+      PluginOptions
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-    const pluginDataRef = useRef<PluginData[]>([]);
+    const prevOptionsRef = useRef(options);
+
     setOptions({
       stateKey,
       options,
@@ -718,6 +728,9 @@ export const createCogsState = <
 
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
+
+    // Create a ref to store plugin data that will be populated later
+    const pluginDataRef = useRef<PluginData[]>([]);
 
     const updater = useCogsStateFn<(typeof statePart)[StateKey]>(thiState, {
       stateKey: stateKey as string,
@@ -732,60 +745,95 @@ export const createCogsState = <
       serverState: options?.serverState,
       syncOptions: options?.syncOptions,
       __useSync: opt?.__useSync as UseSyncType,
-      __pluginDataRef: pluginDataRef,
+      __pluginDataRef: pluginDataRef, // Pass the ref, not the data
     });
-    useLayoutEffect(() => {
+
+    // Now create hookResults with the updater
+    const hookResults = useMemo(() => {
+      const results = new Map<string, any>();
+      if (opt?.plugins) {
+        opt.plugins.forEach((plugin) => {
+          if (plugin.useHook) {
+            const pluginOptions =
+              options?.[plugin.name as keyof typeof options];
+            if (pluginOptions) {
+              console.log(`▶️ Running useHook for plugin: "${plugin.name}"`);
+              const context = {
+                stateKey: stateKey as keyof typeof statePart,
+                cogsState: updater,
+              };
+              const result = plugin.useHook(
+                context as any,
+                pluginOptions as any
+              );
+              results.set(plugin.name, result);
+            }
+          }
+        });
+      }
+      return results;
+    }, [updater, options, stateKey]);
+
+    // Update pluginDataRef with current plugin data
+    useEffect(() => {
+      const pluginData: PluginData[] = [];
+      if (opt?.plugins) {
+        opt.plugins.forEach((plugin) => {
+          const pluginOptions = options?.[plugin.name as keyof typeof options];
+          if (pluginOptions) {
+            pluginData.push({
+              plugin,
+              options: pluginOptions,
+              hookData: hookResults.get(plugin.name),
+            });
+          }
+        });
+      }
+      pluginDataRef.current = pluginData;
+    }, [options, hookResults]);
+
+    // Handle transformState when options change
+    useEffect(() => {
       if (!opt?.plugins) return;
 
-      const pluginData: PluginData[] = opt.plugins.map((plugin) => {
-        let hookData = undefined;
-        if (plugin.useHook) {
-          hookData = plugin.useHook(updater as any, options as PluginOptions);
+      opt.plugins.forEach((plugin) => {
+        const currentPluginOptions =
+          options?.[plugin.name as keyof typeof options];
+
+        if (!currentPluginOptions) {
+          return;
         }
-        return {
-          plugin,
-          options,
-          hookData,
-        };
-      });
 
-      // Store in ref for access during updates
-      pluginDataRef.current = pluginData;
-    }, []); // Run once on mount
+        if (plugin.transformState) {
+          const prevPluginOptions =
+            prevOptionsRef.current?.[plugin.name as keyof typeof options];
 
-    // Apply transformState from plugins
-    useLayoutEffect(() => {
-      if (
-        !opt?.plugins?.some((p) => p.transformState) ||
-        pluginDataRef.current.length === 0
-      ) {
-        return;
-      }
+          if (
+            !prevPluginOptions ||
+            !isDeepEqual(currentPluginOptions, prevPluginOptions)
+          ) {
+            console.log(
+              `▶️ Options changed for "${plugin.name}" on state "${String(stateKey)}", running transformState...`
+            );
 
-      const currentValue = updater.$get() as any;
-      let transformedValue = currentValue;
-      let hasChanges = false;
+            const hookData = hookResults.get(plugin.name);
+            const context = {
+              stateKey: stateKey as keyof typeof statePart,
+              cogsState: updater,
+            };
 
-      pluginDataRef.current.forEach((pluginData) => {
-        if (pluginData.plugin.transformState) {
-          const previousValue = transformedValue;
-          const newValue = pluginData.plugin.transformState(
-            transformedValue,
-            pluginData.options,
-            pluginData.hookData
-          );
-
-          if (newValue !== undefined && !isDeepEqual(previousValue, newValue)) {
-            transformedValue = newValue;
-            hasChanges = true;
+            plugin.transformState(
+              context as any,
+              currentPluginOptions as any,
+              hookData
+            );
           }
         }
       });
 
-      if (hasChanges) {
-        updater.$update(transformedValue);
-      }
-    }, [updater, options, ...(options?.dependencies || [])]);
+      prevOptionsRef.current = options;
+    }, [options, stateKey, updater, hookResults]);
+
     return updater;
   };
 
@@ -801,14 +849,11 @@ export const createCogsState = <
 
     notifyComponents(stateKey as string);
   }
-  type ExtractedPluginOptions = TPlugins extends CogsPlugin<any, infer O, any>[]
-    ? O
-    : {};
 
   return {
     useCogsState,
     setCogsOptions,
-  } as CogsApi<State, never, ExtractedPluginOptions>;
+  } as CogsApi<State, never, PluginOptions>;
 };
 type UseCogsStateHook<
   T extends Record<string, any>,
@@ -819,21 +864,20 @@ type UseCogsStateHook<
   options?: [TApiParamsMap] extends [never]
     ? // When TApiParamsMap is never (no sync)
       Prettify<
-        OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
+        OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions
       >
     : // When TApiParamsMap exists (sync enabled)
       StateKey extends keyof TApiParamsMap
       ? Prettify<
           OptionsType<
             TransformedStateType<T>[StateKey],
-            TApiParamsMap[StateKey],
-            TPluginOptions
+            TApiParamsMap[StateKey]
           > & {
             syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
-          }
+          } & TPluginOptions
         >
       : Prettify<
-          OptionsType<TransformedStateType<T>[StateKey], never, TPluginOptions>
+          OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions
         >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
 
@@ -1408,6 +1452,7 @@ function createEffectiveSetState<T>(
         if (pluginData.plugin.onUpdate) {
           try {
             pluginData.plugin.onUpdate(
+              stateKey,
               newUpdate,
               pluginData.options,
               pluginData.hookData
@@ -1438,6 +1483,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncUpdate,
     dependencies,
     serverState,
+
     __useSync,
     __pluginDataRef,
   }: {
@@ -3495,10 +3541,6 @@ function createProxyHandler<T>(
   }
 
   const rootLevelMethods = {
-    $test: () => {
-      const shadow = shadowStateStore.get(stateKey);
-      console.log('test', shadow); //does nto ahve the data
-    },
     $revertToInitialState: (obj?: { validationKey?: string }) => {
       const shadowMeta = getGlobalStore
         .getState()
