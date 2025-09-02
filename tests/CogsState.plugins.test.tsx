@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { useState } from 'react';
 import { getGlobalStore } from '../src/store';
 import { createCogsState } from '../src/CogsState';
-import { createPluginContext } from '../src/plugins';
+import { createPluginContext, KeyedTypes } from '../src/plugins';
 import { waitFor } from '@testing-library/react';
 
 // --- Mocks ---
@@ -35,9 +35,12 @@ describe('Plugin System', () => {
     let hookDataInTransform: any = null;
     let hookDataInUpdate: any = null;
 
-    const { createPlugin } = createPluginContext<typeof initialState>();
+    const { createPlugin } = createPluginContext<
+      typeof initialState,
+      { multiplier: number }
+    >();
 
-    const testPlugin = createPlugin<{ multiplier: number }>('testPlugin')
+    const testPlugin = createPlugin('testPlugin')
       .useHook((context, options) => {
         events.push(`useHook called with multiplier: ${options.multiplier}`);
         return {
@@ -136,35 +139,52 @@ describe('Plugin System', () => {
   it('should react to state-driven option changes', async () => {
     const events: string[] = [];
 
-    const { createPlugin } = createPluginContext<typeof initialState>();
+    type PluginOptions = {
+      prefix: string;
+      testType: KeyedTypes<{
+        counter: string;
+        settings: number;
+      }>;
+    };
+
+    type Prettify<T> = { [K in keyof T]: T[K] } & {};
+    const { createPlugin } = createPluginContext<
+      typeof initialState,
+      PluginOptions
+    >();
 
     // Plugin that adds a prefix to the label
-    const prefixPlugin = createPlugin<{ prefix: string }>(
-      'prefixPlugin'
-    ).transformState(({ stateKey, cogsState }, options) => {
-      events.push(`transformState: adding prefix "${options.prefix}"`);
+    const prefixPlugin = createPlugin('prefixPlugin').transformState(
+      ({ stateKey, cogsState }, options) => {
+        events.push(`transformState: adding prefix "${options.prefix}"`);
 
-      if (stateKey === 'counter') {
-        const current = cogsState.$get();
-        cogsState.$update({
-          ...current,
-          label: `${options.prefix}_${current.label}`,
-        });
+        if (stateKey === 'counter') {
+          const current = cogsState.$get();
+          cogsState.$update({
+            ...current,
+            label: `${options.prefix}_${current.label}`,
+          });
+        }
       }
-    });
+    );
 
     const { useCogsState } = createCogsState(initialState, {
       plugins: [prefixPlugin],
-    });
+    }); /*'___' is declared but its value is never read.ts(6133)
+const ___: {
+    [x: string]: PluginOptions | undefined;
+}*/
 
     // Simulate getting prefix from another piece of state
     const { result } = renderHook(() => {
-      const settings = useCogsState('settings');
+      const settings = useCogsState('settings', {
+        prefixPlugin: { prefix: 's', testType: 1 },
+      }); //testype should be  number
       const prefix = settings.$get().prefix;
 
       // Use the prefix from settings as the plugin option
       const counter = useCogsState('counter', {
-        prefixPlugin: { prefix },
+        prefixPlugin: { prefix, testType: '1' }, //testype should be  string
       });
 
       return { counter, settings };

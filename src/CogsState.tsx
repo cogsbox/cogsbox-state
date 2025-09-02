@@ -1,5 +1,5 @@
 'use client';
-import { type CogsPlugin, type ExtractPluginOptions } from './plugins';
+import { type CogsPlugin } from './plugins';
 import {
   createElement,
   startTransition,
@@ -44,7 +44,7 @@ import { Operation } from 'fast-json-patch';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 
-type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
+export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
 export type VirtualViewOptions = {
   itemHeight?: number;
@@ -386,7 +386,7 @@ export type CreateStateOptionsType<
 > = {
   formElements?: FormsElementsType<T>;
   validation?: ValidationOptionsType;
-  plugins?: CogsPlugin<T, TPluginOptions>[];
+  plugins?: CogsPlugin<string, T, TPluginOptions>[];
 };
 export type OptionsType<
   T extends unknown = unknown,
@@ -625,7 +625,7 @@ export function addStateOptions<T>(
   };
 }
 export type PluginData = {
-  plugin: CogsPlugin;
+  plugin: CogsPlugin<any, any, any>;
   options: any;
   hookData?: any;
 };
@@ -634,7 +634,7 @@ export type PluginData = {
 
 export const createCogsState = <
   State extends Record<string, unknown>,
-  TPlugins extends readonly CogsPlugin<State, any, any>[] = [],
+  TPlugins extends readonly CogsPlugin<string, State, any, any>[] = [],
 >(
   initialState: State,
   opt?: {
@@ -650,6 +650,7 @@ export const createCogsState = <
 ) => {
   type PluginOptions = {
     [K in TPlugins[number] as K['name']]?: K extends CogsPlugin<
+      string,
       State,
       infer O,
       any
@@ -709,13 +710,28 @@ export const createCogsState = <
   Object.keys(statePart).forEach((key) => {
     initializeShadowState(key, statePart[key]);
   });
-
+  type Prettify<T> = {
+    [K in keyof T]: T[K];
+  } & {};
   type StateKeys = keyof typeof statePart;
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
-    options?: Prettify<OptionsType<(typeof statePart)[StateKey], never>> &
-      PluginOptions
+    options?: Prettify<
+      OptionsType<(typeof statePart)[StateKey], never> & {
+        [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
+          ? P extends Record<string, any>
+            ? {
+                [K in keyof P]: P[K] extends { __key: 'keyed'; map: infer TMap }
+                  ? StateKey extends keyof TMap
+                    ? TMap[StateKey]
+                    : never
+                  : P[K];
+              }
+            : P
+          : never;
+      }
+    >
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
     const prevOptionsRef = useRef(options);
@@ -748,32 +764,40 @@ export const createCogsState = <
       __pluginDataRef: pluginDataRef, // Pass the ref, not the data
     });
 
-    // Now create hookResults with the updater
-    const hookResults = useMemo(() => {
-      const results = new Map<string, any>();
-      if (opt?.plugins) {
-        opt.plugins.forEach((plugin) => {
-          if (plugin.useHook) {
-            const pluginOptions =
-              options?.[plugin.name as keyof typeof options];
-            if (pluginOptions) {
-              console.log(`▶️ Running useHook for plugin: "${plugin.name}"`);
-              const context = {
-                stateKey: stateKey as keyof typeof statePart,
-                cogsState: updater,
-              };
-              const result = plugin.useHook(
-                context as any,
-                pluginOptions as any
-              );
-              results.set(plugin.name, result);
-            }
-          }
-        });
-      }
-      return results;
-    }, [updater, options, stateKey]);
+    const pluginsWithHooks = useMemo(
+      () => opt?.plugins?.filter((p) => p.useHook) || [],
+      [] // Empty deps since plugins shouldn't change
+    );
 
+    // Call ALL hooks unconditionally in the same order every time
+    const hookResults = pluginsWithHooks.map((plugin) => {
+      const pluginOptions = options?.[plugin.name as keyof typeof options];
+
+      // Still call the hook even if no options (rules of hooks)
+      const context = {
+        stateKey: stateKey as keyof typeof statePart,
+        cogsState: updater,
+      };
+      console.log('context', context);
+      // Call hook unconditionally
+      const result = plugin.useHook?.(
+        context as any,
+        pluginOptions || ({} as any) // Pass empty object if no options
+      );
+
+      return { name: plugin.name, result, hasOptions: !!pluginOptions };
+    });
+
+    // Convert to Map, filtering out plugins without options
+    const hookResultsMap = useMemo(() => {
+      const map = new Map<string, any>();
+      hookResults.forEach(({ name, result, hasOptions }) => {
+        if (hasOptions) {
+          map.set(name, result);
+        }
+      });
+      return map;
+    }, [hookResults, options]);
     // Update pluginDataRef with current plugin data
     useEffect(() => {
       const pluginData: PluginData[] = [];
@@ -784,7 +808,7 @@ export const createCogsState = <
             pluginData.push({
               plugin,
               options: pluginOptions,
-              hookData: hookResults.get(plugin.name),
+              hookData: hookResultsMap.get(plugin.name),
             });
           }
         });
@@ -797,36 +821,44 @@ export const createCogsState = <
       if (!opt?.plugins) return;
 
       opt.plugins.forEach((plugin) => {
-        const currentPluginOptions =
-          options?.[plugin.name as keyof typeof options];
+        // Only get plugin options, not other options
+        if (plugin.name in (options || {})) {
+          const currentPluginOptions =
+            options?.[plugin.name as keyof typeof options];
 
-        if (!currentPluginOptions) {
-          return;
-        }
-
-        if (plugin.transformState) {
-          const prevPluginOptions =
-            prevOptionsRef.current?.[plugin.name as keyof typeof options];
-
+          // Type guard to ensure it's an object
           if (
-            !prevPluginOptions ||
-            !isDeepEqual(currentPluginOptions, prevPluginOptions)
+            currentPluginOptions &&
+            typeof currentPluginOptions === 'object' &&
+            !Array.isArray(currentPluginOptions)
           ) {
-            console.log(
-              `▶️ Options changed for "${plugin.name}" on state "${String(stateKey)}", running transformState...`
-            );
+            if (plugin.transformState) {
+              const prevPluginOptions =
+                prevOptionsRef.current?.[plugin.name as keyof typeof options];
 
-            const hookData = hookResults.get(plugin.name);
-            const context = {
-              stateKey: stateKey as keyof typeof statePart,
-              cogsState: updater,
-            };
+              if (
+                !prevPluginOptions ||
+                (typeof prevPluginOptions === 'object' &&
+                  !Array.isArray(prevPluginOptions) &&
+                  !isDeepEqual(currentPluginOptions, prevPluginOptions))
+              ) {
+                console.log(
+                  `▶️ Options changed for "${plugin.name}" on state "${String(stateKey)}", running transformState...`
+                );
 
-            plugin.transformState(
-              context as any,
-              currentPluginOptions as any,
-              hookData
-            );
+                const hookData = hookResultsMap.get(plugin.name);
+                const context = {
+                  stateKey: stateKey as keyof typeof statePart,
+                  cogsState: updater,
+                };
+
+                plugin.transformState(
+                  context as any,
+                  currentPluginOptions as any,
+                  hookData
+                );
+              }
+            }
           }
         }
       });
@@ -853,34 +885,39 @@ export const createCogsState = <
   return {
     useCogsState,
     setCogsOptions,
-  } as CogsApi<State, never, PluginOptions>;
+  };
 };
+
+type ResolvedOptionsForKey<
+  TPluginOptions extends Record<string, any>,
+  StateKeys extends string,
+> = StateKeys extends any // Distribute over union
+  ? {
+      [PName in keyof TPluginOptions]?: {
+        [OKey in keyof TPluginOptions[PName]]: TPluginOptions[PName][OKey] extends {
+          __key: 'keyed';
+          map: infer TMap;
+        }
+          ? TMap extends Record<string, any>
+            ? StateKeys extends keyof TMap
+              ? TMap[StateKeys]
+              : never
+            : never
+          : TPluginOptions[PName][OKey];
+      };
+    }
+  : never;
+
 type UseCogsStateHook<
   T extends Record<string, any>,
-  TApiParamsMap extends Record<string, any> = never,
-  TPluginOptions = {},
+  TPluginOptions extends Record<string, any> = {},
 > = <StateKey extends keyof TransformedStateType<T> & string>(
   stateKey: StateKey,
-  options?: [TApiParamsMap] extends [never]
-    ? // When TApiParamsMap is never (no sync)
-      Prettify<
-        OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions
-      >
-    : // When TApiParamsMap exists (sync enabled)
-      StateKey extends keyof TApiParamsMap
-      ? Prettify<
-          OptionsType<
-            TransformedStateType<T>[StateKey],
-            TApiParamsMap[StateKey]
-          > & {
-            syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
-          } & TPluginOptions
-        >
-      : Prettify<
-          OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions
-        >
+  options?: Prettify<
+    OptionsType<TransformedStateType<T>[StateKey], never> &
+      ResolvedOptionsForKey<TPluginOptions, StateKey>
+  >
 ) => StateObject<TransformedStateType<T>[StateKey]>;
-
 // Define the type for the options setter using the Transformed state
 type SetCogsOptionsFunc<T extends Record<string, any>> = <
   StateKey extends keyof TransformedStateType<T>,
@@ -891,12 +928,12 @@ type SetCogsOptionsFunc<T extends Record<string, any>> = <
 
 type CogsApi<
   T extends Record<string, any>,
-  TApiParamsMap extends Record<string, any> = never,
-  TPluginOptions = {},
+  TPluginOptions extends Record<string, any> = {},
 > = {
-  useCogsState: UseCogsStateHook<T, TApiParamsMap, TPluginOptions>;
+  useCogsState: UseCogsStateHook<T, TPluginOptions>;
   setCogsOptions: SetCogsOptionsFunc<T>;
 };
+
 type GetParamType<SchemaEntry> = SchemaEntry extends {
   api?: { queryData?: { _paramType?: infer P } };
 }

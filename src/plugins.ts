@@ -1,8 +1,12 @@
-import { UpdateTypeDetail, StateObject } from './CogsState';
-import { useState } from 'react';
+import { UpdateTypeDetail, StateObject, PluginData } from './CogsState';
+import { useState, useEffect } from 'react';
+type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
-// --- The Core Solution: A Discriminated Union for Context ---
-
+// Your refined, more explicit version.
+export type KeyedTypes<TMap extends Record<string, any>> = {
+  __key: 'keyed';
+  map: { [K in keyof TMap]: TMap[K] };
+};
 type PluginContext<TState> = {
   [K in keyof TState]: {
     stateKey: K;
@@ -10,8 +14,13 @@ type PluginContext<TState> = {
   };
 }[keyof TState];
 
-export type CogsPlugin<TState = any, TOptions = any, THookReturn = any> = {
-  name: string;
+export type CogsPlugin<
+  TName extends string,
+  TState = any,
+  TOptions = any,
+  THookReturn = any,
+> = {
+  name: TName;
   useHook?: (context: PluginContext<TState>, options: TOptions) => THookReturn;
   transformState?: (
     context: PluginContext<TState>,
@@ -34,16 +43,12 @@ export type ExtractPluginOptions<
     : never;
 };
 
-export type PluginInstance<TState = any, TOptions = any, THookReturn = any> = {
-  plugin: CogsPlugin<TState, TOptions, THookReturn>;
-  options: TOptions;
-};
-
 // The improved builder that makes onUpdate optional
 export function createPluginContext<
-  TState extends Record<string, any> = any,
+  TState extends Record<string, any>,
+  TOptions = unknown,
 >() {
-  function createPlugin<TOptions = any>(name: string) {
+  function createPlugin<TName extends string>(name: TName) {
     // Helper to create the final plugin object
     const createPluginObject = <THookReturn = any>(
       hookFn?: (
@@ -61,7 +66,7 @@ export function createPluginContext<
         options: TOptions,
         ...args: THookReturn extends never ? [] : [hookData: THookReturn]
       ) => void
-    ): CogsPlugin<TState, TOptions, THookReturn> => {
+    ): Prettify<CogsPlugin<TName, TState, TOptions, THookReturn>> => {
       return {
         name,
         useHook: hookFn as any,
@@ -180,6 +185,55 @@ export function createPluginContext<
   return { createPlugin };
 }
 
+export const PluginExecutor = ({
+  plugin,
+  pluginOptions,
+  cogsContext,
+  pluginDataRef,
+}: {
+  plugin: CogsPlugin<any, any, any, any>;
+  pluginOptions: any;
+  cogsContext: PluginContext<any>;
+  pluginDataRef: React.MutableRefObject<PluginData[]>;
+}) => {
+  // 1. Call `useHook` at the top level of this component. This is safe.
+  const hookData = plugin.useHook
+    ? plugin.useHook(cogsContext, pluginOptions)
+    : undefined;
+
+  // 2. Manage the `transformState` logic within a useEffect.
+  // This runs after render when dependencies change.
+  useEffect(() => {
+    if (plugin.transformState) {
+      console.log(`▶️ Running transformState for plugin: "${plugin.name}"`);
+      plugin.transformState(cogsContext, pluginOptions, hookData);
+    }
+  }, [plugin, pluginOptions, cogsContext, hookData]); // Reruns if these change
+
+  // 3. Use an effect to register this plugin's data for the `onUpdate` callback.
+  // The cleanup function ensures the data is removed when the plugin is no longer active.
+  useEffect(() => {
+    const currentPluginData = {
+      plugin,
+      options: pluginOptions,
+      hookData,
+    };
+
+    // Add this plugin's data to the shared ref
+    pluginDataRef.current.push(currentPluginData);
+
+    // The effect's cleanup function
+    return () => {
+      pluginDataRef.current = pluginDataRef.current.filter(
+        (p) => p.plugin.name !== plugin.name
+      );
+    };
+  }, [plugin, pluginOptions, hookData, pluginDataRef]);
+
+  // This component renders nothing to the DOM
+  return null;
+};
+
 // --- DEMO USAGE - ALL THESE NOW WORK ---
 
 type MyGlobalState = {
@@ -187,19 +241,19 @@ type MyGlobalState = {
   address: { city: string; country: string };
 };
 
-const { createPlugin } = createPluginContext<MyGlobalState>();
+const { createPlugin } = createPluginContext<MyGlobalState, { id: string }>();
 
 // Works with just transformState (no onUpdate required!)
-const analyticsPlugin = createPlugin<{ id: string }>(
-  'analyticsPlugin'
-).transformState(({ stateKey, cogsState }, opts) => {
-  if (stateKey === 'user') {
-    cogsState.$update({ test: 'This works!' });
+const analyticsPlugin = createPlugin('analyticsPlugin').transformState(
+  ({ stateKey, cogsState }, opts) => {
+    if (stateKey === 'user') {
+      cogsState.$update({ test: 'This works!' });
+    }
+    if (stateKey === 'address') {
+      cogsState.$update({ city: 'London', country: 'UK' });
+    }
   }
-  if (stateKey === 'address') {
-    cogsState.$update({ city: 'London', country: 'UK' });
-  }
-});
+);
 
 // Works with all three methods
 const fullPlugin = createPlugin('fullPlugin')

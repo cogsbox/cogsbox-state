@@ -5,7 +5,7 @@ import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType }
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
-type Prettify<T> = T extends any ? {
+export type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
 export type VirtualViewOptions = {
@@ -223,7 +223,7 @@ type SyncOptionsType<TApiParams> = {
 export type CreateStateOptionsType<T extends unknown = unknown, TPluginOptions = {}> = {
     formElements?: FormsElementsType<T>;
     validation?: ValidationOptionsType;
-    plugins?: CogsPlugin<T, TPluginOptions>[];
+    plugins?: CogsPlugin<string, T, TPluginOptions>[];
 };
 export type OptionsType<T extends unknown = unknown, TApiParams = never> = CreateStateOptionsType & {
     log?: boolean;
@@ -295,14 +295,14 @@ export declare function addStateOptions<T>(initialState: T, options: CreateState
     _addStateOptions: boolean;
     formElements?: FormsElementsType<T> | undefined;
     validation?: ValidationOptionsType;
-    plugins?: CogsPlugin<T, {}>[] | undefined;
+    plugins?: CogsPlugin<string, T, {}>[] | undefined;
 };
 export type PluginData = {
-    plugin: CogsPlugin;
+    plugin: CogsPlugin<any, any, any>;
     options: any;
     hookData?: any;
 };
-export declare const createCogsState: <State extends Record<string, unknown>, TPlugins extends readonly CogsPlugin<State, any, any>[] = []>(initialState: State, opt?: {
+export declare const createCogsState: <State extends Record<string, unknown>, TPlugins extends readonly CogsPlugin<string, State, any, any>[] = []>(initialState: State, opt?: {
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     plugins?: TPlugins;
@@ -311,13 +311,64 @@ export declare const createCogsState: <State extends Record<string, unknown>, TP
     __apiParamsMap?: Record<string, any>;
     __useSync?: UseSyncType;
     __syncSchemas?: Record<string, any>;
-}) => CogsApi<State, never, { [K in TPlugins[number] as K["name"]]?: (K extends CogsPlugin<State, infer O, any> ? O : never) | undefined; }>;
-type UseCogsStateHook<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: [TApiParamsMap] extends [never] ? Prettify<OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions> : StateKey extends keyof TApiParamsMap ? Prettify<OptionsType<TransformedStateType<T>[StateKey], TApiParamsMap[StateKey]> & {
-    syncOptions: Prettify<SyncOptionsType<TApiParamsMap[StateKey]>>;
-} & TPluginOptions> : Prettify<OptionsType<TransformedStateType<T>[StateKey], never> & TPluginOptions>) => StateObject<TransformedStateType<T>[StateKey]>;
+}) => {
+    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: CreateStateOptionsType<unknown, {}> & {
+        log?: boolean;
+        componentId?: string;
+        syncOptions?: SyncOptionsType<never> | undefined;
+        serverState?: {
+            id?: string | number;
+            data?: TransformedStateType<State>[StateKey] | undefined;
+            status?: "pending" | "error" | "success" | "loading";
+            timestamp?: number;
+            merge?: boolean | {
+                strategy: "append" | "prepend" | "diff";
+                key?: string;
+            };
+        } | undefined;
+        sync?: {
+            action: (state: TransformedStateType<State>[StateKey]) => Promise<{
+                success: boolean;
+                data?: any;
+                error?: any;
+                errors?: Array<{
+                    path: (string | number)[];
+                    message: string;
+                }>;
+            }>;
+            onSuccess?: (data: any) => void;
+            onError?: (error: any) => void;
+        } | undefined;
+        middleware?: ({ update }: {
+            update: UpdateTypeDetail;
+        }) => void;
+        localStorage?: {
+            key: string | ((state: TransformedStateType<State>[StateKey]) => string);
+            onChange?: ((state: TransformedStateType<State>[StateKey]) => void) | undefined;
+        } | undefined;
+        reactiveDeps?: ((state: TransformedStateType<State>[StateKey]) => any[] | true) | undefined;
+        reactiveType?: ReactivityType;
+        syncUpdate?: Partial<UpdateTypeDetail>;
+        defaultState?: TransformedStateType<State>[StateKey] | undefined;
+        dependencies?: any[];
+    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, State, infer O, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, State, infer O, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
+        __key: "keyed";
+        map: infer TMap;
+    } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey]>;
+    setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
+};
+type ResolvedOptionsForKey<TPluginOptions extends Record<string, any>, StateKeys extends string> = StateKeys extends any ? {
+    [PName in keyof TPluginOptions]?: {
+        [OKey in keyof TPluginOptions[PName]]: TPluginOptions[PName][OKey] extends {
+            __key: 'keyed';
+            map: infer TMap;
+        } ? TMap extends Record<string, any> ? StateKeys extends keyof TMap ? TMap[StateKeys] : never : never : TPluginOptions[PName][OKey];
+    };
+} : never;
+type UseCogsStateHook<T extends Record<string, any>, TPluginOptions extends Record<string, any> = {}> = <StateKey extends keyof TransformedStateType<T> & string>(stateKey: StateKey, options?: Prettify<OptionsType<TransformedStateType<T>[StateKey], never> & ResolvedOptionsForKey<TPluginOptions, StateKey>>) => StateObject<TransformedStateType<T>[StateKey]>;
 type SetCogsOptionsFunc<T extends Record<string, any>> = <StateKey extends keyof TransformedStateType<T>>(stateKey: StateKey, options: OptionsType<TransformedStateType<T>[StateKey]>) => void;
-type CogsApi<T extends Record<string, any>, TApiParamsMap extends Record<string, any> = never, TPluginOptions = {}> = {
-    useCogsState: UseCogsStateHook<T, TApiParamsMap, TPluginOptions>;
+type CogsApi<T extends Record<string, any>, TPluginOptions extends Record<string, any> = {}> = {
+    useCogsState: UseCogsStateHook<T, TPluginOptions>;
     setCogsOptions: SetCogsOptionsFunc<T>;
 };
 type GetParamType<SchemaEntry> = SchemaEntry extends {
