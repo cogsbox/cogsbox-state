@@ -1,66 +1,64 @@
-import { jsx as R, Fragment as k } from "react/jsx-runtime";
-import { useState as E, useRef as l, useEffect as D } from "react";
-import { pluginStore as d } from "./pluginStore.js";
-import { getGlobalStore as u } from "./store.js";
-import { isDeepEqual as v } from "./utility.js";
-function j({ children: b }) {
-  const [, p] = E({}), M = l(/* @__PURE__ */ new Map());
-  D(() => d.subscribe(() => {
-    p({});
-  }), []);
-  const s = d.getState(), f = /* @__PURE__ */ new Map();
-  s.pluginOptions.forEach((i, e) => {
-    const r = s.stateHandlers.get(e);
-    r && s.registeredPlugins.forEach((t) => {
-      const a = i.get(t.name);
-      if (a !== void 0 && t.useHook) {
-        const n = `${e}:${t.name}`, g = {
-          stateKey: e,
-          cogsState: r,
-          getPluginMetaData: () => u.getState().getPluginMetaDataMap(e, [])?.get(t.name),
-          setPluginMetaData: (o) => u.getState().setPluginMetaData(e, t.name, o),
-          removePluginMetaData: () => u.getState().removePluginMetaData(e, [], t.name)
-        }, c = t.useHook(g, a);
-        f.set(n, c);
-      }
-    });
-  });
-  const P = l(s);
-  P.current = s;
-  const S = l(f);
-  return S.current = f, D(() => {
-    const i = (r) => {
-      const t = P.current, a = S.current, { stateKey: n } = r, g = t.stateHandlers.get(n), c = t.pluginOptions.get(n);
-      !g || !c || t.registeredPlugins.forEach((o) => {
-        if (o.onUpdate && c.has(o.name)) {
-          const m = c.get(o.name), h = `${n}:${o.name}`, H = a.get(h);
-          o.onUpdate(n, r, m, H);
-        }
-      });
-    };
-    return d.getState().subscribeToUpdates(i);
-  }, []), s.pluginOptions.forEach((i, e) => {
-    const r = s.stateHandlers.get(e);
-    r && s.registeredPlugins.forEach((t) => {
-      if (t.transformState) {
-        const a = i.get(t.name);
-        if (a === void 0) return;
-        const n = `${e}:${t.name}`, g = M.current.get(n);
-        if (!v(a, g)) {
-          const c = {
-            stateKey: e,
-            cogsState: r,
-            getPluginMetaData: () => u.getState().getPluginMetaDataMap(e, [])?.get(t.name),
-            setPluginMetaData: (m) => u.getState().setPluginMetaData(e, t.name, m),
-            removePluginMetaData: () => u.getState().removePluginMetaData(e, [], t.name)
-          }, o = f.get(n);
-          t.transformState(c, a, o), M.current.set(n, a);
-        }
-      }
-    });
-  }), /* @__PURE__ */ R(k, { children: b });
+import { jsxs as P, Fragment as S, jsx as D } from "react/jsx-runtime";
+import M, { useMemo as R, useRef as l, useEffect as i, useReducer as U } from "react";
+import { pluginStore as b } from "./pluginStore.js";
+import { getGlobalStore as f } from "./store.js";
+import { isDeepEqual as h } from "./utility.js";
+const k = M.memo(
+  ({
+    stateKey: r,
+    plugin: e,
+    options: n,
+    stateHandler: c
+  }) => {
+    const a = R(
+      () => ({
+        stateKey: r,
+        cogsState: c,
+        getPluginMetaData: () => f.getState().getPluginMetaDataMap(r, [])?.get(e.name),
+        setPluginMetaData: (o) => f.getState().setPluginMetaData(r, e.name, o),
+        removePluginMetaData: () => f.getState().removePluginMetaData(r, [], e.name)
+      }),
+      [r, c, e.name]
+    ), t = e.useHook ? e.useHook(a, n) : void 0, m = l();
+    i(() => {
+      e.transformState && (h(n, m.current) || (e.transformState(a, n, t), m.current = n));
+    }, [a, e, n, t]);
+    const s = l(t);
+    return s.current = t, i(() => {
+      if (!e.onUpdate)
+        return;
+      const o = (u) => {
+        u.stateKey === r && e.onUpdate(r, u, n, s.current);
+      };
+      return b.getState().subscribeToUpdates(o);
+    }, [r, e, n, a]), null;
+  }
+);
+function E({ children: r }) {
+  const [, e] = U((t) => t + 1, 0);
+  i(() => b.subscribe(e), []);
+  const { pluginOptions: n, stateHandlers: c, registeredPlugins: a } = b.getState();
+  return /* @__PURE__ */ P(S, { children: [
+    Array.from(n.entries()).map(([t, m]) => {
+      const s = c.get(t);
+      return s ? Array.from(m.entries()).map(([o, g]) => {
+        const u = a.find((d) => d.name === o);
+        return u ? /* @__PURE__ */ D(
+          k,
+          {
+            stateKey: t,
+            plugin: u,
+            options: g,
+            stateHandler: s
+          },
+          `${t}:${o}`
+        ) : null;
+      }) : null;
+    }),
+    r
+  ] });
 }
 export {
-  j as PluginRunner
+  E as PluginRunner
 };
 //# sourceMappingURL=PluginRunner.jsx.map
