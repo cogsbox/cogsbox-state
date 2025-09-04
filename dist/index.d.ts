@@ -4,4 +4,5 @@ export * from './utility.js';
 export * from './TRPCValidationLink.js';
 export * from './store.js';
 export * from './plugins.js';
+export * from './PluginRunner.js';
 //# sourceMappingURL=index.d.ts.map

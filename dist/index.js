@@ -1,36 +1,38 @@
-import { $cogsSignal as r, addStateOptions as o, createCogsState as a, useCogsStateFn as n } from "./CogsState.jsx";
+import { $cogsSignal as r, addStateOptions as o, createCogsState as n, useCogsStateFn as a } from "./CogsState.jsx";
 import { CogsStateClient as f, config as g, useCogsConfig as i } from "./CogsStateClient.jsx";
-import { debounce as c, deepMerge as p, deleteNestedProperty as S, getArrayLengthDifferences as u, getArrayLengthDifferencesArray as l, getDifferences as m, getDifferencesArray as C, isArray as x, isDeepEqual as y, isFunction as A, isObject as D, transformStateFunc as b, updateNestedProperty as h } from "./utility.js";
-import { useCogsTrpcValidationLink as L } from "./TRPCValidationLink.js";
-import { buildShadowNode as P, formRefStore as w, generateId as O, getGlobalStore as j, shadowStateStore as k } from "./store.js";
-import { createPluginContext as E } from "./plugins.js";
+import { debounce as p, deepMerge as c, deleteNestedProperty as u, getArrayLengthDifferences as S, getArrayLengthDifferencesArray as l, getDifferences as m, getDifferencesArray as x, isArray as C, isDeepEqual as y, isFunction as A, isObject as D, transformStateFunc as b, updateNestedProperty as h } from "./utility.js";
+import { useCogsTrpcValidationLink as F } from "./TRPCValidationLink.js";
+import { buildShadowNode as N, formRefStore as w, generateId as O, getGlobalStore as R, shadowStateStore as j } from "./store.js";
+import { createPluginContext as q } from "./plugins.js";
+import { PluginRunner as G } from "./PluginRunner.jsx";
 export {
   r as $cogsSignal,
   f as CogsStateClient,
+  G as PluginRunner,
   o as addStateOptions,
-  P as buildShadowNode,
+  N as buildShadowNode,
   g as config,
-  a as createCogsState,
-  E as createPluginContext,
-  c as debounce,
-  p as deepMerge,
-  S as deleteNestedProperty,
+  n as createCogsState,
+  q as createPluginContext,
+  p as debounce,
+  c as deepMerge,
+  u as deleteNestedProperty,
   w as formRefStore,
   O as generateId,
-  u as getArrayLengthDifferences,
+  S as getArrayLengthDifferences,
   l as getArrayLengthDifferencesArray,
   m as getDifferences,
-  C as getDifferencesArray,
-  j as getGlobalStore,
-  x as isArray,
+  x as getDifferencesArray,
+  R as getGlobalStore,
+  C as isArray,
   y as isDeepEqual,
   A as isFunction,
   D as isObject,
-  k as shadowStateStore,
+  j as shadowStateStore,
   b as transformStateFunc,
   h as updateNestedProperty,
   i as useCogsConfig,
-  n as useCogsStateFn,
-  L as useCogsTrpcValidationLink
+  a as useCogsStateFn,
+  F as useCogsTrpcValidationLink
 };
 //# sourceMappingURL=index.js.map
