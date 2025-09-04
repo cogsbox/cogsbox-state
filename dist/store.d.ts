@@ -11,14 +11,6 @@ export type TrieNode = {
     subscribers: Set<string>;
     children: Map<string, TrieNode>;
 };
-export type FormRefStoreState = {
-    formRefs: Map<string, React.RefObject<any>>;
-    registerFormRef: (id: string, ref: React.RefObject<any>) => void;
-    getFormRef: (id: string) => React.RefObject<any> | undefined;
-    removeFormRef: (id: string) => void;
-    getFormRefsByStateKey: (stateKey: string) => Map<string, React.RefObject<any>>;
-};
-export declare const formRefStore: import('zustand').UseBoundStore<import('zustand').StoreApi<FormRefStoreState>>;
 export type ComponentsType = {
     components?: Map<string, {
         forceUpdate: () => void;
@@ -50,6 +42,11 @@ export type TypeInfo = {
     default: any;
     nullable?: boolean;
     optional?: boolean;
+};
+export type UIState = {
+    isFocused?: boolean;
+    isTouched?: boolean;
+    isHovered?: boolean;
 };
 export type ShadowMetadata = {
     value?: any;
@@ -94,6 +91,11 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
     pluginMetaData?: Map<string, Record<string, any>>;
+    formRef?: React.RefObject<any>;
+    focusedElement?: {
+        path: string[];
+        ref: React.RefObject<any>;
+    } | null;
 } & ComponentsType;
 type ShadowNode = {
     _meta?: ShadowMetadata;

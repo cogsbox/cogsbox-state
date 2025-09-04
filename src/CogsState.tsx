@@ -31,7 +31,6 @@ import superjson from 'superjson';
 import { v4 as uuidv4 } from 'uuid';
 
 import {
-  formRefStore,
   getGlobalStore,
   shadowStateStore,
   ValidationError,
@@ -222,7 +221,10 @@ export type EndType<T, IsArrayElement = false> = {
   $getPluginMetaData: (pluginName: string) => Record<string, any>;
   $addPluginMetaData: (key: string, data: Record<string, any>) => void;
   $removePluginMetaData: (key: string) => void;
-
+  $useFocusedFormElement: () => {
+    path: string[];
+    ref: React.RefObject<any>;
+  } | null;
   $addZodValidation: (
     errors: ValidationError[],
     source?: 'client' | 'sync_engine' | 'api'
@@ -252,7 +254,14 @@ export type EndType<T, IsArrayElement = false> = {
   $isSelected: boolean;
   $setSelected: (value: boolean) => void;
   $toggleSelected: () => void;
-  $getFormRef: () => React.RefObject<any> | undefined;
+  $formInput: {
+    setDisabled: (isDisabled: boolean) => void;
+    focus: () => void;
+    blur: () => void;
+    scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+    click: () => void;
+    selectText: () => void;
+  };
   $removeStorage: () => void;
   $sync: () => void;
   $validationWrapper: ({
@@ -274,7 +283,7 @@ export type StateObject<T> = (T extends any[]
       : never) &
   EndType<T, true> & {
     $toggle: T extends boolean ? () => void : never;
-    $getAllFormRefs: () => Map<string, React.RefObject<any>>;
+
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
 
@@ -755,10 +764,6 @@ export const createCogsState = <
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
 
-    const onUpdateCallback = useCallback((update: UpdateTypeDetail) => {
-      // Notify the central plugin store that an update has occurred
-      pluginStore.getState().notifyUpdate(update);
-    }, []);
     const updater = useCogsStateFn<(typeof statePart)[StateKey]>(thiState, {
       stateKey: stateKey as string,
       syncUpdate: options?.syncUpdate,
@@ -771,8 +776,6 @@ export const createCogsState = <
       dependencies: options?.dependencies,
       serverState: options?.serverState,
       syncOptions: options?.syncOptions,
-
-      onUpdateCallback,
     });
 
     useEffect(() => {
@@ -1301,9 +1304,7 @@ function createEffectiveSetState<T>(
   thisKey: string,
   syncApiRef: React.MutableRefObject<any>,
   sessionId: string | undefined,
-  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>,
-
-  onUpdateCallback?: (update: UpdateTypeDetail) => void
+  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
 ): EffectiveSetState<T> {
   return (newStateOrFunction, path, updateObj, validationKey?) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
@@ -1368,14 +1369,7 @@ function createEffectiveSetState<T>(
       latestInitialOptionsRef.current.middleware({ update: newUpdate });
     }
 
-    console.log(
-      'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh',
-      path,
-      newUpdate
-    );
-    if (onUpdateCallback) {
-      onUpdateCallback(newUpdate);
-    }
+    pluginStore.getState().notifyUpdate(newUpdate);
     // if (
     //   pluginDataRef?.current &&
     //   pluginDataRef.current.length > 0 &&
@@ -1413,15 +1407,12 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncUpdate,
     dependencies,
     serverState,
-    onUpdateCallback,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
 
     syncOptions?: SyncOptionsType<any>;
-
-    onUpdateCallback?: (update: UpdateTypeDetail) => void;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -1711,8 +1702,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     thisKey,
     syncApiRef,
     sessionId,
-    latestInitialOptionsRef,
-    onUpdateCallback
+    latestInitialOptionsRef
   );
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
@@ -3089,10 +3079,59 @@ function createProxyHandler<T>(
             });
         }
 
+        if (prop === '$formInput') {
+          const _getFormElement = (path: string[]): HTMLElement | null => {
+            const metadata = getShadowMetadata(stateKey, path);
+            if (metadata?.formRef?.current) {
+              return metadata.formRef.current;
+            }
+            // This warning is helpful for debugging if a ref is missing.
+            console.warn(
+              `Form element ref not found for stateKey "${stateKey}" at path "${path.join('.')}"`
+            );
+            return null;
+          };
+          return {
+            setDisabled: (isDisabled: boolean) => {
+              const element = _getFormElement(path) as HTMLInputElement | null;
+              if (element) {
+                element.disabled = isDisabled;
+              }
+            },
+            focus: () => {
+              const element = _getFormElement(path);
+              element?.focus();
+            },
+            blur: () => {
+              const element = _getFormElement(path);
+              element?.blur();
+            },
+            scrollIntoView: (options?: ScrollIntoViewOptions) => {
+              const element = _getFormElement(path);
+              element?.scrollIntoView(
+                options ?? { behavior: 'smooth', block: 'center' }
+              );
+            },
+            click: () => {
+              const element = _getFormElement(path);
+              element?.click();
+            },
+            selectText: () => {
+              const element = _getFormElement(path) as
+                | HTMLInputElement
+                | HTMLTextAreaElement
+                | null;
+              if (element && typeof element.select === 'function') {
+                element.select();
+              }
+            },
+          };
+        }
         if (prop === '$$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
         }
+
         if (prop === '$lastSynced') {
           const syncKey = `${stateKey}:${path.join('.')}`;
           return getSyncInfo(syncKey);
@@ -3164,6 +3203,33 @@ function createProxyHandler<T>(
           return componentId;
         }
         if (path.length == 0) {
+          if (prop === '$useFocusedFormElement') {
+            // The returned function is the hook.
+            return () => {
+              const { subscribeToPath } = getGlobalStore.getState();
+
+              // Define the virtual path consistently.
+              const virtualFocusPath = `${stateKey}.__focusedElement`;
+
+              const [focusedElement, setFocusedElement] = useState(
+                // Lazily get the initial value from the root metadata.
+                () => getShadowMetadata(stateKey, [])?.focusedElement || null
+              );
+
+              useEffect(() => {
+                // Subscribe specifically to the virtual path. The callback is the state setter.
+                const unsubscribe = subscribeToPath(
+                  virtualFocusPath,
+                  setFocusedElement
+                );
+
+                // The cleanup function is returned by the existing subscription system.
+                return unsubscribe;
+              }, [stateKey]); // Only subscribe once for the lifetime of the component.
+
+              return focusedElement;
+            };
+          }
           if (prop === '$_applyUpdate') {
             return (
               value: any,
@@ -3379,14 +3445,8 @@ function createProxyHandler<T>(
 
           if (prop === '$getComponents')
             return () => getShadowMetadata(stateKey, [])?.components;
-          if (prop === '$getAllFormRefs')
-            return () =>
-              formRefStore.getState().getFormRefsByStateKey(stateKey);
         }
-        if (prop === '$getFormRef') {
-          return () =>
-            formRefStore.getState().getFormRef(stateKey + '.' + path.join('.'));
-        }
+
         if (prop === '$validationWrapper') {
           return ({
             children,

@@ -119,6 +119,10 @@ export type EndType<T, IsArrayElement = false> = {
     $getPluginMetaData: (pluginName: string) => Record<string, any>;
     $addPluginMetaData: (key: string, data: Record<string, any>) => void;
     $removePluginMetaData: (key: string) => void;
+    $useFocusedFormElement: () => {
+        path: string[];
+        ref: React.RefObject<any>;
+    } | null;
     $addZodValidation: (errors: ValidationError[], source?: 'client' | 'sync_engine' | 'api') => void;
     $clearZodValidation: (paths?: string[]) => void;
     $applyOperation: (operation: UpdateTypeDetail, metaData?: Record<string, any>) => void;
@@ -140,7 +144,14 @@ export type EndType<T, IsArrayElement = false> = {
     $isSelected: boolean;
     $setSelected: (value: boolean) => void;
     $toggleSelected: () => void;
-    $getFormRef: () => React.RefObject<any> | undefined;
+    $formInput: {
+        setDisabled: (isDisabled: boolean) => void;
+        focus: () => void;
+        blur: () => void;
+        scrollIntoView: (options?: ScrollIntoViewOptions) => void;
+        click: () => void;
+        selectText: () => void;
+    };
     $removeStorage: () => void;
     $sync: () => void;
     $validationWrapper: ({ children, hideMessage, }: {
@@ -155,7 +166,6 @@ export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Reco
     [K in keyof T]-?: StateObject<T[K]>;
 } : T extends string | number | boolean | null ? EndType<T, true> : never) & EndType<T, true> & {
     $toggle: T extends boolean ? () => void : never;
-    $getAllFormRefs: () => Map<string, React.RefObject<any>>;
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
     $_initialState: T;
@@ -346,12 +356,11 @@ type LocalStorageData<T> = {
     baseServerState?: T;
     stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, onUpdateCallback, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, syncUpdate, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
     syncOptions?: SyncOptionsType<any>;
-    onUpdateCallback?: (update: UpdateTypeDetail) => void;
 } & OptionsType<TStateObject>): StateObject<TStateObject>;
 type MetaData = {
     arrayViews?: {

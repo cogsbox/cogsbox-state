@@ -1,6 +1,6 @@
-import { jsxs as P, Fragment as S, jsx as D } from "react/jsx-runtime";
+import { jsxs as S, Fragment as P, jsx as D } from "react/jsx-runtime";
 import M, { useMemo as R, useRef as l, useEffect as i, useReducer as U } from "react";
-import { pluginStore as b } from "./pluginStore.js";
+import { pluginStore as g } from "./pluginStore.js";
 import { getGlobalStore as f } from "./store.js";
 import { isDeepEqual as h } from "./utility.js";
 const k = M.memo(
@@ -10,55 +10,57 @@ const k = M.memo(
     options: n,
     stateHandler: c
   }) => {
-    const a = R(
+    const s = R(
       () => ({
         stateKey: r,
         cogsState: c,
         getPluginMetaData: () => f.getState().getPluginMetaDataMap(r, [])?.get(e.name),
-        setPluginMetaData: (o) => f.getState().setPluginMetaData(r, e.name, o),
+        setPluginMetaData: (a) => f.getState().setPluginMetaData(r, e.name, a),
         removePluginMetaData: () => f.getState().removePluginMetaData(r, [], e.name)
       }),
       [r, c, e.name]
-    ), t = e.useHook ? e.useHook(a, n) : void 0, m = l();
+    ), t = e.useHook ? e.useHook(s, n) : void 0, m = l();
     i(() => {
-      e.transformState && (h(n, m.current) || (e.transformState(a, n, t), m.current = n));
-    }, [a, e, n, t]);
-    const s = l(t);
-    return s.current = t, i(() => {
+      e.transformState && (h(n, m.current) || (e.transformState(s, n, t), m.current = n));
+    }, [s, e, n, t]);
+    const o = l(t);
+    return o.current = t, i(() => {
       if (!e.onUpdate)
         return;
-      const o = (u) => {
-        u.stateKey === r && e.onUpdate(r, u, n, s.current);
+      const a = (u) => {
+        u.stateKey === r && e.onUpdate(r, u, n, o.current);
       };
-      return b.getState().subscribeToUpdates(o);
-    }, [r, e, n, a]), null;
+      return g.getState().subscribeToUpdates(a);
+    }, [r, e, n, s]), null;
   }
 );
-function E({ children: r }) {
+function A({ children: r }) {
   const [, e] = U((t) => t + 1, 0);
-  i(() => b.subscribe(e), []);
-  const { pluginOptions: n, stateHandlers: c, registeredPlugins: a } = b.getState();
-  return /* @__PURE__ */ P(S, { children: [
+  i(() => g.subscribe(e), []);
+  const { pluginOptions: n, stateHandlers: c, registeredPlugins: s } = g.getState();
+  return /* @__PURE__ */ S(P, { children: [
     Array.from(n.entries()).map(([t, m]) => {
-      const s = c.get(t);
-      return s ? Array.from(m.entries()).map(([o, g]) => {
-        const u = a.find((d) => d.name === o);
+      const o = c.get(t);
+      return o ? Array.from(m.entries()).map(([a, b]) => {
+        const u = s.find((d) => d.name === a);
         return u ? /* @__PURE__ */ D(
           k,
           {
             stateKey: t,
             plugin: u,
-            options: g,
-            stateHandler: s
+            options: b,
+            stateHandler: o
           },
-          `${t}:${o}`
+          `${t}:${a}`
         ) : null;
       }) : null;
     }),
+    "testsetsetsetsetsetsetsetse123123213",
+    JSON.stringify(n),
     r
   ] });
 }
 export {
-  E as PluginRunner
+  A as PluginRunner
 };
 //# sourceMappingURL=PluginRunner.jsx.map

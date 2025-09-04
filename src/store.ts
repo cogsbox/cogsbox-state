@@ -21,43 +21,6 @@ export type TrieNode = {
   children: Map<string, TrieNode>;
 };
 
-export type FormRefStoreState = {
-  formRefs: Map<string, React.RefObject<any>>;
-  registerFormRef: (id: string, ref: React.RefObject<any>) => void;
-  getFormRef: (id: string) => React.RefObject<any> | undefined;
-  removeFormRef: (id: string) => void;
-  getFormRefsByStateKey: (
-    stateKey: string
-  ) => Map<string, React.RefObject<any>>;
-};
-
-export const formRefStore = create<FormRefStoreState>((set, get) => ({
-  formRefs: new Map(),
-  registerFormRef: (id, ref) =>
-    set((state) => {
-      const newRefs = new Map(state.formRefs);
-      newRefs.set(id, ref);
-      return { formRefs: newRefs };
-    }),
-  getFormRef: (id) => get().formRefs.get(id),
-  removeFormRef: (id) =>
-    set((state) => {
-      const newRefs = new Map(state.formRefs);
-      newRefs.delete(id);
-      return { formRefs: newRefs };
-    }),
-  getFormRefsByStateKey: (stateKey) => {
-    const allRefs = get().formRefs;
-    const stateKeyPrefix = stateKey + '.';
-    const filteredRefs = new Map();
-    allRefs.forEach((ref, id) => {
-      if (id.startsWith(stateKeyPrefix) || id === stateKey) {
-        filteredRefs.set(id, ref);
-      }
-    });
-    return filteredRefs;
-  },
-}));
 export type ComponentsType = {
   components?: Map<
     string,
@@ -107,6 +70,12 @@ export type TypeInfo = {
   optional?: boolean;
 };
 
+export type UIState = {
+  isFocused?: boolean;
+  isTouched?: boolean;
+  isHovered?: boolean;
+};
+
 // Update ShadowMetadata to include typeInfo
 export type ShadowMetadata = {
   value?: any;
@@ -153,6 +122,8 @@ export type ShadowMetadata = {
     }
   >;
   pluginMetaData?: Map<string, Record<string, any>>;
+  formRef?: React.RefObject<any>;
+  focusedElement?: { path: string[]; ref: React.RefObject<any> } | null;
 } & ComponentsType;
 
 type ShadowNode = {

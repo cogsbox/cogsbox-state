@@ -9,7 +9,6 @@ import React, {
   useState,
 } from 'react';
 import {
-  formRefStore,
   getGlobalStore,
   shadowStateStore,
   ValidationError,
@@ -225,7 +224,7 @@ export function FormElementWrapper({
 }) {
   const componentId = useRef(uuidv4()).current;
   const [, forceUpdate] = useState({});
-
+  const formElementRef = useRef<any>(null);
   const stateKeyPathKey = [stateKey, ...path].join('.');
   useRegisterComponent(stateKey, componentId, forceUpdate);
 
@@ -249,6 +248,9 @@ export function FormElementWrapper({
   }, [globalStateValue]);
 
   useEffect(() => {
+    const { setShadowMetadata } = getGlobalStore.getState();
+    setShadowMetadata(stateKey, path, { formRef: formElementRef });
+
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
@@ -261,6 +263,12 @@ export function FormElementWrapper({
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
         isCurrentlyDebouncing.current = false;
+      }
+      const currentMeta = getGlobalStore
+        .getState()
+        .getShadowMetadata(stateKey, path);
+      if (currentMeta && currentMeta.formRef) {
+        setShadowMetadata(stateKey, path, { formRef: undefined });
       }
     };
   }, []);
@@ -477,9 +485,19 @@ export function FormElementWrapper({
       globalStateValue,
     ]
   );
+  const virtualFocusPath = `${stateKey}.__focusedElement`;
+  const newFocusedElement = { path, ref: formElementRef };
+  const handleFocus = useCallback(() => {
+    const rootMeta =
+      getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
+    setShadowMetadata(stateKey, [], {
+      ...rootMeta,
+      focusedElement: { path, ref: formElementRef },
+    });
+    notifyPathSubscribers(virtualFocusPath, newFocusedElement);
+  }, [stateKey, path, formElementRef]);
 
   const handleBlur = useCallback(() => {
-    // Commit any pending changes immediately
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
@@ -487,9 +505,21 @@ export function FormElementWrapper({
       setState(localValue, path, { updateType: 'update' });
     }
 
-    // Validate on blur
+    queueMicrotask(() => {
+      const rootMeta =
+        getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
+      if (
+        rootMeta.focusedElement &&
+        JSON.stringify(rootMeta.focusedElement.path) === JSON.stringify(path)
+      ) {
+        setShadowMetadata(stateKey, [], {
+          focusedElement: null,
+        });
+        notifyPathSubscribers(virtualFocusPath, null);
+      }
+    });
     validateField(localValue, 'onBlur');
-  }, [localValue, setState, path, validateField]);
+  }, [localValue, setState, path, validateField, stateKey]);
 
   const baseState = rebuildStateShape({
     path: path,
@@ -505,10 +535,9 @@ export function FormElementWrapper({
           onChange: (e: any) => {
             debouncedUpdate(e.target.value);
           },
+          onFocus: handleFocus,
           onBlur: handleBlur,
-          ref: formRefStore
-            .getState()
-            .getFormRef(stateKey + '.' + path.join('.')),
+          ref: formElementRef,
         };
       }
 

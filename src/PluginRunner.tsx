@@ -141,6 +141,7 @@ export function PluginRunner({ children }: { children: React.ReactNode }) {
           );
         });
       })}
+      testsetsetsetsetsetsetsetse123123213{JSON.stringify(pluginOptions)}
       {children}
     </>
   );
