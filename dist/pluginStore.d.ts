@@ -33,6 +33,10 @@ type PluginRegistryStore = {
         path: string;
         value?: any;
     }) => void;
+    hookResults: Map<string, Map<string, any>>;
+    setHookResult: (stateKey: string, pluginName: string, data: any) => void;
+    getHookResult: (stateKey: string, pluginName: string) => any | undefined;
+    removeHookResult: (stateKey: string, pluginName: string) => void;
 };
 export declare const pluginStore: import('zustand').UseBoundStore<import('zustand').StoreApi<PluginRegistryStore>>;
 export {};

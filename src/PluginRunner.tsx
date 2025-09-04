@@ -5,7 +5,7 @@ import { isDeepEqual } from './utility';
 import type { CogsPlugin, PluginContext } from './plugins';
 
 import type { StateObject, UpdateTypeDetail } from './CogsState';
-
+const { setHookResult, removeHookResult } = pluginStore.getState();
 /**
  * An invisible "controller" component that manages the lifecycle for a SINGLE plugin instance.
  * Its only job is to correctly call the plugin's hooks and effects.
@@ -49,6 +49,13 @@ const PluginInstance = React.memo(
     const hookData = plugin.useHook
       ? plugin.useHook(context, options)
       : undefined;
+
+    useEffect(() => {
+      if (plugin.useHook) setHookResult(stateKey, plugin.name, hookData);
+      else removeHookResult(stateKey, plugin.name);
+
+      return () => removeHookResult(stateKey, plugin.name);
+    }, [stateKey, plugin.name, !!plugin.useHook, hookData]);
 
     // 3. Handle `transformState`. This effect runs ONLY when the plugin's options change.
     const lastProcessedOptionsRef = useRef<any>();

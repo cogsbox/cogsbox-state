@@ -1379,7 +1379,6 @@ function Pe(e, o, g, s) {
                 code: f.code
               }));
               T.getState().setShadowMetadata(e, r.path, {
-                stateVersion: r.version,
                 validation: {
                   status: y.length > 0 ? "INVALID" : "VALID",
                   errors: y,

@@ -48,6 +48,12 @@ export type CogsPlugin<
     options: TOptions,
     hook?: THookReturn
   ) => void;
+  formWrapper?: (
+    element: React.ReactNode,
+    context: PluginContext<TState, TPluginMetaData>,
+    options: TOptions,
+    hook?: THookReturn
+  ) => React.ReactNode;
 };
 
 export type ExtractPluginOptions<
@@ -63,320 +69,240 @@ export function createPluginContext<
   TPluginMetaData extends Record<string, any> = {},
 >() {
   function createPlugin<TName extends string>(name: TName) {
-    // Helper to create the final plugin object
-    const createPluginObject = <THookReturn = any>(
+    // Helpers
+    type HookArgs<THookReturn> = THookReturn extends never
+      ? []
+      : [hookData: THookReturn];
+
+    type TransformFn<THookReturn> = (
+      context: PluginContext<TState, TPluginMetaData>,
+      options: TOptions,
+      ...args: HookArgs<THookReturn>
+    ) => void;
+
+    type UpdateFn<THookReturn> = (
+      context: PluginContext<TState, TPluginMetaData>,
+      update: UpdateTypeDetail,
+      options: TOptions,
+      ...args: HookArgs<THookReturn>
+    ) => void;
+
+    type FormUpdateFn<THookReturn> = (
+      context: PluginContext<TState, TPluginMetaData>,
+      event: { type: 'focus' | 'blur' | 'input'; path: string; value?: any },
+      options: TOptions,
+      ...args: HookArgs<THookReturn>
+    ) => void;
+
+    type FormWrapperFn<THookReturn> = (
+      element: React.ReactNode,
+      context: PluginContext<TState, TPluginMetaData>,
+      options: TOptions,
+      ...args: HookArgs<THookReturn>
+    ) => React.ReactNode;
+
+    type Plugin<THookReturn> = Prettify<
+      CogsPlugin<TName, TState, TOptions, THookReturn>
+    >;
+
+    // Your runtime object factory (unchanged behavior)
+    const createPluginObject = <THookReturn = never>(
       hookFn?: (
         context: PluginContext<TState, TPluginMetaData>,
         options: TOptions
       ) => THookReturn,
-      transformFn?: (
-        context: PluginContext<TState, TPluginMetaData>,
-        options: TOptions,
-        ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-      ) => void,
-      updateHandler?: (
-        context: PluginContext<TState, TPluginMetaData>,
-        update: UpdateTypeDetail,
-        options: TOptions,
-        ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-      ) => void,
-      formUpdateHandler?: (
-        context: PluginContext<TState, TPluginMetaData>,
-        event: { type: 'focus' | 'blur' | 'input'; path: string; value?: any },
-        options: TOptions,
-        ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-      ) => void
-    ): Prettify<CogsPlugin<TName, TState, TOptions, THookReturn>> => {
+      transformFn?: TransformFn<THookReturn>,
+      updateHandler?: UpdateFn<THookReturn>,
+      formUpdateHandler?: FormUpdateFn<THookReturn>,
+      formWrapper?: FormWrapperFn<THookReturn>
+    ): Plugin<THookReturn> => {
       return {
         name,
         useHook: hookFn as any,
         transformState: transformFn as any,
         onUpdate: updateHandler as any,
         onFormUpdate: formUpdateHandler as any,
+        formWrapper: formWrapper as any,
       };
     };
 
-    const make = <THookReturn = never>(
+    // Typed fluent API result
+    type BuildRet<
+      THookReturn,
+      HasTransform extends boolean,
+      HasUpdate extends boolean,
+      HasFormUpdate extends boolean,
+      HasWrapper extends boolean,
+    > = Plugin<THookReturn> &
+      (HasTransform extends true
+        ? {}
+        : {
+            transformState(
+              fn: TransformFn<THookReturn>
+            ): BuildRet<
+              THookReturn,
+              true,
+              HasUpdate,
+              HasFormUpdate,
+              HasWrapper
+            >;
+          }) &
+      (HasUpdate extends true
+        ? {}
+        : {
+            onUpdate(
+              fn: UpdateFn<THookReturn>
+            ): BuildRet<
+              THookReturn,
+              HasTransform,
+              true,
+              HasFormUpdate,
+              HasWrapper
+            >;
+          }) &
+      (HasFormUpdate extends true
+        ? {}
+        : {
+            onFormUpdate(
+              fn: FormUpdateFn<THookReturn>
+            ): BuildRet<THookReturn, HasTransform, HasUpdate, true, HasWrapper>;
+          }) &
+      (HasWrapper extends true
+        ? {}
+        : {
+            formWrapper(
+              fn: FormWrapperFn<THookReturn>
+            ): BuildRet<
+              THookReturn,
+              HasTransform,
+              HasUpdate,
+              HasFormUpdate,
+              true
+            >;
+          });
+
+    // Single builder: keeps runtime exactly the same, improves types only
+    function createBuilder<
+      THookReturn = never,
+      HasTransform extends boolean = false,
+      HasUpdate extends boolean = false,
+      HasFormUpdate extends boolean = false,
+      HasWrapper extends boolean = false,
+    >(
       hookFn?: (
         context: PluginContext<TState, TPluginMetaData>,
         options: TOptions
-      ) => THookReturn
-    ) => {
-      const plugin = createPluginObject<THookReturn>(hookFn);
+      ) => THookReturn,
+      transformFn?: TransformFn<THookReturn>,
+      updateHandler?: UpdateFn<THookReturn>,
+      formUpdateHandler?: FormUpdateFn<THookReturn>,
+      formWrapper?: FormWrapperFn<THookReturn>
+    ): BuildRet<
+      THookReturn,
+      HasTransform,
+      HasUpdate,
+      HasFormUpdate,
+      HasWrapper
+    > {
+      const plugin = createPluginObject<THookReturn>(
+        hookFn,
+        transformFn,
+        updateHandler,
+        formUpdateHandler,
+        formWrapper
+      );
 
-      return Object.assign(plugin, {
-        transformState(
-          transformFn: (
-            context: PluginContext<TState, TPluginMetaData>,
-            options: TOptions,
-            ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-          ) => void
-        ) {
-          const pluginWithTransform = createPluginObject<THookReturn>(
+      // Attach only the remaining chain methods (typed)
+      const methods = {} as Partial<
+        BuildRet<
+          THookReturn,
+          HasTransform,
+          HasUpdate,
+          HasFormUpdate,
+          HasWrapper
+        >
+      >;
+
+      if (!transformFn) {
+        (methods as any).transformState = (fn: TransformFn<THookReturn>) =>
+          createBuilder<
+            THookReturn,
+            true,
+            HasUpdate,
+            HasFormUpdate,
+            HasWrapper
+          >(hookFn, fn, updateHandler, formUpdateHandler, formWrapper);
+      }
+
+      if (!updateHandler) {
+        (methods as any).onUpdate = (fn: UpdateFn<THookReturn>) =>
+          createBuilder<
+            THookReturn,
+            HasTransform,
+            true,
+            HasFormUpdate,
+            HasWrapper
+          >(hookFn, transformFn, fn, formUpdateHandler, formWrapper);
+      }
+
+      if (!formUpdateHandler) {
+        (methods as any).onFormUpdate = (fn: FormUpdateFn<THookReturn>) =>
+          createBuilder<THookReturn, HasTransform, HasUpdate, true, HasWrapper>(
             hookFn,
-            transformFn
+            transformFn,
+            updateHandler,
+            fn,
+            formWrapper
           );
+      }
 
-          return Object.assign(pluginWithTransform, {
-            onUpdate(
-              updateHandler: (
-                context: PluginContext<TState, TPluginMetaData>,
-                update: UpdateTypeDetail,
-                options: TOptions,
-                ...args: THookReturn extends never
-                  ? []
-                  : [hookData: THookReturn]
-              ) => void
-            ) {
-              const pluginWithUpdate = createPluginObject<THookReturn>(
-                hookFn,
-                transformFn,
-                updateHandler
-              );
+      if (!formWrapper) {
+        (methods as any).formWrapper = (fn: FormWrapperFn<THookReturn>) =>
+          createBuilder<
+            THookReturn,
+            HasTransform,
+            HasUpdate,
+            HasFormUpdate,
+            true
+          >(hookFn, transformFn, updateHandler, formUpdateHandler, fn);
+      }
 
-              return Object.assign(pluginWithUpdate, {
-                onFormUpdate(
-                  formUpdateHandler: (
-                    context: PluginContext<TState, TPluginMetaData>,
-                    event: {
-                      type: 'focus' | 'blur' | 'input';
-                      path: string;
-                      value?: any;
-                    },
-                    options: TOptions,
-                    ...args: THookReturn extends never
-                      ? []
-                      : [hookData: THookReturn]
-                  ) => void
-                ) {
-                  return createPluginObject<THookReturn>(
-                    hookFn,
-                    transformFn,
-                    updateHandler,
-                    formUpdateHandler
-                  );
-                },
-              });
-            },
-            onFormUpdate(
-              formUpdateHandler: (
-                context: PluginContext<TState, TPluginMetaData>,
-                event: {
-                  type: 'focus' | 'blur' | 'input';
-                  path: string;
-                  value?: any;
-                },
-                options: TOptions,
-                ...args: THookReturn extends never
-                  ? []
-                  : [hookData: THookReturn]
-              ) => void
-            ) {
-              return createPluginObject<THookReturn>(
-                hookFn,
-                transformFn,
-                undefined,
-                formUpdateHandler
-              );
-            },
-          });
-        },
-        onUpdate(
-          updateHandler: (
+      return Object.assign(plugin, methods) as BuildRet<
+        THookReturn,
+        HasTransform,
+        HasUpdate,
+        HasFormUpdate,
+        HasWrapper
+      >;
+    }
+
+    // Base fluent object + typed useHook that flips THookReturn
+    const start = Object.assign(
+      createBuilder<never, false, false, false, false>(),
+      {
+        useHook<THookReturn>(
+          hookFn: (
             context: PluginContext<TState, TPluginMetaData>,
-            update: UpdateTypeDetail,
-            options: TOptions,
-            ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-          ) => void
+            options: TOptions
+          ) => THookReturn
         ) {
-          const pluginWithUpdate = createPluginObject<THookReturn>(
-            hookFn,
-            undefined,
-            updateHandler
-          );
-
-          return Object.assign(pluginWithUpdate, {
-            onFormUpdate(
-              formUpdateHandler: (
-                context: PluginContext<TState, TPluginMetaData>,
-                event: {
-                  type: 'focus' | 'blur' | 'input';
-                  path: string;
-                  value?: any;
-                },
-                options: TOptions,
-                ...args: THookReturn extends never
-                  ? []
-                  : [hookData: THookReturn]
-              ) => void
-            ) {
-              return createPluginObject<THookReturn>(
-                hookFn,
-                undefined,
-                updateHandler,
-                formUpdateHandler
-              );
-            },
-          });
+          return createBuilder<THookReturn, false, false, false, false>(hookFn);
         },
-        onFormUpdate(
-          formUpdateHandler: (
-            context: PluginContext<TState, TPluginMetaData>,
-            event: {
-              type: 'focus' | 'blur' | 'input';
-              path: string;
-              value?: any;
-            },
-            options: TOptions,
-            ...args: THookReturn extends never ? [] : [hookData: THookReturn]
-          ) => void
-        ) {
-          return createPluginObject<THookReturn>(
-            hookFn,
-            undefined,
-            undefined,
-            formUpdateHandler
-          );
-        },
-      });
-    };
-
-    // For starting without useHook
-    const basePlugin = createPluginObject();
-
-    return Object.assign(basePlugin, {
+      }
+    ) as BuildRet<never, false, false, false, false> & {
       useHook<THookReturn>(
         hookFn: (
           context: PluginContext<TState, TPluginMetaData>,
           options: TOptions
         ) => THookReturn
-      ) {
-        return make<THookReturn>(hookFn);
-      },
-      transformState(
-        transformFn: (
-          context: PluginContext<TState, TPluginMetaData>,
-          options: TOptions
-        ) => void
-      ) {
-        const pluginWithTransform = createPluginObject(
-          undefined,
-          transformFn as any
-        );
+      ): BuildRet<THookReturn, false, false, false, false>;
+    };
 
-        return Object.assign(pluginWithTransform, {
-          onUpdate(
-            updateHandler: (
-              context: PluginContext<TState, TPluginMetaData>,
-              update: UpdateTypeDetail,
-              options: TOptions
-            ) => void
-          ) {
-            const pluginWithUpdate = createPluginObject(
-              undefined,
-              transformFn as any,
-              updateHandler as any
-            );
-
-            return Object.assign(pluginWithUpdate, {
-              onFormUpdate(
-                formUpdateHandler: (
-                  context: PluginContext<TState, TPluginMetaData>,
-                  event: {
-                    type: 'focus' | 'blur' | 'input';
-                    path: string;
-                    value?: any;
-                  },
-                  options: TOptions
-                ) => void
-              ) {
-                return createPluginObject(
-                  undefined,
-                  transformFn as any,
-                  updateHandler as any,
-                  formUpdateHandler as any
-                );
-              },
-            });
-          },
-          onFormUpdate(
-            formUpdateHandler: (
-              context: PluginContext<TState, TPluginMetaData>,
-              event: {
-                type: 'focus' | 'blur' | 'input';
-                path: string;
-                value?: any;
-              },
-              options: TOptions
-            ) => void
-          ) {
-            return createPluginObject(
-              undefined,
-              transformFn as any,
-              undefined,
-              formUpdateHandler as any
-            );
-          },
-        });
-      },
-      onUpdate(
-        updateHandler: (
-          context: PluginContext<TState, TPluginMetaData>,
-          update: UpdateTypeDetail,
-          options: TOptions
-        ) => void
-      ) {
-        const pluginWithUpdate = createPluginObject(
-          undefined,
-          undefined,
-          updateHandler as any
-        );
-
-        return Object.assign(pluginWithUpdate, {
-          onFormUpdate(
-            formUpdateHandler: (
-              context: PluginContext<TState, TPluginMetaData>,
-              event: {
-                type: 'focus' | 'blur' | 'input';
-                path: string;
-                value?: any;
-              },
-              options: TOptions
-            ) => void
-          ) {
-            return createPluginObject(
-              undefined,
-              undefined,
-              updateHandler as any,
-              formUpdateHandler as any
-            );
-          },
-        });
-      },
-      onFormUpdate(
-        formUpdateHandler: (
-          context: PluginContext<TState, TPluginMetaData>,
-          event: {
-            type: 'focus' | 'blur' | 'input';
-            path: string;
-            value?: any;
-          },
-          options: TOptions
-        ) => void
-      ) {
-        return createPluginObject(
-          undefined,
-          undefined,
-          undefined,
-          formUpdateHandler as any
-        );
-      },
-    });
+    return start;
   }
 
   return { createPlugin };
 }
-
 // --- DEMO USAGE - ALL THESE NOW WORK ---
 
 type MyGlobalState = {

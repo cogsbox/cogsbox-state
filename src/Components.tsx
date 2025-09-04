@@ -8,6 +8,7 @@ import React, {
   useLayoutEffect,
   useRef,
   useState,
+  useMemo,
 } from 'react';
 import {
   getGlobalStore,
@@ -31,6 +32,8 @@ const {
   notifyPathSubscribers,
   subscribeToPath,
 } = getGlobalStore.getState();
+const { getHookResult, pluginOptions } = pluginStore.getState();
+
 export type ValidationWrapperProps = {
   formOpts?: FormOptsType;
   path: string[];
@@ -224,11 +227,11 @@ export function FormElementWrapper({
   setState: any;
 }) {
   const componentId = useRef(uuidv4()).current;
+
   const [, forceUpdate] = useState({});
   const formElementRef = useRef<any>(null);
   const stateKeyPathKey = [stateKey, ...path].join('.');
   useRegisterComponent(stateKey, componentId, forceUpdate);
-
   // Get the shadow node to access typeInfo and schema
   const shadowNode = getGlobalStore.getState().getShadowNode(stateKey, path);
   const typeInfo = shadowNode?._meta?.typeInfo;
@@ -238,6 +241,19 @@ export function FormElementWrapper({
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  const cogsState = pluginStore.getState().stateHandlers.get(stateKey);
+
+  // 2. Memoize the list of active form wrappers to avoid re-calculating on every render.
+  const activeFormWrappers = useMemo(() => {
+    return (
+      pluginStore
+        .getState()
+        .getPluginConfigsForState(stateKey)
+        // We only care about plugins that have defined a formWrapper
+        .filter((config) => typeof config.plugin.formWrapper === 'function')
+    );
+  }, [stateKey]);
 
   useEffect(() => {
     if (
@@ -563,9 +579,34 @@ export function FormElementWrapper({
     },
   });
 
+  const initialElement = renderFn(stateWithInputProps);
+
+  const wrappedElement = activeFormWrappers.reduceRight(
+    (currentElement, config) => {
+      if (!cogsState) {
+        return currentElement;
+      }
+
+      // --- THIS IS THE CORRECT WAY TO GET THE METADATA/OPTIONS ---
+      // It comes from the pluginOptions map in the pluginStore.
+      const metaData = pluginOptions.get(stateKey)?.get(config.plugin.name);
+
+      const hookData = getHookResult(stateKey, config.plugin.name);
+      return config.plugin.formWrapper
+        ? config.plugin.formWrapper(
+            currentElement,
+            cogsState as any,
+            metaData,
+            hookData
+          )
+        : currentElement;
+    },
+    initialElement
+  );
+
   return (
     <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
-      {renderFn(stateWithInputProps)}
+      {wrappedElement}
     </ValidationWrapper>
   );
 }

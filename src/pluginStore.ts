@@ -49,6 +49,10 @@ type PluginRegistryStore = {
     path: string;
     value?: any;
   }) => void;
+  hookResults: Map<string, Map<string, any>>; // stateKey -> pluginName -> hook
+  setHookResult: (stateKey: string, pluginName: string, data: any) => void;
+  getHookResult: (stateKey: string, pluginName: string) => any | undefined;
+  removeHookResult: (stateKey: string, pluginName: string) => void;
 };
 
 export const pluginStore = create<PluginRegistryStore>((set, get) => ({
@@ -127,4 +131,29 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
   notifyFormUpdate: (event) => {
     get().formUpdateSubscribers.forEach((callback) => callback(event));
   },
+  hookResults: new Map(),
+
+  setHookResult: (stateKey, pluginName, data) =>
+    set((state) => {
+      const next = new Map(state.hookResults);
+      const byPlugin = new Map(next.get(stateKey) ?? new Map());
+      if (data === undefined) byPlugin.delete(pluginName);
+      else byPlugin.set(pluginName, data);
+      if (byPlugin.size > 0) next.set(stateKey, byPlugin);
+      else next.delete(stateKey);
+      return { hookResults: next };
+    }),
+
+  getHookResult: (stateKey, pluginName) =>
+    get().hookResults.get(stateKey)?.get(pluginName),
+
+  removeHookResult: (stateKey, pluginName) =>
+    set((state) => {
+      const next = new Map(state.hookResults);
+      const byPlugin = new Map(next.get(stateKey) ?? new Map());
+      byPlugin.delete(pluginName);
+      if (byPlugin.size > 0) next.set(stateKey, byPlugin);
+      else next.delete(stateKey);
+      return { hookResults: next };
+    }),
 }));

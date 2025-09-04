@@ -27,6 +27,7 @@ export type CogsPlugin<TName extends string, TState = any, TOptions = any, THook
         path: string;
         value?: any;
     }, options: TOptions, hook?: THookReturn) => void;
+    formWrapper?: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, hook?: THookReturn) => React.ReactNode;
 };
 export type ExtractPluginOptions<TPlugins extends readonly CogsPlugin<any, any, any>[]> = {
     [P in TPlugins[number] as P['name']]?: P extends CogsPlugin<any, infer O, any> ? O : never;
@@ -34,14 +35,911 @@ export type ExtractPluginOptions<TPlugins extends readonly CogsPlugin<any, any, 
 export declare function createPluginContext<TState extends Record<string, any>, TOptions = unknown, TPluginMetaData extends Record<string, any> = {}>(): {
     createPlugin: <TName extends string>(name: TName) => {
         name: TName;
-        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
+        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
         onFormUpdate?: ((stateKey: keyof TState, event: {
             type: "focus" | "blur" | "input";
             path: string;
             value?: any;
-        }, options: TOptions, hook?: any) => void) | undefined;
+        }, options: TOptions, hook?: undefined) => void) | undefined;
+        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+    } & {
+        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+            name: TName;
+            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+            onFormUpdate?: ((stateKey: keyof TState, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, hook?: undefined) => void) | undefined;
+            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+        } & {
+            onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        };
+    } & {
+        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+            name: TName;
+            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+            onFormUpdate?: ((stateKey: keyof TState, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, hook?: undefined) => void) | undefined;
+            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+        } & {
+            transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        };
+    } & {
+        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+            type: "focus" | "blur" | "input";
+            path: string;
+            value?: any;
+        }, options: TOptions, ...args: never) => void): {
+            name: TName;
+            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+            onFormUpdate?: ((stateKey: keyof TState, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, hook?: undefined) => void) | undefined;
+            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+        } & {
+            transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        };
+    } & {
+        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => React.ReactNode): {
+            name: TName;
+            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+            onFormUpdate?: ((stateKey: keyof TState, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, hook?: undefined) => void) | undefined;
+            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+        } & {
+            transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        } & {
+            onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                type: "focus" | "blur" | "input";
+                path: string;
+                value?: any;
+            }, options: TOptions, ...args: never) => void): {
+                name: TName;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                onFormUpdate?: ((stateKey: keyof TState, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, hook?: undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: never) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: never) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => never) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: undefined) => React.ReactNode) | undefined;
+                    };
+                };
+            };
+        };
     } & {
         useHook<THookReturn>(hookFn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions) => THookReturn): {
             name: TName;
@@ -53,8 +951,9 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                 path: string;
                 value?: any;
             }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
         } & {
-            transformState(transformFn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+            transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
                 name: TName;
                 useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
                 transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
@@ -64,8 +963,9 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                     path: string;
                     value?: any;
                 }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
             } & {
-                onUpdate(updateHandler: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
                     name: TName;
                     useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
                     transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
@@ -75,8 +975,9 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                         path: string;
                         value?: any;
                     }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
                 } & {
-                    onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
                         type: "focus" | "blur" | "input";
                         path: string;
                         value?: any;
@@ -90,9 +991,54 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                             path: string;
                             value?: any;
                         }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
                     };
                 };
-                onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
                     type: "focus" | "blur" | "input";
                     path: string;
                     value?: any;
@@ -106,9 +1052,136 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                         path: string;
                         value?: any;
                     }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
                 };
             };
-            onUpdate(updateHandler: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+        } & {
+            onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
                 name: TName;
                 useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
                 transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
@@ -118,8 +1191,82 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                     path: string;
                     value?: any;
                 }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
             } & {
-                onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
                     type: "focus" | "blur" | "input";
                     path: string;
                     value?: any;
@@ -133,9 +1280,136 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                         path: string;
                         value?: any;
                     }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
                 };
             };
-            onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
+        } & {
+            onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
                 type: "focus" | "blur" | "input";
                 path: string;
                 value?: any;
@@ -149,103 +1423,431 @@ export declare function createPluginContext<TState extends Record<string, any>, 
                     path: string;
                     value?: any;
                 }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
-            };
-        };
-        transformState(transformFn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions) => void): {
-            name: TName;
-            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
-            onFormUpdate?: ((stateKey: keyof TState, event: {
-                type: "focus" | "blur" | "input";
-                path: string;
-                value?: any;
-            }, options: TOptions, hook?: any) => void) | undefined;
-        } & {
-            onUpdate(updateHandler: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions) => void): {
-                name: TName;
-                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
-                onFormUpdate?: ((stateKey: keyof TState, event: {
-                    type: "focus" | "blur" | "input";
-                    path: string;
-                    value?: any;
-                }, options: TOptions, hook?: any) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
             } & {
-                onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
-                    type: "focus" | "blur" | "input";
-                    path: string;
-                    value?: any;
-                }, options: TOptions) => void): {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
                     name: TName;
-                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
                     onFormUpdate?: ((stateKey: keyof TState, event: {
                         type: "focus" | "blur" | "input";
                         path: string;
                         value?: any;
-                    }, options: TOptions, hook?: any) => void) | undefined;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
                 };
             };
-            onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
-                type: "focus" | "blur" | "input";
-                path: string;
-                value?: any;
-            }, options: TOptions) => void): {
-                name: TName;
-                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
-                onFormUpdate?: ((stateKey: keyof TState, event: {
-                    type: "focus" | "blur" | "input";
-                    path: string;
-                    value?: any;
-                }, options: TOptions, hook?: any) => void) | undefined;
-            };
-        };
-        onUpdate(updateHandler: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions) => void): {
-            name: TName;
-            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
-            onFormUpdate?: ((stateKey: keyof TState, event: {
-                type: "focus" | "blur" | "input";
-                path: string;
-                value?: any;
-            }, options: TOptions, hook?: any) => void) | undefined;
         } & {
-            onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
-                type: "focus" | "blur" | "input";
-                path: string;
-                value?: any;
-            }, options: TOptions) => void): {
+            formWrapper(fn: (element: React.ReactNode, context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => React.ReactNode): {
                 name: TName;
-                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
+                useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
                 onFormUpdate?: ((stateKey: keyof TState, event: {
                     type: "focus" | "blur" | "input";
                     path: string;
                     value?: any;
-                }, options: TOptions, hook?: any) => void) | undefined;
+                }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+            } & {
+                transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, event: {
+                    type: "focus" | "blur" | "input";
+                    path: string;
+                    value?: any;
+                }, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                    name: TName;
+                    useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                    transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    onFormUpdate?: ((stateKey: keyof TState, event: {
+                        type: "focus" | "blur" | "input";
+                        path: string;
+                        value?: any;
+                    }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                    formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                } & {
+                    transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                } & {
+                    onUpdate(fn: (context: PluginContext<TState, TPluginMetaData>, update: UpdateTypeDetail, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                        name: TName;
+                        useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                        transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        onFormUpdate?: ((stateKey: keyof TState, event: {
+                            type: "focus" | "blur" | "input";
+                            path: string;
+                            value?: any;
+                        }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                        formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                    } & {
+                        transformState(fn: (context: PluginContext<TState, TPluginMetaData>, options: TOptions, ...args: THookReturn extends never ? [] : [hookData: THookReturn]) => void): {
+                            name: TName;
+                            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => THookReturn) | undefined;
+                            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            onFormUpdate?: ((stateKey: keyof TState, event: {
+                                type: "focus" | "blur" | "input";
+                                path: string;
+                                value?: any;
+                            }, options: TOptions, hook?: THookReturn | undefined) => void) | undefined;
+                            formWrapper?: ((element: React.ReactNode, context: PluginContext<TState, any>, options: TOptions, hook?: THookReturn | undefined) => React.ReactNode) | undefined;
+                        };
+                    };
+                };
             };
-        };
-        onFormUpdate(formUpdateHandler: (context: PluginContext<TState, TPluginMetaData>, event: {
-            type: "focus" | "blur" | "input";
-            path: string;
-            value?: any;
-        }, options: TOptions) => void): {
-            name: TName;
-            useHook?: ((context: PluginContext<TState, any>, options: TOptions) => any) | undefined;
-            transformState?: ((context: PluginContext<TState, any>, options: TOptions, hook?: any) => void) | undefined;
-            onUpdate?: ((stateKey: keyof TState, update: UpdateTypeDetail, options: TOptions, hook?: any) => void) | undefined;
-            onFormUpdate?: ((stateKey: keyof TState, event: {
-                type: "focus" | "blur" | "input";
-                path: string;
-                value?: any;
-            }, options: TOptions, hook?: any) => void) | undefined;
         };
     };
 };
