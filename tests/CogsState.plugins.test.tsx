@@ -1,39 +1,29 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import '@testing-library/jest-dom';
-import { useState } from 'react';
-import { getGlobalStore } from '../src/store';
 import { createCogsState } from '../src/CogsState';
-import { createPluginContext, KeyedTypes } from '../src/plugins';
-import { waitFor } from '@testing-library/react';
+import { createPluginContext } from '../src/plugins';
+import { PluginRunner } from '../src/PluginRunner';
+import { pluginStore } from '../src/pluginStore';
+import React from 'react';
 
-// --- Mocks ---
-vi.mock('../src/CogsStateClient.js', () => ({
-  useCogsConfig: () => ({ sessionId: 'test-session-id' }),
-}));
+describe('Plugin Hook to Transform Flow', () => {
+  const initialState = {
+    counter: { value: 0 },
+  };
 
-// --- Test Setup ---
-const initialState = {
-  counter: { count: 0, label: 'Counter' },
-  settings: { prefix: 'Default', multiplier: 1 },
-};
-
-describe('Plugin System', () => {
   beforeEach(() => {
-    // Reset the global store
-    const store = getGlobalStore.getState();
-    Object.keys(initialState).forEach((key) => {
-      store.initializeShadowState(
-        key,
-        initialState[key as keyof typeof initialState]
-      );
-    });
+    // Clear any plugin store state
+    pluginStore.getState().registeredPlugins = [];
+    pluginStore.getState().pluginOptions.clear();
+    pluginStore.getState().stateHandlers.clear();
+    // Clear update subscribers to prevent tests from interfering
+    pluginStore.getState().updateSubscribers.clear();
   });
 
-  it('should execute plugin lifecycle when options change', async () => {
-    const events: string[] = [];
-    let hookDataInTransform: any = null;
-    let hookDataInUpdate: any = null;
+  it('should pass hook data to transformState', () => {
+    let capturedHookData: any = null;
+    let hookRenderCount = 0;
+    let transformCallCount = 0;
 
     const { createPlugin } = createPluginContext<
       typeof initialState,
@@ -42,204 +32,169 @@ describe('Plugin System', () => {
 
     const testPlugin = createPlugin('testPlugin')
       .useHook((context, options) => {
-        events.push(`useHook called with multiplier: ${options.multiplier}`);
+        hookRenderCount++;
+        // Return some data that transformState can use
         return {
-          multiply: (n: number) => n * options.multiplier,
-          id: 'test-hook-data',
+          computedValue: options.multiplier * 10,
+          timestamp: Date.now(),
         };
       })
-      .transformState(({ stateKey, cogsState }, options, hookData) => {
-        events.push(
-          `transformState called with multiplier: ${options.multiplier}`
-        );
-        hookDataInTransform = hookData;
+      .transformState((context, options, hookData) => {
+        transformCallCount++;
+        capturedHookData = hookData;
 
-        if (stateKey === 'counter') {
-          const current = cogsState.$get();
-          cogsState.$update({
-            count: 10 * options.multiplier,
-            label: current.label,
+        // Use the hook data to update state
+        if (hookData && context.stateKey === 'counter') {
+          context.cogsState.$update({
+            value: hookData.computedValue,
           });
         }
-      })
-      .onUpdate((stateKey, update, options, hookData) => {
-        events.push(
-          `onUpdate called: ${JSON.stringify(update.oldValue)} -> ${JSON.stringify(update.newValue)}`
-        );
-        hookDataInUpdate = hookData;
       });
 
     const { useCogsState } = createCogsState(initialState, {
       plugins: [testPlugin],
     });
 
-    // Create a wrapper component that uses reactive state for plugin options
-    const { result } = renderHook(() => {
-      const [multiplier, setMultiplier] = useState(1);
-      const state = useCogsState('counter', { testPlugin: { multiplier } });
-      return { state, setMultiplier };
+    // Wrap in PluginRunner
+    const { result } = renderHook(
+      () => {
+        const state = useCogsState('counter', {
+          testPlugin: { multiplier: 5 },
+        });
+
+        return state;
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    // Check that hook was called
+    expect(hookRenderCount).toBeGreaterThan(0);
+
+    // Check that transformState was called
+    expect(transformCallCount).toBe(1);
+
+    // Check that hook data was passed to transformState
+    expect(capturedHookData).toEqual({
+      computedValue: 50, // 5 * 10
+      timestamp: expect.any(Number),
     });
 
-    // Initial state - plugin hasn't run yet (this is correct behavior)
-    expect(result.current.state.$get().count).toBe(0);
-
-    // Verify initial hook was called
-    expect(
-      events.some((e) => e.includes('useHook called with multiplier: 1'))
-    ).toBe(true);
-
-    // Clear events for cleaner tracking
-    events.length = 0;
-
-    // NOW CHANGE the multiplier to trigger the plugin
-    act(() => {
-      result.current.setMultiplier(3);
-    });
-
-    // Wait for transform to apply after the change (10 * 3 = 30)
-    await waitFor(() => {
-      expect(result.current.state.$get().count).toBe(30);
-    });
-
-    // Verify the plugin lifecycle ran
-    expect(
-      events.some((e) => e.includes('useHook called with multiplier: 3'))
-    ).toBe(true);
-    expect(
-      events.some((e) => e.includes('transformState called with multiplier: 3'))
-    ).toBe(true);
-    expect(events.some((e) => e.includes('onUpdate called'))).toBe(true);
-
-    // Verify hook data was passed correctly
-    expect(hookDataInTransform).toEqual({
-      multiply: expect.any(Function),
-      id: 'test-hook-data',
-    });
-    expect(hookDataInTransform.multiply(5)).toBe(15); // 5 * 3
-
-    // Clear events again
-    events.length = 0;
-
-    // Change multiplier again
-    act(() => {
-      result.current.setMultiplier(5);
-    });
-
-    // Wait for new transform (10 * 5 = 50)
-    await waitFor(() => {
-      expect(result.current.state.$get().count).toBe(50);
-    });
-
-    // Verify it ran again with new value
-    expect(
-      events.some((e) => e.includes('transformState called with multiplier: 5'))
-    ).toBe(true);
+    // Check that state was updated using hook data
+    expect(result.current.$get().value).toBe(50);
   });
 
-  it('should react to state-driven option changes', async () => {
-    const events: string[] = [];
+  it('should re-run hooks on each render but only run transformState on option changes', () => {
+    let hookRenderCount = 0;
+    let transformCallCount = 0;
 
-    type PluginOptions = {
-      prefix: string;
-      testType: KeyedTypes<{
-        counter: string;
-        settings: number;
-      }>;
-    };
-
-    type Prettify<T> = { [K in keyof T]: T[K] } & {};
     const { createPlugin } = createPluginContext<
       typeof initialState,
-      PluginOptions
+      { value: number }
     >();
 
-    // Plugin that adds a prefix to the label
-    const prefixPlugin = createPlugin('prefixPlugin').transformState(
-      ({ stateKey, cogsState }, options) => {
-        events.push(`transformState: adding prefix "${options.prefix}"`);
+    const testPlugin = createPlugin('testPlugin')
+      .useHook((context, options) => {
+        hookRenderCount++;
+        return { renderCount: hookRenderCount };
+      })
+      .transformState((context, options, hookData) => {
+        transformCallCount++;
+      });
 
-        if (stateKey === 'counter') {
-          const current = cogsState.$get();
-          cogsState.$update({
-            ...current,
-            label: `${options.prefix}_${current.label}`,
-          });
-        }
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    const { rerender } = renderHook(
+      ({ value }) => {
+        useCogsState('counter', {
+          testPlugin: { value },
+        });
+      },
+      {
+        initialProps: { value: 1 },
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
       }
     );
 
-    const { useCogsState } = createCogsState(initialState, {
-      plugins: [prefixPlugin],
-    }); /*'___' is declared but its value is never read.ts(6133)
-const ___: {
-    [x: string]: PluginOptions | undefined;
-}*/
+    const initialHookCount = hookRenderCount;
+    expect(transformCallCount).toBe(1);
 
-    // Simulate getting prefix from another piece of state
-    const { result } = renderHook(() => {
-      const settings = useCogsState('settings', {
-        prefixPlugin: { prefix: 's', testType: 1 },
-      }); //testype should be  number
-      const prefix = settings.$get().prefix;
+    // Force a re-render without changing options
+    rerender({ value: 1 });
 
-      // Use the prefix from settings as the plugin option
-      const counter = useCogsState('counter', {
-        prefixPlugin: { prefix, testType: '1' }, //testype should be  string
-      });
+    // Hook should run again
+    expect(hookRenderCount).toBeGreaterThan(initialHookCount);
 
-      return { counter, settings };
-    });
+    // Transform should NOT run again (options didn't change)
+    expect(transformCallCount).toBe(1);
 
-    // Initial state
-    expect(result.current.counter.$get().label).toBe('Counter');
+    // Now change the options
+    rerender({ value: 2 });
 
-    // Clear events
-    events.length = 0;
-
-    // Change the settings which will change the plugin options
-    act(() => {
-      result.current.settings.$update({
-        prefix: 'NEW',
-        multiplier: 1,
-      });
-    });
-
-    // The counter's plugin should react to the new prefix
-    await waitFor(() => {
-      expect(result.current.counter.$get().label).toBe('NEW_Counter');
-    });
-
-    // Verify the plugin ran
-    expect(events.some((e) => e.includes('adding prefix "NEW"'))).toBe(true);
+    // Both should run
+    expect(hookRenderCount).toBeGreaterThan(initialHookCount + 1);
+    expect(transformCallCount).toBe(2);
   });
 
-  it('should handle plugin with only onUpdate', () => {
-    const events: string[] = [];
+  it('should trigger onUpdate when state changes and pass hook data', () => {
+    let onUpdateCallCount = 0;
+    let capturedUpdateDetail: any = null;
+    let capturedHookData: any = null;
 
-    const { createPlugin } = createPluginContext<typeof initialState>();
+    const { createPlugin } = createPluginContext<
+      typeof initialState,
+      { someOption: string }
+    >();
 
-    const updateOnlyPlugin = createPlugin('updateOnly').onUpdate(
-      (stateKey, update, options) => {
-        events.push(`onUpdate: ${stateKey} changed`);
+    const testPlugin = createPlugin('updateTestPlugin')
+      .useHook(() => {
+        // Return static data to be passed to onUpdate
+        return { hookId: 'hook-123' };
+      })
+      .onUpdate((stateKey, update, options, hookData) => {
+        onUpdateCallCount++;
+        capturedUpdateDetail = update;
+        capturedHookData = hookData;
+
+        // Also verify the other parameters are correct
+        expect(stateKey).toBe('counter');
+        expect(options.someOption).toBe('test-value');
+      });
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    const { result } = renderHook(
+      () => {
+        return useCogsState('counter', {
+          updateTestPlugin: { someOption: 'test-value' },
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
       }
     );
 
-    const { useCogsState } = createCogsState(initialState, {
-      plugins: [updateOnlyPlugin],
-    });
-
-    const { result } = renderHook(() =>
-      useCogsState('counter', { updateOnly: {} })
-    );
-
-    // Trigger an update
+    // Act: Trigger a state update
     act(() => {
-      result.current.$update({ count: 100, label: 'Updated' });
+      result.current.$update({ value: 99 });
     });
 
-    // Verify onUpdate was called
-    expect(events.some((e) => e.includes('onUpdate: counter changed'))).toBe(
-      true
-    );
+    // Assert: Check that onUpdate was called correctly
+    expect(onUpdateCallCount).toBe(1);
+
+    // Verify the update object
+    expect(capturedUpdateDetail).not.toBeNull();
+    expect(capturedUpdateDetail.stateKey).toBe('counter');
+    expect(capturedUpdateDetail.updateType).toBe('update');
+    expect(capturedUpdateDetail.newValue).toEqual({ value: 99 });
+    expect(capturedUpdateDetail.oldValue).toEqual({ value: 0 });
+
+    // Verify the hook data was passed through
+    expect(capturedHookData).toEqual({ hookId: 'hook-123' });
   });
 });

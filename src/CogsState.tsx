@@ -1,4 +1,5 @@
 'use client';
+import { pluginStore } from './pluginStore';
 import { type CogsPlugin } from './plugins';
 import {
   createElement,
@@ -43,6 +44,7 @@ import { Operation } from 'fast-json-patch';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
+import { get } from 'http';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -217,12 +219,19 @@ export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type EndType<T, IsArrayElement = false> = {
+  $getPluginMetaData: (pluginName: string) => Record<string, any>;
+  $addPluginMetaData: (key: string, data: Record<string, any>) => void;
+  $removePluginMetaData: (key: string) => void;
+
   $addZodValidation: (
     errors: ValidationError[],
     source?: 'client' | 'sync_engine' | 'api'
   ) => void;
   $clearZodValidation: (paths?: string[]) => void;
-  $applyOperation: (operation: UpdateTypeDetail) => void;
+  $applyOperation: (
+    operation: UpdateTypeDetail,
+    metaData?: Record<string, any>
+  ) => void;
   $applyJsonPatch: (patches: any[]) => void;
   $update: UpdateType<T>;
   $_path: string[];
@@ -303,7 +312,7 @@ type EffectiveSetStateArg<
 type UpdateOptions = {
   updateType: 'insert' | 'cut' | 'update';
   itemId?: string;
-  sync?: boolean;
+  metaData?: Record<string, any>;
 };
 type EffectiveSetState<TStateObject> = (
   newStateOrFunction:
@@ -324,8 +333,10 @@ export type UpdateTypeDetail = {
   oldValue: any;
   newValue: any;
   userId?: number;
+
   itemId?: string; // For insert: the new item's ID
   insertAfterId?: string; // For insert: ID to insert after (null = beginning)
+  metaData?: Record<string, any>;
 };
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
 export type ReactivityType =
@@ -491,6 +502,9 @@ const {
   clearSelectedIndex,
   getSyncInfo,
   notifyPathSubscribers,
+  getPluginMetaDataMap,
+  setPluginMetaData,
+  removePluginMetaData,
   // Note: The old functions are no longer imported under their original names
 } = getGlobalStore.getState();
 function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
@@ -612,6 +626,8 @@ function setOptions<StateKey, Opt>({
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
+
+  return mergedOptions;
 }
 
 export function addStateOptions<T>(
@@ -641,11 +657,6 @@ export const createCogsState = <
     formElements?: FormsElementsType<State>;
     validation?: ValidationOptionsType;
     plugins?: TPlugins;
-    __fromSyncSchema?: boolean;
-    __syncNotifications?: Record<string, Function>;
-    __apiParamsMap?: Record<string, any>;
-    __useSync?: UseSyncType;
-    __syncSchemas?: Record<string, any>;
   }
 ) => {
   type PluginOptions = {
@@ -658,7 +669,9 @@ export const createCogsState = <
       ? O
       : never;
   };
-
+  if (opt?.plugins) {
+    pluginStore.getState().setRegisteredPlugins(opt.plugins as any);
+  }
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(initialState);
 
@@ -686,12 +699,7 @@ export const createCogsState = <
         mergedOptions.validation.key = `${opt.validation.key}.${key}`;
       }
     }
-    if (opt?.__syncSchemas?.[key]?.schemas?.validation) {
-      mergedOptions.validation = {
-        zodSchemaV4: opt.__syncSchemas[key].schemas.validation,
-        ...existingOptions.validation,
-      };
-    }
+
     if (Object.keys(mergedOptions).length > 0) {
       const existingGlobalOptions = getInitialOptions(key);
 
@@ -734,20 +742,23 @@ export const createCogsState = <
     >
   ) => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
-    const prevOptionsRef = useRef(options);
 
-    setOptions({
+    const currentOptions = setOptions({
       stateKey,
       options,
       initialOptionsPart,
     });
 
+    const optionsRef = useRef(currentOptions);
+    optionsRef.current = currentOptions;
+
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
 
-    // Create a ref to store plugin data that will be populated later
-    const pluginDataRef = useRef<PluginData[]>([]);
-
+    const onUpdateCallback = useCallback((update: UpdateTypeDetail) => {
+      // Notify the central plugin store that an update has occurred
+      pluginStore.getState().notifyUpdate(update);
+    }, []);
     const updater = useCogsStateFn<(typeof statePart)[StateKey]>(thiState, {
       stateKey: stateKey as string,
       syncUpdate: options?.syncUpdate,
@@ -760,112 +771,101 @@ export const createCogsState = <
       dependencies: options?.dependencies,
       serverState: options?.serverState,
       syncOptions: options?.syncOptions,
-      __useSync: opt?.__useSync as UseSyncType,
-      __pluginDataRef: pluginDataRef, // Pass the ref, not the data
+
+      onUpdateCallback,
     });
 
-    const pluginsWithHooks = useMemo(
-      () => opt?.plugins?.filter((p) => p.useHook) || [],
-      [] // Empty deps since plugins shouldn't change
-    );
-
-    // Call ALL hooks unconditionally in the same order every time
-    const hookResults = pluginsWithHooks.map((plugin) => {
-      const pluginOptions = options?.[plugin.name as keyof typeof options];
-
-      // Still call the hook even if no options (rules of hooks)
-      const context = {
-        stateKey: stateKey as keyof typeof statePart,
-        cogsState: updater,
-      };
-      console.log('context', context);
-      // Call hook unconditionally
-      const result = plugin.useHook?.(
-        context as any,
-        pluginOptions || ({} as any) // Pass empty object if no options
-      );
-
-      return { name: plugin.name, result, hasOptions: !!pluginOptions };
-    });
-
-    // Convert to Map, filtering out plugins without options
-    const hookResultsMap = useMemo(() => {
-      const map = new Map<string, any>();
-      hookResults.forEach(({ name, result, hasOptions }) => {
-        if (hasOptions) {
-          map.set(name, result);
-        }
-      });
-      return map;
-    }, [hookResults, options]);
-    // Update pluginDataRef with current plugin data
     useEffect(() => {
-      const pluginData: PluginData[] = [];
-      if (opt?.plugins) {
-        opt.plugins.forEach((plugin) => {
-          const pluginOptions = options?.[plugin.name as keyof typeof options];
-          if (pluginOptions) {
-            pluginData.push({
-              plugin,
-              options: pluginOptions,
-              hookData: hookResultsMap.get(plugin.name),
-            });
-          }
-        });
+      if (options) {
+        pluginStore
+          .getState()
+          .setPluginOptionsForState(stateKey as string, options);
       }
-      pluginDataRef.current = pluginData;
-    }, [options, hookResults]);
-
-    // Handle transformState when options change
+    }, [stateKey, options]);
     useEffect(() => {
-      if (!opt?.plugins) return;
+      console.log('adding handler 1', stateKey, updater);
+      pluginStore
+        .getState()
+        .stateHandlers.set(stateKey as string, updater as any);
 
-      opt.plugins.forEach((plugin) => {
-        // Only get plugin options, not other options
-        if (plugin.name in (options || {})) {
-          const currentPluginOptions =
-            options?.[plugin.name as keyof typeof options];
+      return () => {
+        pluginStore.getState().stateHandlers.delete(stateKey as string);
+      };
+    }, [stateKey, updater]);
+    // const pluginsRef = useRef(opt?.plugins);
 
-          // Type guard to ensure it's an object
-          if (
-            currentPluginOptions &&
-            typeof currentPluginOptions === 'object' &&
-            !Array.isArray(currentPluginOptions)
-          ) {
-            if (plugin.transformState) {
-              const prevPluginOptions =
-                prevOptionsRef.current?.[plugin.name as keyof typeof options];
+    // pluginDataRef.current = [];
 
-              if (
-                !prevPluginOptions ||
-                (typeof prevPluginOptions === 'object' &&
-                  !Array.isArray(prevPluginOptions) &&
-                  !isDeepEqual(currentPluginOptions, prevPluginOptions))
-              ) {
-                console.log(
-                  `▶️ Options changed for "${plugin.name}" on state "${String(stateKey)}", running transformState...`
-                );
+    // pluginsRef.current?.forEach((plugin) => {
+    //   const pluginOptions =
+    //     optionsRef.current?.[plugin.name as keyof typeof optionsRef.current];
 
-                const hookData = hookResultsMap.get(plugin.name);
-                const context = {
-                  stateKey: stateKey as keyof typeof statePart,
-                  cogsState: updater,
-                };
+    //   let hookResult;
+    //   if (plugin.useHook) {
+    //     const context = {
+    //       stateKey: stateKey as keyof typeof statePart,
+    //       cogsState: updater,
+    //       getPluginMetaData: () => updater.$getPluginMetaData(plugin.name),
+    //       setPluginMetaData: (data: any) =>
+    //         updater.$addPluginMetaData(plugin.name as string, data),
+    //       removePluginMetaData: () =>
+    //         updater.$removePluginMetaData(plugin.name as string),
+    //     };
+    //     hookResult = plugin.useHook(
+    //       context as any,
+    //       pluginOptions || ({} as any)
+    //     );
+    //   }
 
-                plugin.transformState(
-                  context as any,
-                  currentPluginOptions as any,
-                  hookData
-                );
-              }
-            }
-          }
-        }
-      });
+    //   if (
+    //     pluginOptions &&
+    //     typeof pluginOptions === 'object' &&
+    //     !Array.isArray(pluginOptions)
+    //   ) {
+    //     pluginDataRef.current.push({
+    //       plugin,
+    //       options: pluginOptions,
+    //       hookData: hookResult,
+    //     });
 
-      prevOptionsRef.current = options;
-    }, [options, stateKey, updater, hookResults]);
+    //     if (plugin.transformState) {
+    //       // --- THE REAL FIX IN ACTION ---
+    //       // 1. Get the options for THIS plugin from our ref.
+    //       const prevPluginOptions =
+    //         lastProcessedOptionsRef.current[plugin.name];
+    //       console.log('currentOptions', optionsRef.current);
+    //       console.log('prevPluginOptions', prevPluginOptions);
+    //       // 2. Compare the CURRENT options with the LAST PROCESSED options.
+    //       if (!isDeepEqual(pluginOptions, prevPluginOptions)) {
+    //         console.log(
+    //           `▶️ Options changed for "${plugin.name}" on state "${String(
+    //             stateKey
+    //           )}", running transformState...`,
+    //           pluginOptions,
+    //           prevPluginOptions
+    //         );
 
+    //         const context = {
+    //           stateKey: stateKey as keyof typeof statePart,
+    //           cogsState: updater,
+    //         };
+
+    //         plugin.transformState(
+    //           context as any,
+    //           pluginOptions as any,
+    //           hookResult
+    //         );
+
+    //         // 3. CRUCIAL: Only update the ref for this plugin with the new options
+    //         // AFTER we have run the transform.
+    //         lastProcessedOptionsRef.current[plugin.name] = JSON.parse(
+    //           JSON.stringify(pluginOptions)
+    //         );
+    //       }
+    //       // --- END FIX ---
+    //     }
+    //   }
+    // });
     return updater;
   };
 
@@ -887,125 +887,6 @@ export const createCogsState = <
     setCogsOptions,
   };
 };
-
-type ResolvedOptionsForKey<
-  TPluginOptions extends Record<string, any>,
-  StateKeys extends string,
-> = StateKeys extends any // Distribute over union
-  ? {
-      [PName in keyof TPluginOptions]?: {
-        [OKey in keyof TPluginOptions[PName]]: TPluginOptions[PName][OKey] extends {
-          __key: 'keyed';
-          map: infer TMap;
-        }
-          ? TMap extends Record<string, any>
-            ? StateKeys extends keyof TMap
-              ? TMap[StateKeys]
-              : never
-            : never
-          : TPluginOptions[PName][OKey];
-      };
-    }
-  : never;
-
-type UseCogsStateHook<
-  T extends Record<string, any>,
-  TPluginOptions extends Record<string, any> = {},
-> = <StateKey extends keyof TransformedStateType<T> & string>(
-  stateKey: StateKey,
-  options?: Prettify<
-    OptionsType<TransformedStateType<T>[StateKey], never> &
-      ResolvedOptionsForKey<TPluginOptions, StateKey>
-  >
-) => StateObject<TransformedStateType<T>[StateKey]>;
-// Define the type for the options setter using the Transformed state
-type SetCogsOptionsFunc<T extends Record<string, any>> = <
-  StateKey extends keyof TransformedStateType<T>,
->(
-  stateKey: StateKey,
-  options: OptionsType<TransformedStateType<T>[StateKey]>
-) => void;
-
-type CogsApi<
-  T extends Record<string, any>,
-  TPluginOptions extends Record<string, any> = {},
-> = {
-  useCogsState: UseCogsStateHook<T, TPluginOptions>;
-  setCogsOptions: SetCogsOptionsFunc<T>;
-};
-
-type GetParamType<SchemaEntry> = SchemaEntry extends {
-  api?: { queryData?: { _paramType?: infer P } };
-}
-  ? P
-  : never;
-
-export function createCogsStateFromSync<
-  TSyncSchema extends {
-    schemas: Record<
-      string,
-      {
-        schemas: { defaults: any };
-        relations?: any;
-        api?: {
-          queryData?: any;
-        };
-        [key: string]: any;
-      }
-    >;
-    notifications: Record<string, any>;
-  },
->(
-  syncSchema: TSyncSchema,
-  useSync: UseSyncType
-): CogsApi<
-  {
-    [K in keyof TSyncSchema['schemas']]: TSyncSchema['schemas'][K]['relations'] extends object
-      ? TSyncSchema['schemas'][K] extends {
-          schemas: { defaults: infer D };
-        }
-        ? D
-        : TSyncSchema['schemas'][K]['schemas']['defaults']
-      : TSyncSchema['schemas'][K]['schemas']['defaults'];
-  },
-  {
-    [K in keyof TSyncSchema['schemas']]: GetParamType<
-      TSyncSchema['schemas'][K]
-    >;
-  }
-> {
-  const schemas = syncSchema.schemas;
-  const initialState: any = {};
-  const apiParamsMap: any = {};
-
-  // Extract defaultValues AND apiParams from each entry
-  for (const key in schemas) {
-    const entry = schemas[key];
-
-    // Check if we have relations and thus view defaults
-    if (entry?.relations && entry?.schemas?.defaults) {
-      // Use the view defaults when relations are present
-      initialState[key] = entry.schemas.defaults;
-    } else {
-      // Fall back to regular defaultValues
-      initialState[key] = entry?.schemas?.defaults || {};
-    }
-    console.log('initialState', initialState);
-
-    // Extract apiParams from the api.queryData._paramType
-    if (entry?.api?.queryData?._paramType) {
-      apiParamsMap[key] = entry.api.queryData._paramType;
-    }
-  }
-
-  return createCogsState(initialState, {
-    __fromSyncSchema: true,
-    __syncNotifications: syncSchema.notifications,
-    __apiParamsMap: apiParamsMap,
-    __useSync: useSync,
-    __syncSchemas: schemas,
-  }) as any;
-}
 
 const saveToLocalStorage = <T,>(
   state: T,
@@ -1421,7 +1302,8 @@ function createEffectiveSetState<T>(
   syncApiRef: React.MutableRefObject<any>,
   sessionId: string | undefined,
   latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>,
-  pluginDataRef?: React.MutableRefObject<PluginData[]>
+
+  onUpdateCallback?: (update: UpdateTypeDetail) => void
 ): EffectiveSetState<T> {
   return (newStateOrFunction, path, updateObj, validationKey?) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
@@ -1468,6 +1350,7 @@ function createEffectiveSetState<T>(
       newValue: result.newValue ?? null,
       itemId: result.itemId,
       insertAfterId: result.insertAfterId,
+      metaData: options.metaData,
     };
 
     updateBatchQueue.push(newUpdate);
@@ -1484,25 +1367,35 @@ function createEffectiveSetState<T>(
     if (latestInitialOptionsRef.current?.middleware) {
       latestInitialOptionsRef.current.middleware({ update: newUpdate });
     }
-    if (pluginDataRef?.current && pluginDataRef.current.length > 0) {
-      pluginDataRef.current.forEach((pluginData) => {
-        if (pluginData.plugin.onUpdate) {
-          try {
-            pluginData.plugin.onUpdate(
-              stateKey,
-              newUpdate,
-              pluginData.options,
-              pluginData.hookData
-            );
-          } catch (error) {
-            console.error('Plugin onUpdate error:', error);
-          }
-        }
-      });
+
+    console.log(
+      'hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh',
+      path,
+      newUpdate
+    );
+    if (onUpdateCallback) {
+      onUpdateCallback(newUpdate);
     }
-    if (options.sync !== false && syncApiRef.current?.connected) {
-      syncApiRef.current.updateState({ operation: newUpdate });
-    }
+    // if (
+    //   pluginDataRef?.current &&
+    //   pluginDataRef.current.length > 0 &&
+    //   newUpdate
+    // ) {
+    //   pluginDataRef.current.forEach((pluginData) => {
+    //     if (pluginData.plugin.onUpdate) {
+    //       try {
+    //         pluginData.plugin.onUpdate(
+    //           stateKey,
+    //           newUpdate,
+    //           pluginData.options,
+    //           pluginData.hookData
+    //         );
+    //       } catch (error) {
+    //         console.error('Plugin onUpdate error:', error);
+    //       }
+    //     }
+    //   });
+    // }
   }
 }
 
@@ -1520,16 +1413,15 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncUpdate,
     dependencies,
     serverState,
-
-    __useSync,
-    __pluginDataRef,
+    onUpdateCallback,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    __useSync?: UseSyncType;
+
     syncOptions?: SyncOptionsType<any>;
-    __pluginDataRef?: React.MutableRefObject<PluginData[]>;
+
+    onUpdateCallback?: (update: UpdateTypeDetail) => void;
   } & OptionsType<TStateObject> = {}
 ) {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -1712,7 +1604,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const options = getInitialOptions(thisKey as string);
 
     const features = {
-      syncEnabled: !!cogsSyncFn && !!syncOpt,
       validationEnabled: !!(
         options?.validation?.zodSchemaV4 || options?.validation?.zodSchemaV3
       ),
@@ -1821,7 +1712,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
     syncApiRef,
     sessionId,
     latestInitialOptionsRef,
-    __pluginDataRef
+    onUpdateCallback
   );
 
   if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
@@ -1838,16 +1729,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
 
     return handler;
   }, [thisKey, sessionId]);
-
-  const cogsSyncFn = __useSync;
-  const syncOpt = latestInitialOptionsRef.current?.syncOptions;
-
-  if (cogsSyncFn) {
-    syncApiRef.current = cogsSyncFn(
-      updaterFinal as any,
-      syncOpt ?? ({} as any)
-    );
-  }
 
   return updaterFinal;
 }
@@ -3283,6 +3164,32 @@ function createProxyHandler<T>(
           return componentId;
         }
         if (path.length == 0) {
+          if (prop === '$_applyUpdate') {
+            return (
+              value: any,
+              path: string[],
+              updateType: 'update' | 'insert' | 'cut' = 'update'
+            ) => {
+              effectiveSetState(value, path, { updateType });
+            };
+          }
+
+          if (prop === '$_getEffectiveSetState') {
+            return effectiveSetState;
+          }
+          if (prop === '$getPluginMetaData') {
+            return (pluginName: string) =>
+              getPluginMetaDataMap(stateKey, path)?.get(pluginName);
+          }
+          if (prop === '$addPluginMetaData') {
+            console.log('$addPluginMetaDat');
+            return (pluginName: string, data: Record<string, any>) =>
+              setPluginMetaData(stateKey, pluginName, data);
+          }
+          if (prop === '$removePluginMetaData') {
+            return (pluginName: string) =>
+              removePluginMetaData(stateKey, path, pluginName);
+          }
           if (prop === '$addZodValidation') {
             return (
               zodErrors: any[],
@@ -3335,7 +3242,13 @@ function createProxyHandler<T>(
           }
 
           if (prop === '$applyOperation') {
-            return (operation: UpdateTypeDetail & { validation?: any[] }) => {
+            return (
+              operation: UpdateTypeDetail & {
+                validation?: any[];
+                version?: string;
+              },
+              metaData?: Record<string, any>
+            ) => {
               const validationErrorsFromServer = operation.validation || [];
 
               if (!operation || !operation.path) {
@@ -3357,6 +3270,7 @@ function createProxyHandler<T>(
               getGlobalStore
                 .getState()
                 .setShadowMetadata(stateKey, operation.path, {
+                  stateVersion: operation.version,
                   validation: {
                     status: newErrors.length > 0 ? 'INVALID' : 'VALID',
                     errors: newErrors,
@@ -3366,8 +3280,8 @@ function createProxyHandler<T>(
 
               effectiveSetState(operation.newValue, operation.path, {
                 updateType: operation.updateType,
-                sync: false,
                 itemId: operation.itemId,
+                metaData,
               });
             };
           }
@@ -3492,6 +3406,7 @@ function createProxyHandler<T>(
             </ValidationWrapper>
           );
         }
+
         if (prop === '$_stateKey') return stateKey;
         if (prop === '$_path') return path;
         if (prop === '$update') {

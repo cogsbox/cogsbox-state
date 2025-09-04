@@ -7,10 +7,15 @@ export type KeyedTypes<TMap extends Record<string, any>> = {
   __key: 'keyed';
   map: { [K in keyof TMap]: TMap[K] };
 };
-type PluginContext<TState> = {
+export type PluginContext<TState, TMetaData> = {
   [K in keyof TState]: {
     stateKey: K;
     cogsState: StateObject<TState[K]>;
+    getPluginMetaData: () => TMetaData | undefined;
+    /** Sets/merges the metadata for this plugin at the current state path */
+    setPluginMetaData: (data: Partial<TMetaData>) => void;
+    /** Removes all metadata for this plugin at the current state path */
+    removePluginMetaData: () => void;
   };
 }[keyof TState];
 
@@ -19,11 +24,15 @@ export type CogsPlugin<
   TState = any,
   TOptions = any,
   THookReturn = any,
+  TPluginMetaData = any,
 > = {
   name: TName;
-  useHook?: (context: PluginContext<TState>, options: TOptions) => THookReturn;
+  useHook?: (
+    context: PluginContext<TState, TPluginMetaData>,
+    options: TOptions
+  ) => THookReturn;
   transformState?: (
-    context: PluginContext<TState>,
+    context: PluginContext<TState, TPluginMetaData>,
     options: TOptions,
     hook?: THookReturn
   ) => void;
@@ -47,21 +56,22 @@ export type ExtractPluginOptions<
 export function createPluginContext<
   TState extends Record<string, any>,
   TOptions = unknown,
+  TPluginMetaData extends Record<string, any> = {},
 >() {
   function createPlugin<TName extends string>(name: TName) {
     // Helper to create the final plugin object
     const createPluginObject = <THookReturn = any>(
       hookFn?: (
-        context: PluginContext<TState>,
+        context: PluginContext<TState, TPluginMetaData>,
         options: TOptions
       ) => THookReturn,
       transformFn?: (
-        context: PluginContext<TState>,
+        context: PluginContext<TState, TPluginMetaData>,
         options: TOptions,
         ...args: THookReturn extends never ? [] : [hookData: THookReturn]
       ) => void,
       updateHandler?: (
-        context: PluginContext<TState>,
+        context: PluginContext<TState, TPluginMetaData>,
         update: UpdateTypeDetail,
         options: TOptions,
         ...args: THookReturn extends never ? [] : [hookData: THookReturn]
@@ -77,7 +87,7 @@ export function createPluginContext<
 
     const make = <THookReturn = never>(
       hookFn?: (
-        context: PluginContext<TState>,
+        context: PluginContext<TState, TPluginMetaData>,
         options: TOptions
       ) => THookReturn
     ) => {
@@ -87,7 +97,7 @@ export function createPluginContext<
       return Object.assign(plugin, {
         transformState(
           transformFn: (
-            context: PluginContext<TState>,
+            context: PluginContext<TState, TPluginMetaData>,
             options: TOptions,
             ...args: THookReturn extends never ? [] : [hookData: THookReturn]
           ) => void
@@ -101,7 +111,7 @@ export function createPluginContext<
           return Object.assign(pluginWithTransform, {
             onUpdate(
               updateHandler: (
-                context: PluginContext<TState>,
+                context: PluginContext<TState, TPluginMetaData>,
                 update: UpdateTypeDetail,
                 options: TOptions,
                 ...args: THookReturn extends never
@@ -119,7 +129,7 @@ export function createPluginContext<
         },
         onUpdate(
           updateHandler: (
-            context: PluginContext<TState>,
+            context: PluginContext<TState, TPluginMetaData>,
             update: UpdateTypeDetail,
             options: TOptions,
             ...args: THookReturn extends never ? [] : [hookData: THookReturn]
@@ -140,14 +150,17 @@ export function createPluginContext<
     return Object.assign(basePlugin, {
       useHook<THookReturn>(
         hookFn: (
-          context: PluginContext<TState>,
+          context: PluginContext<TState, TPluginMetaData>,
           options: TOptions
         ) => THookReturn
       ) {
         return make<THookReturn>(hookFn);
       },
       transformState(
-        transformFn: (context: PluginContext<TState>, options: TOptions) => void
+        transformFn: (
+          context: PluginContext<TState, TPluginMetaData>,
+          options: TOptions
+        ) => void
       ) {
         const pluginWithTransform = createPluginObject(
           undefined,
@@ -157,7 +170,7 @@ export function createPluginContext<
         return Object.assign(pluginWithTransform, {
           onUpdate(
             updateHandler: (
-              context: PluginContext<TState>,
+              context: PluginContext<TState, TPluginMetaData>,
               update: UpdateTypeDetail,
               options: TOptions
             ) => void
@@ -172,7 +185,7 @@ export function createPluginContext<
       },
       onUpdate(
         updateHandler: (
-          context: PluginContext<TState>,
+          context: PluginContext<TState, TPluginMetaData>,
           update: UpdateTypeDetail,
           options: TOptions
         ) => void
@@ -184,55 +197,6 @@ export function createPluginContext<
 
   return { createPlugin };
 }
-
-export const PluginExecutor = ({
-  plugin,
-  pluginOptions,
-  cogsContext,
-  pluginDataRef,
-}: {
-  plugin: CogsPlugin<any, any, any, any>;
-  pluginOptions: any;
-  cogsContext: PluginContext<any>;
-  pluginDataRef: React.MutableRefObject<PluginData[]>;
-}) => {
-  // 1. Call `useHook` at the top level of this component. This is safe.
-  const hookData = plugin.useHook
-    ? plugin.useHook(cogsContext, pluginOptions)
-    : undefined;
-
-  // 2. Manage the `transformState` logic within a useEffect.
-  // This runs after render when dependencies change.
-  useEffect(() => {
-    if (plugin.transformState) {
-      console.log(`▶️ Running transformState for plugin: "${plugin.name}"`);
-      plugin.transformState(cogsContext, pluginOptions, hookData);
-    }
-  }, [plugin, pluginOptions, cogsContext, hookData]); // Reruns if these change
-
-  // 3. Use an effect to register this plugin's data for the `onUpdate` callback.
-  // The cleanup function ensures the data is removed when the plugin is no longer active.
-  useEffect(() => {
-    const currentPluginData = {
-      plugin,
-      options: pluginOptions,
-      hookData,
-    };
-
-    // Add this plugin's data to the shared ref
-    pluginDataRef.current.push(currentPluginData);
-
-    // The effect's cleanup function
-    return () => {
-      pluginDataRef.current = pluginDataRef.current.filter(
-        (p) => p.plugin.name !== plugin.name
-      );
-    };
-  }, [plugin, pluginOptions, hookData, pluginDataRef]);
-
-  // This component renders nothing to the DOM
-  return null;
-};
 
 // --- DEMO USAGE - ALL THESE NOW WORK ---
 

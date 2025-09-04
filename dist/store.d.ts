@@ -53,7 +53,7 @@ export type TypeInfo = {
 };
 export type ShadowMetadata = {
     value?: any;
-    syncArrayIdPrefix?: string;
+    stateVersion?: number;
     id?: string;
     typeInfo?: TypeInfo;
     stateSource?: 'default' | 'server' | 'localStorage';
@@ -71,7 +71,6 @@ export type ShadowMetadata = {
     };
     validation?: ValidationState;
     features?: {
-        syncEnabled: boolean;
         validationEnabled: boolean;
         localStorageEnabled: boolean;
     };
@@ -94,12 +93,16 @@ export type ShadowMetadata = {
         buffer: any[];
         flushTimer: NodeJS.Timeout | null;
     }>;
+    pluginMetaData?: Map<string, Record<string, any>>;
 } & ComponentsType;
 type ShadowNode = {
     _meta?: ShadowMetadata;
     [key: string]: any;
 };
 export type CogsGlobalState = {
+    getPluginMetaDataMap: (key: string, path: string[]) => Map<string, Record<string, any>> | undefined;
+    setPluginMetaData: (key: string, pluginName: string, data: Record<string, any>) => void;
+    removePluginMetaData: (key: string, path: string[], pluginName: string) => void;
     setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     initializeAndMergeShadowState: (key: string, initialState: any) => void;
     initializeShadowState: (key: string, initialState: any) => void;

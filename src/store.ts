@@ -7,8 +7,6 @@ import type {
   UpdateTypeDetail,
 } from './CogsState.js';
 
-import { type ReactNode } from 'react';
-
 export type FreshValuesObject = {
   pathsToValues?: string[];
   prevValue?: any;
@@ -35,34 +33,28 @@ export type FormRefStoreState = {
 
 export const formRefStore = create<FormRefStoreState>((set, get) => ({
   formRefs: new Map(),
-
   registerFormRef: (id, ref) =>
     set((state) => {
       const newRefs = new Map(state.formRefs);
       newRefs.set(id, ref);
       return { formRefs: newRefs };
     }),
-
   getFormRef: (id) => get().formRefs.get(id),
-
   removeFormRef: (id) =>
     set((state) => {
       const newRefs = new Map(state.formRefs);
       newRefs.delete(id);
       return { formRefs: newRefs };
     }),
-
   getFormRefsByStateKey: (stateKey) => {
     const allRefs = get().formRefs;
     const stateKeyPrefix = stateKey + '.';
     const filteredRefs = new Map();
-
     allRefs.forEach((ref, id) => {
       if (id.startsWith(stateKeyPrefix) || id === stateKey) {
         filteredRefs.set(id, ref);
       }
     });
-
     return filteredRefs;
   },
 }));
@@ -118,7 +110,8 @@ export type TypeInfo = {
 // Update ShadowMetadata to include typeInfo
 export type ShadowMetadata = {
   value?: any;
-  syncArrayIdPrefix?: string;
+
+  stateVersion?: number;
   id?: string;
   typeInfo?: TypeInfo;
   stateSource?: 'default' | 'server' | 'localStorage';
@@ -134,7 +127,6 @@ export type ShadowMetadata = {
   syncInfo?: { status: string };
   validation?: ValidationState;
   features?: {
-    syncEnabled: boolean;
     validationEnabled: boolean;
     localStorageEnabled: boolean;
   };
@@ -144,7 +136,6 @@ export type ShadowMetadata = {
     position: number;
     effect?: string;
   }>;
-
   transformCaches?: Map<
     string,
     {
@@ -161,6 +152,7 @@ export type ShadowMetadata = {
       flushTimer: NodeJS.Timeout | null;
     }
   >;
+  pluginMetaData?: Map<string, Record<string, any>>;
 } & ComponentsType;
 
 type ShadowNode = {
@@ -169,6 +161,21 @@ type ShadowNode = {
 };
 
 export type CogsGlobalState = {
+  getPluginMetaDataMap: (
+    key: string,
+    path: string[]
+  ) => Map<string, Record<string, any>> | undefined;
+  setPluginMetaData: (
+    key: string,
+
+    pluginName: string,
+    data: Record<string, any>
+  ) => void;
+  removePluginMetaData: (
+    key: string,
+    path: string[],
+    pluginName: string
+  ) => void;
   setTransformCache: (
     key: string,
     path: string[],
@@ -713,12 +720,42 @@ let globalCounter = 0;
 const instanceId = Date.now().toString(36);
 
 export function generateId(stateKey: string): string {
-  const rootMeta = getGlobalStore.getState().getShadowMetadata(stateKey, []);
-  const prefix = rootMeta?.syncArrayIdPrefix || 'local';
+  const prefix = 'local';
 
   return `id:${prefix}_${instanceId}_${(globalCounter++).toString(36)}`;
 }
 export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
+  getPluginMetaDataMap: (
+    key: string,
+    path: string[]
+  ): Map<string, Record<string, any>> | undefined => {
+    const metadata = get().getShadowMetadata(key, path);
+    return metadata?.pluginMetaData;
+  },
+
+  setPluginMetaData: (
+    key: string,
+
+    pluginName: string,
+    data: Record<string, any>
+  ) => {
+    const metadata = get().getShadowMetadata(key, []) || {};
+    console.log('metadata', metadata);
+    const pluginMetaData = new Map(metadata.pluginMetaData || []);
+    const existingData = pluginMetaData.get(pluginName) || {};
+    pluginMetaData.set(pluginName, { ...existingData, ...data });
+    console.log('pluginMetaData', pluginMetaData);
+    get().setShadowMetadata(key, [], { ...metadata, pluginMetaData });
+  },
+
+  removePluginMetaData: (key: string, path: string[], pluginName: string) => {
+    const metadata = get().getShadowMetadata(key, path);
+    if (!metadata?.pluginMetaData) return;
+    const pluginMetaData = new Map(metadata.pluginMetaData);
+    pluginMetaData.delete(pluginName);
+    get().setShadowMetadata(key, path, { ...metadata, pluginMetaData });
+  },
+
   setTransformCache: (
     key: string,
     path: string[],
@@ -755,7 +792,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         pathComponents,
         signals,
         validation,
-        syncArrayIdPrefix,
       } = existingRoot._meta;
 
       if (components) preservedMetadata.components = components;
@@ -766,8 +802,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       if (pathComponents) preservedMetadata.pathComponents = pathComponents;
       if (signals) preservedMetadata.signals = signals;
       if (validation) preservedMetadata.validation = validation;
-      if (syncArrayIdPrefix)
-        preservedMetadata.syncArrayIdPrefix = syncArrayIdPrefix;
     }
 
     // Deep merge function that preserves shadow node structure
