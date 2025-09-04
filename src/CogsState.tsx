@@ -343,8 +343,8 @@ export type UpdateTypeDetail = {
   newValue: any;
   userId?: number;
 
-  itemId?: string; // For insert: the new item's ID
-  insertAfterId?: string; // For insert: ID to insert after (null = beginning)
+  itemId?: string;
+  insertAfterId?: string;
   metaData?: Record<string, any>;
 };
 export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
@@ -1866,7 +1866,6 @@ function createProxyHandler<T>(
   sessionId?: string
 ): StateObject<T> {
   const proxyCache = new Map<string, any>();
-  let stateVersion = 0;
 
   function rebuildStateShape({
     path = [],
@@ -2821,8 +2820,6 @@ function createProxyHandler<T>(
 
             if (!Array.isArray(currentState)) return [];
 
-            stateVersion++;
-
             return rebuildStateShape({
               path: [...path, '[*]', fieldName],
               componentId: componentId!,
@@ -3336,7 +3333,6 @@ function createProxyHandler<T>(
               getGlobalStore
                 .getState()
                 .setShadowMetadata(stateKey, operation.path, {
-                  stateVersion: operation.version,
                   validation: {
                     status: newErrors.length > 0 ? 'INVALID' : 'VALID',
                     errors: newErrors,
@@ -3592,8 +3588,6 @@ function createProxyHandler<T>(
       notifyComponents(stateKey);
     },
     $updateInitialState: (newState: T) => {
-      stateVersion++;
-
       const newUpdaterState = createProxyHandler(
         stateKey,
         effectiveSetState,

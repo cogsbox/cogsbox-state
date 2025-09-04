@@ -80,7 +80,6 @@ export type UIState = {
 export type ShadowMetadata = {
   value?: any;
 
-  stateVersion?: number;
   id?: string;
   typeInfo?: TypeInfo;
   stateSource?: 'default' | 'server' | 'localStorage';
