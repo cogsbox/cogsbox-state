@@ -3529,6 +3529,7 @@ function createProxyHandler<T>(
     },
     $initializeAndMergeShadowState: (newState: T) => {
       initializeAndMergeShadowState(stateKey, newState);
+      notifyComponents(stateKey);
     },
     $updateInitialState: (newState: T) => {
       stateVersion++;
