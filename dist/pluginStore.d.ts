@@ -15,6 +15,24 @@ type PluginRegistryStore = {
     updateSubscribers: Set<(update: UpdateTypeDetail) => void>;
     subscribeToUpdates: (callback: (update: UpdateTypeDetail) => void) => () => void;
     notifyUpdate: (update: UpdateTypeDetail) => void;
+    formUpdateSubscribers: Set<(event: {
+        stateKey: string;
+        type: 'focus' | 'blur' | 'input';
+        path: string;
+        value?: any;
+    }) => void>;
+    subscribeToFormUpdates: (callback: (event: {
+        stateKey: string;
+        type: 'focus' | 'blur' | 'input';
+        path: string;
+        value?: any;
+    }) => void) => () => void;
+    notifyFormUpdate: (event: {
+        stateKey: string;
+        type: 'focus' | 'blur' | 'input';
+        path: string;
+        value?: any;
+    }) => void;
 };
 export declare const pluginStore: import('zustand').UseBoundStore<import('zustand').StoreApi<PluginRegistryStore>>;
 export {};

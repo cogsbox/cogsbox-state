@@ -1,4 +1,5 @@
 import { FormElementParams, type FormOptsType } from './CogsState';
+import { pluginStore } from './pluginStore';
 import React, {
   memo,
   RefObject,
@@ -458,7 +459,12 @@ export function FormElementWrapper({
       }
 
       setLocalValue(newValue);
-
+      pluginStore.getState().notifyFormUpdate({
+        stateKey,
+        type: 'input',
+        path: path.join('.'),
+        value: newValue,
+      });
       // Validate immediately on change (will only run if configured or clearing errors)
       validateField(newValue, 'onChange');
 
@@ -495,6 +501,12 @@ export function FormElementWrapper({
       focusedElement: { path, ref: formElementRef },
     });
     notifyPathSubscribers(virtualFocusPath, newFocusedElement);
+    pluginStore.getState().notifyFormUpdate({
+      stateKey,
+      type: 'focus',
+      path: path.join('.'),
+      value: localValue,
+    });
   }, [stateKey, path, formElementRef]);
 
   const handleBlur = useCallback(() => {
@@ -516,6 +528,12 @@ export function FormElementWrapper({
           focusedElement: null,
         });
         notifyPathSubscribers(virtualFocusPath, null);
+        pluginStore.getState().notifyFormUpdate({
+          stateKey,
+          type: 'blur',
+          path: path.join('.'),
+          value: localValue,
+        });
       }
     });
     validateField(localValue, 'onBlur');

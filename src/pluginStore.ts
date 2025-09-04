@@ -27,6 +27,28 @@ type PluginRegistryStore = {
     callback: (update: UpdateTypeDetail) => void
   ) => () => void;
   notifyUpdate: (update: UpdateTypeDetail) => void;
+  formUpdateSubscribers: Set<
+    (event: {
+      stateKey: string;
+      type: 'focus' | 'blur' | 'input';
+      path: string;
+      value?: any;
+    }) => void
+  >;
+  subscribeToFormUpdates: (
+    callback: (event: {
+      stateKey: string;
+      type: 'focus' | 'blur' | 'input';
+      path: string;
+      value?: any;
+    }) => void
+  ) => () => void;
+  notifyFormUpdate: (event: {
+    stateKey: string;
+    type: 'focus' | 'blur' | 'input';
+    path: string;
+    value?: any;
+  }) => void;
 };
 
 export const pluginStore = create<PluginRegistryStore>((set, get) => ({
@@ -93,5 +115,16 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
   notifyUpdate: (update) => {
     // Call all registered subscribers with the update details
     get().updateSubscribers.forEach((callback) => callback(update));
+  },
+  formUpdateSubscribers: new Set(),
+  subscribeToFormUpdates: (callback) => {
+    const subscribers = get().formUpdateSubscribers;
+    subscribers.add(callback);
+    return () => {
+      get().formUpdateSubscribers.delete(callback);
+    };
+  },
+  notifyFormUpdate: (event) => {
+    get().formUpdateSubscribers.forEach((callback) => callback(event));
   },
 }));

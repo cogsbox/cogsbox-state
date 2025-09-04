@@ -42,6 +42,12 @@ export type CogsPlugin<
     options: TOptions,
     hook?: THookReturn
   ) => void;
+  onFormUpdate?: (
+    stateKey: keyof TState,
+    event: { type: 'focus' | 'blur' | 'input'; path: string; value?: any },
+    options: TOptions,
+    hook?: THookReturn
+  ) => void;
 };
 
 export type ExtractPluginOptions<
@@ -51,8 +57,6 @@ export type ExtractPluginOptions<
     ? O
     : never;
 };
-
-// The improved builder that makes onUpdate optional
 export function createPluginContext<
   TState extends Record<string, any>,
   TOptions = unknown,
@@ -75,6 +79,12 @@ export function createPluginContext<
         update: UpdateTypeDetail,
         options: TOptions,
         ...args: THookReturn extends never ? [] : [hookData: THookReturn]
+      ) => void,
+      formUpdateHandler?: (
+        context: PluginContext<TState, TPluginMetaData>,
+        event: { type: 'focus' | 'blur' | 'input'; path: string; value?: any },
+        options: TOptions,
+        ...args: THookReturn extends never ? [] : [hookData: THookReturn]
       ) => void
     ): Prettify<CogsPlugin<TName, TState, TOptions, THookReturn>> => {
       return {
@@ -82,6 +92,7 @@ export function createPluginContext<
         useHook: hookFn as any,
         transformState: transformFn as any,
         onUpdate: updateHandler as any,
+        onFormUpdate: formUpdateHandler as any,
       };
     };
 
@@ -91,7 +102,6 @@ export function createPluginContext<
         options: TOptions
       ) => THookReturn
     ) => {
-      // Return the plugin directly if no methods are chained
       const plugin = createPluginObject<THookReturn>(hookFn);
 
       return Object.assign(plugin, {
@@ -102,7 +112,6 @@ export function createPluginContext<
             ...args: THookReturn extends never ? [] : [hookData: THookReturn]
           ) => void
         ) {
-          // Create plugin with transform, still allowing optional onUpdate
           const pluginWithTransform = createPluginObject<THookReturn>(
             hookFn,
             transformFn
@@ -119,10 +128,55 @@ export function createPluginContext<
                   : [hookData: THookReturn]
               ) => void
             ) {
-              return createPluginObject<THookReturn>(
+              const pluginWithUpdate = createPluginObject<THookReturn>(
                 hookFn,
                 transformFn,
                 updateHandler
+              );
+
+              return Object.assign(pluginWithUpdate, {
+                onFormUpdate(
+                  formUpdateHandler: (
+                    context: PluginContext<TState, TPluginMetaData>,
+                    event: {
+                      type: 'focus' | 'blur' | 'input';
+                      path: string;
+                      value?: any;
+                    },
+                    options: TOptions,
+                    ...args: THookReturn extends never
+                      ? []
+                      : [hookData: THookReturn]
+                  ) => void
+                ) {
+                  return createPluginObject<THookReturn>(
+                    hookFn,
+                    transformFn,
+                    updateHandler,
+                    formUpdateHandler
+                  );
+                },
+              });
+            },
+            onFormUpdate(
+              formUpdateHandler: (
+                context: PluginContext<TState, TPluginMetaData>,
+                event: {
+                  type: 'focus' | 'blur' | 'input';
+                  path: string;
+                  value?: any;
+                },
+                options: TOptions,
+                ...args: THookReturn extends never
+                  ? []
+                  : [hookData: THookReturn]
+              ) => void
+            ) {
+              return createPluginObject<THookReturn>(
+                hookFn,
+                transformFn,
+                undefined,
+                formUpdateHandler
               );
             },
           });
@@ -135,10 +189,53 @@ export function createPluginContext<
             ...args: THookReturn extends never ? [] : [hookData: THookReturn]
           ) => void
         ) {
-          return createPluginObject<THookReturn>(
+          const pluginWithUpdate = createPluginObject<THookReturn>(
             hookFn,
             undefined,
             updateHandler
+          );
+
+          return Object.assign(pluginWithUpdate, {
+            onFormUpdate(
+              formUpdateHandler: (
+                context: PluginContext<TState, TPluginMetaData>,
+                event: {
+                  type: 'focus' | 'blur' | 'input';
+                  path: string;
+                  value?: any;
+                },
+                options: TOptions,
+                ...args: THookReturn extends never
+                  ? []
+                  : [hookData: THookReturn]
+              ) => void
+            ) {
+              return createPluginObject<THookReturn>(
+                hookFn,
+                undefined,
+                updateHandler,
+                formUpdateHandler
+              );
+            },
+          });
+        },
+        onFormUpdate(
+          formUpdateHandler: (
+            context: PluginContext<TState, TPluginMetaData>,
+            event: {
+              type: 'focus' | 'blur' | 'input';
+              path: string;
+              value?: any;
+            },
+            options: TOptions,
+            ...args: THookReturn extends never ? [] : [hookData: THookReturn]
+          ) => void
+        ) {
+          return createPluginObject<THookReturn>(
+            hookFn,
+            undefined,
+            undefined,
+            formUpdateHandler
           );
         },
       });
@@ -175,10 +272,49 @@ export function createPluginContext<
               options: TOptions
             ) => void
           ) {
-            return createPluginObject(
+            const pluginWithUpdate = createPluginObject(
               undefined,
               transformFn as any,
               updateHandler as any
+            );
+
+            return Object.assign(pluginWithUpdate, {
+              onFormUpdate(
+                formUpdateHandler: (
+                  context: PluginContext<TState, TPluginMetaData>,
+                  event: {
+                    type: 'focus' | 'blur' | 'input';
+                    path: string;
+                    value?: any;
+                  },
+                  options: TOptions
+                ) => void
+              ) {
+                return createPluginObject(
+                  undefined,
+                  transformFn as any,
+                  updateHandler as any,
+                  formUpdateHandler as any
+                );
+              },
+            });
+          },
+          onFormUpdate(
+            formUpdateHandler: (
+              context: PluginContext<TState, TPluginMetaData>,
+              event: {
+                type: 'focus' | 'blur' | 'input';
+                path: string;
+                value?: any;
+              },
+              options: TOptions
+            ) => void
+          ) {
+            return createPluginObject(
+              undefined,
+              transformFn as any,
+              undefined,
+              formUpdateHandler as any
             );
           },
         });
@@ -190,7 +326,50 @@ export function createPluginContext<
           options: TOptions
         ) => void
       ) {
-        return createPluginObject(undefined, undefined, updateHandler as any);
+        const pluginWithUpdate = createPluginObject(
+          undefined,
+          undefined,
+          updateHandler as any
+        );
+
+        return Object.assign(pluginWithUpdate, {
+          onFormUpdate(
+            formUpdateHandler: (
+              context: PluginContext<TState, TPluginMetaData>,
+              event: {
+                type: 'focus' | 'blur' | 'input';
+                path: string;
+                value?: any;
+              },
+              options: TOptions
+            ) => void
+          ) {
+            return createPluginObject(
+              undefined,
+              undefined,
+              updateHandler as any,
+              formUpdateHandler as any
+            );
+          },
+        });
+      },
+      onFormUpdate(
+        formUpdateHandler: (
+          context: PluginContext<TState, TPluginMetaData>,
+          event: {
+            type: 'focus' | 'blur' | 'input';
+            path: string;
+            value?: any;
+          },
+          options: TOptions
+        ) => void
+      ) {
+        return createPluginObject(
+          undefined,
+          undefined,
+          undefined,
+          formUpdateHandler as any
+        );
       },
     });
   }

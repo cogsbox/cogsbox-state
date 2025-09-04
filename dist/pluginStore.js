@@ -1,35 +1,42 @@
 import { create as d } from "zustand";
-const l = d((o, i) => ({
+const c = d((o, t) => ({
   stateHandlers: /* @__PURE__ */ new Map(),
-  registerStateHandler: (e, t) => o((n) => {
-    const s = new Map(n.stateHandlers);
-    return s.set(e, t), console.log("addign handler", e, t), { stateHandlers: s };
+  registerStateHandler: (e, s) => o((n) => {
+    const r = new Map(n.stateHandlers);
+    return r.set(e, s), console.log("addign handler", e, s), { stateHandlers: r };
   }),
   registeredPlugins: [],
   pluginOptions: /* @__PURE__ */ new Map(),
   setRegisteredPlugins: (e) => o({ registeredPlugins: e }),
-  setPluginOptionsForState: (e, t) => o((n) => {
-    const s = new Map(n.pluginOptions), r = /* @__PURE__ */ new Map();
-    return Object.entries(t).forEach(([a, u]) => {
-      n.registeredPlugins.some((p) => p.name === a) && r.set(a, u);
-    }), r.size > 0 && s.set(e, r), { pluginOptions: s };
+  setPluginOptionsForState: (e, s) => o((n) => {
+    const r = new Map(n.pluginOptions), i = /* @__PURE__ */ new Map();
+    return Object.entries(s).forEach(([u, a]) => {
+      n.registeredPlugins.some((p) => p.name === u) && i.set(u, a);
+    }), i.size > 0 && r.set(e, i), { pluginOptions: r };
   }),
   getPluginConfigsForState: (e) => {
-    const t = i(), n = t.pluginOptions.get(e);
-    return n ? t.registeredPlugins.map((s) => {
-      const r = n.get(s.name);
-      return r !== void 0 ? { plugin: s, options: r } : null;
+    const s = t(), n = s.pluginOptions.get(e);
+    return n ? s.registeredPlugins.map((r) => {
+      const i = n.get(r.name);
+      return i !== void 0 ? { plugin: r, options: i } : null;
     }).filter(Boolean) : [];
   },
   updateSubscribers: /* @__PURE__ */ new Set(),
-  subscribeToUpdates: (e) => (i().updateSubscribers.add(e), () => {
-    i().updateSubscribers.delete(e);
+  subscribeToUpdates: (e) => (t().updateSubscribers.add(e), () => {
+    t().updateSubscribers.delete(e);
   }),
   notifyUpdate: (e) => {
-    i().updateSubscribers.forEach((t) => t(e));
+    t().updateSubscribers.forEach((s) => s(e));
+  },
+  formUpdateSubscribers: /* @__PURE__ */ new Set(),
+  subscribeToFormUpdates: (e) => (t().formUpdateSubscribers.add(e), () => {
+    t().formUpdateSubscribers.delete(e);
+  }),
+  notifyFormUpdate: (e) => {
+    t().formUpdateSubscribers.forEach((s) => s(e));
   }
 }));
 export {
-  l as pluginStore
+  c as pluginStore
 };
 //# sourceMappingURL=pluginStore.js.map

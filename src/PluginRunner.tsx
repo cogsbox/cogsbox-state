@@ -86,7 +86,37 @@ const PluginInstance = React.memo(
         .subscribeToUpdates(handleUpdate);
       return unsubscribe; // React will call this cleanup function when the component unmounts.
     }, [stateKey, plugin, options, context]); // The dependencies are stable and correctly manage the subscription lifecycle.
+    useEffect(() => {
+      if (!plugin.onFormUpdate) {
+        return; // Do nothing if the plugin doesn't have this method.
+      }
 
+      const handleFormUpdate = (event: {
+        stateKey: string;
+        type: 'focus' | 'blur' | 'input';
+        path: string;
+        value?: any;
+      }) => {
+        // Only handle events for this stateKey
+        if (event.stateKey === stateKey) {
+          plugin.onFormUpdate!(
+            stateKey,
+            {
+              type: event.type,
+              path: event.path,
+              value: event.value,
+            },
+            options,
+            hookDataRef.current
+          );
+        }
+      };
+
+      const unsubscribe = pluginStore
+        .getState()
+        .subscribeToFormUpdates(handleFormUpdate);
+      return unsubscribe;
+    }, [stateKey, plugin, options]);
     // This component renders nothing to the DOM.
     return null;
   }
@@ -141,7 +171,7 @@ export function PluginRunner({ children }: { children: React.ReactNode }) {
           );
         });
       })}
-      testsetsetsetsetsetsetsetse123123213{JSON.stringify(pluginOptions)}
+
       {children}
     </>
   );
