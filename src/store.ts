@@ -137,7 +137,7 @@ export type CogsGlobalState = {
   ) => Map<string, Record<string, any>> | undefined;
   setPluginMetaData: (
     key: string,
-
+    path: string[],
     pluginName: string,
     data: Record<string, any>
   ) => void;
@@ -705,19 +705,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
   setPluginMetaData: (
     key: string,
-
+    path: string[], // ADD THIS PARAMETER
     pluginName: string,
     data: Record<string, any>
   ) => {
-    const metadata = get().getShadowMetadata(key, []) || {};
-    console.log('metadata', metadata);
+    const metadata = get().getShadowMetadata(key, path) || {}; // Use the path!
     const pluginMetaData = new Map(metadata.pluginMetaData || []);
     const existingData = pluginMetaData.get(pluginName) || {};
     pluginMetaData.set(pluginName, { ...existingData, ...data });
-    console.log('pluginMetaData', pluginMetaData);
-    get().setShadowMetadata(key, [], { ...metadata, pluginMetaData });
+    get().setShadowMetadata(key, path, { ...metadata, pluginMetaData });
   },
-
   removePluginMetaData: (key: string, path: string[], pluginName: string) => {
     const metadata = get().getShadowMetadata(key, path);
     if (!metadata?.pluginMetaData) return;

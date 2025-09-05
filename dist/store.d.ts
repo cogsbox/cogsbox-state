@@ -102,7 +102,7 @@ type ShadowNode = {
 };
 export type CogsGlobalState = {
     getPluginMetaDataMap: (key: string, path: string[]) => Map<string, Record<string, any>> | undefined;
-    setPluginMetaData: (key: string, pluginName: string, data: Record<string, any>) => void;
+    setPluginMetaData: (key: string, path: string[], pluginName: string, data: Record<string, any>) => void;
     removePluginMetaData: (key: string, path: string[], pluginName: string) => void;
     setTransformCache: (key: string, path: string[], cacheKey: string, cacheData: any) => void;
     initializeAndMergeShadowState: (key: string, initialState: any) => void;

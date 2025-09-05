@@ -1,82 +1,121 @@
-import { jsxs as D, Fragment as U, jsx as k } from "react/jsx-runtime";
-import M, { useMemo as R, useEffect as c, useRef as S, useReducer as h } from "react";
-import { pluginStore as m } from "./pluginStore.js";
-import { getGlobalStore as i } from "./store.js";
-import { isDeepEqual as H } from "./utility.js";
-const { setHookResult: g, removeHookResult: l } = m.getState(), F = M.memo(
+import { jsxs as l, Fragment as M, jsx as P } from "react/jsx-runtime";
+import T, { useState as U, useMemo as R, useEffect as u, useRef as I, useReducer as C } from "react";
+import { pluginStore as f } from "./pluginStore.js";
+import { isDeepEqual as j } from "./utility.js";
+import { createMetadataContext as v } from "./plugins.js";
+const { setHookResult: A, removeHookResult: x } = f.getState(), E = T.memo(
   ({
-    stateKey: r,
-    plugin: e,
-    options: o,
-    stateHandler: f
+    stateKey: e,
+    plugin: r,
+    options: t,
+    stateHandler: o
   }) => {
-    const s = R(
+    const [i, c] = U(!0), n = R(
+      () => v(e, r.name),
+      [e, r.name]
+    ), b = R(
       () => ({
-        stateKey: r,
-        cogsState: f,
-        getPluginMetaData: () => i.getState().getPluginMetaDataMap(r, [])?.get(e.name),
-        setPluginMetaData: (n) => i.getState().setPluginMetaData(r, e.name, n),
-        removePluginMetaData: () => i.getState().removePluginMetaData(r, [], e.name)
+        stateKey: e,
+        cogsState: o,
+        ...n,
+        options: t,
+        pluginName: r.name,
+        isInitialMount: i
       }),
-      [r, f, e.name]
-    ), t = e.useHook ? e.useHook(s, o) : void 0;
-    c(() => (e.useHook ? g(r, e.name, t) : l(r, e.name), () => l(r, e.name)), [r, e.name, !!e.useHook, t]);
-    const b = S();
-    c(() => {
-      e.transformState && (H(o, b.current) || (e.transformState(s, o, t), b.current = o));
-    }, [s, e, o, t]);
-    const u = S(t);
-    return u.current = t, c(() => {
-      if (!e.onUpdate)
-        return;
-      const n = (a) => {
-        a.stateKey === r && e.onUpdate(r, a, o, u.current);
+      [
+        e,
+        o,
+        n,
+        t,
+        r.name,
+        i
+      ]
+    ), s = r.useHook ? r.useHook(b) : void 0;
+    u(() => {
+      c(!1);
+    }, []), u(() => (r.useHook ? A(e, r.name, s) : x(e, r.name), () => x(e, r.name)), [e, r.name, !!r.useHook, s]);
+    const d = I(), [m, h] = U(!0);
+    u(() => {
+      r.transformState && (j(t, d.current) || (r.transformState({
+        stateKey: e,
+        cogsState: o,
+        ...n,
+        options: t,
+        hookData: s,
+        isInitialTransform: m
+      }), d.current = t, h(!1)));
+    }, [
+      e,
+      o,
+      n,
+      r,
+      t,
+      s,
+      m
+    ]);
+    const S = I(s);
+    return S.current = s, u(() => {
+      if (!r.onUpdate) return;
+      const k = (a) => {
+        a.stateKey === e && r.onUpdate({
+          stateKey: e,
+          cogsState: o,
+          ...n,
+          update: a,
+          path: a.path,
+          options: t,
+          hookData: S.current
+        });
       };
-      return m.getState().subscribeToUpdates(n);
-    }, [r, e, o, s]), c(() => {
-      if (!e.onFormUpdate)
-        return;
-      const n = (a) => {
-        a.stateKey === r && e.onFormUpdate(
-          r,
-          {
-            type: a.type,
-            path: a.path,
-            value: a.value
-          },
-          o,
-          u.current
-        );
+      return f.getState().subscribeToUpdates(k);
+    }, [e, o, n, r, t]), u(() => {
+      if (!r.onFormUpdate) return;
+      const k = (a) => {
+        if (a.stateKey === e) {
+          const F = a.path.split(".");
+          r.onFormUpdate({
+            stateKey: e,
+            cogsState: o,
+            ...n,
+            path: F,
+            event: {
+              type: a.type,
+              value: a.value
+            },
+            options: t,
+            hookData: S.current
+          });
+        }
       };
-      return m.getState().subscribeToFormUpdates(n);
-    }, [r, e, o]), null;
+      return f.getState().subscribeToFormUpdates(k);
+    }, [e, o, n, r, t]), null;
   }
 );
-function O({ children: r }) {
-  const [, e] = h((t) => t + 1, 0);
-  c(() => m.subscribe(e), []);
-  const { pluginOptions: o, stateHandlers: f, registeredPlugins: s } = m.getState();
-  return /* @__PURE__ */ D(U, { children: [
-    Array.from(o.entries()).map(([t, b]) => {
-      const u = f.get(t);
-      return u ? Array.from(b.entries()).map(([n, d]) => {
-        const a = s.find((P) => P.name === n);
-        return a ? /* @__PURE__ */ k(
-          F,
+function z({ children: e }) {
+  const [, r] = C((c) => c + 1, 0);
+  u(() => f.subscribe(r), []);
+  const { pluginOptions: t, stateHandlers: o, registeredPlugins: i } = f.getState();
+  return /* @__PURE__ */ l(M, { children: [
+    Array.from(t.entries()).map(([c, n]) => {
+      const b = o.get(c);
+      return b ? Array.from(n.entries()).map(([s, d]) => {
+        const m = i.find((h) => h.name === s);
+        return m ? /* @__PURE__ */ P(
+          E,
           {
-            stateKey: t,
-            plugin: a,
+            stateKey: c,
+            plugin: m,
             options: d,
-            stateHandler: u
+            stateHandler: b
           },
-          `${t}:${n}`
+          `${c}:${s}`
         ) : null;
       }) : null;
     }),
-    r
+    e
   ] });
 }
 export {
-  O as PluginRunner
+  z as PluginRunner
 };
 //# sourceMappingURL=PluginRunner.jsx.map

@@ -1323,7 +1323,7 @@ function Pe(e, o, g, s) {
           if (m === "$getPluginMetaData")
             return (r) => Ze(e, t)?.get(r);
           if (m === "$addPluginMetaData")
-            return console.log("$addPluginMetaDat"), (r, n) => Qe(e, r, n);
+            return console.log("$addPluginMetaDat"), (r, n) => Qe(e, t, r, n);
           if (m === "$removePluginMetaData")
             return (r) => Xe(e, t, r);
           if (m === "$addZodValidation")

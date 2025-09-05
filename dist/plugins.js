@@ -1,63 +1,74 @@
-import { useState as S } from "react";
-function f() {
-  function n(o) {
-    const r = (e, s, i, u, c) => ({
-      name: o,
-      useHook: e,
-      transformState: s,
-      onUpdate: i,
-      onFormUpdate: u,
-      formWrapper: c
+import { getGlobalStore as r } from "./store.js";
+function V(t, e) {
+  return {
+    // Root metadata functions
+    getPluginMetaData: () => r.getState().getPluginMetaDataMap(t, [])?.get(e),
+    setPluginMetaData: (s) => r.getState().setPluginMetaData(t, [], e, s),
+    removePluginMetaData: () => r.getState().removePluginMetaData(t, [], e),
+    // Field metadata functions
+    getFieldMetaData: (s) => r.getState().getPluginMetaDataMap(t, s)?.get(e),
+    setFieldMetaData: (s, a) => r.getState().setPluginMetaData(t, s, e, a),
+    removeFieldMetaData: (s) => r.getState().removePluginMetaData(t, s, e)
+  };
+}
+function S() {
+  function t(e) {
+    const s = (n, i, c, o, g) => ({
+      name: e,
+      useHook: n,
+      transformState: i,
+      onUpdate: c,
+      onFormUpdate: o,
+      formWrapper: g
     });
-    function t(e, s, i, u, c) {
-      const y = r(
-        e,
-        s,
+    function a(n, i, c, o, g) {
+      const D = s(
+        n,
         i,
+        c,
+        o,
+        g
+      ), P = {};
+      return i || (P.transformState = (u) => a(n, u, c, o, g)), c || (P.onUpdate = (u) => a(n, i, u, o, g)), o || (P.onFormUpdate = (u) => a(
+        n,
+        i,
+        c,
         u,
-        c
-      ), l = {};
-      return s || (l.transformState = (g) => t(e, g, i, u, c)), i || (l.onUpdate = (g) => t(e, s, g, u, c)), u || (l.onFormUpdate = (g) => t(
-        e,
-        s,
-        i,
-        g,
-        c
-      )), c || (l.formWrapper = (g) => t(e, s, i, u, g)), Object.assign(y, l);
+        g
+      )), g || (P.formWrapper = (u) => a(n, i, c, o, u)), Object.assign(D, P);
     }
     return Object.assign(
-      t(),
+      a(),
       {
-        useHook(e) {
-          return t(e);
+        /**
+         * Define a React hook for this plugin.
+         * Sets up subscriptions, state, and returns data for other methods.
+         */
+        useHook(n) {
+          return a(n);
         }
       }
     );
   }
-  return { createPlugin: n };
+  return { createPlugin: t };
 }
-const { createPlugin: P } = f();
-P("analyticsPlugin").transformState(
-  ({ stateKey: n, cogsState: o }, r) => {
-    n === "user" && o.$update({ test: "This works!" }), n === "address" && o.$update({ city: "London", country: "UK" });
+const { createPlugin: l } = S();
+l("analyticsPlugin").transformState(
+  ({ stateKey: t, cogsState: e, setPluginMetaData: s }) => {
+    t === "user" && (e.$update({ test: "This works!", email: "test@example.com" }), s({ lastUpdated: /* @__PURE__ */ new Date() }));
   }
 );
-P("fullPlugin").useHook(({ stateKey: n, cogsState: o }, r) => {
-  const [t, a] = S(0);
-  return {
-    count: t,
-    increment: () => a((e) => e + 1)
-  };
-}).transformState(({ stateKey: n, cogsState: o }, r, t) => {
-  t && console.log(
-    `[Logger] RENDER: Key '${n}' has been updated ${t.count} times.`
-  );
-}).onUpdate(({ stateKey: n, cogsState: o }, r, t, a) => {
-  a && (console.log(`[Logger] UPDATE: Key '${n}' just changed.`), a.increment());
+l("sync").useHook(({ setPluginMetaData: t, setFieldMetaData: e, cogsState: s }) => {
+  const a = "session-123";
+  return t({ sessionId: a }), e(["user"], { syncVersion: "v1.0" }), e(["address"], { syncVersion: "v1.1" }), { sessionId: a };
+}).onUpdate(({ path: t, update: e, getFieldMetaData: s, setFieldMetaData: a }) => {
+  if (t) {
+    const M = s(t)?.syncVersion || "v0", n = `v${parseInt(M.slice(1)) + 1}`;
+    a(t, { syncVersion: n });
+  }
 });
-P("hookOnly").useHook((n, o) => ({ id: "test" }));
-P("empty");
 export {
-  f as createPluginContext
+  V as createMetadataContext,
+  S as createPluginContext
 };
 //# sourceMappingURL=plugins.js.map

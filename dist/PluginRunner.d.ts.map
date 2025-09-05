@@ -1,1 +1,1 @@
-{"version":3,"file":"PluginRunner.d.ts","sourceRoot":"","sources":["../src/PluginRunner.tsx"],"names":[],"mappings":"AAAA,OAAO,KAAiD,MAAM,OAAO,CAAC;AAmItE;;;GAGG;AACH,wBAAgB,YAAY,CAAC,EAAE,QAAQ,EAAE,EAAE;IAAE,QAAQ,EAAE,KAAK,CAAC,SAAS,CAAA;CAAE,2CAiDvE"}
+{"version":3,"file":"PluginRunner.d.ts","sourceRoot":"","sources":["../src/PluginRunner.tsx"],"names":[],"mappings":"AAAA,OAAO,KAA2D,MAAM,OAAO,CAAC;AA0JhF;;;GAGG;AACH,wBAAgB,YAAY,CAAC,EAAE,QAAQ,EAAE,EAAE;IAAE,QAAQ,EAAE,KAAK,CAAC,SAAS,CAAA;CAAE,2CAiDvE"}

@@ -1,164 +1,165 @@
 import { jsx as F, Fragment as K } from "react/jsx-runtime";
-import { pluginStore as R } from "./pluginStore.js";
-import Z, { memo as ge, useState as j, useRef as L, useCallback as O, useEffect as J, useLayoutEffect as ee, useMemo as me } from "react";
+import { pluginStore as E } from "./pluginStore.js";
+import { createMetadataContext as ge } from "./plugins.js";
+import Z, { memo as me, useState as O, useRef as L, useCallback as J, useEffect as x, useLayoutEffect as ee, useMemo as Se } from "react";
 import { getGlobalStore as p } from "./store.js";
-import { useInView as Se } from "react-intersection-observer";
+import { useInView as pe } from "react-intersection-observer";
 import { v4 as te } from "uuid";
-import { isDeepEqual as pe } from "./utility.js";
+import { isDeepEqual as ve } from "./utility.js";
 const {
-  getInitialOptions: ve,
-  getShadowMetadata: he,
-  setShadowMetadata: H,
+  getInitialOptions: he,
+  getShadowMetadata: be,
+  setShadowMetadata: U,
   getShadowValue: V,
-  registerComponent: be,
-  unregisterComponent: Ie,
+  registerComponent: Ie,
+  unregisterComponent: Me,
   notifyPathSubscribers: _,
-  subscribeToPath: Me
-} = p.getState(), { getHookResult: Ee, pluginOptions: Te } = R.getState();
-function ye({
-  formOpts: t,
-  path: e,
+  subscribeToPath: Ee
+} = p.getState(), { getHookResult: We, pluginOptions: He } = E.getState();
+function Te({
+  formOpts: e,
+  path: t,
   stateKey: n,
   children: s
 }) {
-  const { getInitialOptions: l, getShadowMetadata: i, getShadowValue: a } = p.getState(), m = l(n), E = i(n, e)?.validation, T = E?.status || "NOT_VALIDATED", c = (E?.errors || []).map((o) => ({
+  const { getInitialOptions: l, getShadowMetadata: i, getShadowValue: a } = p.getState(), m = l(n), T = i(n, t)?.validation, C = T?.status || "NOT_VALIDATED", c = (T?.errors || []).map((o) => ({
     ...o,
-    path: e
-  })), v = c.filter((o) => o.severity === "error").map((o) => o.message), d = c.filter((o) => o.severity === "warning").map((o) => o.message), f = v[0] || d[0], y = v.length > 0 ? "error" : d.length > 0 ? "warning" : void 0;
-  return /* @__PURE__ */ F(K, { children: m?.formElements?.validation && !t?.validation?.disable ? m.formElements.validation({
-    children: /* @__PURE__ */ F(Z.Fragment, { children: s }, e.toString()),
-    status: T,
+    path: t
+  })), v = c.filter((o) => o.severity === "error").map((o) => o.message), d = c.filter((o) => o.severity === "warning").map((o) => o.message), f = v[0] || d[0], w = v.length > 0 ? "error" : d.length > 0 ? "warning" : void 0;
+  return /* @__PURE__ */ F(K, { children: m?.formElements?.validation && !e?.validation?.disable ? m.formElements.validation({
+    children: /* @__PURE__ */ F(Z.Fragment, { children: s }, t.toString()),
+    status: C,
     // Now passes the new ValidationStatus type
-    message: t?.validation?.hideMessage ? "" : t?.validation?.message || f || "",
-    severity: y,
+    message: e?.validation?.hideMessage ? "" : e?.validation?.message || f || "",
+    severity: w,
     hasErrors: v.length > 0,
     hasWarnings: d.length > 0,
     allErrors: c,
-    path: e,
-    getData: () => a(n, e)
-  }) : /* @__PURE__ */ F(Z.Fragment, { children: s }, e.toString()) });
+    path: t,
+    getData: () => a(n, t)
+  }) : /* @__PURE__ */ F(Z.Fragment, { children: s }, t.toString()) });
 }
-const Oe = ge(
-  we,
-  (t, e) => t.itemPath.join(".") === e.itemPath.join(".") && t.stateKey === e.stateKey && t.itemComponentId === e.itemComponentId && t.localIndex === e.localIndex
+const Je = me(
+  Ce,
+  (e, t) => e.itemPath.join(".") === t.itemPath.join(".") && e.stateKey === t.stateKey && e.itemComponentId === t.itemComponentId && e.localIndex === t.localIndex
 );
-function we({
-  stateKey: t,
-  itemComponentId: e,
+function Ce({
+  stateKey: e,
+  itemComponentId: t,
   itemPath: n,
   localIndex: s,
   arraySetter: l,
   rebuildStateShape: i,
   renderFn: a
 }) {
-  const [, m] = j({}), { ref: S, inView: E } = Se(), T = L(null), c = Ce(T), v = L(!1), d = [t, ...n].join(".");
-  $(t, e, m);
-  const f = O(
+  const [, m] = O({}), { ref: S, inView: T } = pe(), C = L(null), c = we(C), v = L(!1), d = [e, ...n].join(".");
+  $(e, t, m);
+  const f = J(
     (g) => {
-      T.current = g, S(g);
+      C.current = g, S(g);
     },
     [S]
   );
-  J(() => {
-    const g = Me(d, (U) => {
+  x(() => {
+    const g = Ee(d, (j) => {
       m({});
     });
     return () => g();
-  }, [d]), J(() => {
-    if (!E || !c || v.current)
+  }, [d]), x(() => {
+    if (!T || !c || v.current)
       return;
-    const g = T.current;
+    const g = C.current;
     if (g && g.offsetHeight > 0) {
       v.current = !0;
-      const U = g.offsetHeight;
-      H(t, n, {
+      const j = g.offsetHeight;
+      U(e, n, {
         virtualizer: {
-          itemHeight: U,
+          itemHeight: j,
           domRef: g
         }
       });
-      const C = n.slice(0, -1), B = [t, ...C].join(".");
+      const R = n.slice(0, -1), B = [e, ...R].join(".");
       _(B, {
         type: "ITEMHEIGHT",
         itemKey: n.join("."),
-        ref: T.current
+        ref: C.current
       });
     }
-  }, [E, c, t, n]);
-  const y = V(t, n);
-  if (y === void 0)
+  }, [T, c, e, n]);
+  const w = V(e, n);
+  if (w === void 0)
     return null;
   const o = i({
-    currentState: y,
+    currentState: w,
     path: n,
-    componentId: e
+    componentId: t
   }), h = a(o, s, l);
   return /* @__PURE__ */ F("div", { ref: f, children: h });
 }
-function He({
-  stateKey: t,
-  path: e,
+function Ue({
+  stateKey: e,
+  path: t,
   rebuildStateShape: n,
   renderFn: s,
   formOpts: l,
   setState: i
 }) {
-  const a = L(te()).current, [, m] = j({}), S = L(null), E = [t, ...e].join(".");
-  $(t, a, m);
-  const c = p.getState().getShadowNode(t, e)?._meta?.typeInfo, v = c?.schema, d = V(t, e), [f, y] = j(d), o = L(!1), h = L(null), g = R.getState().stateHandlers.get(t), U = me(() => R.getState().getPluginConfigsForState(t).filter((r) => typeof r.plugin.formWrapper == "function"), [t]);
-  J(() => {
-    !o.current && !pe(d, f) && y(d);
-  }, [d]), J(() => {
+  const a = L(te()).current, [, m] = O({}), S = L(null), T = [e, ...t].join(".");
+  $(e, a, m);
+  const c = p.getState().getShadowNode(e, t)?._meta?.typeInfo, v = c?.schema, d = V(e, t), [f, w] = O(d), o = L(!1), h = L(null), g = E.getState().stateHandlers.get(e), j = Se(() => E.getState().getPluginConfigsForState(e).filter((r) => typeof r.plugin.formWrapper == "function"), [e]);
+  x(() => {
+    !o.current && !ve(d, f) && w(d);
+  }, [d]), x(() => {
     const { setShadowMetadata: r } = p.getState();
-    r(t, e, { formRef: S });
-    const u = p.getState().subscribeToPath(E, (b) => {
+    r(e, t, { formRef: S });
+    const u = p.getState().subscribeToPath(T, (b) => {
       !o.current && f !== b && m({});
     });
     return () => {
       u(), h.current && (clearTimeout(h.current), o.current = !1);
-      const b = p.getState().getShadowMetadata(t, e);
-      b && b.formRef && r(t, e, { formRef: void 0 });
+      const b = p.getState().getShadowMetadata(e, t);
+      b && b.formRef && r(e, t, { formRef: void 0 });
     };
   }, []);
-  const C = O(
+  const R = J(
     (r, u) => {
-      if (!p.getState().getShadowMetadata(t, [])?.features?.validationEnabled) return;
-      const I = ve(t)?.validation;
+      if (!p.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
+      const I = he(e)?.validation;
       if (!I) return;
-      const k = he(t, e) || {}, ue = k?.validation?.status;
-      let D = !1, A;
-      if (u === "onBlur" && I.onBlur ? (D = !0, A = I.onBlur ?? "error") : u === "onChange" && (I.onChange ? (D = !0, A = I.onChange) : ue === "INVALID" && (D = !0, A = "warning")), !D) return;
+      const D = be(e, t) || {}, ue = D?.validation?.status;
+      let W = !1, A;
+      if (u === "onBlur" && I.onBlur ? (W = !0, A = I.onBlur ?? "error") : u === "onChange" && (I.onChange ? (W = !0, A = I.onChange) : ue === "INVALID" && (W = !0, A = "warning")), !W) return;
       let M = null;
-      if (v && D) {
-        const w = v.safeParse(r);
-        w.success ? M = { success: !0 } : M = {
+      if (v && W) {
+        const y = v.safeParse(r);
+        y.success ? M = { success: !0 } : M = {
           success: !1,
-          message: ("issues" in w.error ? w.error.issues : w.error.errors)[0]?.message || "Invalid value"
+          message: ("issues" in y.error ? y.error.issues : y.error.errors)[0]?.message || "Invalid value"
         };
       } else {
-        const w = I.zodSchemaV4 || I.zodSchemaV3;
-        if (!w) return;
-        const G = V(t, []), x = JSON.parse(JSON.stringify(G));
-        let W = x;
-        for (let N = 0; N < e.length - 1; N++)
-          W[e[N]] || (W[e[N]] = {}), W = W[e[N]];
-        e.length > 0 ? W[e[e.length - 1]] = r : Object.assign(x, r);
-        const P = w.safeParse(x);
+        const y = I.zodSchemaV4 || I.zodSchemaV3;
+        if (!y) return;
+        const G = V(e, []), k = JSON.parse(JSON.stringify(G));
+        let H = k;
+        for (let N = 0; N < t.length - 1; N++)
+          H[t[N]] || (H[t[N]] = {}), H = H[t[N]];
+        t.length > 0 ? H[t[t.length - 1]] = r : Object.assign(k, r);
+        const P = y.safeParse(k);
         if (P.success)
           M = { success: !0 };
         else {
           const Q = ("issues" in P.error ? P.error.issues : P.error.errors).filter((X) => {
-            if (e.some((z) => z.startsWith("id:"))) {
-              const z = e[0].startsWith("id:") ? [] : e.slice(0, -1), Y = p.getState().getShadowMetadata(t, z);
+            if (t.some((z) => z.startsWith("id:"))) {
+              const z = t[0].startsWith("id:") ? [] : t.slice(0, -1), Y = p.getState().getShadowMetadata(e, z);
               if (Y?.arrayKeys) {
-                e.slice(0, -1).join(".");
+                t.slice(0, -1).join(".");
                 const le = Y.arrayKeys.findIndex(
-                  (fe) => fe === e[e.length - 2]
-                ), de = [...z, le, ...e.slice(-1)];
+                  (fe) => fe === t[t.length - 2]
+                ), de = [...z, le, ...t.slice(-1)];
                 return JSON.stringify(X.path) === JSON.stringify(de);
               }
             }
-            return JSON.stringify(X.path) === JSON.stringify(e);
+            return JSON.stringify(X.path) === JSON.stringify(t);
           });
           Q.length > 0 ? M = {
             success: !1,
@@ -166,16 +167,16 @@ function He({
           } : M = { success: !0 };
         }
       }
-      M && (M.success ? H(t, e, {
-        ...k,
+      M && (M.success ? U(e, t, {
+        ...D,
         validation: {
           status: "VALID",
           errors: [],
           lastValidated: Date.now(),
           validatedValue: r
         }
-      }) : H(t, e, {
-        ...k,
+      }) : U(e, t, {
+        ...D,
         validation: {
           status: "INVALID",
           errors: [
@@ -190,53 +191,53 @@ function He({
         }
       })), m({});
     },
-    [t, e, v]
-  ), B = O(
+    [e, t, v]
+  ), B = J(
     (r) => {
-      c ? c.type === "number" && typeof r == "string" ? r = r === "" ? c.nullable ? null : c.default ?? 0 : Number(r) : c.type === "boolean" && typeof r == "string" ? r = r === "true" || r === "1" : c.type === "date" && typeof r == "string" && (r = new Date(r)) : typeof d === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), y(r), R.getState().notifyFormUpdate({
-        stateKey: t,
+      c ? c.type === "number" && typeof r == "string" ? r = r === "" ? c.nullable ? null : c.default ?? 0 : Number(r) : c.type === "boolean" && typeof r == "string" ? r = r === "true" || r === "1" : c.type === "date" && typeof r == "string" && (r = new Date(r)) : typeof d === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), w(r), E.getState().notifyFormUpdate({
+        stateKey: e,
         type: "input",
-        path: e.join("."),
+        path: t.join("."),
         value: r
-      }), C(r, "onChange"), o.current = !0, h.current && clearTimeout(h.current);
+      }), R(r, "onChange"), o.current = !0, h.current && clearTimeout(h.current);
       const u = l?.debounceTime ?? 200;
       h.current = setTimeout(() => {
-        o.current = !1, i(r, e, { updateType: "update" });
+        o.current = !1, i(r, t, { updateType: "update" });
       }, u);
     },
     [
       i,
-      e,
+      t,
       l?.debounceTime,
-      C,
+      R,
       c,
       d
     ]
-  ), q = `${t}.__focusedElement`, re = { path: e, ref: S }, ne = O(() => {
-    const r = p.getState().getShadowMetadata(t, []) || {};
-    H(t, [], {
+  ), q = `${e}.__focusedElement`, re = { path: t, ref: S }, ne = J(() => {
+    const r = p.getState().getShadowMetadata(e, []) || {};
+    U(e, [], {
       ...r,
-      focusedElement: { path: e, ref: S }
-    }), _(q, re), R.getState().notifyFormUpdate({
-      stateKey: t,
+      focusedElement: { path: t, ref: S }
+    }), _(q, re), E.getState().notifyFormUpdate({
+      stateKey: e,
       type: "focus",
-      path: e.join("."),
+      path: t.join("."),
       value: f
     });
-  }, [t, e, S]), oe = O(() => {
-    h.current && (clearTimeout(h.current), h.current = null, o.current = !1, i(f, e, { updateType: "update" })), queueMicrotask(() => {
-      const r = p.getState().getShadowMetadata(t, []) || {};
-      r.focusedElement && JSON.stringify(r.focusedElement.path) === JSON.stringify(e) && (H(t, [], {
+  }, [e, t, S]), oe = J(() => {
+    h.current && (clearTimeout(h.current), h.current = null, o.current = !1, i(f, t, { updateType: "update" })), queueMicrotask(() => {
+      const r = p.getState().getShadowMetadata(e, []) || {};
+      r.focusedElement && JSON.stringify(r.focusedElement.path) === JSON.stringify(t) && (U(e, [], {
         focusedElement: null
-      }), _(q, null), R.getState().notifyFormUpdate({
-        stateKey: t,
+      }), _(q, null), E.getState().notifyFormUpdate({
+        stateKey: e,
         type: "blur",
-        path: e.join("."),
+        path: t.join("."),
         value: f
       }));
-    }), C(f, "onBlur");
-  }, [f, i, e, C, t]), se = n({
-    path: e,
+    }), R(f, "onBlur");
+  }, [f, i, t, R, e]), se = n({
+    path: t,
     componentId: a,
     meta: void 0
   }), ie = new Proxy(se, {
@@ -251,40 +252,49 @@ function He({
         ref: S
       } : r[u];
     }
-  }), ae = s(ie), ce = U.reduceRight(
+  }), ae = s(ie), ce = j.reduceRight(
     (r, u) => {
       if (!g)
         return r;
-      const b = Te.get(t)?.get(u.plugin.name), I = Ee(t, u.plugin.name);
-      return u.plugin.formWrapper ? u.plugin.formWrapper(
-        r,
-        g,
-        b,
-        I
-      ) : r;
+      const b = ge(
+        e,
+        u.plugin.name
+      ), I = E.getState().pluginOptions.get(e)?.get(u.plugin.name), D = E.getState().getHookResult(e, u.plugin.name);
+      return u.plugin.formWrapper ? u.plugin.formWrapper({
+        element: r,
+        path: t,
+        stateKey: e,
+        cogsState: g,
+        ...b,
+        // Spread all the metadata functions
+        options: I,
+        hookData: D,
+        fieldType: c?.type,
+        wrapperDepth: j.indexOf(u)
+      }) : r;
     },
     ae
   );
-  return /* @__PURE__ */ F(ye, { formOpts: l, path: e, stateKey: t, children: ce });
+  return /* @__PURE__ */ F(Te, { formOpts: l, path: t, stateKey: e, children: ce });
 }
-function $(t, e, n) {
-  const s = `${t}////${e}`;
-  ee(() => (be(t, s, {
+function $(e, t, n) {
+  const s = `${e}////${t}`;
+  ee(() => (Ie(e, s, {
     forceUpdate: () => n({}),
     paths: /* @__PURE__ */ new Set(),
     reactiveType: ["component"]
   }), () => {
-    Ie(t, s);
-  }), [t, s]);
+    Me(e, s);
+  }), [e, s]);
 }
-const Ce = (t) => {
-  const [e, n] = j(!1);
+const we = (e) => {
+  const [t, n] = O(!1);
   return ee(() => {
-    if (!t.current) {
+    if (!e.current) {
       n(!0);
       return;
     }
-    const s = Array.from(t.current.querySelectorAll("img"));
+    const s = Array.from(e.current.querySelectorAll("img"));
     if (s.length === 0) {
       n(!0);
       return;
@@ -300,34 +310,34 @@ const Ce = (t) => {
         a.removeEventListener("load", i), a.removeEventListener("error", i);
       });
     };
-  }, [t.current]), e;
+  }, [e.current]), t;
 };
-function Je({
-  stateKey: t,
-  path: e,
+function xe({
+  stateKey: e,
+  path: t,
   rebuildStateShape: n,
   renderFn: s
 }) {
-  const [l] = j(() => te()), [, i] = j({}), a = [t, ...e].join(".");
-  $(t, l, i), J(() => {
+  const [l] = O(() => te()), [, i] = O({}), a = [e, ...t].join(".");
+  $(e, l, i), x(() => {
     const S = p.getState().subscribeToPath(a, () => {
       i({});
     });
     return () => S();
   }, [a]);
   const m = n({
-    path: e,
+    path: t,
     componentId: l,
     meta: void 0
   });
   return /* @__PURE__ */ F(K, { children: s(m) });
 }
 export {
-  He as FormElementWrapper,
-  Je as IsolatedComponentWrapper,
-  we as ListItemWrapper,
-  Oe as MemoizedCogsItemWrapper,
-  ye as ValidationWrapper,
+  Ue as FormElementWrapper,
+  xe as IsolatedComponentWrapper,
+  Ce as ListItemWrapper,
+  Je as MemoizedCogsItemWrapper,
+  Te as ValidationWrapper,
   $ as useRegisterComponent
 };
 //# sourceMappingURL=Components.jsx.map

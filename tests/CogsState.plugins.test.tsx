@@ -29,24 +29,21 @@ describe('Plugin Hook to Transform Flow', () => {
       typeof initialState,
       { multiplier: number }
     >();
-
     const testPlugin = createPlugin('testPlugin')
-      .useHook((context, options) => {
+      .useHook((params) => {
         hookRenderCount++;
-        // Return some data that transformState can use
         return {
-          computedValue: options.multiplier * 10,
+          computedValue: params.options.multiplier * 10,
           timestamp: Date.now(),
         };
       })
-      .transformState((context, options, hookData) => {
+      .transformState((params) => {
         transformCallCount++;
-        capturedHookData = hookData;
+        capturedHookData = params.hookData;
 
-        // Use the hook data to update state
-        if (hookData && context.stateKey === 'counter') {
-          context.cogsState.$update({
-            value: hookData.computedValue,
+        if (params.hookData && params.stateKey === 'counter') {
+          params.cogsState.$update({
+            value: params.hookData.computedValue,
           });
         }
       });
@@ -95,11 +92,11 @@ describe('Plugin Hook to Transform Flow', () => {
     >();
 
     const testPlugin = createPlugin('testPlugin')
-      .useHook((context, options) => {
+      .useHook((params) => {
         hookRenderCount++;
         return { renderCount: hookRenderCount };
       })
-      .transformState((context, options, hookData) => {
+      .transformState((params) => {
         transformCallCount++;
       });
 
@@ -154,14 +151,13 @@ describe('Plugin Hook to Transform Flow', () => {
         // Return static data to be passed to onUpdate
         return { hookId: 'hook-123' };
       })
-      .onUpdate((stateKey, update, options, hookData) => {
+      .onUpdate((params) => {
         onUpdateCallCount++;
-        capturedUpdateDetail = update;
-        capturedHookData = hookData;
+        capturedUpdateDetail = params.update;
+        capturedHookData = params.hookData;
 
-        // Also verify the other parameters are correct
-        expect(stateKey).toBe('counter');
-        expect(options.someOption).toBe('test-value');
+        expect(params.stateKey).toBe('counter');
+        expect(params.options.someOption).toBe('test-value');
       });
 
     const { useCogsState } = createCogsState(initialState, {

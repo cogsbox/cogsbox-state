@@ -1,16 +1,12 @@
-import React, { useEffect, useMemo, useReducer, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
 import { pluginStore } from './pluginStore';
-import { getGlobalStore } from './store';
 import { isDeepEqual } from './utility';
-import type { CogsPlugin, PluginContext } from './plugins';
-
+import { createMetadataContext } from './plugins';
+import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
+
 const { setHookResult, removeHookResult } = pluginStore.getState();
-/**
- * An invisible "controller" component that manages the lifecycle for a SINGLE plugin instance.
- * Its only job is to correctly call the plugin's hooks and effects.
- * By isolating each plugin here, we guarantee the Rules of Hooks are followed.
- */
+
 const PluginInstance = React.memo(
   ({
     stateKey,
@@ -23,80 +19,106 @@ const PluginInstance = React.memo(
     options: any;
     stateHandler: StateObject<any>;
   }) => {
-    // 1. Create a stable context object for the hooks.
-    const context = useMemo<PluginContext<any, any>>(
+    const [isInitialMount, setIsInitialMount] = useState(true);
+
+    // Create metadata context
+    const metadataContext = useMemo(
+      () => createMetadataContext(stateKey, plugin.name),
+      [stateKey, plugin.name]
+    );
+
+    // Create the full context for useHook
+    const hookContext = useMemo(
       () => ({
         stateKey,
         cogsState: stateHandler,
-        getPluginMetaData: () =>
-          getGlobalStore
-            .getState()
-            .getPluginMetaDataMap(stateKey, [])
-            ?.get(plugin.name),
-        setPluginMetaData: (data: any) =>
-          getGlobalStore
-            .getState()
-            .setPluginMetaData(stateKey, plugin.name, data),
-        removePluginMetaData: () =>
-          getGlobalStore
-            .getState()
-            .removePluginMetaData(stateKey, [], plugin.name),
+        ...metadataContext,
+        options,
+        pluginName: plugin.name,
+        isInitialMount,
       }),
-      [stateKey, stateHandler, plugin.name]
+      [
+        stateKey,
+        stateHandler,
+        metadataContext,
+        options,
+        plugin.name,
+        isInitialMount,
+      ]
     );
 
-    // 2. Call the plugin's hook at the top level of this component. This is the main fix.
-    const hookData = plugin.useHook
-      ? plugin.useHook(context, options)
-      : undefined;
+    // Call the plugin's hook
+    const hookData = plugin.useHook ? plugin.useHook(hookContext) : undefined;
+
+    useEffect(() => {
+      setIsInitialMount(false);
+    }, []);
 
     useEffect(() => {
       if (plugin.useHook) setHookResult(stateKey, plugin.name, hookData);
       else removeHookResult(stateKey, plugin.name);
-
       return () => removeHookResult(stateKey, plugin.name);
     }, [stateKey, plugin.name, !!plugin.useHook, hookData]);
 
-    // 3. Handle `transformState`. This effect runs ONLY when the plugin's options change.
+    // Handle transformState
     const lastProcessedOptionsRef = useRef<any>();
+    const [isInitialTransform, setIsInitialTransform] = useState(true);
+
     useEffect(() => {
       if (plugin.transformState) {
-        // Use deep equality to prevent re-running for objects with the same value.
         if (!isDeepEqual(options, lastProcessedOptionsRef.current)) {
-          plugin.transformState(context, options, hookData);
+          plugin.transformState({
+            stateKey,
+            cogsState: stateHandler,
+            ...metadataContext,
+            options,
+            hookData,
+            isInitialTransform,
+          });
           lastProcessedOptionsRef.current = options;
+          setIsInitialTransform(false);
         }
       }
-    }, [context, plugin, options, hookData]); // Dependencies ensure this logic is re-evaluated correctly.
+    }, [
+      stateKey,
+      stateHandler,
+      metadataContext,
+      plugin,
+      options,
+      hookData,
+      isInitialTransform,
+    ]);
 
-    // 4. Handle `onUpdate`. This effect subscribes to the global update bus.
+    // Handle onUpdate
     const hookDataRef = useRef(hookData);
-    hookDataRef.current = hookData; // Keep the ref updated with the latest hookData on every render.
+    hookDataRef.current = hookData;
 
     useEffect(() => {
-      if (!plugin.onUpdate) {
-        return; // Do nothing if the plugin doesn't have this method.
-      }
+      if (!plugin.onUpdate) return;
 
       const handleUpdate = (update: UpdateTypeDetail) => {
-        // We only care about updates for the stateKey this instance is responsible for.
         if (update.stateKey === stateKey) {
-          // As you corrected, the first param is just the stateKey.
-          // We read from the ref to ensure the callback uses the LATEST hookData
-          // without needing to re-subscribe on every render.
-          plugin.onUpdate!(stateKey, update, options, hookDataRef.current);
+          plugin.onUpdate!({
+            stateKey,
+            cogsState: stateHandler,
+            ...metadataContext,
+            update,
+            path: update.path,
+            options,
+            hookData: hookDataRef.current,
+          });
         }
       };
 
       const unsubscribe = pluginStore
         .getState()
         .subscribeToUpdates(handleUpdate);
-      return unsubscribe; // React will call this cleanup function when the component unmounts.
-    }, [stateKey, plugin, options, context]); // The dependencies are stable and correctly manage the subscription lifecycle.
+      return unsubscribe;
+    }, [stateKey, stateHandler, metadataContext, plugin, options]);
+
+    // Handle onFormUpdate
     useEffect(() => {
-      if (!plugin.onFormUpdate) {
-        return; // Do nothing if the plugin doesn't have this method.
-      }
+      if (!plugin.onFormUpdate) return;
 
       const handleFormUpdate = (event: {
         stateKey: string;
@@ -104,18 +126,20 @@ const PluginInstance = React.memo(
         path: string;
         value?: any;
       }) => {
-        // Only handle events for this stateKey
         if (event.stateKey === stateKey) {
-          plugin.onFormUpdate!(
+          const path = event.path.split('.');
+          plugin.onFormUpdate!({
             stateKey,
-            {
+            cogsState: stateHandler,
+            ...metadataContext,
+            path,
+            event: {
               type: event.type,
-              path: event.path,
               value: event.value,
             },
             options,
-            hookDataRef.current
-          );
+            hookData: hookDataRef.current,
+          });
         }
       };
 
@@ -123,12 +147,11 @@ const PluginInstance = React.memo(
         .getState()
         .subscribeToFormUpdates(handleFormUpdate);
       return unsubscribe;
-    }, [stateKey, plugin, options]);
-    // This component renders nothing to the DOM.
+    }, [stateKey, stateHandler, metadataContext, plugin, options]);
+
     return null;
   }
 );
-
 /**
  * The main orchestrator component. It reads from the central pluginStore
  * and renders a `PluginInstance` controller for each active plugin.

@@ -3247,7 +3247,7 @@ function createProxyHandler<T>(
           if (prop === '$addPluginMetaData') {
             console.log('$addPluginMetaDat');
             return (pluginName: string, data: Record<string, any>) =>
-              setPluginMetaData(stateKey, pluginName, data);
+              setPluginMetaData(stateKey, path, pluginName, data);
           }
           if (prop === '$removePluginMetaData') {
             return (pluginName: string) =>

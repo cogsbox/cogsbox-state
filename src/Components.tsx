@@ -1,5 +1,6 @@
 import { FormElementParams, type FormOptsType } from './CogsState';
 import { pluginStore } from './pluginStore';
+import { createMetadataContext } from './plugins';
 import React, {
   memo,
   RefObject,
@@ -587,23 +588,36 @@ export function FormElementWrapper({
         return currentElement;
       }
 
-      // --- THIS IS THE CORRECT WAY TO GET THE METADATA/OPTIONS ---
-      // It comes from the pluginOptions map in the pluginStore.
-      const metaData = pluginOptions.get(stateKey)?.get(config.plugin.name);
+      const metadataContext = createMetadataContext(
+        stateKey,
+        config.plugin.name
+      );
 
-      const hookData = getHookResult(stateKey, config.plugin.name);
+      const options = pluginStore
+        .getState()
+        .pluginOptions.get(stateKey)
+        ?.get(config.plugin.name);
+
+      const hookData = pluginStore
+        .getState()
+        .getHookResult(stateKey, config.plugin.name);
+
       return config.plugin.formWrapper
-        ? config.plugin.formWrapper(
-            currentElement,
-            cogsState as any,
-            metaData,
-            hookData
-          )
+        ? config.plugin.formWrapper({
+            element: currentElement,
+            path: path,
+            stateKey: stateKey,
+            cogsState: cogsState,
+            ...metadataContext, // Spread all the metadata functions
+            options: options,
+            hookData: hookData,
+            fieldType: typeInfo?.type,
+            wrapperDepth: activeFormWrappers.indexOf(config),
+          })
         : currentElement;
     },
     initialElement
   );
-
   return (
     <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
       {wrappedElement}

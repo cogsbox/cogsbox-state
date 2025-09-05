@@ -1,9 +1,9 @@
-import { $cogsSignal as r, addStateOptions as o, createCogsState as n, useCogsStateFn as a } from "./CogsState.jsx";
+import { $cogsSignal as r, addStateOptions as o, createCogsState as a, useCogsStateFn as n } from "./CogsState.jsx";
 import { CogsStateClient as g, config as i, useCogsConfig as f } from "./CogsStateClient.jsx";
-import { debounce as p, deepMerge as c, deleteNestedProperty as u, getArrayLengthDifferences as l, getArrayLengthDifferencesArray as S, getDifferences as m, getDifferencesArray as x, isArray as C, isDeepEqual as y, isFunction as A, isObject as D, transformStateFunc as b, updateNestedProperty as h } from "./utility.js";
+import { debounce as c, deepMerge as p, deleteNestedProperty as u, getArrayLengthDifferences as l, getArrayLengthDifferencesArray as S, getDifferences as x, getDifferencesArray as C, isArray as m, isDeepEqual as y, isFunction as A, isObject as D, transformStateFunc as b, updateNestedProperty as h } from "./utility.js";
 import { useCogsTrpcValidationLink as F } from "./TRPCValidationLink.js";
-import { buildShadowNode as N, generateId as w, getGlobalStore as O, shadowStateStore as j } from "./store.js";
-import { createPluginContext as q } from "./plugins.js";
+import { buildShadowNode as N, generateId as w, getGlobalStore as M, shadowStateStore as O } from "./store.js";
+import { createMetadataContext as k, createPluginContext as q } from "./plugins.js";
 import { PluginRunner as G } from "./PluginRunner.jsx";
 export {
   r as $cogsSignal,
@@ -12,26 +12,27 @@ export {
   o as addStateOptions,
   N as buildShadowNode,
   i as config,
-  n as createCogsState,
+  a as createCogsState,
+  k as createMetadataContext,
   q as createPluginContext,
-  p as debounce,
-  c as deepMerge,
+  c as debounce,
+  p as deepMerge,
   u as deleteNestedProperty,
   w as generateId,
   l as getArrayLengthDifferences,
   S as getArrayLengthDifferencesArray,
-  m as getDifferences,
-  x as getDifferencesArray,
-  O as getGlobalStore,
-  C as isArray,
+  x as getDifferences,
+  C as getDifferencesArray,
+  M as getGlobalStore,
+  m as isArray,
   y as isDeepEqual,
   A as isFunction,
   D as isObject,
-  j as shadowStateStore,
+  O as shadowStateStore,
   b as transformStateFunc,
   h as updateNestedProperty,
   f as useCogsConfig,
-  a as useCogsStateFn,
+  n as useCogsStateFn,
   F as useCogsTrpcValidationLink
 };
 //# sourceMappingURL=index.js.map
