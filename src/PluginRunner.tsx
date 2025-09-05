@@ -136,6 +136,7 @@ const PluginInstance = React.memo(
             event: {
               type: event.type,
               value: event.value,
+              path,
             },
             options,
             hookData: hookDataRef.current,

@@ -33,7 +33,7 @@ const {
   notifyPathSubscribers,
   subscribeToPath,
 } = getGlobalStore.getState();
-const { getHookResult, pluginOptions } = pluginStore.getState();
+const { stateHandlers, notifyFormUpdate } = pluginStore.getState();
 
 export type ValidationWrapperProps = {
   formOpts?: FormOptsType;
@@ -243,7 +243,7 @@ export function FormElementWrapper({
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const cogsState = pluginStore.getState().stateHandlers.get(stateKey);
+  const cogsState = stateHandlers.get(stateKey);
 
   // 2. Memoize the list of active form wrappers to avoid re-calculating on every render.
   const activeFormWrappers = useMemo(() => {
@@ -476,7 +476,7 @@ export function FormElementWrapper({
       }
 
       setLocalValue(newValue);
-      pluginStore.getState().notifyFormUpdate({
+      notifyFormUpdate({
         stateKey,
         type: 'input',
         path: path.join('.'),
@@ -518,7 +518,7 @@ export function FormElementWrapper({
       focusedElement: { path, ref: formElementRef },
     });
     notifyPathSubscribers(virtualFocusPath, newFocusedElement);
-    pluginStore.getState().notifyFormUpdate({
+    notifyFormUpdate({
       stateKey,
       type: 'focus',
       path: path.join('.'),
@@ -545,7 +545,7 @@ export function FormElementWrapper({
           focusedElement: null,
         });
         notifyPathSubscribers(virtualFocusPath, null);
-        pluginStore.getState().notifyFormUpdate({
+        notifyFormUpdate({
           stateKey,
           type: 'blur',
           path: path.join('.'),

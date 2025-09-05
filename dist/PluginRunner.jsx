@@ -1,19 +1,19 @@
 import { jsxs as l, Fragment as M, jsx as P } from "react/jsx-runtime";
-import T, { useState as U, useMemo as R, useEffect as u, useRef as I, useReducer as C } from "react";
+import T, { useState as R, useMemo as I, useEffect as u, useRef as x, useReducer as C } from "react";
 import { pluginStore as f } from "./pluginStore.js";
 import { isDeepEqual as j } from "./utility.js";
 import { createMetadataContext as v } from "./plugins.js";
-const { setHookResult: A, removeHookResult: x } = f.getState(), E = T.memo(
+const { setHookResult: A, removeHookResult: D } = f.getState(), E = T.memo(
   ({
     stateKey: e,
     plugin: r,
     options: t,
     stateHandler: o
   }) => {
-    const [i, c] = U(!0), n = R(
+    const [i, c] = R(!0), n = I(
       () => v(e, r.name),
       [e, r.name]
-    ), b = R(
+    ), b = I(
       () => ({
         stateKey: e,
         cogsState: o,
@@ -33,8 +33,8 @@ const { setHookResult: A, removeHookResult: x } = f.getState(), E = T.memo(
     ), s = r.useHook ? r.useHook(b) : void 0;
     u(() => {
       c(!1);
-    }, []), u(() => (r.useHook ? A(e, r.name, s) : x(e, r.name), () => x(e, r.name)), [e, r.name, !!r.useHook, s]);
-    const d = I(), [m, h] = U(!0);
+    }, []), u(() => (r.useHook ? A(e, r.name, s) : D(e, r.name), () => D(e, r.name)), [e, r.name, !!r.useHook, s]);
+    const d = x(), [m, h] = R(!0);
     u(() => {
       r.transformState && (j(t, d.current) || (r.transformState({
         stateKey: e,
@@ -53,7 +53,7 @@ const { setHookResult: A, removeHookResult: x } = f.getState(), E = T.memo(
       s,
       m
     ]);
-    const S = I(s);
+    const S = x(s);
     return S.current = s, u(() => {
       if (!r.onUpdate) return;
       const k = (a) => {
@@ -72,15 +72,16 @@ const { setHookResult: A, removeHookResult: x } = f.getState(), E = T.memo(
       if (!r.onFormUpdate) return;
       const k = (a) => {
         if (a.stateKey === e) {
-          const F = a.path.split(".");
+          const U = a.path.split(".");
           r.onFormUpdate({
             stateKey: e,
             cogsState: o,
             ...n,
-            path: F,
+            path: U,
             event: {
               type: a.type,
-              value: a.value
+              value: a.value,
+              path: U
             },
             options: t,
             hookData: S.current

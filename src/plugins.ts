@@ -231,6 +231,8 @@ export type OnFormUpdateParams<
       type: 'focus' | 'blur' | 'input';
       /** Current field value (primarily for input events) */
       value?: any;
+      /** Current field path (primarily for input events) */
+      path: string[];
     };
 
     /** Plugin-specific options */
