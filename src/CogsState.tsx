@@ -366,29 +366,6 @@ type ValidationOptionsType = {
   blockSync?: boolean;
 };
 
-type UseSyncReturnType = Readonly<{
-  state: any;
-  connected: boolean;
-  clientId: string | null;
-  schemaRegistered: boolean;
-  updateState: (data: UpdateTypeDetail) => void;
-  subscribers: string[];
-}>;
-
-type UseSyncType = (
-  stateObject: any,
-  options: {
-    stateKey?: string;
-    stateRoom:
-      | number
-      | string
-      | (({ clientId }: { clientId: string }) => string | null);
-    connect?: boolean;
-    inMemoryState?: boolean;
-    apiParams?: Record<string, any>;
-  }
-) => UseSyncReturnType;
-
 type SyncOptionsType<TApiParams> = {
   apiParams: TApiParams;
   stateKey?: string;
@@ -775,7 +752,6 @@ export const createCogsState = <
       defaultState: options?.defaultState as any,
       dependencies: options?.dependencies,
       serverState: options?.serverState,
-      syncOptions: options?.syncOptions,
     });
 
     useEffect(() => {
@@ -1302,7 +1278,6 @@ function flushQueue() {
 }
 function createEffectiveSetState<T>(
   thisKey: string,
-  syncApiRef: React.MutableRefObject<any>,
   sessionId: string | undefined,
   latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
 ): EffectiveSetState<T> {
@@ -1397,21 +1372,18 @@ export function useCogsStateFn<TStateObject extends unknown>(
   stateObject: TStateObject,
   {
     stateKey,
-
     localStorage,
     formElements,
     reactiveDeps,
     reactiveType,
     componentId,
     defaultState,
-    syncUpdate,
     dependencies,
     serverState,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-
     syncOptions?: SyncOptionsType<any>;
   } & OptionsType<TStateObject> = {}
 ) {
@@ -1697,10 +1669,9 @@ export function useCogsStateFn<TStateObject extends unknown>(
     };
   }, []);
 
-  const syncApiRef = useRef<UseSyncReturnType | null>(null);
   const effectiveSetState = createEffectiveSetState(
     thisKey,
-    syncApiRef,
+
     sessionId,
     latestInitialOptionsRef
   );

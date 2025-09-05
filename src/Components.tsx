@@ -479,7 +479,7 @@ export function FormElementWrapper({
       notifyFormUpdate({
         stateKey,
         type: 'input',
-        path: path.join('.'),
+        path,
         value: newValue,
       });
       // Validate immediately on change (will only run if configured or clearing errors)
@@ -521,7 +521,7 @@ export function FormElementWrapper({
     notifyFormUpdate({
       stateKey,
       type: 'focus',
-      path: path.join('.'),
+      path,
       value: localValue,
     });
   }, [stateKey, path, formElementRef]);
@@ -548,7 +548,7 @@ export function FormElementWrapper({
         notifyFormUpdate({
           stateKey,
           type: 'blur',
-          path: path.join('.'),
+          path,
           value: localValue,
         });
       }

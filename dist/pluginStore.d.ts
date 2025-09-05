@@ -18,19 +18,19 @@ type PluginRegistryStore = {
     formUpdateSubscribers: Set<(event: {
         stateKey: string;
         type: 'focus' | 'blur' | 'input';
-        path: string;
+        path: string[];
         value?: any;
     }) => void>;
     subscribeToFormUpdates: (callback: (event: {
         stateKey: string;
         type: 'focus' | 'blur' | 'input';
-        path: string;
+        path: string[];
         value?: any;
     }) => void) => () => void;
     notifyFormUpdate: (event: {
         stateKey: string;
         type: 'focus' | 'blur' | 'input';
-        path: string;
+        path: string[];
         value?: any;
     }) => void;
     hookResults: Map<string, Map<string, any>>;

@@ -4,6 +4,7 @@ import { isDeepEqual } from './utility';
 import { createMetadataContext } from './plugins';
 import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
+import { FormEventType } from './store';
 
 const { setHookResult, removeHookResult } = pluginStore.getState();
 
@@ -120,14 +121,11 @@ const PluginInstance = React.memo(
     useEffect(() => {
       if (!plugin.onFormUpdate) return;
 
-      const handleFormUpdate = (event: {
-        stateKey: string;
-        type: 'focus' | 'blur' | 'input';
-        path: string;
-        value?: any;
-      }) => {
+      const handleFormUpdate = (
+        event: FormEventType & { stateKey: string }
+      ) => {
         if (event.stateKey === stateKey) {
-          const path = event.path.split('.');
+          const path = event.path;
           plugin.onFormUpdate!({
             stateKey,
             cogsState: stateHandler,

@@ -1,13 +1,13 @@
 import { jsx as L, Fragment as ee } from "react/jsx-runtime";
 import { pluginStore as B } from "./pluginStore.js";
 import { createMetadataContext as me } from "./plugins.js";
-import K, { memo as Se, useState as j, useRef as y, useCallback as H, useEffect as x, useLayoutEffect as te, useMemo as pe } from "react";
+import K, { memo as Se, useState as D, useRef as y, useCallback as H, useEffect as x, useLayoutEffect as te, useMemo as pe } from "react";
 import { getGlobalStore as p } from "./store.js";
 import { useInView as ve } from "react-intersection-observer";
 import { v4 as re } from "uuid";
-import { isDeepEqual as he } from "./utility.js";
+import { isDeepEqual as be } from "./utility.js";
 const {
-  getInitialOptions: be,
+  getInitialOptions: he,
   getShadowMetadata: Ie,
   setShadowMetadata: J,
   getShadowValue: _,
@@ -52,7 +52,7 @@ function Ne({
   rebuildStateShape: i,
   renderFn: a
 }) {
-  const [, m] = j({}), { ref: S, inView: E } = ve(), T = y(null), c = Re(T), v = y(!1), d = [e, ...n].join(".");
+  const [, m] = D({}), { ref: S, inView: E } = ve(), T = y(null), c = Re(T), v = y(!1), d = [e, ...n].join(".");
   q(e, t, m);
   const f = H(
     (g) => {
@@ -61,7 +61,7 @@ function Ne({
     [S]
   );
   x(() => {
-    const g = Te(d, (D) => {
+    const g = Te(d, (O) => {
       m({});
     });
     return () => g();
@@ -71,10 +71,10 @@ function Ne({
     const g = T.current;
     if (g && g.offsetHeight > 0) {
       v.current = !0;
-      const D = g.offsetHeight;
+      const O = g.offsetHeight;
       J(e, n, {
         virtualizer: {
-          itemHeight: D,
+          itemHeight: O,
           domRef: g
         }
       });
@@ -93,8 +93,8 @@ function Ne({
     currentState: C,
     path: n,
     componentId: t
-  }), h = a(o, s, l);
-  return /* @__PURE__ */ L("div", { ref: f, children: h });
+  }), b = a(o, s, l);
+  return /* @__PURE__ */ L("div", { ref: f, children: b });
 }
 function xe({
   stateKey: e,
@@ -104,33 +104,33 @@ function xe({
   formOpts: l,
   setState: i
 }) {
-  const a = y(re()).current, [, m] = j({}), S = y(null), E = [e, ...t].join(".");
+  const a = y(re()).current, [, m] = D({}), S = y(null), E = [e, ...t].join(".");
   q(e, a, m);
-  const c = p.getState().getShadowNode(e, t)?._meta?.typeInfo, v = c?.schema, d = _(e, t), [f, C] = j(d), o = y(!1), h = y(null), g = Ce.get(e), D = pe(() => B.getState().getPluginConfigsForState(e).filter((r) => typeof r.plugin.formWrapper == "function"), [e]);
+  const c = p.getState().getShadowNode(e, t)?._meta?.typeInfo, v = c?.schema, d = _(e, t), [f, C] = D(d), o = y(!1), b = y(null), g = Ce.get(e), O = pe(() => B.getState().getPluginConfigsForState(e).filter((r) => typeof r.plugin.formWrapper == "function"), [e]);
   x(() => {
-    !o.current && !he(d, f) && C(d);
+    !o.current && !be(d, f) && C(d);
   }, [d]), x(() => {
     const { setShadowMetadata: r } = p.getState();
     r(e, t, { formRef: S });
-    const u = p.getState().subscribeToPath(E, (b) => {
-      !o.current && f !== b && m({});
+    const u = p.getState().subscribeToPath(E, (h) => {
+      !o.current && f !== h && m({});
     });
     return () => {
-      u(), h.current && (clearTimeout(h.current), o.current = !1);
-      const b = p.getState().getShadowMetadata(e, t);
-      b && b.formRef && r(e, t, { formRef: void 0 });
+      u(), b.current && (clearTimeout(b.current), o.current = !1);
+      const h = p.getState().getShadowMetadata(e, t);
+      h && h.formRef && r(e, t, { formRef: void 0 });
     };
   }, []);
   const N = H(
     (r, u) => {
       if (!p.getState().getShadowMetadata(e, [])?.features?.validationEnabled) return;
-      const I = be(e)?.validation;
+      const I = he(e)?.validation;
       if (!I) return;
-      const O = Ie(e, t) || {}, le = O?.validation?.status;
-      let W = !1, A;
-      if (u === "onBlur" && I.onBlur ? (W = !0, A = I.onBlur ?? "error") : u === "onChange" && (I.onChange ? (W = !0, A = I.onChange) : le === "INVALID" && (W = !0, A = "warning")), !W) return;
+      const W = Ie(e, t) || {}, le = W?.validation?.status;
+      let F = !1, A;
+      if (u === "onBlur" && I.onBlur ? (F = !0, A = I.onBlur ?? "error") : u === "onChange" && (I.onChange ? (F = !0, A = I.onChange) : le === "INVALID" && (F = !0, A = "warning")), !F) return;
       let M = null;
-      if (v && W) {
+      if (v && F) {
         const w = v.safeParse(r);
         w.success ? M = { success: !0 } : M = {
           success: !1,
@@ -140,10 +140,10 @@ function xe({
         const w = I.zodSchemaV4 || I.zodSchemaV3;
         if (!w) return;
         const Q = _(e, []), k = JSON.parse(JSON.stringify(Q));
-        let F = k;
+        let j = k;
         for (let R = 0; R < t.length - 1; R++)
-          F[t[R]] || (F[t[R]] = {}), F = F[t[R]];
-        t.length > 0 ? F[t[t.length - 1]] = r : Object.assign(k, r);
+          j[t[R]] || (j[t[R]] = {}), j = j[t[R]];
+        t.length > 0 ? j[t[t.length - 1]] = r : Object.assign(k, r);
         const P = w.safeParse(k);
         if (P.success)
           M = { success: !0 };
@@ -168,7 +168,7 @@ function xe({
         }
       }
       M && (M.success ? J(e, t, {
-        ...O,
+        ...W,
         validation: {
           status: "VALID",
           errors: [],
@@ -176,7 +176,7 @@ function xe({
           validatedValue: r
         }
       }) : J(e, t, {
-        ...O,
+        ...W,
         validation: {
           status: "INVALID",
           errors: [
@@ -197,11 +197,11 @@ function xe({
       c ? c.type === "number" && typeof r == "string" ? r = r === "" ? c.nullable ? null : c.default ?? 0 : Number(r) : c.type === "boolean" && typeof r == "string" ? r = r === "true" || r === "1" : c.type === "date" && typeof r == "string" && (r = new Date(r)) : typeof d === "number" && typeof r == "string" && (r = r === "" ? 0 : Number(r)), C(r), V({
         stateKey: e,
         type: "input",
-        path: t.join("."),
+        path: t,
         value: r
-      }), N(r, "onChange"), o.current = !0, h.current && clearTimeout(h.current);
+      }), N(r, "onChange"), o.current = !0, b.current && clearTimeout(b.current);
       const u = l?.debounceTime ?? 200;
-      h.current = setTimeout(() => {
+      b.current = setTimeout(() => {
         o.current = !1, i(r, t, { updateType: "update" });
       }, u);
     },
@@ -221,18 +221,18 @@ function xe({
     }), $(G, ne), V({
       stateKey: e,
       type: "focus",
-      path: t.join("."),
+      path: t,
       value: f
     });
   }, [e, t, S]), se = H(() => {
-    h.current && (clearTimeout(h.current), h.current = null, o.current = !1, i(f, t, { updateType: "update" })), queueMicrotask(() => {
+    b.current && (clearTimeout(b.current), b.current = null, o.current = !1, i(f, t, { updateType: "update" })), queueMicrotask(() => {
       const r = p.getState().getShadowMetadata(e, []) || {};
       r.focusedElement && JSON.stringify(r.focusedElement.path) === JSON.stringify(t) && (J(e, [], {
         focusedElement: null
       }), $(G, null), V({
         stateKey: e,
         type: "blur",
-        path: t.join("."),
+        path: t,
         value: f
       }));
     }), N(f, "onBlur");
@@ -244,33 +244,33 @@ function xe({
     get(r, u) {
       return u === "$inputProps" ? {
         value: f ?? "",
-        onChange: (b) => {
-          U(b.target.value);
+        onChange: (h) => {
+          U(h.target.value);
         },
         onFocus: oe,
         onBlur: se,
         ref: S
       } : r[u];
     }
-  }), ce = s(ae), ue = D.reduceRight(
+  }), ce = s(ae), ue = O.reduceRight(
     (r, u) => {
       if (!g)
         return r;
-      const b = me(
+      const h = me(
         e,
         u.plugin.name
-      ), I = B.getState().pluginOptions.get(e)?.get(u.plugin.name), O = B.getState().getHookResult(e, u.plugin.name);
+      ), I = B.getState().pluginOptions.get(e)?.get(u.plugin.name), W = B.getState().getHookResult(e, u.plugin.name);
       return u.plugin.formWrapper ? u.plugin.formWrapper({
         element: r,
         path: t,
         stateKey: e,
         cogsState: g,
-        ...b,
+        ...h,
         // Spread all the metadata functions
         options: I,
-        hookData: O,
+        hookData: W,
         fieldType: c?.type,
-        wrapperDepth: D.indexOf(u)
+        wrapperDepth: O.indexOf(u)
       }) : r;
     },
     ce
@@ -288,7 +288,7 @@ function q(e, t, n) {
   }), [e, s]);
 }
 const Re = (e) => {
-  const [t, n] = j(!1);
+  const [t, n] = D(!1);
   return te(() => {
     if (!e.current) {
       n(!0);
@@ -318,7 +318,7 @@ function Ae({
   rebuildStateShape: n,
   renderFn: s
 }) {
-  const [l] = j(() => re()), [, i] = j({}), a = [e, ...t].join(".");
+  const [l] = D(() => re()), [, i] = D({}), a = [e, ...t].join(".");
   q(e, l, i), x(() => {
     const S = p.getState().subscribeToPath(a, () => {
       i({});

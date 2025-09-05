@@ -31,7 +31,7 @@ type PluginRegistryStore = {
     (event: {
       stateKey: string;
       type: 'focus' | 'blur' | 'input';
-      path: string;
+      path: string[];
       value?: any;
     }) => void
   >;
@@ -39,14 +39,14 @@ type PluginRegistryStore = {
     callback: (event: {
       stateKey: string;
       type: 'focus' | 'blur' | 'input';
-      path: string;
+      path: string[];
       value?: any;
     }) => void
   ) => () => void;
   notifyFormUpdate: (event: {
     stateKey: string;
     type: 'focus' | 'blur' | 'input';
-    path: string;
+    path: string[];
     value?: any;
   }) => void;
   hookResults: Map<string, Map<string, any>>; // stateKey -> pluginName -> hook

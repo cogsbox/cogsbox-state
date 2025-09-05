@@ -15,7 +15,11 @@ export type FreshValuesObject = {
 };
 
 type StateValue = any;
-
+export type FormEventType = {
+  type: 'focus' | 'blur' | 'input';
+  value?: any;
+  path: string[];
+};
 export type TrieNode = {
   subscribers: Set<string>;
   children: Map<string, TrieNode>;

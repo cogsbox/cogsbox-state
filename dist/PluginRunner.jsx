@@ -1,9 +1,9 @@
-import { jsxs as l, Fragment as M, jsx as P } from "react/jsx-runtime";
-import T, { useState as R, useMemo as I, useEffect as u, useRef as x, useReducer as C } from "react";
+import { jsxs as M, Fragment as P, jsx as T } from "react/jsx-runtime";
+import l, { useState as R, useMemo as I, useEffect as u, useRef as x, useReducer as C } from "react";
 import { pluginStore as f } from "./pluginStore.js";
 import { isDeepEqual as j } from "./utility.js";
 import { createMetadataContext as v } from "./plugins.js";
-const { setHookResult: A, removeHookResult: D } = f.getState(), E = T.memo(
+const { setHookResult: A, removeHookResult: D } = f.getState(), E = l.memo(
   ({
     stateKey: e,
     plugin: r,
@@ -72,7 +72,7 @@ const { setHookResult: A, removeHookResult: D } = f.getState(), E = T.memo(
       if (!r.onFormUpdate) return;
       const k = (a) => {
         if (a.stateKey === e) {
-          const U = a.path.split(".");
+          const U = a.path;
           r.onFormUpdate({
             stateKey: e,
             cogsState: o,
@@ -96,12 +96,12 @@ function z({ children: e }) {
   const [, r] = C((c) => c + 1, 0);
   u(() => f.subscribe(r), []);
   const { pluginOptions: t, stateHandlers: o, registeredPlugins: i } = f.getState();
-  return /* @__PURE__ */ l(M, { children: [
+  return /* @__PURE__ */ M(P, { children: [
     Array.from(t.entries()).map(([c, n]) => {
       const b = o.get(c);
       return b ? Array.from(n.entries()).map(([s, d]) => {
         const m = i.find((h) => h.name === s);
-        return m ? /* @__PURE__ */ P(
+        return m ? /* @__PURE__ */ T(
           E,
           {
             stateKey: c,
