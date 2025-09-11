@@ -1,6 +1,6 @@
 'use client';
 import { pluginStore } from './pluginStore';
-import { type CogsPlugin } from './plugins';
+import { FormWrapperParams, type CogsPlugin } from './plugins';
 import {
   createElement,
   startTransition,
@@ -19,6 +19,8 @@ import {
   transformStateFunc,
   isFunction,
   type GenericObject,
+  isArray,
+  getDifferences,
 } from './utility.js';
 import {
   FormElementWrapper,
@@ -133,6 +135,7 @@ export type ArrayEndType<TShape extends unknown> = {
     $_index: number;
   } & EndType<Prettify<InferArrayElement<TShape>>>;
   $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+  $insertMany: (payload: InferArrayElement<TShape>[]) => void;
   $cut: CutFunctionType<TShape>;
   $cutSelected: () => void;
   $cutByValue: (value: string | number | boolean) => void;
@@ -221,6 +224,7 @@ export type EndType<T, IsArrayElement = false> = {
   $getPluginMetaData: (pluginName: string) => Record<string, any>;
   $addPluginMetaData: (key: string, data: Record<string, any>) => void;
   $removePluginMetaData: (key: string) => void;
+  $setOptions: (options: OptionsType<T>) => void;
   $useFocusedFormElement: () => {
     path: string[];
     ref: React.RefObject<any>;
@@ -318,9 +322,11 @@ type EffectiveSetStateArg<
     ? InsertParams<InferArrayElement<T>>
     : never
   : UpdateArg<T>;
+
 type UpdateOptions = {
-  updateType: 'insert' | 'cut' | 'update';
+  updateType: 'insert' | 'cut' | 'update' | 'insert_many';
   itemId?: string;
+  index?: number;
   metaData?: Record<string, any>;
 };
 type EffectiveSetState<TStateObject> = (
@@ -336,7 +342,7 @@ type EffectiveSetState<TStateObject> = (
 export type UpdateTypeDetail = {
   timeStamp: number;
   stateKey: string;
-  updateType: 'update' | 'insert' | 'cut';
+  updateType: 'update' | 'insert' | 'cut' | 'insert_many';
   path: string[];
   status: 'new' | 'sent' | 'synced';
   oldValue: any;
@@ -379,11 +385,11 @@ type SyncOptionsType<TApiParams> = {
 
 export type CreateStateOptionsType<
   T extends unknown = unknown,
-  TPluginOptions = {},
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
 > = {
-  formElements?: FormsElementsType<T>;
+  formElements?: FormsElementsType<T, TPlugins>;
   validation?: ValidationOptionsType;
-  plugins?: CogsPlugin<string, T, TPluginOptions>[];
+  plugins?: TPlugins;
 };
 export type OptionsType<
   T extends unknown = unknown,
@@ -435,7 +441,11 @@ export type OptionsType<
   dependencies?: any[];
 };
 
-type FormsElementsType<T> = {
+export type FormsElementsType<
+  TState,
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
+> = {
+  // These optional, built-in wrappers are unchanged.
   validation?: (options: {
     children: React.ReactNode;
     status: ValidationStatus;
@@ -443,19 +453,27 @@ type FormsElementsType<T> = {
     hasErrors: boolean;
     hasWarnings: boolean;
     allErrors: ValidationError[];
-
     path: string[];
     message?: string;
-    getData?: () => T;
+    getData?: () => TState;
   }) => React.ReactNode;
   syncRender?: (options: {
     children: React.ReactNode;
     time: number;
-    data?: T;
+    data?: TState;
     key?: string;
   }) => React.ReactNode;
+} & {
+  // For each plugin `P` in the TPlugins array...
+  [P in TPlugins[number] as P['name']]?: P['formWrapper'] extends (
+    // ...check if its `formWrapper` property is a function...
+    arg: any
+  ) => any
+    ? // ...if it is, infer the type of its FIRST PARAMETER. This is the key.
+      Parameters<P['formWrapper']>[0]
+    : // Otherwise, the type is invalid.
+      never;
 };
-
 export type CogsInitialState<T> =
   | {
       initialState: T;
@@ -493,6 +511,9 @@ const {
   removePluginMetaData,
   // Note: The old functions are no longer imported under their original names
 } = getGlobalStore.getState();
+
+const { notifyUpdate } = pluginStore.getState();
+
 function getArrayData(stateKey: string, path: string[], meta?: MetaData) {
   const shadowMeta = getShadowMetadata(stateKey, path);
   const isArray = !!shadowMeta?.arrayKeys;
@@ -535,10 +556,21 @@ function findArrayItem(
 function setAndMergeOptions(stateKey: string, newOptions: OptionsType<any>) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
 
-  setInitialStateOptions(stateKey as string, {
+  const mergedOptions = {
     ...initialOptions,
     ...newOptions,
-  });
+  };
+
+  // FIX: Apply the same default onBlur logic here too
+  if (
+    (mergedOptions.validation?.zodSchemaV4 ||
+      mergedOptions.validation?.zodSchemaV3) &&
+    !mergedOptions.validation?.onBlur
+  ) {
+    mergedOptions.validation.onBlur = 'error';
+  }
+
+  setInitialStateOptions(stateKey as string, mergedOptions);
 }
 
 function setOptions<StateKey, Opt>({
@@ -552,7 +584,7 @@ function setOptions<StateKey, Opt>({
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
-
+  console.log('initialOptions', initialOptions);
   // Start with the base options
   let mergedOptions = { ...initialOptionsPartState, ...initialOptions };
   let needToAdd = false;
@@ -589,30 +621,24 @@ function setOptions<StateKey, Opt>({
     mergedOptions = deepMerge(mergedOptions, options);
   }
 
-  // Your existing logic for defaults and preservation can follow
-  if (
-    mergedOptions.syncOptions &&
-    (!options || !options.hasOwnProperty('syncOptions'))
-  ) {
-    needToAdd = true;
-  }
-  if (
-    (mergedOptions.validation && mergedOptions?.validation?.zodSchemaV4) ||
-    mergedOptions?.validation?.zodSchemaV3
-  ) {
-    // Only set default if onBlur wasn't explicitly provided
-    const wasOnBlurProvided =
+  // Set default onBlur ONLY if validation exists and onBlur was not explicitly provided
+  if (mergedOptions.validation) {
+    // Check if onBlur was explicitly provided in any of the option sources
+    const onBlurProvided =
       options?.validation?.hasOwnProperty('onBlur') ||
-      initialOptions?.validation?.hasOwnProperty('onBlur');
+      initialOptions?.validation?.hasOwnProperty('onBlur') ||
+      initialOptionsPartState?.validation?.hasOwnProperty('onBlur');
 
-    if (!wasOnBlurProvided) {
+    if (!onBlurProvided) {
       mergedOptions.validation.onBlur = 'error'; // Default to error on blur
+      needToAdd = true;
     }
   }
+
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
   }
-
+  console.log('mergedOptions', mergedOptions);
   return mergedOptions;
 }
 
@@ -627,7 +653,7 @@ export function addStateOptions<T>(
   };
 }
 export type PluginData = {
-  plugin: CogsPlugin<any, any, any>;
+  plugin: CogsPlugin<any, any, any, any, any>;
   options: any;
   hookData?: any;
 };
@@ -636,31 +662,35 @@ export type PluginData = {
 
 export const createCogsState = <
   State extends Record<string, unknown>,
-  TPlugins extends readonly CogsPlugin<string, State, any, any>[] = [],
+  const TPlugins extends readonly CogsPlugin<string, any, any, any, any>[] = [],
 >(
   initialState: State,
   opt?: {
-    formElements?: FormsElementsType<State>;
-    validation?: ValidationOptionsType;
     plugins?: TPlugins;
+    formElements?: FormsElementsType<State, TPlugins>;
+    validation?: ValidationOptionsType;
   }
 ) => {
   type PluginOptions = {
     [K in TPlugins[number] as K['name']]?: K extends CogsPlugin<
       string,
-      State,
       infer O,
+      any,
+      any,
       any
     >
       ? O
       : never;
   };
+
   if (opt?.plugins) {
     pluginStore.getState().setRegisteredPlugins(opt.plugins as any);
   }
+
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(initialState);
 
+  // FIX: Store options INCLUDING validation for each state key
   Object.keys(statePart).forEach((key) => {
     let existingOptions = initialOptionsPart[key] || {};
 
@@ -675,30 +705,34 @@ export const createCogsState = <
       };
     }
 
-    if (opt?.validation) {
-      mergedOptions.validation = {
-        ...opt.validation,
-        ...(existingOptions.validation || {}),
-      };
+    mergedOptions.validation = {
+      onBlur: 'error',
+      ...opt?.validation,
+      ...(existingOptions.validation || {}),
+    };
 
-      if (opt.validation.key && !existingOptions.validation?.key) {
-        mergedOptions.validation.key = `${opt.validation.key}.${key}`;
-      }
+    if (opt?.validation?.key && !existingOptions.validation?.key) {
+      mergedOptions.validation.key = `${opt.validation.key}.${key}`;
     }
 
-    if (Object.keys(mergedOptions).length > 0) {
-      const existingGlobalOptions = getInitialOptions(key);
+    const existingGlobalOptions = getInitialOptions(key);
 
-      if (!existingGlobalOptions) {
-        setInitialStateOptions(key, mergedOptions);
-      } else {
-        // Merge with existing global options
-        setInitialStateOptions(key, {
+    const finalOptions = existingGlobalOptions
+      ? {
           ...existingGlobalOptions,
           ...mergedOptions,
-        });
-      }
-    }
+          formElements: {
+            ...existingGlobalOptions.formElements,
+            ...mergedOptions.formElements,
+          },
+          validation: {
+            ...existingGlobalOptions.validation,
+            ...mergedOptions.validation,
+          },
+        }
+      : mergedOptions;
+
+    setInitialStateOptions(key, finalOptions);
   });
 
   Object.keys(statePart).forEach((key) => {
@@ -771,84 +805,11 @@ export const createCogsState = <
         pluginStore.getState().stateHandlers.delete(stateKey as string);
       };
     }, [stateKey, updater]);
-    // const pluginsRef = useRef(opt?.plugins);
 
-    // pluginDataRef.current = [];
-
-    // pluginsRef.current?.forEach((plugin) => {
-    //   const pluginOptions =
-    //     optionsRef.current?.[plugin.name as keyof typeof optionsRef.current];
-
-    //   let hookResult;
-    //   if (plugin.useHook) {
-    //     const context = {
-    //       stateKey: stateKey as keyof typeof statePart,
-    //       cogsState: updater,
-    //       getPluginMetaData: () => updater.$getPluginMetaData(plugin.name),
-    //       setPluginMetaData: (data: any) =>
-    //         updater.$addPluginMetaData(plugin.name as string, data),
-    //       removePluginMetaData: () =>
-    //         updater.$removePluginMetaData(plugin.name as string),
-    //     };
-    //     hookResult = plugin.useHook(
-    //       context as any,
-    //       pluginOptions || ({} as any)
-    //     );
-    //   }
-
-    //   if (
-    //     pluginOptions &&
-    //     typeof pluginOptions === 'object' &&
-    //     !Array.isArray(pluginOptions)
-    //   ) {
-    //     pluginDataRef.current.push({
-    //       plugin,
-    //       options: pluginOptions,
-    //       hookData: hookResult,
-    //     });
-
-    //     if (plugin.transformState) {
-    //       // --- THE REAL FIX IN ACTION ---
-    //       // 1. Get the options for THIS plugin from our ref.
-    //       const prevPluginOptions =
-    //         lastProcessedOptionsRef.current[plugin.name];
-    //       console.log('currentOptions', optionsRef.current);
-    //       console.log('prevPluginOptions', prevPluginOptions);
-    //       // 2. Compare the CURRENT options with the LAST PROCESSED options.
-    //       if (!isDeepEqual(pluginOptions, prevPluginOptions)) {
-    //         console.log(
-    //           `▶️ Options changed for "${plugin.name}" on state "${String(
-    //             stateKey
-    //           )}", running transformState...`,
-    //           pluginOptions,
-    //           prevPluginOptions
-    //         );
-
-    //         const context = {
-    //           stateKey: stateKey as keyof typeof statePart,
-    //           cogsState: updater,
-    //         };
-
-    //         plugin.transformState(
-    //           context as any,
-    //           pluginOptions as any,
-    //           hookResult
-    //         );
-
-    //         // 3. CRUCIAL: Only update the ref for this plugin with the new options
-    //         // AFTER we have run the transform.
-    //         lastProcessedOptionsRef.current[plugin.name] = JSON.parse(
-    //           JSON.stringify(pluginOptions)
-    //         );
-    //       }
-    //       // --- END FIX ---
-    //     }
-    //   }
-    // });
     return updater;
   };
 
-  function setCogsOptions<StateKey extends StateKeys>(
+  function setCogsOptionsByKey<StateKey extends StateKeys>(
     stateKey: StateKey,
     options: OptionsType<(typeof statePart)[StateKey]>
   ) {
@@ -861,9 +822,51 @@ export const createCogsState = <
     notifyComponents(stateKey as string);
   }
 
+  function setCogsFormElements(
+    formElements: FormsElementsType<State, TPlugins>
+  ) {
+    // Get the current list of registered plugins from the store.
+    const currentPlugins = pluginStore.getState().registeredPlugins;
+
+    // Create a new array by mapping over the current plugins.
+    // This is crucial for immutability and ensuring Zustand detects the change.
+    const updatedPlugins = currentPlugins.map((plugin) => {
+      // Check if the formElements object has a wrapper for this specific plugin by name.
+      if (formElements.hasOwnProperty(plugin.name)) {
+        // If it does, return a *new* plugin object.
+        // Spread the existing plugin properties and add/overwrite the formWrapper.
+        return {
+          ...plugin,
+          formWrapper: formElements[plugin.name as keyof typeof formElements],
+        };
+      }
+      // If there's no new wrapper for this plugin, return the original object.
+      return plugin;
+    });
+
+    // Use the store's dedicated setter function to update the registered plugins list.
+    // This will trigger a state update that components listening to the store will react to.
+    pluginStore.getState().setRegisteredPlugins(updatedPlugins as any);
+
+    // For good measure and consistency, we should still update the formElements
+    // in the initial options, in case any other part of the system relies on it.
+    const allStateKeys = Object.keys(statePart);
+    allStateKeys.forEach((key) => {
+      const existingOptions = getInitialOptions(key) || {};
+      const finalOptions = {
+        ...existingOptions,
+        formElements: {
+          ...(existingOptions.formElements || {}),
+          ...formElements,
+        },
+      };
+      setInitialStateOptions(key, finalOptions);
+    });
+  }
   return {
     useCogsState,
-    setCogsOptions,
+    setCogsOptionsByKey,
+    setCogsFormElements,
   };
 };
 
@@ -1037,35 +1040,14 @@ let isFlushScheduled = false;
 function scheduleFlush() {
   if (!isFlushScheduled) {
     isFlushScheduled = true;
-    queueMicrotask(flushQueue);
+    console.log('Scheduling flush');
+    queueMicrotask(() => {
+      console.log('Actually flushing');
+      flushQueue();
+    });
   }
 }
-function handleUpdate(
-  stateKey: string,
-  path: string[],
-  payload: any
-): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } {
-  // ✅ FIX: Get the old value before the update.
-  const oldValue = getGlobalStore.getState().getShadowValue(stateKey, path);
 
-  const newValue = isFunction(payload) ? payload(oldValue) : payload;
-
-  // ✅ FIX: The new `updateShadowAtPath` handles metadata preservation automatically.
-  // The manual loop has been removed.
-  updateShadowAtPath(stateKey, path, newValue);
-
-  markAsDirty(stateKey, path, { bubble: true });
-
-  // Return the metadata of the node *after* the update.
-  const newShadowMeta = getShadowMetadata(stateKey, path);
-
-  return {
-    type: 'update',
-    oldValue: oldValue,
-    newValue,
-    shadowMeta: newShadowMeta,
-  };
-}
 // 2. Update signals
 function updateSignals(shadowMeta: any, displayValue: any) {
   if (!shadowMeta?.signals?.length) return;
@@ -1109,72 +1091,170 @@ function getComponentNotifications(
 
   const componentsToNotify = new Set<any>();
 
-  // For insert operations, use the array path not the item path
-  let notificationPath = path;
-  if (result.type === 'insert' && result.itemId) {
-    // We have the new structure with itemId separate
-    notificationPath = path; // Already the array path
-  }
+  // --- PASS 1: Notify specific subscribers based on update type ---
 
-  // BUBBLE UP: Notify components at this path and all parent paths
-  let currentPath = [...notificationPath];
-  while (true) {
-    const pathMeta = getShadowMetadata(stateKey, currentPath);
+  if (result.type === 'update') {
+    // --- Bubble-up Notification ---
+    // An update to `user.address.street` notifies listeners of `street`, `address`, and `user`.
+    let currentPath = [...path];
+    while (true) {
+      const pathMeta = getShadowMetadata(stateKey, currentPath);
 
-    if (pathMeta?.pathComponents) {
-      pathMeta.pathComponents.forEach((componentId: string) => {
-        const component = rootMeta.components?.get(componentId);
-        if (component) {
-          const reactiveTypes = Array.isArray(component.reactiveType)
-            ? component.reactiveType
-            : [component.reactiveType || 'component'];
-          if (!reactiveTypes.includes('none')) {
-            componentsToNotify.add(component);
+      if (pathMeta?.pathComponents) {
+        pathMeta.pathComponents.forEach((componentId: string) => {
+          const component = rootMeta.components?.get(componentId);
+          // NEW: Add component to the set instead of calling forceUpdate()
+          if (component) {
+            const reactiveTypes = Array.isArray(component.reactiveType)
+              ? component.reactiveType
+              : [component.reactiveType || 'component'];
+            if (!reactiveTypes.includes('none')) {
+              componentsToNotify.add(component);
+            }
           }
+        });
+      }
+
+      if (currentPath.length === 0) break;
+      currentPath.pop(); // Go up one level
+    }
+
+    // --- Deep Object Change Notification ---
+    // If the new value is an object, notify components subscribed to sub-paths that changed.
+    if (
+      result.newValue &&
+      typeof result.newValue === 'object' &&
+      !isArray(result.newValue)
+    ) {
+      const changedSubPaths = getDifferences(result.newValue, result.oldValue);
+
+      changedSubPaths.forEach((subPathString: string) => {
+        const subPath = subPathString.split('.');
+        const fullSubPath = [...path, ...subPath];
+        const subPathMeta = getShadowMetadata(stateKey, fullSubPath);
+
+        if (subPathMeta?.pathComponents) {
+          subPathMeta.pathComponents.forEach((componentId: string) => {
+            const component = rootMeta.components?.get(componentId);
+            // NEW: Add component to the set
+            if (component) {
+              const reactiveTypes = Array.isArray(component.reactiveType)
+                ? component.reactiveType
+                : [component.reactiveType || 'component'];
+              if (!reactiveTypes.includes('none')) {
+                componentsToNotify.add(component);
+              }
+            }
+          });
         }
       });
     }
+  } else if (
+    result.type === 'insert' ||
+    result.type === 'cut' ||
+    result.type === 'insert_many'
+  ) {
+    // For array structural changes (add/remove), notify components listening to the parent array.
+    const parentArrayPath = result.type === 'insert' ? path : path.slice(0, -1);
+    const parentMeta = getShadowMetadata(stateKey, parentArrayPath);
 
-    if (currentPath.length === 0) break;
-    currentPath.pop(); // Go up one level
+    if (parentMeta?.pathComponents) {
+      parentMeta.pathComponents.forEach((componentId: string) => {
+        const component = rootMeta.components?.get(componentId);
+        // NEW: Add component to the set
+        if (component) {
+          componentsToNotify.add(component);
+        }
+      });
+    }
   }
 
   // --- PASS 2: Handle 'all' and 'deps' reactivity types ---
   // Iterate over all components for this stateKey that haven't been notified yet.
-  rootMeta.components.forEach((component, componentId) => {
-    // If we've already added this component, skip it.
-    if (componentsToNotify.has(component)) {
-      return;
-    }
+  // rootMeta.components.forEach((component, componentId) => {
+  //   // If we've already added this component, skip it.
+  //   if (componentsToNotify.has(component)) {
+  //     return;
+  //   }
 
-    const reactiveTypes = Array.isArray(component.reactiveType)
-      ? component.reactiveType
-      : [component.reactiveType || 'component'];
+  //   const reactiveTypes = Array.isArray(component.reactiveType)
+  //     ? component.reactiveType
+  //     : [component.reactiveType || 'component'];
 
-    if (reactiveTypes.includes('all')) {
-      componentsToNotify.add(component);
-    } else if (reactiveTypes.includes('deps') && component.depsFunction) {
-      const currentState = getShadowValue(stateKey, []);
-      const newDeps = component.depsFunction(currentState);
+  //   if (reactiveTypes.includes('all')) {
+  //     componentsToNotify.add(component);
+  //   } else if (reactiveTypes.includes('deps') && component.depsFunction) {
+  //     const currentState = getShadowValue(stateKey, []);
+  //     const newDeps = component.depsFunction(currentState);
 
-      if (
-        newDeps === true ||
-        (Array.isArray(newDeps) && !isDeepEqual(component.prevDeps, newDeps))
-      ) {
-        component.prevDeps = newDeps as any; // Update the dependencies for the next check
-        componentsToNotify.add(component);
-      }
-    }
-  });
+  //     if (
+  //       newDeps === true ||
+  //       (Array.isArray(newDeps) && !isDeepEqual(component.prevDeps, newDeps))
+  //     ) {
+  //       component.prevDeps = newDeps as any; // Update the dependencies for the next check
+  //       componentsToNotify.add(component);
+  //     }
+  //   }
+  // });
 
   return componentsToNotify;
+}
+
+function handleUpdate(
+  stateKey: string,
+  path: string[],
+  payload: any
+): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } {
+  // ✅ FIX: Get the old value before the update.
+  const oldValue = getGlobalStore.getState().getShadowValue(stateKey, path);
+
+  const newValue = isFunction(payload) ? payload(oldValue) : payload;
+
+  // ✅ FIX: The new `updateShadowAtPath` handles metadata preservation automatically.
+  // The manual loop has been removed.
+  updateShadowAtPath(stateKey, path, newValue);
+
+  markAsDirty(stateKey, path, { bubble: true });
+
+  // Return the metadata of the node *after* the update.
+  const newShadowMeta = getShadowMetadata(stateKey, path);
+
+  return {
+    type: 'update',
+    oldValue: oldValue,
+    newValue,
+    shadowMeta: newShadowMeta,
+  };
+}
+function handleInsertMany(
+  stateKey: string,
+  path: string[],
+  payload: any[]
+): {
+  type: 'insert_many';
+  count: number;
+  shadowMeta: any;
+  path: string[];
+} {
+  // Use the existing, optimized global store function to perform the state update
+  insertManyShadowArrayElements(stateKey, path, payload);
+
+  markAsDirty(stateKey, path, { bubble: true });
+  const updatedMeta = getShadowMetadata(stateKey, path);
+
+  return {
+    type: 'insert_many',
+    count: payload.length,
+    shadowMeta: updatedMeta,
+    path: path,
+  };
 }
 function handleInsert(
   stateKey: string,
   path: string[],
   payload: any,
   index?: number,
-  itemId?: string // Add optional itemId parameter
+  itemId?: string
 ): {
   type: 'insert';
   newValue: any;
@@ -1184,13 +1264,14 @@ function handleInsert(
   insertAfterId?: string;
 } {
   let newValue;
+
   if (isFunction(payload)) {
     const { value: currentValue } = getScopedData(stateKey, path);
-    newValue = payload({ state: currentValue, uuid: uuidv4() });
+    newValue = payload({ state: currentValue });
   } else {
     newValue = payload;
   }
-
+  //console.time('insertShadowArrayElement');
   // Pass itemId to insertShadowArrayElement
   const actualItemId = insertShadowArrayElement(
     stateKey,
@@ -1199,6 +1280,8 @@ function handleInsert(
     index,
     itemId
   );
+  //console.timeEnd('insertShadowArrayElement');
+
   markAsDirty(stateKey, path, { bubble: true });
 
   const updatedMeta = getShadowMetadata(stateKey, path);
@@ -1247,7 +1330,7 @@ function flushQueue() {
     if (result.shadowMeta?.signals?.length > 0) {
       signalUpdates.push({ shadowMeta: result.shadowMeta, displayValue });
     }
-
+    // console.time('getComponentNotifications');
     const componentNotifications = getComponentNotifications(
       result.stateKey,
       result.path,
@@ -1257,19 +1340,22 @@ function flushQueue() {
     componentNotifications.forEach((component) => {
       allComponentsToNotify.add(component);
     });
+    //  console.timeEnd('getComponentNotifications');
   }
-
+  //console.time('logs');
   if (logsToAdd.length > 0) {
     addStateLog(logsToAdd);
   }
-
+  //console.timeEnd('logs');
   signalUpdates.forEach(({ shadowMeta, displayValue }) => {
     updateSignals(shadowMeta, displayValue);
   });
 
+  // console.time('updateComponents');
   allComponentsToNotify.forEach((component) => {
     component.forceUpdate();
   });
+  //console.timeEnd('updateComponents');
 
   // --- Step 3: CLEANUP ---
   // Clear the queue for the next batch of updates.
@@ -1281,7 +1367,7 @@ function createEffectiveSetState<T>(
   sessionId: string | undefined,
   latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
 ): EffectiveSetState<T> {
-  return (newStateOrFunction, path, updateObj, validationKey?) => {
+  return (newStateOrFunction, path, updateObj) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
   };
 
@@ -1297,20 +1383,21 @@ function createEffectiveSetState<T>(
         result = handleUpdate(stateKey, path, payload);
         break;
       case 'insert':
-        // Pass itemId to handleInsert if it exists
         result = handleInsert(
           stateKey,
           path,
           payload,
-          undefined,
+          options.index,
           options.itemId
         );
+        break;
+      case 'insert_many':
+        result = handleInsertMany(stateKey, path, payload);
         break;
       case 'cut':
         result = handleCut(stateKey, path);
         break;
     }
-
     result.stateKey = stateKey;
     result.path = path;
     updateBatchQueue.push(result);
@@ -1344,27 +1431,7 @@ function createEffectiveSetState<T>(
       latestInitialOptionsRef.current.middleware({ update: newUpdate });
     }
 
-    pluginStore.getState().notifyUpdate(newUpdate);
-    // if (
-    //   pluginDataRef?.current &&
-    //   pluginDataRef.current.length > 0 &&
-    //   newUpdate
-    // ) {
-    //   pluginDataRef.current.forEach((pluginData) => {
-    //     if (pluginData.plugin.onUpdate) {
-    //       try {
-    //         pluginData.plugin.onUpdate(
-    //           stateKey,
-    //           newUpdate,
-    //           pluginData.options,
-    //           pluginData.hookData
-    //         );
-    //       } catch (error) {
-    //         console.error('Plugin onUpdate error:', error);
-    //       }
-    //     }
-    //   });
-    // }
+    notifyUpdate(newUpdate);
   }
 }
 
@@ -1567,9 +1634,6 @@ export function useCogsStateFn<TStateObject extends unknown>(
     const options = getInitialOptions(thisKey as string);
 
     const features = {
-      validationEnabled: !!(
-        options?.validation?.zodSchemaV4 || options?.validation?.zodSchemaV3
-      ),
       localStorageEnabled: !!options?.localStorage?.key,
     };
 
@@ -2852,7 +2916,18 @@ function createProxyHandler<T>(
             payload: InsertParams<InferArrayElement<T>>,
             index?: number
           ) => {
-            effectiveSetState(payload as any, path, { updateType: 'insert' });
+            effectiveSetState(payload as any, path, {
+              updateType: 'insert',
+              index,
+            });
+          };
+        }
+        if (prop === '$insertMany') {
+          return (payload: InferArrayElement<T>[]) => {
+            // Call the one true path for all state changes.
+            effectiveSetState(payload as any, path, {
+              updateType: 'insert_many',
+            });
           };
         }
         if (prop === '$uniqueInsert') {
@@ -3013,11 +3088,7 @@ function createProxyHandler<T>(
               });
             }
 
-            return rebuildStateShape({
-              path: [...path, `not_found_${uuidv4()}`],
-              componentId: componentId!,
-              meta,
-            });
+            return null;
           };
         }
         if (prop === '$cutThis') {
@@ -3171,6 +3242,12 @@ function createProxyHandler<T>(
           return componentId;
         }
         if (path.length == 0) {
+          if (prop === '$setOptions') {
+            return (options: OptionsType<T>) => {
+              setOptions({ stateKey, options, initialOptionsPart: {} });
+            };
+          }
+
           if (prop === '$useFocusedFormElement') {
             // The returned function is the hook.
             return () => {
@@ -3300,7 +3377,7 @@ function createProxyHandler<T>(
                   severity: 'warning',
                   code: err.code,
                 }));
-
+              console.log('newErrors', newErrors);
               getGlobalStore
                 .getState()
                 .setShadowMetadata(stateKey, operation.path, {
@@ -3310,10 +3387,32 @@ function createProxyHandler<T>(
                     lastValidated: Date.now(),
                   },
                 });
+              console.log(
+                'getGlobalStore',
+                getGlobalStore
+                  .getState()
+                  .getShadowMetadata(stateKey, operation.path)
+              );
+              let index: number | undefined;
+              if (
+                operation.insertAfterId &&
+                operation.updateType === 'insert'
+              ) {
+                const shadowMeta = getShadowMetadata(stateKey, operation.path);
+                if (shadowMeta?.arrayKeys) {
+                  const afterIndex = shadowMeta.arrayKeys.indexOf(
+                    operation.insertAfterId
+                  );
+                  if (afterIndex !== -1) {
+                    index = afterIndex + 1; // Insert after the found item
+                  }
+                }
+              }
 
               effectiveSetState(operation.newValue, operation.path, {
                 updateType: operation.updateType,
                 itemId: operation.itemId,
+                index, // Pass the calculated index
                 metaData,
               });
             };

@@ -1,455 +1,295 @@
-import { UpdateTypeDetail, StateObject, PluginData } from './CogsState';
-import { useState, useEffect } from 'react';
+import { z } from 'zod';
+import type React from 'react';
+import { StateObject, UpdateTypeDetail } from './CogsState';
 import { getGlobalStore } from './store';
+
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
-// Your refined, more explicit version.
 export type KeyedTypes<TMap extends Record<string, any>> = {
   __key: 'keyed';
   map: { [K in keyof TMap]: TMap[K] };
 };
 
-/**
- * Base context available to all plugin methods.
- * Provides access to state and metadata storage at both root and path levels.
- */
-type BaseContext<
-  TState,
-  TKey extends keyof TState,
-  TPluginMetaData,
-  TFieldMetaData,
+export const keyedSchema = <TMap extends Record<string, any>>() =>
+  z.object({
+    __key: z.literal('keyed'),
+    map: z.any(),
+  }) as z.ZodType<KeyedTypes<TMap>>;
+
+// Helpers: turn a zod object shape into its inferred value shape
+type InferZodObject<T extends Record<string, z.ZodTypeAny>> = {
+  [K in keyof T]: z.infer<T[K]>;
+};
+export type InferPerKeyValueMap<
+  TMap extends Record<string, Record<string, z.ZodTypeAny>>,
 > = {
-  /** The key identifying which state this plugin is operating on */
-  stateKey: TKey;
-
-  /** The root-level state object with all Cogs state methods ($update, $get, etc.) */
-  cogsState: StateObject<TState[TKey]>;
-
-  /**
-   * Get plugin metadata stored at the root level (path: []).
-   * Use for plugin-wide state like sessionIds, feature flags, etc.
-   * @returns The plugin's root metadata or undefined if not set
-   */
-  getPluginMetaData: () => TPluginMetaData | undefined;
-
-  /**
-   * Set plugin metadata at the root level (path: []).
-   * Merges with existing metadata.
-   * @param data - Partial metadata to merge with existing root metadata
-   */
-  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-
-  /**
-   * Remove all plugin metadata at the root level.
-   * Clears all root-level plugin state.
-   */
-  removePluginMetaData: () => void;
-
-  /**
-   * Get plugin metadata stored at a specific path.
-   * Use for field-specific state like validation errors, sync versions per path.
-   * @param path - The state path to get metadata from (e.g., ['users', '0', 'email'])
-   * @returns The metadata at that path or undefined if not set
-   */
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-
-  /**
-   * Set plugin metadata at a specific path.
-   * Merges with existing metadata at that path.
-   * @param path - The state path to store metadata at (e.g., ['users', '0', 'email'])
-   * @param data - Partial metadata to merge with existing metadata at path
-   */
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-
-  /**
-   * Remove plugin metadata at a specific path.
-   * Clears all metadata for this plugin at the specified path.
-   * @param path - The state path to remove metadata from
-   */
-  removeFieldMetaData: (path: string[]) => void;
+  [K in keyof TMap]: InferZodObject<TMap[K]>;
 };
 
-/**
- * Parameters passed to the useHook method.
- * Called once when plugin is initialized to set up React hooks.
- */
-export type UseHookParams<TState, TOptions, TPluginMetaData, TFieldMetaData> = {
-  [K in keyof TState]: BaseContext<
-    TState,
-    K,
-    TPluginMetaData,
-    TFieldMetaData
-  > & {
-    /**
-     * Plugin-specific options passed when registering the plugin.
-     * @example { syncEnabled: true, debounceMs: 500 }
-     */
-    options: TOptions;
+// Keep your field metadata extension mechanism
+type ExtractFieldExtensions<THookReturn, TBase> = THookReturn extends {
+  __fieldMetaExtensions: infer E;
+}
+  ? TBase & E
+  : TBase;
 
-    /**
-     * The name identifier of this plugin.
-     * Useful for debugging or conditional logic.
-     */
-    pluginName: string;
-
-    /**
-     * True on the very first mount, false on all subsequent renders.
-     * Use to run initialization logic only once.
-     */
-    isInitialMount: boolean;
+// Deconstructed cogs methods (no TState)
+type DeconstructedCogsMethods<TStateSlice = any> = {
+  initialiseState: (data: TStateSlice) => void;
+  applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) => void;
+  addZodErrors: (errors: any[]) => void;
+  getState: () => TStateSlice;
+  setOptions: (options: any) => void;
+};
+export function toDeconstructedMethods(stateHandler: StateObject<any>) {
+  return {
+    initialiseState: (data: any) =>
+      stateHandler.$initializeAndMergeShadowState(data),
+    applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) =>
+      stateHandler.$applyOperation(patch, meta),
+    addZodErrors: (errors: any[]) => stateHandler.$addZodValidation(errors),
+    getState: () => stateHandler.$get(),
+    setOptions: (opts: any) => stateHandler.$setOptions(opts),
   };
-}[keyof TState];
+}
+// UseHook now uses the base field metadata type (no extensions)
+export type UseHookParams<
+  TOptions,
+  TPluginMetaData,
+  TFieldMetaData,
+  TStateSlice = any,
+> = DeconstructedCogsMethods<TStateSlice> & {
+  stateKey: string;
 
-/**
- * Parameters passed to the transformState method.
- * Called to transform/modify state based on plugin logic.
- */
+  getPluginMetaData: () => TPluginMetaData | undefined;
+  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+  removePluginMetaData: () => void;
+
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
+  removeFieldMetaData: (path: string[]) => void;
+
+  options: TOptions;
+  pluginName: string;
+  isInitialMount: boolean;
+};
+
+// All other contexts use the extended field meta type (based on hook return)
 export type TransformStateParams<
-  TState,
   TOptions,
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
-> = {
-  [K in keyof TState]: BaseContext<
-    TState,
-    K,
-    TPluginMetaData,
-    TFieldMetaData
-  > & {
-    /** Plugin-specific options */
-    options: TOptions;
+  TStateSlice = any,
+> = DeconstructedCogsMethods<TStateSlice> & {
+  stateKey: string;
 
-    /**
-     * Data returned from useHook if defined.
-     * Will be undefined if plugin has no useHook.
-     */
-    hookData?: THookReturn;
+  getPluginMetaData: () => TPluginMetaData | undefined;
+  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+  removePluginMetaData: () => void;
 
-    /**
-     * The state value before this transformation.
-     * Useful for computing deltas or conditional transforms.
-     */
-    previousState?: TState[K];
+  getFieldMetaData: (
+    path: string[]
+  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
+  setFieldMetaData: (
+    path: string[],
+    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
+  ) => void;
+  removeFieldMetaData: (path: string[]) => void;
 
-    /**
-     * True on the first transform call, false on subsequent calls.
-     * Use to differentiate initial setup from updates.
-     */
-    isInitialTransform: boolean;
-  };
-}[keyof TState];
+  options: TOptions;
+  hookData?: THookReturn;
+  previousState?: TStateSlice;
+  isInitialTransform: boolean;
+  pluginName: string;
+};
 
-/**
- * Parameters passed to the onUpdate method.
- * Called whenever state is updated through any mechanism.
- */
 export type OnUpdateParams<
-  TState,
   TOptions,
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
-> = {
-  [K in keyof TState]: BaseContext<
-    TState,
-    K,
-    TPluginMetaData,
-    TFieldMetaData
-  > & {
-    /**
-     * The update operation details including type, path, and value.
-     * Contains all information about what changed.
-     */
-    update: UpdateTypeDetail;
+  TStateSlice = any,
+> = DeconstructedCogsMethods<TStateSlice> & {
+  stateKey: string;
 
-    /**
-     * The path that was updated (extracted from update.path for convenience).
-     * @example ['users', '0', 'name'] for updating a user's name
-     */
-    path?: string[];
+  getPluginMetaData: () => TPluginMetaData | undefined;
+  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+  removePluginMetaData: () => void;
 
-    /** Plugin-specific options */
-    options: TOptions;
+  getFieldMetaData: (
+    path: string[]
+  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
+  setFieldMetaData: (
+    path: string[],
+    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
+  ) => void;
+  removeFieldMetaData: (path: string[]) => void;
 
-    /**
-     * Data returned from useHook if defined.
-     * Will be undefined if plugin has no useHook.
-     */
-    hookData?: THookReturn;
+  update: UpdateTypeDetail;
+  path?: string[];
 
-    /**
-     * The value at this path before the update.
-     * Undefined if path didn't exist before.
-     */
-    previousValue?: any;
+  options: TOptions;
+  hookData?: THookReturn;
 
-    /**
-     * The value at this path after the update.
-     * The current value at the updated path.
-     */
-    nextValue?: any;
+  previousValue?: any;
+  nextValue?: any;
+  updateSource?: 'user' | 'plugin' | 'system';
 
-    /**
-     * Where this update originated from.
-     * 'user' = user interaction, 'plugin' = plugin code, 'system' = framework
-     */
-    updateSource?: 'user' | 'plugin' | 'system';
-  };
-}[keyof TState];
+  pluginName: string;
+};
 
-/**
- * Parameters passed to the onFormUpdate method.
- * Called for form-specific events (focus, blur, input).
- */
 export type OnFormUpdateParams<
-  TState,
   TOptions,
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
-> = {
-  [K in keyof TState]: BaseContext<
-    TState,
-    K,
-    TPluginMetaData,
-    TFieldMetaData
-  > & {
-    /**
-     * Path to the form field that triggered this event.
-     * @example ['user', 'email'] for an email input field
-     */
+  TStateSlice = any,
+> = DeconstructedCogsMethods<TStateSlice> & {
+  stateKey: string;
+
+  getPluginMetaData: () => TPluginMetaData | undefined;
+  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+  removePluginMetaData: () => void;
+
+  getFieldMetaData: (
+    path: string[]
+  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
+  setFieldMetaData: (
+    path: string[],
+    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
+  ) => void;
+  removeFieldMetaData: (path: string[]) => void;
+
+  path: string[];
+  event: {
+    type: 'focus' | 'blur' | 'input';
+    value?: any;
     path: string[];
-
-    /**
-     * The form event details.
-     * type: 'focus' | 'blur' | 'input' - the type of form event
-     * value: The current value of the form field (for input events)
-     */
-    event: {
-      /** Type of form interaction */
-      type: 'focus' | 'blur' | 'input';
-      /** Current field value (primarily for input events) */
-      value?: any;
-      /** Current field path (primarily for input events) */
-      path: string[];
-    };
-
-    /** Plugin-specific options */
-    options: TOptions;
-
-    /**
-     * Data returned from useHook if defined.
-     * Will be undefined if plugin has no useHook.
-     */
-    hookData?: THookReturn;
-
-    /**
-     * Additional field metadata like validation rules, field type, etc.
-     * Can be used to customize behavior per field.
-     */
-    fieldMetadata?: any;
-
-    /**
-     * Current state of the form.
-     * Useful for conditional logic based on form lifecycle.
-     */
-    formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
   };
-}[keyof TState];
 
-/**
- * Parameters passed to the formWrapper method.
- * Used to wrap form elements with additional UI/behavior.
- */
+  options: TOptions;
+  hookData?: THookReturn;
+
+  fieldMetadata?: any;
+  formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
+  pluginName: string;
+};
+
 export type FormWrapperParams<
-  TState,
   TOptions,
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
+  TStateSlice = any,
 > = {
-  [K in keyof TState]: {
-    /**
-     * The form element to wrap (input, select, textarea, etc.).
-     * This is the actual React element that will be enhanced.
-     */
-    element: React.ReactNode;
+  element: React.ReactNode;
+  path: string[];
+  stateKey: string;
+  options: TOptions;
+  hookData?: THookReturn;
+  fieldType?: string;
+  wrapperDepth?: number;
 
-    /**
-     * Path to this specific form field.
-     * @example ['address', 'street'] for a street address input
-     */
-    path: string[];
+  // Deconstructed methods
+  initialiseState: (data: TStateSlice) => void;
+  applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) => void;
+  addZodErrors: (errors: any[]) => void;
+  getState: () => TStateSlice;
+  setOptions: (options: any) => void;
 
-    /** The state key this form field belongs to */
-    stateKey: K;
+  getPluginMetaData: () => TPluginMetaData | undefined;
+  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+  removePluginMetaData: () => void;
 
-    /** Root-level state object with all Cogs methods */
-    cogsState: StateObject<TState[K]>;
+  getFieldMetaData: (
+    path: string[]
+  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
+  setFieldMetaData: (
+    path: string[],
+    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
+  ) => void;
+  removeFieldMetaData: (path: string[]) => void;
 
-    /**
-     * Get plugin metadata stored at the root level (path: []).
-     * Use for plugin-wide state.
-     * @returns The plugin's root metadata or undefined
-     */
-    getPluginMetaData: () => TPluginMetaData | undefined;
+  pluginName: string;
+};
 
-    /**
-     * Set plugin metadata at the root level (path: []).
-     * @param data - Partial metadata to merge with existing
-     */
-    setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-
-    /** Remove all plugin metadata at the root level */
-    removePluginMetaData: () => void;
-
-    /**
-     * Get plugin metadata for this specific field.
-     * @param path - The field path (must be explicitly provided)
-     * @returns The field metadata or undefined
-     */
-    getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-
-    /**
-     * Set plugin metadata for this specific field.
-     * @param path - The field path (must be explicitly provided)
-     * @param data - Partial metadata to merge
-     */
-    setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-
-    /**
-     * Remove plugin metadata for this specific field.
-     * @param path - The field path to clear
-     */
-    removeFieldMetaData: (path: string[]) => void;
-
-    /** Plugin-specific options */
-    options: TOptions;
-
-    /**
-     * Data returned from useHook if defined.
-     * Will be undefined if plugin has no useHook.
-     */
-    hookData?: THookReturn;
-
-    /**
-     * Type of form field (text, number, email, etc.).
-     * Can be used to apply type-specific wrapping logic.
-     */
-    fieldType?: string;
-
-    /**
-     * Depth of wrapper nesting for this field.
-     * Useful when multiple plugins wrap the same field.
-     */
-    wrapperDepth?: number;
-  };
-}[keyof TState];
-
-/**
- * Plugin type definition.
- * Represents a complete plugin with all its lifecycle methods.
- */
+// Unified plugin definition (no TState anywhere)
 export type CogsPlugin<
   TName extends string,
-  TState = any,
-  TOptions = any,
-  THookReturn = any,
-  TPluginMetaData = any,
-  TFieldMetaData = any,
+  TOptions,
+  THookReturn,
+  TPluginMetaData,
+  TFieldMetaData,
 > = {
-  /** Unique identifier for this plugin */
   name: TName;
 
-  /**
-   * Hook method for React integration.
-   * Called once on mount to set up hooks, subscriptions, etc.
-   */
   useHook?: (
-    params: UseHookParams<TState, TOptions, TPluginMetaData, TFieldMetaData>
+    params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
   ) => THookReturn;
 
-  /**
-   * Transform state on initialization or when options change.
-   * Use for setting default values, initial sync, etc.
-   */
   transformState?: (
     params: TransformStateParams<
-      TState,
       TOptions,
       THookReturn,
       TPluginMetaData,
-      TFieldMetaData
+      TFieldMetaData,
+      any
     >
   ) => void;
 
-  /**
-   * React to any state updates.
-   * Called after state changes for side effects, sync, logging, etc.
-   */
   onUpdate?: (
     params: OnUpdateParams<
-      TState,
       TOptions,
       THookReturn,
       TPluginMetaData,
-      TFieldMetaData
+      TFieldMetaData,
+      any
     >
   ) => void;
 
-  /**
-   * Handle form-specific events.
-   * Called for focus, blur, and input events on form fields.
-   */
   onFormUpdate?: (
     params: OnFormUpdateParams<
-      TState,
       TOptions,
       THookReturn,
       TPluginMetaData,
-      TFieldMetaData
+      TFieldMetaData,
+      any
     >
   ) => void;
 
-  /**
-   * Wrap form elements with additional UI.
-   * Returns enhanced element with validation messages, loading states, etc.
-   */
   formWrapper?: (
     params: FormWrapperParams<
-      TState,
       TOptions,
       THookReturn,
       TPluginMetaData,
-      TFieldMetaData
+      TFieldMetaData,
+      any
     >
   ) => React.ReactNode;
 };
 
-/**
- * Extract plugin options type from a tuple of plugins.
- * Creates a mapped type of plugin names to their options.
- */
+// Optional: still useful if you collect plugins as a tuple
 export type ExtractPluginOptions<
-  TPlugins extends readonly CogsPlugin<any, any, any>[],
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
 > = {
   [P in TPlugins[number] as P['name']]?: P extends CogsPlugin<
     any,
-    any,
     infer O,
+    any,
+    any,
     any
   >
     ? O
     : never;
 };
 
+// Same metadata helpers (now independent of TState)
 export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   stateKey: string,
   pluginName: string
 ) {
   return {
-    // Root metadata functions
     getPluginMetaData: (): TPluginMetaData | undefined =>
       getGlobalStore
         .getState()
@@ -464,7 +304,6 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
     removePluginMetaData: () =>
       getGlobalStore.getState().removePluginMetaData(stateKey, [], pluginName),
 
-    // Field metadata functions
     getFieldMetaData: (path: string[]): TFieldMetaData | undefined =>
       getGlobalStore
         .getState()
@@ -483,86 +322,74 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   };
 }
 
-/**
- * Create a plugin context factory for a specific state shape.
- * @param TState - The shape of your application state
- * @param TOptions - Common options type for all plugins
- * @param TPluginMetaData - Type for root-level plugin metadata
- * @param TFieldMetaData - Type for field-level plugin metadata
- */
+// ======================================================================
+// New schema-driven context factory (no TState)
+// ======================================================================
 export function createPluginContext<
-  TState extends Record<string, any>,
-  TOptions = unknown,
-  TPluginMetaData extends Record<string, any> = {},
-  TFieldMetaData extends Record<string, any> = {},
->() {
-  /**
-   * Create a new plugin with the given name.
-   * Returns a fluent API for defining plugin behavior.
-   * @param name - Unique identifier for this plugin
-   */
-  function createPlugin<TName extends string>(name: TName) {
-    // Helper types for optional hook data
-    type HookArgs<THookReturn> = THookReturn extends never
-      ? []
-      : [hookData: THookReturn];
+  TOptionsSchema extends z.ZodTypeAny,
+  TPluginMetaDataSchema extends z.ZodTypeAny = z.ZodTypeAny,
+  TFieldMetaDataSchema extends z.ZodTypeAny = z.ZodTypeAny,
+>(schemas: {
+  options: TOptionsSchema;
+  pluginMetaData?: TPluginMetaDataSchema;
+  fieldMetaData?: TFieldMetaDataSchema;
+}) {
+  type Options = z.infer<TOptionsSchema>;
+  type PluginMetaData = z.infer<
+    TPluginMetaDataSchema extends z.ZodTypeAny
+      ? TPluginMetaDataSchema
+      : z.ZodTypeAny
+  >;
+  type FieldMetaData = z.infer<
+    TFieldMetaDataSchema extends z.ZodTypeAny
+      ? TFieldMetaDataSchema
+      : z.ZodTypeAny
+  >;
 
-    // Method type signatures
+  function createPlugin<TName extends string>(name: TName) {
     type TransformFn<THookReturn> = (
       params: TransformStateParams<
-        TState,
-        TOptions,
+        Options,
         THookReturn,
-        TPluginMetaData,
-        TFieldMetaData
+        PluginMetaData,
+        FieldMetaData
       >
     ) => void;
 
     type UpdateFn<THookReturn> = (
       params: OnUpdateParams<
-        TState,
-        TOptions,
+        Options,
         THookReturn,
-        TPluginMetaData,
-        TFieldMetaData
+        PluginMetaData,
+        FieldMetaData
       >
     ) => void;
 
     type FormUpdateFn<THookReturn> = (
       params: OnFormUpdateParams<
-        TState,
-        TOptions,
+        Options,
         THookReturn,
-        TPluginMetaData,
-        TFieldMetaData
+        PluginMetaData,
+        FieldMetaData
       >
     ) => void;
 
     type FormWrapperFn<THookReturn> = (
       params: FormWrapperParams<
-        TState,
-        TOptions,
+        Options,
         THookReturn,
-        TPluginMetaData,
-        TFieldMetaData
+        PluginMetaData,
+        FieldMetaData
       >
     ) => React.ReactNode;
 
     type Plugin<THookReturn> = Prettify<
-      CogsPlugin<
-        TName,
-        TState,
-        TOptions,
-        THookReturn,
-        TPluginMetaData,
-        TFieldMetaData
-      >
+      CogsPlugin<TName, Options, THookReturn, PluginMetaData, FieldMetaData>
     >;
 
-    // Runtime object factory
     const createPluginObject = <THookReturn = never>(
       hookFn?: (
-        params: UseHookParams<TState, TOptions, TPluginMetaData, TFieldMetaData>
+        params: UseHookParams<Options, PluginMetaData, FieldMetaData>
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
@@ -579,7 +406,6 @@ export function createPluginContext<
       };
     };
 
-    // Fluent API return type with conditional methods
     type BuildRet<
       THookReturn,
       HasTransform extends boolean,
@@ -590,7 +416,6 @@ export function createPluginContext<
       (HasTransform extends true
         ? {}
         : {
-            /** Define state transformation logic */
             transformState(
               fn: TransformFn<THookReturn>
             ): BuildRet<
@@ -604,7 +429,6 @@ export function createPluginContext<
       (HasUpdate extends true
         ? {}
         : {
-            /** React to state updates */
             onUpdate(
               fn: UpdateFn<THookReturn>
             ): BuildRet<
@@ -618,7 +442,6 @@ export function createPluginContext<
       (HasFormUpdate extends true
         ? {}
         : {
-            /** Handle form events */
             onFormUpdate(
               fn: FormUpdateFn<THookReturn>
             ): BuildRet<THookReturn, HasTransform, HasUpdate, true, HasWrapper>;
@@ -626,7 +449,6 @@ export function createPluginContext<
       (HasWrapper extends true
         ? {}
         : {
-            /** Wrap form elements */
             formWrapper(
               fn: FormWrapperFn<THookReturn>
             ): BuildRet<
@@ -638,7 +460,6 @@ export function createPluginContext<
             >;
           });
 
-    // Builder function with type tracking
     function createBuilder<
       THookReturn = never,
       HasTransform extends boolean = false,
@@ -647,7 +468,7 @@ export function createPluginContext<
       HasWrapper extends boolean = false,
     >(
       hookFn?: (
-        params: UseHookParams<TState, TOptions, TPluginMetaData, TFieldMetaData>
+        params: UseHookParams<Options, PluginMetaData, FieldMetaData>
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
@@ -668,7 +489,6 @@ export function createPluginContext<
         formWrapper
       );
 
-      // Attach only the remaining chain methods
       const methods = {} as Partial<
         BuildRet<
           THookReturn,
@@ -732,22 +552,12 @@ export function createPluginContext<
       >;
     }
 
-    // Starting point with all methods available
     const start = Object.assign(
       createBuilder<never, false, false, false, false>(),
       {
-        /**
-         * Define a React hook for this plugin.
-         * Sets up subscriptions, state, and returns data for other methods.
-         */
         useHook<THookReturn>(
           hookFn: (
-            params: UseHookParams<
-              TState,
-              TOptions,
-              TPluginMetaData,
-              TFieldMetaData
-            >
+            params: UseHookParams<Options, PluginMetaData, FieldMetaData>
           ) => THookReturn
         ) {
           return createBuilder<THookReturn, false, false, false, false>(hookFn);
@@ -756,12 +566,7 @@ export function createPluginContext<
     ) as BuildRet<never, false, false, false, false> & {
       useHook<THookReturn>(
         hookFn: (
-          params: UseHookParams<
-            TState,
-            TOptions,
-            TPluginMetaData,
-            TFieldMetaData
-          >
+          params: UseHookParams<Options, PluginMetaData, FieldMetaData>
         ) => THookReturn
       ): BuildRet<THookReturn, false, false, false, false>;
     };
@@ -771,96 +576,3 @@ export function createPluginContext<
 
   return { createPlugin };
 }
-
-// --- DEMO USAGE ---
-
-type MyGlobalState = {
-  user: { test: string; email: string };
-  address: { city: string; country: string };
-};
-
-type MyPluginMetaData = {
-  lastUpdated?: Date;
-  updateCount?: number;
-  sessionId?: string;
-  stateVersion?: string;
-};
-
-type MyFieldMetaData = {
-  status?: 'VALID' | 'INVALID' | 'NOT_VALIDATED';
-  errors?: Array<{ message: string; severity: 'error' | 'warning' }>;
-  touched?: boolean;
-  syncVersion?: string;
-};
-
-const { createPlugin } = createPluginContext<
-  MyGlobalState,
-  { id: string; syncEnabled?: boolean },
-  MyPluginMetaData,
-  MyFieldMetaData
->();
-
-// Example: Analytics plugin with root metadata
-const analyticsPlugin = createPlugin('analyticsPlugin').transformState(
-  ({ stateKey, cogsState, setPluginMetaData }) => {
-    if (stateKey === 'user') {
-      cogsState.$update({ test: 'This works!', email: 'test@example.com' });
-      setPluginMetaData({ lastUpdated: new Date() });
-    }
-  }
-);
-
-// // Example: Validation plugin with field metadata
-// const validationPlugin = createPlugin('validation')
-//   .onFormUpdate(({ path, event, setFieldMetaData, cogsState }) => {
-//     if (event.type === 'blur') {
-//       const value = cogsState.$get(path);
-
-//       if (path[path.length - 1] === 'email') {
-//         const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
-//         // Store validation state at the specific field path
-//         setFieldMetaData(path, {
-//           status: isValid ? 'VALID' : 'INVALID',
-//           errors: isValid ? [] : [{ message: 'Invalid email format', severity: 'error' }],
-//           touched: true
-//         });
-//       }
-//     }
-//   })
-//   .formWrapper(({ element, path, getFieldMetaData }) => {
-//     // Get metadata for this specific field
-//     const fieldMeta = getFieldMetaData(path);
-
-//     return (
-//       <div className="field-wrapper">
-//         {element}
-//         {fieldMeta?.status === 'INVALID' && fieldMeta?.touched && (
-//           <div className="error-message">
-//             {fieldMeta.errors?.[0]?.message}
-//           </div>
-//         )}
-//       </div>
-//     );
-//   });
-
-// Example: Sync plugin with both root and field metadata
-const syncPlugin = createPlugin('sync')
-  .useHook(({ setPluginMetaData, setFieldMetaData, cogsState }) => {
-    // Store session at root
-    const sessionId = 'session-123';
-    setPluginMetaData({ sessionId });
-
-    // Store sync versions at specific paths
-    setFieldMetaData(['user'], { syncVersion: 'v1.0' });
-    setFieldMetaData(['address'], { syncVersion: 'v1.1' });
-
-    return { sessionId };
-  })
-  .onUpdate(({ path, update, getFieldMetaData, setFieldMetaData }) => {
-    if (path) {
-      // Update sync version for the changed path
-      const currentVersion = getFieldMetaData(path)?.syncVersion || 'v0';
-      const newVersion = `v${parseInt(currentVersion.slice(1)) + 1}`;
-      setFieldMetaData(path, { syncVersion: newVersion });
-    }
-  });

@@ -99,7 +99,6 @@ export type ShadowMetadata = {
   syncInfo?: { status: string };
   validation?: ValidationState;
   features?: {
-    validationEnabled: boolean;
     localStorageEnabled: boolean;
   };
   signals?: Array<{
@@ -117,6 +116,7 @@ export type ShadowMetadata = {
     }
   >;
   pathComponents?: Set<string>;
+
   streams?: Map<
     string,
     {
@@ -181,8 +181,7 @@ export type CogsGlobalState = {
   addItemsToArrayNode: (
     key: string,
     arrayPath: string[],
-    newItems: any,
-    newKeys: string[]
+    newItems: any
   ) => void;
   insertShadowArrayElement: (
     key: string,
@@ -482,213 +481,247 @@ type BuildContext = {
     zodV3?: any;
   };
 };
-// Update buildShadowNode to use the new schema storage
+
 export function buildShadowNode(
   stateKey: string,
   value: any,
   context?: BuildContext
 ): ShadowNode {
-  // For primitive values
+  // Handle null/undefined/primitives first
   if (value === null || value === undefined || typeof value !== 'object') {
-    const node: ShadowNode = { _meta: {} };
-    node._meta!.value = value;
+    const node: ShadowNode = {
+      _meta: {
+        value: value,
+      },
+    };
+
+    // Add type info
+    let typeInfo: TypeInfo | null = null;
+
     if (context) {
-      let typeInfo: TypeInfo | null = null;
-
-      // 1. Try to get type from sync schema
-      if (context.schemas.sync && context.schemas.sync[context.stateKey]) {
-        const syncEntry = context.schemas.sync[context.stateKey];
-        if (syncEntry.schemas?.validation) {
-          // Navigate to the field in the validation schema
-          let fieldSchema = syncEntry.schemas.validation;
-          for (const segment of context.path) {
-            if (fieldSchema?.shape) {
-              fieldSchema = fieldSchema.shape[segment];
-            } else if (fieldSchema?._def?.shape) {
-              fieldSchema = fieldSchema._def.shape()[segment];
-            }
-          }
-
-          if (fieldSchema) {
-            typeInfo = getTypeFromZodSchema(fieldSchema, 'sync');
-            if (typeInfo) {
-              // Use the default from sync schema if available
-              if (syncEntry.schemas.defaults) {
-                let defaultValue = syncEntry.schemas.defaults;
-                for (const segment of context.path) {
-                  if (defaultValue && typeof defaultValue === 'object') {
-                    defaultValue = defaultValue[segment];
-                  }
-                }
-                if (defaultValue !== undefined) {
-                  typeInfo.default = defaultValue;
-                  // If no value provided and not optional, use the default
-                  if (
-                    (value === undefined || value === null) &&
-                    !typeInfo.optional
-                  ) {
-                    node._meta!.value = defaultValue;
-                  }
-                }
-              }
-            }
-          }
+      // Check for schema-based type info
+      if (context.schemas.zodV4) {
+        const zodV4Path =
+          context.path.length === 0
+            ? context.schemas.zodV4
+            : getSchemaAtPath(context.schemas.zodV4, context.path);
+        if (zodV4Path) {
+          typeInfo = getTypeFromZodSchema(zodV4Path, 'zod4');
         }
       }
 
-      // 2. If no sync schema, try Zod v4
-      if (!typeInfo && context.schemas.zodV4) {
-        let fieldSchema = context.schemas.zodV4;
-        for (const segment of context.path) {
-          if (fieldSchema?.shape) {
-            fieldSchema = fieldSchema.shape[segment];
-          } else if (fieldSchema?._def?.shape) {
-            fieldSchema = fieldSchema._def.shape()[segment];
-          }
-        }
-
-        if (fieldSchema) {
-          typeInfo = getTypeFromZodSchema(fieldSchema, 'zod4');
-          if (typeInfo && (value === undefined || value === null)) {
-            // Only use default if the field is not optional/nullable
-            if (!typeInfo.optional && !typeInfo.nullable) {
-              node.value = typeInfo.default;
-            }
-          }
-        }
-      }
-
-      // 3. If no Zod v4, try Zod v3
       if (!typeInfo && context.schemas.zodV3) {
-        let fieldSchema = context.schemas.zodV3;
-        for (const segment of context.path) {
-          if (fieldSchema?.shape) {
-            fieldSchema = fieldSchema.shape[segment];
-          } else if (fieldSchema?._shape) {
-            fieldSchema = fieldSchema._shape[segment];
-          }
-        }
-
-        if (fieldSchema) {
-          typeInfo = getTypeFromZodSchema(fieldSchema, 'zod3');
-          if (typeInfo && (value === undefined || value === null)) {
-            // Only use default if the field is not optional/nullable
-            if (!typeInfo.optional && !typeInfo.nullable) {
-              node.value = typeInfo.default;
-            }
-          }
+        const zodV3Path =
+          context.path.length === 0
+            ? context.schemas.zodV3
+            : getSchemaAtPath(context.schemas.zodV3, context.path);
+        if (zodV3Path) {
+          typeInfo = getTypeFromZodSchema(zodV3Path, 'zod3');
         }
       }
 
-      // 4. Fall back to runtime type
-      if (!typeInfo) {
-        typeInfo = getTypeFromValue(node._meta!.value);
+      if (!typeInfo && context.schemas.sync?.[stateKey]) {
+        // Handle sync schemas if needed
+        typeInfo = getTypeFromValue(value);
+        typeInfo.source = 'sync';
       }
-
-      // Store the type info
-      if (typeInfo) {
-        if (!node._meta) node._meta = {};
-        node._meta.typeInfo = typeInfo;
-      }
-    } else {
-      // No context, just use runtime type
-      const typeInfo = getTypeFromValue(value);
-      if (!node._meta) node._meta = {};
-      node._meta.typeInfo = typeInfo;
     }
 
+    if (!typeInfo) {
+      typeInfo = getTypeFromValue(value);
+    }
+
+    node._meta!.typeInfo = typeInfo;
     return node;
   }
 
-  // For arrays
+  // Handle arrays
   if (Array.isArray(value)) {
-    const arrayNode: ShadowNode = { _meta: { arrayKeys: [] } };
-    const idKeys: string[] = [];
+    const arrayNode: ShadowNode = {
+      _meta: {
+        arrayKeys: [],
+      },
+    };
 
+    const idKeys: string[] = [];
     value.forEach((item, index) => {
-      const itemId = `${generateId(stateKey)}`;
-      // Pass context down for array items
+      const itemId = generateId(stateKey);
       const itemContext = context
         ? {
             ...context,
             path: [...context.path, index.toString()],
           }
         : undefined;
+
       arrayNode[itemId] = buildShadowNode(stateKey, item, itemContext);
       idKeys.push(itemId);
     });
 
     arrayNode._meta!.arrayKeys = idKeys;
+
+    // Add array type info if context available
     if (context) {
-      // Try to get the array schema
-      let arraySchema = null;
+      let typeInfo: TypeInfo | null = null;
 
       if (context.schemas.zodV4) {
-        let fieldSchema = context.schemas.zodV4;
-        for (const segment of context.path) {
-          if (fieldSchema?.shape) {
-            fieldSchema = fieldSchema.shape[segment];
-          } else if (fieldSchema?._def?.shape) {
-            fieldSchema = fieldSchema._def.shape()[segment];
-          }
+        const schema =
+          context.path.length === 0
+            ? context.schemas.zodV4
+            : getSchemaAtPath(context.schemas.zodV4, context.path);
+        if (schema) {
+          typeInfo = getTypeFromZodSchema(schema, 'zod4');
         }
-        arraySchema = fieldSchema;
       }
 
-      arrayNode._meta!.typeInfo = {
-        type: 'array',
-        schema: arraySchema,
-        source: arraySchema ? 'zod4' : 'runtime',
-        default: [],
-      };
+      if (!typeInfo && context.schemas.zodV3) {
+        const schema =
+          context.path.length === 0
+            ? context.schemas.zodV3
+            : getSchemaAtPath(context.schemas.zodV3, context.path);
+        if (schema) {
+          typeInfo = getTypeFromZodSchema(schema, 'zod3');
+        }
+      }
+
+      if (!typeInfo) {
+        typeInfo = {
+          type: 'array',
+          schema: null,
+          source: 'runtime',
+          default: [],
+        };
+      }
+
+      arrayNode._meta!.typeInfo = typeInfo;
     }
+
     return arrayNode;
   }
 
-  // For objects
+  // Handle objects
   if (value.constructor === Object) {
-    const objectNode: ShadowNode = { _meta: {} };
-    for (const key in value) {
-      if (Object.prototype.hasOwnProperty.call(value, key)) {
-        // Pass context down for object properties
-        const propContext = context
-          ? {
-              ...context,
-              path: [...context.path, key],
-            }
-          : undefined;
-        objectNode[key] = buildShadowNode(stateKey, value[key], propContext);
+    // Check if it's a simple object for optimization
+    const keys = Object.keys(value);
+    let isSimpleObject = true;
+
+    for (const key of keys) {
+      const propValue = value[key];
+      const propType = typeof propValue;
+      if (
+        propValue !== null &&
+        propType !== 'string' &&
+        propType !== 'number' &&
+        propType !== 'boolean'
+      ) {
+        isSimpleObject = false;
+        break;
       }
     }
-    if (context) {
-      // Try to get the object schema
-      let objectSchema = null;
 
-      if (context.schemas.zodV4) {
-        let fieldSchema = context.schemas.zodV4;
-        for (const segment of context.path) {
-          if (fieldSchema?.shape) {
-            fieldSchema = fieldSchema.shape[segment];
-          } else if (fieldSchema?._def?.shape) {
-            fieldSchema = fieldSchema._def.shape()[segment];
-          }
+    const objectNode: ShadowNode = {
+      _meta: {
+        typeInfo: {
+          type: 'object',
+          schema: context
+            ? getSchemaAtPath(
+                context.schemas.zodV4 || context.schemas.zodV3,
+                context.path
+              )
+            : null,
+          source: context?.schemas.zodV4
+            ? 'zod4'
+            : context?.schemas.zodV3
+              ? 'zod3'
+              : 'runtime',
+          default: {},
+        },
+      },
+    };
+
+    // Use optimized path for simple objects
+    if (isSimpleObject && !context) {
+      for (const key of keys) {
+        objectNode[key] = {
+          _meta: {
+            value: value[key],
+            typeInfo: getTypeFromValue(value[key]),
+          },
+        };
+      }
+    } else {
+      // Use recursive path for complex objects or when context is needed
+      for (const key in value) {
+        if (Object.prototype.hasOwnProperty.call(value, key)) {
+          const propContext = context
+            ? {
+                ...context,
+                path: [...context.path, key],
+              }
+            : undefined;
+
+          objectNode[key] = buildShadowNode(stateKey, value[key], propContext);
         }
-        objectSchema = fieldSchema;
       }
-
-      objectNode._meta!.typeInfo = {
-        type: 'object',
-        schema: objectSchema,
-        source: objectSchema ? 'zod4' : 'runtime',
-        default: {},
-      };
     }
+
     return objectNode;
   }
 
-  return { value };
+  // Fallback for other object types (Date, etc.)
+  return {
+    _meta: {
+      value: value,
+      typeInfo: getTypeFromValue(value),
+    },
+  };
 }
 
+// Helper function to get schema at a specific path
+function getSchemaAtPath(schema: any, path: string[]): any {
+  if (!schema || path.length === 0) return schema;
+
+  let current = schema;
+
+  for (const segment of path) {
+    // Handle Zod v4
+    if (current._def) {
+      // Unwrap modifiers
+      while (
+        current._def &&
+        (current._def.typeName === 'ZodOptional' ||
+          current._def.typeName === 'ZodNullable' ||
+          current._def.typeName === 'ZodDefault')
+      ) {
+        current = current._def.innerType || current.unwrap();
+      }
+
+      if (current._def.typeName === 'ZodObject') {
+        current = current.shape[segment];
+      } else if (current._def.typeName === 'ZodArray') {
+        // For array indices, get the element schema
+        current = current._def.type;
+      } else {
+        return null;
+      }
+    }
+    // Handle Zod v3
+    else if (current._type) {
+      if (current._type === 'object' && current._shape) {
+        current = current._shape[segment];
+      } else if (current._type === 'array' && current._def) {
+        current = current._def.type;
+      } else {
+        return null;
+      }
+    } else {
+      return null;
+    }
+
+    if (!current) return null;
+  }
+
+  return current;
+}
 export const shadowStateStore = new Map<string, ShadowNode>();
 let globalCounter = 0;
 const instanceId = Date.now().toString(36);
@@ -718,6 +751,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const existingData = pluginMetaData.get(pluginName) || {};
     pluginMetaData.set(pluginName, { ...existingData, ...data });
     get().setShadowMetadata(key, path, { ...metadata, pluginMetaData });
+    get().notifyPathSubscribers([key, ...path].join('.'), {
+      type: 'METADATA_UPDATE',
+    });
   },
   removePluginMetaData: (key: string, path: string[], pluginName: string) => {
     const metadata = get().getShadowMetadata(key, path);
@@ -974,49 +1010,66 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
     Object.assign(current._meta, newMetadata);
   },
+  getShadowValue: (key: string, path: string[], validArrayIds?: string[]) => {
+    const startNode = get().getShadowNode(key, path);
 
-  getShadowValue: (
-    key: string,
-    path: string[],
-    validArrayIds?: string[],
-    log?: boolean
-  ) => {
-    const node = get().getShadowNode(key, path);
-
-    if (node === null || node === undefined) return undefined;
-
-    const nodeKeys = Object.keys(node);
-
-    if (
-      node._meta &&
-      Object.prototype.hasOwnProperty.call(node._meta, 'value') &&
-      nodeKeys.length === 1 &&
-      nodeKeys[0] === '_meta'
-    ) {
-      return node._meta.value;
+    // If the path is invalid or leads nowhere, return undefined immediately.
+    if (!startNode) {
+      return undefined;
     }
 
-    const isArrayNode =
-      node._meta &&
-      Object.prototype.hasOwnProperty.call(node._meta, 'arrayKeys');
-    if (isArrayNode) {
-      const keysToIterate =
-        validArrayIds !== undefined && validArrayIds.length > 0
-          ? validArrayIds
-          : node._meta!.arrayKeys!;
+    // --- High-Performance Iterative Materializer ---
 
-      return keysToIterate.map((itemKey: string) =>
-        get().getShadowValue(key, [...path, itemKey])
-      );
-    }
+    // A single root object to hold the final, materialized result.
+    const rootResult: any = {};
 
-    const result: any = {};
-    for (const propKey of nodeKeys) {
-      if (propKey !== '_meta' && !propKey.startsWith('id:')) {
-        result[propKey] = get().getShadowValue(key, [...path, propKey]);
+    // Stack to manage the traversal without recursion.
+    // Each item is [shadowNode, parentObjectInResult, keyToSetOnParent]
+    const stack: [ShadowNode, any, string | number][] = [
+      [startNode, rootResult, 'final'],
+    ];
+
+    while (stack.length > 0) {
+      const [currentNode, parentResult, resultKey] = stack.pop()!;
+
+      // 1. Handle primitive values
+      if (currentNode._meta?.hasOwnProperty('value')) {
+        parentResult[resultKey] = currentNode._meta.value;
+        continue; // Done with this branch
+      }
+
+      // 2. Handle arrays
+      if (currentNode._meta?.arrayKeys) {
+        const keysToIterate = validArrayIds || currentNode._meta.arrayKeys;
+        const newArray: any[] = [];
+        parentResult[resultKey] = newArray;
+
+        // Push children onto the stack in reverse order to process them from 0 to N
+        for (let i = keysToIterate.length - 1; i >= 0; i--) {
+          const itemKey = keysToIterate[i]!;
+          if (currentNode[itemKey]) {
+            // The child's result will be placed at index `i` in `newArray`
+            stack.push([currentNode[itemKey], newArray, i]);
+          }
+        }
+        continue; // Done with this branch
+      }
+
+      // 3. Handle objects
+      const newObject: any = {};
+      parentResult[resultKey] = newObject;
+
+      const objectKeys = Object.keys(currentNode);
+      // Push children onto the stack (order doesn't matter for objects)
+      for (const propKey of objectKeys) {
+        if (propKey !== '_meta') {
+          // The child's result will be set as a property on `newObject`
+          stack.push([currentNode[propKey], newObject, propKey]);
+        }
       }
     }
-    return result;
+
+    return rootResult.final;
   },
 
   updateShadowAtPath: (key, path, newValue) => {
@@ -1033,7 +1086,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       }
       parentNode = parentNode[path[i]!];
     }
-
     const targetNode =
       path.length === 0 ? parentNode : parentNode[path[path.length - 1]!];
 
@@ -1097,8 +1149,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     });
   },
 
-  addItemsToArrayNode: (key, arrayPath, newItems, newKeys) => {
-    // Direct mutation - no cloning!
+  addItemsToArrayNode: (key, arrayPath, newItems) => {
     const rootKey = shadowStateStore.has(`[${key}`) ? `[${key}` : key;
     let root = shadowStateStore.get(rootKey);
     if (!root) {
@@ -1106,7 +1157,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return;
     }
 
-    // Navigate without cloning
     let current = root;
     for (const segment of arrayPath) {
       if (!current[segment]) {
@@ -1115,18 +1165,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       current = current[segment];
     }
 
-    // Mutate directly
     Object.assign(current, newItems);
-    if (!current._meta) current._meta = {};
-    current._meta.arrayKeys = newKeys; // Direct assignment!
   },
-  insertShadowArrayElement: (
-    key: string,
-    arrayPath: string[],
-    newItem: any,
-    index?: number,
-    itemId?: string // Add optional itemId parameter
-  ) => {
+  insertShadowArrayElement: (key, arrayPath, newItem, index, itemId) => {
     const arrayNode = get().getShadowNode(key, arrayPath);
     if (!arrayNode?._meta?.arrayKeys) {
       throw new Error(
@@ -1134,11 +1175,12 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       );
     }
 
-    // Use provided itemId or generate a new one
-    const newItemId = itemId || generateId(key);
-    const itemsToAdd = { [newItemId]: buildShadowNode(key, newItem) };
+    const newItemId = itemId || `${generateId(key)}`;
 
-    // Rest of the function remains the same...
+    // BUILD AND ADD the node directly - no need for addItemsToArrayNode
+    arrayNode[newItemId] = buildShadowNode(key, newItem);
+
+    // Mutate the array directly
     const currentKeys = arrayNode._meta.arrayKeys;
     const insertionPoint =
       index !== undefined && index >= 0 && index <= currentKeys.length
@@ -1151,7 +1193,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       currentKeys.splice(insertionPoint, 0, newItemId);
     }
 
-    get().addItemsToArrayNode(key, arrayPath, itemsToAdd, currentKeys);
+    // Skip addItemsToArrayNode entirely - we already did everything it does!
 
     const arrayKey = [key, ...arrayPath].join('.');
     get().notifyPathSubscribers(arrayKey, {
@@ -1163,7 +1205,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     return newItemId;
   },
-
   insertManyShadowArrayElements: (key, arrayPath, newItems, index) => {
     if (!newItems || newItems.length === 0) {
       return;
@@ -1177,16 +1218,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       return;
     }
 
-    const itemsToAdd: Record<string, any> = {};
     const newIds: string[] = [];
 
+    // Build and add items directly
     newItems.forEach((item) => {
       const newItemId = `${generateId(key)}`;
       newIds.push(newItemId);
-      itemsToAdd[newItemId] = buildShadowNode(key, item);
+      arrayNode[newItemId] = buildShadowNode(key, item); // ADD DIRECTLY!
     });
 
-    // Mutate directly
+    // Mutate the keys array
     const currentKeys = arrayNode._meta.arrayKeys;
     const insertionPoint =
       index !== undefined && index >= 0 && index <= currentKeys.length
@@ -1194,12 +1235,12 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         : currentKeys.length;
 
     if (insertionPoint >= currentKeys.length) {
-      currentKeys.push(...newIds); // O(k) where k is items being added
+      currentKeys.push(...newIds);
     } else {
-      currentKeys.splice(insertionPoint, 0, ...newIds); // O(n + k)
+      currentKeys.splice(insertionPoint, 0, ...newIds);
     }
 
-    get().addItemsToArrayNode(key, arrayPath, itemsToAdd, currentKeys);
+    // NO addItemsToArrayNode call needed!
 
     const arrayKey = [key, ...arrayPath].join('.');
     get().notifyPathSubscribers(arrayKey, {
@@ -1290,25 +1331,36 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   },
 
   markAsDirty: (key, path, options = { bubble: true }) => {
-    const setDirtyOnPath = (pathToMark: string[]) => {
-      const node = get().getShadowNode(key, pathToMark);
-      if (node?._meta?.isDirty) {
-        return true;
-      }
-      get().setShadowMetadata(key, pathToMark, { isDirty: true });
-      return false;
-    };
+    // Start at the root node once.
+    let rootNode = get().getShadowNode(key, []);
+    if (!rootNode) return;
 
-    setDirtyOnPath(path);
+    // Navigate to the target node once.
+    let currentNode = rootNode;
+    for (const segment of path) {
+      currentNode = currentNode[segment];
+      if (!currentNode) return; // Path doesn't exist, nothing to mark.
+    }
 
-    if (options.bubble) {
-      let parentPath = [...path];
-      while (parentPath.length > 0) {
-        parentPath.pop();
-        if (setDirtyOnPath(parentPath)) {
-          break;
-        }
+    // Mark the target node as dirty.
+    if (!currentNode._meta) currentNode._meta = {};
+    currentNode._meta.isDirty = true;
+
+    // If bubbling is disabled, we are done.
+    if (!options.bubble) return;
+
+    // Efficiently bubble up using the path segments.
+    let parentNode = rootNode;
+    for (let i = 0; i < path.length; i++) {
+      // The current node in the loop is the parent of the next one.
+      if (parentNode._meta?.isDirty) {
+        // Optimization: If a parent is already dirty, all of its ancestors are too.
+        // We can stop bubbling immediately.
+        return;
       }
+      if (!parentNode._meta) parentNode._meta = {};
+      parentNode._meta.isDirty = true;
+      parentNode = parentNode[path[i]!];
     }
   },
 

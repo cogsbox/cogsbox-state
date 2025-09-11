@@ -1,6 +1,6 @@
-import { FormElementParams, type FormOptsType } from './CogsState';
+import { FormElementParams, StateObject, type FormOptsType } from './CogsState';
 import { pluginStore } from './pluginStore';
-import { createMetadataContext } from './plugins';
+import { createMetadataContext, toDeconstructedMethods } from './plugins';
 import React, {
   memo,
   RefObject,
@@ -11,15 +11,11 @@ import React, {
   useState,
   useMemo,
 } from 'react';
-import {
-  getGlobalStore,
-  shadowStateStore,
-  ValidationError,
-  ValidationSeverity,
-} from './store';
+import { getGlobalStore, ValidationError, ValidationSeverity } from './store';
 import { useInView } from 'react-intersection-observer';
 import { v4 as uuidv4 } from 'uuid';
 import { isDeepEqual } from './utility';
+import { useStore } from 'zustand';
 const {
   getInitialOptions,
 
@@ -237,7 +233,7 @@ export function FormElementWrapper({
   const shadowNode = getGlobalStore.getState().getShadowNode(stateKey, path);
   const typeInfo = shadowNode?._meta?.typeInfo;
   const fieldSchema = typeInfo?.schema; // The actual Zod schema for this field
-
+  console.log('fieldSchema', fieldSchema);
   const globalStateValue = getShadowValue(stateKey, path);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
@@ -294,13 +290,8 @@ export function FormElementWrapper({
   // Separate validation function that uses the field's schema
   const validateField = useCallback(
     (value: any, trigger: 'onChange' | 'onBlur') => {
-      const rootMeta = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, []);
-      if (!rootMeta?.features?.validationEnabled) return;
-
       const validationOptions = getInitialOptions(stateKey)?.validation;
-
+      console.log('validationOptions', validationOptions);
       if (!validationOptions) return;
 
       const currentMeta = getShadowMetadata(stateKey, path) || {};
@@ -321,7 +312,7 @@ export function FormElementWrapper({
           severity = 'warning';
         }
       }
-
+      console.log('shouldValidate', shouldValidate);
       if (!shouldValidate) return;
 
       let validationResult: { success: boolean; message?: string } | null =
@@ -533,7 +524,7 @@ export function FormElementWrapper({
       isCurrentlyDebouncing.current = false;
       setState(localValue, path, { updateType: 'update' });
     }
-
+    console.log('handleBlur');
     queueMicrotask(() => {
       const rootMeta =
         getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
@@ -553,6 +544,7 @@ export function FormElementWrapper({
         });
       }
     });
+    console.log('handleBlur', localValue);
     validateField(localValue, 'onBlur');
   }, [localValue, setState, path, validateField, stateKey]);
 
@@ -583,41 +575,19 @@ export function FormElementWrapper({
   const initialElement = renderFn(stateWithInputProps);
 
   const wrappedElement = activeFormWrappers.reduceRight(
-    (currentElement, config) => {
-      if (!cogsState) {
-        return currentElement;
-      }
-
-      const metadataContext = createMetadataContext(
-        stateKey,
-        config.plugin.name
-      );
-
-      const options = pluginStore
-        .getState()
-        .pluginOptions.get(stateKey)
-        ?.get(config.plugin.name);
-
-      const hookData = pluginStore
-        .getState()
-        .getHookResult(stateKey, config.plugin.name);
-
-      return config.plugin.formWrapper
-        ? config.plugin.formWrapper({
-            element: currentElement,
-            path: path,
-            stateKey: stateKey,
-            cogsState: cogsState,
-            ...metadataContext, // Spread all the metadata functions
-            options: options,
-            hookData: hookData,
-            fieldType: typeInfo?.type,
-            wrapperDepth: activeFormWrappers.indexOf(config),
-          })
-        : currentElement;
-    },
+    (currentElement, config, index) => (
+      <PluginWrapper
+        stateKey={stateKey}
+        path={path}
+        pluginName={config.plugin.name}
+        wrapperDepth={activeFormWrappers.length - 1 - index}
+      >
+        {currentElement}
+      </PluginWrapper>
+    ),
     initialElement
   );
+
   return (
     <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
       {wrappedElement}
@@ -731,3 +701,70 @@ export function IsolatedComponentWrapper({
 
   return <>{renderFn(baseState)}</>;
 }
+
+// 1. Define the MINIMAL props needed.
+type PluginWrapperProps = {
+  children: React.ReactNode;
+  stateKey: string;
+  path: string[];
+  pluginName: string;
+  wrapperDepth: number;
+};
+
+const PluginWrapper = memo(function PluginWrapper({
+  children,
+  stateKey,
+  path,
+  pluginName,
+  wrapperDepth,
+}: PluginWrapperProps) {
+  const [, forceUpdate] = useState({});
+
+  useEffect(() => {
+    const fullPathKey = [stateKey, ...path].join('.');
+    const unsubscribe = getGlobalStore
+      .getState()
+      .subscribeToPath(fullPathKey, () => {
+        forceUpdate({});
+      });
+    return unsubscribe;
+  }, [stateKey, path]);
+
+  const plugin = pluginStore
+    .getState()
+    .registeredPlugins.find((p) => p.name === pluginName);
+
+  const stateHandler: StateObject<any> | undefined = pluginStore
+    .getState()
+    .stateHandlers.get(stateKey);
+
+  const typeInfo = getGlobalStore.getState().getShadowNode(stateKey, path)
+    ?._meta?.typeInfo;
+
+  const options = pluginStore
+    .getState()
+    .pluginOptions.get(stateKey)
+    ?.get(pluginName);
+
+  const hookData = pluginStore.getState().getHookResult(stateKey, pluginName);
+
+  if (!plugin?.formWrapper || !stateHandler) {
+    return <>{children}</>;
+  }
+
+  const metadataContext = createMetadataContext(stateKey, plugin.name);
+  const deconstructed = toDeconstructedMethods(stateHandler);
+
+  return plugin.formWrapper({
+    element: children,
+    path,
+    stateKey,
+    pluginName: plugin.name,
+    ...deconstructed,
+    ...metadataContext,
+    options,
+    hookData,
+    fieldType: typeInfo?.type,
+    wrapperDepth,
+  });
+});

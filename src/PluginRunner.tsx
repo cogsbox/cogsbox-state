@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
 import { pluginStore } from './pluginStore';
 import { isDeepEqual } from './utility';
-import { createMetadataContext } from './plugins';
+import { createMetadataContext, toDeconstructedMethods } from './plugins';
 import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
 import { FormEventType } from './store';
@@ -16,39 +16,40 @@ const PluginInstance = React.memo(
     stateHandler,
   }: {
     stateKey: string;
-    plugin: CogsPlugin<any, any, any, any>;
+    plugin: CogsPlugin<any, any, any, any, any>;
     options: any;
     stateHandler: StateObject<any>;
   }) => {
     const [isInitialMount, setIsInitialMount] = useState(true);
-
-    // Create metadata context
     const metadataContext = useMemo(
       () => createMetadataContext(stateKey, plugin.name),
       [stateKey, plugin.name]
     );
 
-    // Create the full context for useHook
+    const deconstructed = useMemo(
+      () => toDeconstructedMethods(stateHandler),
+      [stateHandler]
+    );
+
     const hookContext = useMemo(
       () => ({
         stateKey,
-        cogsState: stateHandler,
-        ...metadataContext,
-        options,
         pluginName: plugin.name,
         isInitialMount,
+        options,
+        ...deconstructed,
+        ...metadataContext,
       }),
       [
         stateKey,
-        stateHandler,
-        metadataContext,
-        options,
         plugin.name,
         isInitialMount,
+        options,
+        deconstructed,
+        metadataContext,
       ]
     );
 
-    // Call the plugin's hook
     const hookData = plugin.useHook ? plugin.useHook(hookContext) : undefined;
 
     useEffect(() => {
@@ -61,7 +62,6 @@ const PluginInstance = React.memo(
       return () => removeHookResult(stateKey, plugin.name);
     }, [stateKey, plugin.name, !!plugin.useHook, hookData]);
 
-    // Handle transformState
     const lastProcessedOptionsRef = useRef<any>();
     const [isInitialTransform, setIsInitialTransform] = useState(true);
 
@@ -70,11 +70,12 @@ const PluginInstance = React.memo(
         if (!isDeepEqual(options, lastProcessedOptionsRef.current)) {
           plugin.transformState({
             stateKey,
-            cogsState: stateHandler,
-            ...metadataContext,
+            pluginName: plugin.name,
             options,
             hookData,
             isInitialTransform,
+            ...deconstructed,
+            ...metadataContext,
           });
           lastProcessedOptionsRef.current = options;
           setIsInitialTransform(false);
@@ -82,15 +83,14 @@ const PluginInstance = React.memo(
       }
     }, [
       stateKey,
-      stateHandler,
-      metadataContext,
       plugin,
       options,
       hookData,
       isInitialTransform,
+      deconstructed,
+      metadataContext,
     ]);
 
-    // Handle onUpdate
     const hookDataRef = useRef(hookData);
     hookDataRef.current = hookData;
 
@@ -101,12 +101,13 @@ const PluginInstance = React.memo(
         if (update.stateKey === stateKey) {
           plugin.onUpdate!({
             stateKey,
-            cogsState: stateHandler,
-            ...metadataContext,
+            pluginName: plugin.name,
             update,
             path: update.path,
             options,
             hookData: hookDataRef.current,
+            ...deconstructed,
+            ...metadataContext,
           });
         }
       };
@@ -115,9 +116,8 @@ const PluginInstance = React.memo(
         .getState()
         .subscribeToUpdates(handleUpdate);
       return unsubscribe;
-    }, [stateKey, stateHandler, metadataContext, plugin, options]);
+    }, [stateKey, plugin, options, deconstructed, metadataContext]);
 
-    // Handle onFormUpdate
     useEffect(() => {
       if (!plugin.onFormUpdate) return;
 
@@ -128,8 +128,7 @@ const PluginInstance = React.memo(
           const path = event.path;
           plugin.onFormUpdate!({
             stateKey,
-            cogsState: stateHandler,
-            ...metadataContext,
+            pluginName: plugin.name,
             path,
             event: {
               type: event.type,
@@ -138,6 +137,8 @@ const PluginInstance = React.memo(
             },
             options,
             hookData: hookDataRef.current,
+            ...deconstructed,
+            ...metadataContext,
           });
         }
       };
@@ -146,7 +147,7 @@ const PluginInstance = React.memo(
         .getState()
         .subscribeToFormUpdates(handleFormUpdate);
       return unsubscribe;
-    }, [stateKey, stateHandler, metadataContext, plugin, options]);
+    }, [stateKey, plugin, options, deconstructed, metadataContext]);
 
     return null;
   }

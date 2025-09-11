@@ -5,9 +5,9 @@ import type { CogsPlugin } from './plugins';
 type PluginRegistryStore = {
   stateHandlers: Map<string, StateObject<any>>; // stateKey -> handler
   registerStateHandler: (stateKey: string, handler: StateObject<any>) => void;
-  registeredPlugins: readonly CogsPlugin<any, any, any, any>[];
+  registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
   setRegisteredPlugins: (
-    plugins: readonly CogsPlugin<any, any, any, any>[]
+    plugins: readonly CogsPlugin<any, any, any, any, any>[]
   ) => void;
 
   // Store options keyed by stateKey and pluginName
@@ -19,7 +19,7 @@ type PluginRegistryStore = {
 
   // Get all plugin configs for a specific stateKey
   getPluginConfigsForState: (stateKey: string) => Array<{
-    plugin: CogsPlugin<any, any, any, any>;
+    plugin: CogsPlugin<any, any, any, any, any>;
     options: any;
   }>;
   updateSubscribers: Set<(update: UpdateTypeDetail) => void>;
@@ -103,7 +103,7 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
         return null;
       })
       .filter(Boolean) as Array<{
-      plugin: CogsPlugin<any, any, any, any>;
+      plugin: CogsPlugin<any, any, any, any, any>;
       options: any;
     }>;
   },

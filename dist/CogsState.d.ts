@@ -74,6 +74,7 @@ export type ArrayEndType<TShape extends unknown> = {
         $_index: number;
     } & EndType<Prettify<InferArrayElement<TShape>>>;
     $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+    $insertMany: (payload: InferArrayElement<TShape>[]) => void;
     $cut: CutFunctionType<TShape>;
     $cutSelected: () => void;
     $cutByValue: (value: string | number | boolean) => void;
@@ -119,6 +120,7 @@ export type EndType<T, IsArrayElement = false> = {
     $getPluginMetaData: (pluginName: string) => Record<string, any>;
     $addPluginMetaData: (key: string, data: Record<string, any>) => void;
     $removePluginMetaData: (key: string) => void;
+    $setOptions: (options: OptionsType<T>) => void;
     $useFocusedFormElement: () => {
         path: string[];
         ref: React.RefObject<any>;
@@ -188,7 +190,7 @@ export type CogsUpdate<T extends unknown> = UpdateType<T>;
 export type UpdateTypeDetail = {
     timeStamp: number;
     stateKey: string;
-    updateType: 'update' | 'insert' | 'cut';
+    updateType: 'update' | 'insert' | 'cut' | 'insert_many';
     path: string[];
     status: 'new' | 'sent' | 'synced';
     oldValue: any;
@@ -217,10 +219,10 @@ type SyncOptionsType<TApiParams> = {
     connect?: boolean;
     inMemoryState?: boolean;
 };
-export type CreateStateOptionsType<T extends unknown = unknown, TPluginOptions = {}> = {
-    formElements?: FormsElementsType<T>;
+export type CreateStateOptionsType<T extends unknown = unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
+    formElements?: FormsElementsType<T, TPlugins>;
     validation?: ValidationOptionsType;
-    plugins?: CogsPlugin<string, T, TPluginOptions>[];
+    plugins?: TPlugins;
 };
 export type OptionsType<T extends unknown = unknown, TApiParams = never> = CreateStateOptionsType & {
     log?: boolean;
@@ -262,7 +264,7 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = Creat
     defaultState?: T;
     dependencies?: any[];
 };
-type FormsElementsType<T> = {
+export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     validation?: (options: {
         children: React.ReactNode;
         status: ValidationStatus;
@@ -272,14 +274,16 @@ type FormsElementsType<T> = {
         allErrors: ValidationError[];
         path: string[];
         message?: string;
-        getData?: () => T;
+        getData?: () => TState;
     }) => React.ReactNode;
     syncRender?: (options: {
         children: React.ReactNode;
         time: number;
-        data?: T;
+        data?: TState;
         key?: string;
     }) => React.ReactNode;
+} & {
+    [P in TPlugins[number] as P['name']]?: P['formWrapper'] extends (arg: any) => any ? Parameters<P['formWrapper']>[0] : never;
 };
 export type CogsInitialState<T> = {
     initialState: T;
@@ -290,21 +294,21 @@ export type TransformedStateType<T> = {
 export declare function addStateOptions<T>(initialState: T, options: CreateStateOptionsType<T>): {
     initialState: T;
     _addStateOptions: boolean;
-    formElements?: FormsElementsType<T> | undefined;
+    formElements?: FormsElementsType<T, []> | undefined;
     validation?: ValidationOptionsType;
-    plugins?: CogsPlugin<string, T, {}>[] | undefined;
+    plugins?: [] | undefined;
 };
 export type PluginData = {
-    plugin: CogsPlugin<any, any, any>;
+    plugin: CogsPlugin<any, any, any, any, any>;
     options: any;
     hookData?: any;
 };
-export declare const createCogsState: <State extends Record<string, unknown>, TPlugins extends readonly CogsPlugin<string, State, any, any>[] = []>(initialState: State, opt?: {
-    formElements?: FormsElementsType<State>;
-    validation?: ValidationOptionsType;
+export declare const createCogsState: <State extends Record<string, unknown>, const TPlugins extends readonly CogsPlugin<string, any, any, any, any>[] = []>(initialState: State, opt?: {
     plugins?: TPlugins;
+    formElements?: FormsElementsType<State, TPlugins>;
+    validation?: ValidationOptionsType;
 }) => {
-    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: CreateStateOptionsType<unknown, {}> & {
+    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: CreateStateOptionsType<unknown, []> & {
         log?: boolean;
         componentId?: string;
         syncOptions?: SyncOptionsType<never> | undefined;
@@ -343,11 +347,12 @@ export declare const createCogsState: <State extends Record<string, unknown>, TP
         syncUpdate?: Partial<UpdateTypeDetail>;
         defaultState?: TransformedStateType<State>[StateKey] | undefined;
         dependencies?: any[];
-    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, State, infer O, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, State, infer O, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
+    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
         __key: "keyed";
         map: infer TMap;
     } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey]>;
-    setCogsOptions: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
+    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
+    setCogsFormElements: (formElements: FormsElementsType<State, TPlugins>) => void;
 };
 type LocalStorageData<T> = {
     state: T;

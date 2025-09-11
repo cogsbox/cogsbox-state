@@ -72,7 +72,6 @@ export type ShadowMetadata = {
     };
     validation?: ValidationState;
     features?: {
-        validationEnabled: boolean;
         localStorageEnabled: boolean;
     };
     signals?: Array<{
@@ -118,7 +117,7 @@ export type CogsGlobalState = {
     getShadowValue: (key: string, path: string[], validArrayIds?: string[], log?: boolean) => any;
     updateShadowAtPath: (key: string, path: string[], newValue: any) => void;
     insertManyShadowArrayElements: (key: string, arrayPath: string[], newItems: any[], index?: number) => void;
-    addItemsToArrayNode: (key: string, arrayPath: string[], newItems: any, newKeys: string[]) => void;
+    addItemsToArrayNode: (key: string, arrayPath: string[], newItems: any) => void;
     insertShadowArrayElement: (key: string, arrayPath: string[], newItem: any, index?: number, itemId?: string) => string;
     removeShadowArrayElement: (key: string, itemPath: string[]) => void;
     registerComponent: (stateKey: string, componentId: string, registration: any) => void;

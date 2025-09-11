@@ -5,6 +5,7 @@ import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
 import { pluginStore } from '../src/pluginStore';
 import React from 'react';
+import z from 'zod';
 
 describe('Plugin Hook to Transform Flow', () => {
   const initialState = {
@@ -25,10 +26,9 @@ describe('Plugin Hook to Transform Flow', () => {
     let hookRenderCount = 0;
     let transformCallCount = 0;
 
-    const { createPlugin } = createPluginContext<
-      typeof initialState,
-      { multiplier: number }
-    >();
+    const { createPlugin } = createPluginContext({
+      options: z.object({ multiplier: z.number() }),
+    });
     const testPlugin = createPlugin('testPlugin')
       .useHook((params) => {
         hookRenderCount++;
@@ -40,12 +40,6 @@ describe('Plugin Hook to Transform Flow', () => {
       .transformState((params) => {
         transformCallCount++;
         capturedHookData = params.hookData;
-
-        if (params.hookData && params.stateKey === 'counter') {
-          params.cogsState.$update({
-            value: params.hookData.computedValue,
-          });
-        }
       });
 
     const { useCogsState } = createCogsState(initialState, {
@@ -86,10 +80,9 @@ describe('Plugin Hook to Transform Flow', () => {
     let hookRenderCount = 0;
     let transformCallCount = 0;
 
-    const { createPlugin } = createPluginContext<
-      typeof initialState,
-      { value: number }
-    >();
+    const { createPlugin } = createPluginContext({
+      options: z.object({ value: z.number() }),
+    });
 
     const testPlugin = createPlugin('testPlugin')
       .useHook((params) => {
@@ -141,10 +134,9 @@ describe('Plugin Hook to Transform Flow', () => {
     let capturedUpdateDetail: any = null;
     let capturedHookData: any = null;
 
-    const { createPlugin } = createPluginContext<
-      typeof initialState,
-      { someOption: string }
-    >();
+    const { createPlugin } = createPluginContext({
+      options: z.object({ someOption: z.string() }),
+    });
 
     const testPlugin = createPlugin('updateTestPlugin')
       .useHook(() => {
