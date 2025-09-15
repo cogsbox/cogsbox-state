@@ -43,13 +43,18 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
 };
 export function toDeconstructedMethods(stateHandler: StateObject<any>) {
   return {
-    initialiseState: (data: any) =>
-      stateHandler.$initializeAndMergeShadowState(data),
+    initialiseState: (data: any) => {
+      console.log('initialiseState', data);
+      stateHandler.$initializeAndMergeShadowState(data);
+    },
     applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) =>
       stateHandler.$applyOperation(patch, meta),
     addZodErrors: (errors: any[]) => stateHandler.$addZodValidation(errors),
     getState: () => stateHandler.$get(),
-    setOptions: (opts: any) => stateHandler.$setOptions(opts),
+    setOptions: (opts: any) => {
+      console.log('setOptions', opts);
+      stateHandler.$setOptions(opts);
+    },
   };
 }
 // UseHook now uses the base field metadata type (no extensions)
@@ -171,7 +176,6 @@ export type OnFormUpdateParams<
   options: TOptions;
   hookData?: THookReturn;
 
-  fieldMetadata?: any;
   formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
   pluginName: string;
 };

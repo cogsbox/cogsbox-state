@@ -35,6 +35,7 @@ import { v4 as uuidv4 } from 'uuid';
 import {
   getGlobalStore,
   shadowStateStore,
+  updateShadowTypeInfo,
   ValidationError,
   ValidationSeverity,
   ValidationStatus,
@@ -584,29 +585,24 @@ function setOptions<StateKey, Opt>({
 }) {
   const initialOptions = getInitialOptions(stateKey as string) || {};
   const initialOptionsPartState = initialOptionsPart[stateKey as string] || {};
-  console.log('initialOptions', initialOptions);
-  // Start with the base options
+
   let mergedOptions = { ...initialOptionsPartState, ...initialOptions };
   let needToAdd = false;
 
   if (options) {
-    // A function to recursively merge properties
     const deepMerge = (target: any, source: any) => {
       for (const key in source) {
         if (source.hasOwnProperty(key)) {
-          // If the property is an object (and not an array), recurse
           if (
             source[key] instanceof Object &&
             !Array.isArray(source[key]) &&
             target[key] instanceof Object
           ) {
-            // Check for changes before merging to set `needToAdd`
             if (!isDeepEqual(target[key], source[key])) {
               deepMerge(target[key], source[key]);
               needToAdd = true;
             }
           } else {
-            // Overwrite if the value is different
             if (target[key] !== source[key]) {
               target[key] = source[key];
               needToAdd = true;
@@ -617,31 +613,63 @@ function setOptions<StateKey, Opt>({
       return target;
     };
 
-    // Perform a deep merge
     mergedOptions = deepMerge(mergedOptions, options);
   }
 
-  // Set default onBlur ONLY if validation exists and onBlur was not explicitly provided
+  // Set default onBlur
   if (mergedOptions.validation) {
-    // Check if onBlur was explicitly provided in any of the option sources
     const onBlurProvided =
       options?.validation?.hasOwnProperty('onBlur') ||
       initialOptions?.validation?.hasOwnProperty('onBlur') ||
       initialOptionsPartState?.validation?.hasOwnProperty('onBlur');
 
     if (!onBlurProvided) {
-      mergedOptions.validation.onBlur = 'error'; // Default to error on blur
+      mergedOptions.validation.onBlur = 'error';
       needToAdd = true;
     }
   }
 
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
+
+    // NEW: Update type info if validation schema was added
+    const hadSchema =
+      initialOptions?.validation?.zodSchemaV4 ||
+      initialOptions?.validation?.zodSchemaV3;
+    const hasNewSchemaV4 =
+      mergedOptions.validation?.zodSchemaV4 &&
+      !initialOptions?.validation?.zodSchemaV4;
+    const hasNewSchemaV3 =
+      mergedOptions.validation?.zodSchemaV3 &&
+      !initialOptions?.validation?.zodSchemaV3;
+    console.log(
+      '!bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
+      hadSchema,
+      hasNewSchemaV4,
+      hasNewSchemaV3
+    );
+    if (!hadSchema && (hasNewSchemaV4 || hasNewSchemaV3)) {
+      if (hasNewSchemaV4) {
+        updateShadowTypeInfo(
+          stateKey as string,
+          mergedOptions.validation.zodSchemaV4,
+          'zod4'
+        );
+      } else if (hasNewSchemaV3) {
+        updateShadowTypeInfo(
+          stateKey as string,
+          mergedOptions.validation.zodSchemaV3,
+          'zod3'
+        );
+      }
+
+      // Notify components to re-render with updated validation
+      notifyComponents(stateKey as string);
+    }
   }
-  console.log('mergedOptions', mergedOptions);
+  console.log('merged optipons', mergedOptions);
   return mergedOptions;
 }
-
 export function addStateOptions<T>(
   initialState: T,
   options: CreateStateOptionsType<T>

@@ -246,187 +246,131 @@ export type CogsGlobalState = {
   setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
   getSyncInfo: (key: string) => SyncInfo | null;
 };
-
 function getTypeFromZodSchema(
   schema: any,
   source: 'zod4' | 'zod3' | 'sync' = 'zod4'
 ): TypeInfo | null {
   if (!schema) return null;
 
-  let baseSchema = schema;
+  let current = schema;
   let isNullable = false;
   let isOptional = false;
   let defaultValue: any = undefined;
   let hasDefault = false;
 
-  // Zod v4 unwrapping
-  if (schema._def) {
-    let current = schema;
+  // This loop will now correctly navigate through any wrappers AND unions.
+  for (let i = 0; i < 20; i++) {
+    // Added a safety break for complex schemas
+    const def = current?.def || current?._def;
+    if (!def) break;
 
-    // Keep unwrapping until we get to the base type
-    while (current._def) {
-      const typeName = current._def.typeName;
+    const typeIdentifier = def.typeName || def.type || current._type;
 
-      if (typeName === 'ZodOptional') {
-        isOptional = true;
-        current = current._def.innerType || current.unwrap();
-      } else if (typeName === 'ZodNullable') {
-        isNullable = true;
-        current = current._def.innerType || current.unwrap();
-      } else if (typeName === 'ZodDefault') {
-        hasDefault = true;
-        defaultValue = current._def.defaultValue();
-        current = current._def.innerType;
-      } else if (typeName === 'ZodEffects') {
-        // Handle .refine(), .transform() etc
-        current = current._def.schema;
+    // --- START: THE CRITICAL FIX FOR ZodUnion ---
+    if (typeIdentifier === 'ZodUnion' || typeIdentifier === 'union') {
+      if (def.options && def.options.length > 0) {
+        current = def.options[0]; // Proceed by analyzing the FIRST option of the union
+        continue; // Restart the loop with the new schema
       } else {
-        // We've reached the base type
-        break;
+        break; // Union with no options, cannot determine type
       }
     }
+    // --- END: THE CRITICAL FIX ---
 
-    baseSchema = current;
-    const typeName = baseSchema._def?.typeName;
-
-    if (typeName === 'ZodNumber') {
-      return {
-        type: 'number',
-        schema: schema, // Store the original schema with wrappers
-        source,
-        default: hasDefault ? defaultValue : 0,
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (typeName === 'ZodString') {
-      return {
-        type: 'string',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : '',
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (typeName === 'ZodBoolean') {
-      return {
-        type: 'boolean',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : false,
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (typeName === 'ZodArray') {
-      return {
-        type: 'array',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : [],
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (typeName === 'ZodObject') {
-      return {
-        type: 'object',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : {},
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (typeName === 'ZodDate') {
-      return {
-        type: 'date',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : new Date(),
-        nullable: isNullable,
-        optional: isOptional,
-      };
+    if (typeIdentifier === 'ZodOptional' || typeIdentifier === 'optional') {
+      isOptional = true;
+    } else if (
+      typeIdentifier === 'ZodNullable' ||
+      typeIdentifier === 'nullable'
+    ) {
+      isNullable = true;
+    } else if (
+      typeIdentifier === 'ZodDefault' ||
+      typeIdentifier === 'default'
+    ) {
+      hasDefault = true;
+      defaultValue =
+        typeof def.defaultValue === 'function'
+          ? def.defaultValue()
+          : def.defaultValue;
+    } else if (
+      typeIdentifier !== 'ZodEffects' &&
+      typeIdentifier !== 'effects'
+    ) {
+      // This is not a wrapper we need to unwrap further, so we can exit the loop.
+      break;
     }
+
+    const nextSchema = def.innerType || def.schema || current._inner;
+    if (!nextSchema || nextSchema === current) {
+      break; // Reached the end or a recursive schema
+    }
+    current = nextSchema;
   }
 
-  // Zod v3 unwrapping
-  if (schema._type) {
-    let current = schema;
+  const baseSchema = current;
+  const baseDef = baseSchema?.def || baseSchema?._def;
+  const baseType = baseDef?.typeName || baseDef?.type || baseSchema?._type;
 
-    // Check for wrappers in v3
-    while (current) {
-      if (current._type === 'optional') {
-        isOptional = true;
-        current = current._def?.innerType || current._inner;
-      } else if (current._type === 'nullable') {
-        isNullable = true;
-        current = current._def?.innerType || current._inner;
-      } else if (current._def?.defaultValue !== undefined) {
-        hasDefault = true;
-        defaultValue =
-          typeof current._def.defaultValue === 'function'
-            ? current._def.defaultValue()
-            : current._def.defaultValue;
-        break;
-      } else {
-        break;
-      }
-    }
-
-    baseSchema = current;
-
-    if (baseSchema._type === 'number') {
-      return {
-        type: 'number',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : 0,
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (baseSchema._type === 'string') {
-      return {
-        type: 'string',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : '',
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (baseSchema._type === 'boolean') {
-      return {
-        type: 'boolean',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : false,
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (baseSchema._type === 'array') {
-      return {
-        type: 'array',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : [],
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (baseSchema._type === 'object') {
-      return {
-        type: 'object',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : {},
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    } else if (baseSchema._type === 'date') {
-      return {
-        type: 'date',
-        schema: schema,
-        source,
-        default: hasDefault ? defaultValue : new Date(),
-        nullable: isNullable,
-        optional: isOptional,
-      };
-    }
+  if (baseType === 'ZodNumber' || baseType === 'number') {
+    return {
+      type: 'number',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : 0,
+      nullable: isNullable,
+      optional: isOptional,
+    };
+  }
+  if (baseType === 'ZodString' || baseType === 'string') {
+    return {
+      type: 'string',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : '',
+      nullable: isNullable,
+      optional: isOptional,
+    };
+  }
+  if (baseType === 'ZodBoolean' || baseType === 'boolean') {
+    return {
+      type: 'boolean',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : false,
+      nullable: isNullable,
+      optional: isOptional,
+    };
+  }
+  if (baseType === 'ZodArray' || baseType === 'array') {
+    return {
+      type: 'array',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : [],
+      nullable: isNullable,
+      optional: isOptional,
+    };
+  }
+  if (baseType === 'ZodObject' || baseType === 'object') {
+    return {
+      type: 'object',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : {},
+      nullable: isNullable,
+      optional: isOptional,
+    };
+  }
+  if (baseType === 'ZodDate' || baseType === 'date') {
+    return {
+      type: 'date',
+      schema: schema,
+      source,
+      default: hasDefault ? defaultValue : new Date(),
+      nullable: isNullable,
+      optional: isOptional,
+    };
   }
 
   return null;
@@ -487,63 +431,23 @@ export function buildShadowNode(
   value: any,
   context?: BuildContext
 ): ShadowNode {
-  // Handle null/undefined/primitives first
+  // Handle null/undefined/primitives (This part is already correct)
   if (value === null || value === undefined || typeof value !== 'object') {
-    const node: ShadowNode = {
-      _meta: {
-        value: value,
-      },
-    };
-
-    // Add type info
-    let typeInfo: TypeInfo | null = null;
-
-    if (context) {
-      // Check for schema-based type info
-      if (context.schemas.zodV4) {
-        const zodV4Path =
-          context.path.length === 0
-            ? context.schemas.zodV4
-            : getSchemaAtPath(context.schemas.zodV4, context.path);
-        if (zodV4Path) {
-          typeInfo = getTypeFromZodSchema(zodV4Path, 'zod4');
-        }
-      }
-
-      if (!typeInfo && context.schemas.zodV3) {
-        const zodV3Path =
-          context.path.length === 0
-            ? context.schemas.zodV3
-            : getSchemaAtPath(context.schemas.zodV3, context.path);
-        if (zodV3Path) {
-          typeInfo = getTypeFromZodSchema(zodV3Path, 'zod3');
-        }
-      }
-
-      if (!typeInfo && context.schemas.sync?.[stateKey]) {
-        // Handle sync schemas if needed
-        typeInfo = getTypeFromValue(value);
-        typeInfo.source = 'sync';
-      }
-    }
-
-    if (!typeInfo) {
-      typeInfo = getTypeFromValue(value);
-    }
-
-    node._meta!.typeInfo = typeInfo;
+    const node: ShadowNode = { _meta: { value } };
+    node._meta!.typeInfo = getTypeInfoForPath(value, context);
     return node;
   }
 
   // Handle arrays
   if (Array.isArray(value)) {
-    const arrayNode: ShadowNode = {
-      _meta: {
-        arrayKeys: [],
-      },
-    };
+    // --- START: CORRECTED LOGIC ---
+    // 1. Create the node for the array.
+    const node: ShadowNode = { _meta: { arrayKeys: [] } };
 
-    const idKeys: string[] = [];
+    // 2. Get the type info for the array itself ONCE, right at the start.
+    node._meta!.typeInfo = getTypeInfoForPath(value, context);
+
+    // 3. THEN, recursively process the children.
     value.forEach((item, index) => {
       const itemId = generateId(stateKey);
       const itemContext = context
@@ -553,121 +457,44 @@ export function buildShadowNode(
           }
         : undefined;
 
-      arrayNode[itemId] = buildShadowNode(stateKey, item, itemContext);
-      idKeys.push(itemId);
+      node[itemId] = buildShadowNode(stateKey, item, itemContext);
+      node._meta!.arrayKeys!.push(itemId);
     });
 
-    arrayNode._meta!.arrayKeys = idKeys;
-
-    // Add array type info if context available
-    if (context) {
-      let typeInfo: TypeInfo | null = null;
-
-      if (context.schemas.zodV4) {
-        const schema =
-          context.path.length === 0
-            ? context.schemas.zodV4
-            : getSchemaAtPath(context.schemas.zodV4, context.path);
-        if (schema) {
-          typeInfo = getTypeFromZodSchema(schema, 'zod4');
-        }
-      }
-
-      if (!typeInfo && context.schemas.zodV3) {
-        const schema =
-          context.path.length === 0
-            ? context.schemas.zodV3
-            : getSchemaAtPath(context.schemas.zodV3, context.path);
-        if (schema) {
-          typeInfo = getTypeFromZodSchema(schema, 'zod3');
-        }
-      }
-
-      if (!typeInfo) {
-        typeInfo = {
-          type: 'array',
-          schema: null,
-          source: 'runtime',
-          default: [],
-        };
-      }
-
-      arrayNode._meta!.typeInfo = typeInfo;
-    }
-
-    return arrayNode;
+    return node;
+    // --- END: CORRECTED LOGIC ---
   }
 
   // Handle objects
   if (value.constructor === Object) {
-    // Check if it's a simple object for optimization
-    const keys = Object.keys(value);
-    let isSimpleObject = true;
+    // --- START: CORRECTED LOGIC ---
+    // 1. Create the node for the object.
+    const node: ShadowNode = { _meta: {} };
 
-    for (const key of keys) {
-      const propValue = value[key];
-      const propType = typeof propValue;
-      if (
-        propValue !== null &&
-        propType !== 'string' &&
-        propType !== 'number' &&
-        propType !== 'boolean'
-      ) {
-        isSimpleObject = false;
-        break;
+    // 2. Get the type info for the object itself ONCE, right at the start.
+    node._meta!.typeInfo = getTypeInfoForPath(value, context);
+
+    // 3. THEN, recursively process the children.
+    for (const key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        const propContext = context
+          ? {
+              ...context,
+              path: [...context.path, key],
+            }
+          : undefined;
+
+        node[key] = buildShadowNode(stateKey, value[key], propContext);
       }
     }
 
-    const objectNode: ShadowNode = {
-      _meta: {
-        typeInfo: {
-          type: 'object',
-          schema: context
-            ? getSchemaAtPath(
-                context.schemas.zodV4 || context.schemas.zodV3,
-                context.path
-              )
-            : null,
-          source: context?.schemas.zodV4
-            ? 'zod4'
-            : context?.schemas.zodV3
-              ? 'zod3'
-              : 'runtime',
-          default: {},
-        },
-      },
-    };
-
-    // Use optimized path for simple objects
-    if (isSimpleObject && !context) {
-      for (const key of keys) {
-        objectNode[key] = {
-          _meta: {
-            value: value[key],
-            typeInfo: getTypeFromValue(value[key]),
-          },
-        };
-      }
-    } else {
-      // Use recursive path for complex objects or when context is needed
-      for (const key in value) {
-        if (Object.prototype.hasOwnProperty.call(value, key)) {
-          const propContext = context
-            ? {
-                ...context,
-                path: [...context.path, key],
-              }
-            : undefined;
-
-          objectNode[key] = buildShadowNode(stateKey, value[key], propContext);
-        }
-      }
-    }
-
-    return objectNode;
+    return node;
+    // --- END: CORRECTED LOGIC ---
+    // Note: The "simple object" optimization was removed as it complicates this clean logic.
+    // The recursive path is more robust and now more efficient.
   }
 
-  // Fallback for other object types (Date, etc.)
+  // Fallback for other object types (Date, class instances, etc.)
   return {
     _meta: {
       value: value,
@@ -676,51 +503,164 @@ export function buildShadowNode(
   };
 }
 
-// Helper function to get schema at a specific path
-function getSchemaAtPath(schema: any, path: string[]): any {
-  if (!schema || path.length === 0) return schema;
+// Helper function to get type info (extracted for clarity)
+function getTypeInfoForPath(value: any, context?: BuildContext): TypeInfo {
+  if (context) {
+    // Try to get schema-based type info
+    let typeInfo: TypeInfo | null = null;
 
-  let current = schema;
-
-  for (const segment of path) {
-    // Handle Zod v4
-    if (current._def) {
-      // Unwrap modifiers
-      while (
-        current._def &&
-        (current._def.typeName === 'ZodOptional' ||
-          current._def.typeName === 'ZodNullable' ||
-          current._def.typeName === 'ZodDefault')
-      ) {
-        current = current._def.innerType || current.unwrap();
-      }
-
-      if (current._def.typeName === 'ZodObject') {
-        current = current.shape[segment];
-      } else if (current._def.typeName === 'ZodArray') {
-        // For array indices, get the element schema
-        current = current._def.type;
-      } else {
-        return null;
+    if (context.schemas.zodV4) {
+      const schema =
+        context.path.length === 0
+          ? context.schemas.zodV4
+          : getSchemaAtPath(context.schemas.zodV4, context.path);
+      if (schema) {
+        console.log('uuuuuuuuuuuuuuuuuuuuuuuuuuuuuu', schema);
+        typeInfo = getTypeFromZodSchema(schema, 'zod4');
       }
     }
-    // Handle Zod v3
-    else if (current._type) {
-      if (current._type === 'object' && current._shape) {
-        current = current._shape[segment];
-      } else if (current._type === 'array' && current._def) {
-        current = current._def.type;
-      } else {
-        return null;
+
+    if (!typeInfo && context.schemas.zodV3) {
+      const schema =
+        context.path.length === 0
+          ? context.schemas.zodV3
+          : getSchemaAtPath(context.schemas.zodV3, context.path);
+      if (schema) {
+        typeInfo = getTypeFromZodSchema(schema, 'zod3');
       }
-    } else {
-      return null;
     }
 
-    if (!current) return null;
+    if (!typeInfo && context.schemas.sync?.[context.stateKey]) {
+      typeInfo = getTypeFromValue(value);
+      typeInfo.source = 'sync';
+    }
+
+    if (typeInfo) return typeInfo;
   }
 
+  return getTypeFromValue(value);
+}
+
+export function updateShadowTypeInfo(
+  stateKey: string,
+  rootSchema: any,
+  source: 'zod4' | 'zod3'
+) {
+  const rootNode =
+    shadowStateStore.get(stateKey) || shadowStateStore.get(`[${stateKey}`);
+  if (!rootNode) return;
+
+  function updateNodeTypeInfo(node: any, path: string[]) {
+    if (!node || typeof node !== 'object') return;
+    const fieldSchema = getSchemaAtPath(rootSchema, path);
+    console.log('fieldSchema', fieldSchema, path);
+    if (fieldSchema) {
+      const typeInfo = getTypeFromZodSchema(fieldSchema, source);
+      console.log('typeInfo', typeInfo);
+      if (typeInfo) {
+        if (!node._meta) node._meta = {};
+        node._meta.typeInfo = {
+          ...typeInfo,
+          schema: fieldSchema,
+        };
+      }
+    }
+    console.log('nodenodenodenodenodenode', node);
+    // Recursively update children
+    if (node._meta?.arrayKeys) {
+      node._meta.arrayKeys.forEach((itemKey: string) => {
+        if (node[itemKey]) {
+          console.log(
+            'updating type info for array item',
+            node[itemKey],
+            itemKey
+          );
+          updateNodeTypeInfo(node[itemKey], [...path, '0']); // Use index 0 for array item schema
+        }
+      });
+    } else if (!node._meta?.hasOwnProperty('value')) {
+      // It's an object - update each property
+      Object.keys(node).forEach((key) => {
+        if (key !== '_meta') {
+          updateNodeTypeInfo(node[key], [...path, key]);
+        }
+      });
+    }
+  }
+
+  updateNodeTypeInfo(rootNode, []);
+}
+
+/**
+ * Reliably unwraps a Zod schema to its core type, handling modifiers
+ * from both Zod v3 and modern Zod.
+ */
+function unwrapSchema(schema: any): any {
+  let current = schema;
+  while (current) {
+    // Version-agnostic way to get the definition object
+    const def = current.def || current._def;
+
+    // VITAL FIX: Check for `def.type` (like in your log), `def.typeName` (modern Zod), and `_type` (zod v3)
+    const typeIdentifier = def?.typeName || def?.type || current._type;
+
+    if (
+      typeIdentifier === 'ZodOptional' ||
+      typeIdentifier === 'optional' ||
+      typeIdentifier === 'ZodNullable' ||
+      typeIdentifier === 'nullable' ||
+      typeIdentifier === 'ZodDefault' ||
+      typeIdentifier === 'default' ||
+      typeIdentifier === 'ZodEffects' ||
+      typeIdentifier === 'effects'
+    ) {
+      // Get the inner schema, supporting multiple internal structures
+      current =
+        def.innerType || def.schema || current._inner || current.unwrap?.();
+    } else {
+      break; // Reached the base schema
+    }
+  }
   return current;
+}
+
+/**
+ * Helper function to get a nested schema at a specific path,
+ * correctly handling both Zod v3 and modern Zod internals.
+ */
+function getSchemaAtPath(schema: any, path: string[]): any {
+  if (!schema) return null;
+  if (path.length === 0) return schema;
+
+  let currentSchema = schema;
+
+  for (const segment of path) {
+    const containerSchema = unwrapSchema(currentSchema);
+    if (!containerSchema) return null;
+
+    const def = containerSchema.def || containerSchema._def;
+
+    // VITAL FIX: Check for `def.type` as you discovered.
+    const typeIdentifier = def?.typeName || def?.type || containerSchema._type;
+
+    if (typeIdentifier === 'ZodObject' || typeIdentifier === 'object') {
+      // VITAL FIX: Check for `shape` inside `def` first, then on the schema itself.
+      const shape =
+        def?.shape || containerSchema.shape || containerSchema._shape;
+      currentSchema = shape?.[segment];
+    } else if (typeIdentifier === 'ZodArray' || typeIdentifier === 'array') {
+      // For arrays, the next schema is always the element's schema.
+      currentSchema = containerSchema.element || def?.type;
+    } else {
+      return null; // Not a container, cannot traverse deeper.
+    }
+
+    if (!currentSchema) {
+      return null; // Path segment does not exist in the schema.
+    }
+  }
+
+  return currentSchema;
 }
 export const shadowStateStore = new Map<string, ShadowNode>();
 let globalCounter = 0;
@@ -778,6 +718,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       transformCaches: metadata.transformCaches,
     });
   },
+  // Replace your entire `initializeAndMergeShadowState` function with this one.
+
   initializeAndMergeShadowState: (key: string, shadowState: any) => {
     const isArrayState = shadowState?._meta?.arrayKeys !== undefined;
     const storageKey = isArrayState ? `[${key}` : key;
@@ -787,8 +729,10 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       shadowStateStore.get(key) ||
       shadowStateStore.get(`[${key}`);
 
+    // --- THIS LOGIC IS RESTORED ---
+    // This is vital for preserving component registrations and other top-level
+    // metadata across a full merge/replace, which is why removing it was a mistake.
     let preservedMetadata: Partial<ShadowMetadata> = {};
-
     if (existingRoot?._meta) {
       const {
         components,
@@ -810,108 +754,119 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       if (signals) preservedMetadata.signals = signals;
       if (validation) preservedMetadata.validation = validation;
     }
+    function deepMergeShadowNodes(target: ShadowNode, source: ShadowNode) {
+      // --- START: CORRECTED, MORE ROBUST METADATA MERGE ---
+      if (source._meta || target._meta) {
+        const existingMeta = target._meta || {};
+        const sourceMeta = source._meta || {};
 
-    // Deep merge function that preserves shadow node structure
-    function deepMergeShadowNodes(
-      target: ShadowNode,
-      source: ShadowNode
-    ): ShadowNode {
-      // If source has a primitive value in _meta, use it
+        // Combine metadata, letting the source overwrite simple, top-level properties.
+        const newMeta = { ...existingMeta, ...sourceMeta };
+
+        // CRITICAL FIX: Now, explicitly check and preserve the complex, valuable
+        // objects from the existing state if the incoming source state doesn't have
+        // an equally good or better version.
+
+        // 1. Preserve rich TypeInfo (with a schema) over a simple runtime one.
+        if (existingMeta.typeInfo?.schema && !sourceMeta.typeInfo?.schema) {
+          newMeta.typeInfo = existingMeta.typeInfo;
+        }
+
+        // 2. Preserve the existing validation state, which is computed and stored on the target.
+        // A source built from a plain object will never have this.
+        if (existingMeta.validation && !sourceMeta.validation) {
+          newMeta.validation = existingMeta.validation;
+        }
+
+        // 3. Preserve component registrations, which only exist on the live target state.
+        if (existingMeta.components) {
+          newMeta.components = existingMeta.components;
+        }
+
+        target._meta = newMeta;
+      }
+      // --- END: CORRECTED METADATA MERGE ---
+
+      // 2. Handle the node's data (primitive, array, or object).
       if (source._meta?.hasOwnProperty('value')) {
-        if (!target._meta) target._meta = {};
-        target._meta.value = source._meta.value;
-        // Clear any non-meta properties since this is a primitive
+        // Source is a primitive. Clear any old child properties from target.
         for (const key in target) {
-          if (key !== '_meta') {
-            delete target[key];
-          }
+          if (key !== '_meta') delete target[key];
         }
-        return target;
+        return; // Done with this branch
       }
 
-      // Handle array nodes
-      if (source._meta?.arrayKeys) {
-        // For arrays, completely replace with new array structure
-        // but preserve non-array metadata
-        const preservedMeta = { ...target._meta };
-        delete preservedMeta.arrayKeys;
+      // Synchronize the data structure based on the source.
+      const sourceKeys = new Set(
+        Object.keys(source).filter((k) => k !== '_meta')
+      );
+      const targetKeys = new Set(
+        Object.keys(target).filter((k) => k !== '_meta')
+      );
 
-        // Clear old array items
-        if (target._meta?.arrayKeys) {
-          target._meta.arrayKeys.forEach((itemKey) => {
-            delete target[itemKey];
-          });
+      // Delete keys that are in the target but no longer in the source.
+      for (const key of targetKeys) {
+        if (!sourceKeys.has(key)) {
+          delete target[key];
         }
-
-        // Copy new array structure
-        target._meta = { ...preservedMeta, ...source._meta };
-        source._meta.arrayKeys.forEach((itemKey) => {
-          target[itemKey] = source[itemKey];
-        });
-
-        return target;
       }
 
-      // Handle object nodes - merge properties
-      for (const key in source) {
-        if (key === '_meta') {
-          // Merge metadata
-          target._meta = { ...(target._meta || {}), ...(source._meta || {}) };
+      // Recursively merge or add keys from the source.
+      for (const key of sourceKeys) {
+        const sourceValue = source[key];
+        const targetValue = target[key];
+        if (
+          targetValue &&
+          typeof targetValue === 'object' &&
+          sourceValue &&
+          typeof sourceValue === 'object'
+        ) {
+          deepMergeShadowNodes(targetValue, sourceValue); // Recurse for objects
         } else {
-          // Recursively merge or set property
-          if (
-            target[key] &&
-            typeof target[key] === 'object' &&
-            typeof source[key] === 'object'
-          ) {
-            deepMergeShadowNodes(target[key], source[key]);
-          } else {
-            target[key] = source[key];
-          }
+          target[key] = sourceValue; // Add new or replace primitive/node
         }
       }
-
-      // Remove any keys in target that don't exist in source (for object nodes)
-      if (!source._meta?.arrayKeys && !source._meta?.hasOwnProperty('value')) {
-        for (const key in target) {
-          if (key !== '_meta' && !source.hasOwnProperty(key)) {
-            delete target[key];
-          }
-        }
-      }
-
-      return target;
     }
-
+    // --- THIS IS YOUR ORIGINAL, CORRECT MAIN LOGIC ---
     if (existingRoot) {
       // Merge the new shadow state into the existing one
       deepMergeShadowNodes(existingRoot, shadowState);
-
-      // Restore preserved metadata (these should override what came from shadowState)
+      // Restore preserved metadata
       if (!existingRoot._meta) existingRoot._meta = {};
       Object.assign(existingRoot._meta, preservedMetadata);
-
-      // Update the store with merged state
       shadowStateStore.set(storageKey, existingRoot);
     } else {
-      // No existing state, just use the provided shadowState
-      // But still preserve any metadata if it somehow exists
+      // The logic for when no state exists yet
       if (preservedMetadata && Object.keys(preservedMetadata).length > 0) {
         if (!shadowState._meta) shadowState._meta = {};
         Object.assign(shadowState._meta, preservedMetadata);
       }
-
       shadowStateStore.set(storageKey, shadowState);
     }
 
-    // Clear any incorrect keys if they exist
+    // As your logs show, this part works. It runs AFTER the merge to apply schemas.
+    const options = get().getInitialOptions(key);
+    const hasSchema =
+      options?.validation?.zodSchemaV4 || options?.validation?.zodSchemaV3;
+    if (hasSchema) {
+      if (options.validation?.zodSchemaV4) {
+        console.log('updating type info for zod4', key);
+        updateShadowTypeInfo(key, options.validation.zodSchemaV4, 'zod4');
+      } else if (options.validation?.zodSchemaV3) {
+        updateShadowTypeInfo(key, options.validation.zodSchemaV3, 'zod3');
+      }
+    }
+    console.log(
+      'shadowStateStoreshadowStateStore >>>>>>>>>>>>>>>>>>>>>',
+      shadowStateStore
+    );
+    // Cleanup logic is restored
     if (storageKey === key) {
       shadowStateStore.delete(`[${key}`);
     } else {
       shadowStateStore.delete(key);
     }
   },
-
   initializeShadowState: (key: string, initialState: any) => {
     const existingRoot =
       shadowStateStore.get(key) || shadowStateStore.get(`[${key}`);
@@ -1008,6 +963,10 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     if (!current._meta) {
       current._meta = {};
     }
+    if (path.length > 0) {
+      console.log('current._meta', path, current._meta);
+      console.log('newMetadata', path, newMetadata);
+    }
     Object.assign(current._meta, newMetadata);
   },
   getShadowValue: (key: string, path: string[], validArrayIds?: string[]) => {
@@ -1071,14 +1030,11 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     return rootResult.final;
   },
-
   updateShadowAtPath: (key, path, newValue) => {
-    // NO MORE set() wrapper - direct mutation!
     const rootKey = shadowStateStore.has(`[${key}`) ? `[${key}` : key;
     let root = shadowStateStore.get(rootKey);
     if (!root) return;
 
-    // Navigate to parent without cloning
     let parentNode = root;
     for (let i = 0; i < path.length - 1; i++) {
       if (!parentNode[path[i]!]) {
@@ -1089,66 +1045,137 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const targetNode =
       path.length === 0 ? parentNode : parentNode[path[path.length - 1]!];
 
-    if (!targetNode) {
-      parentNode[path[path.length - 1]!] = buildShadowNode(key, newValue);
-      get().notifyPathSubscribers([key, ...path].join('.'), {
-        type: 'UPDATE',
-        newValue,
-      });
-      return;
-    }
-
-    function intelligentMerge(nodeToUpdate: any, plainValue: any) {
+    // This function is now defined inside to close over 'key' and 'path' for context
+    function intelligentMerge(
+      nodeToUpdate: any,
+      plainValue: any,
+      currentPath: string[]
+    ) {
+      // 1. Handle primitives (but NOT arrays)
       if (
         typeof plainValue !== 'object' ||
         plainValue === null ||
-        Array.isArray(plainValue)
+        plainValue instanceof Date
       ) {
-        const oldMeta = nodeToUpdate._meta;
-        // Clear existing properties
-        for (const key in nodeToUpdate) {
-          if (key !== '_meta') delete nodeToUpdate[key];
+        const oldMeta = nodeToUpdate._meta || {};
+        // Clear all child properties
+        for (const prop in nodeToUpdate) {
+          if (prop !== '_meta') delete nodeToUpdate[prop];
         }
-        const newNode = buildShadowNode(key, plainValue);
-        Object.assign(nodeToUpdate, newNode);
-        if (oldMeta) {
-          nodeToUpdate._meta = { ...oldMeta, ...(nodeToUpdate._meta || {}) };
-        }
+        // Set the new primitive value, preserving metadata
+        nodeToUpdate._meta = { ...oldMeta, value: plainValue };
         return;
       }
 
+      // 2. Handle Arrays INTELLIGENTLY
+      if (Array.isArray(plainValue)) {
+        // Ensure the target is a shadow array node
+        if (!nodeToUpdate._meta) nodeToUpdate._meta = {};
+        if (!nodeToUpdate._meta.arrayKeys) nodeToUpdate._meta.arrayKeys = [];
+
+        const existingKeys = nodeToUpdate._meta.arrayKeys;
+        const newValues = plainValue;
+
+        const updatedKeys: string[] = [];
+
+        // Merge existing items and add new items
+        for (let i = 0; i < newValues.length; i++) {
+          const newItemValue = newValues[i]!;
+          if (i < existingKeys.length) {
+            // Merge into existing item, preserving its key and metadata
+            const existingKey = existingKeys[i]!;
+            intelligentMerge(nodeToUpdate[existingKey], newItemValue, [
+              ...currentPath,
+              existingKey,
+            ]);
+            updatedKeys.push(existingKey);
+          } else {
+            // Add a new item
+            const newItemId = generateId(key);
+            const options = get().getInitialOptions(key);
+            // Build the new node WITH proper context to get schema info
+            const itemContext: BuildContext = {
+              stateKey: key,
+              path: [...currentPath, '0'], // Use '0' for array element schema lookup
+              schemas: {
+                zodV4: options?.validation?.zodSchemaV4,
+                zodV3: options?.validation?.zodSchemaV3,
+              },
+            };
+            nodeToUpdate[newItemId] = buildShadowNode(
+              key,
+              newItemValue,
+              itemContext
+            );
+            updatedKeys.push(newItemId);
+          }
+        }
+
+        // Remove deleted items
+        if (existingKeys.length > newValues.length) {
+          const keysToDelete = existingKeys.slice(newValues.length);
+          keysToDelete.forEach((keyToDelete: string) => {
+            delete nodeToUpdate[keyToDelete];
+          });
+        }
+
+        // Update the keys array to reflect the new state
+        nodeToUpdate._meta.arrayKeys = updatedKeys;
+        return;
+      }
+
+      // 3. Handle Objects
       const plainValueKeys = new Set(Object.keys(plainValue));
+      if (nodeToUpdate._meta?.hasOwnProperty('value')) {
+        // transitioning from primitive to object, clear the value
+        delete nodeToUpdate._meta.value;
+      }
 
       for (const propKey of plainValueKeys) {
         const childValue = plainValue[propKey];
         if (nodeToUpdate[propKey]) {
-          intelligentMerge(nodeToUpdate[propKey], childValue);
+          intelligentMerge(nodeToUpdate[propKey], childValue, [
+            ...currentPath,
+            propKey,
+          ]);
         } else {
-          nodeToUpdate[propKey] = buildShadowNode(key, childValue);
+          const options = get().getInitialOptions(key);
+          const itemContext: BuildContext = {
+            stateKey: key,
+            path: [...currentPath, propKey],
+            schemas: {
+              zodV4: options?.validation?.zodSchemaV4,
+              zodV3: options?.validation?.zodSchemaV3,
+            },
+          };
+          nodeToUpdate[propKey] = buildShadowNode(key, childValue, itemContext);
         }
       }
 
+      // Delete keys that no longer exist
       for (const nodeKey in nodeToUpdate) {
         if (
           nodeKey === '_meta' ||
           !Object.prototype.hasOwnProperty.call(nodeToUpdate, nodeKey)
         )
           continue;
-
         if (!plainValueKeys.has(nodeKey)) {
           delete nodeToUpdate[nodeKey];
         }
       }
     }
 
-    intelligentMerge(targetNode, newValue);
+    if (!targetNode) {
+      parentNode[path[path.length - 1]!] = buildShadowNode(key, newValue); // Build fresh if no target
+    } else {
+      intelligentMerge(targetNode, newValue, path); // Use the new intelligent merge
+    }
 
     get().notifyPathSubscribers([key, ...path].join('.'), {
       type: 'UPDATE',
       newValue,
     });
   },
-
   addItemsToArrayNode: (key, arrayPath, newItems) => {
     const rootKey = shadowStateStore.has(`[${key}`) ? `[${key}` : key;
     let root = shadowStateStore.get(rootKey);
@@ -1174,7 +1201,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         `Array not found at path: ${[key, ...arrayPath].join('.')}`
       );
     }
-
+    console.log('OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO');
     const newItemId = itemId || `${generateId(key)}`;
 
     // BUILD AND ADD the node directly - no need for addItemsToArrayNode
@@ -1205,6 +1232,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     return newItemId;
   },
+
   insertManyShadowArrayElements: (key, arrayPath, newItems, index) => {
     if (!newItems || newItems.length === 0) {
       return;

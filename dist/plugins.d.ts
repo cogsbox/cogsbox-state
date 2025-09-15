@@ -95,7 +95,6 @@ export type OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMet
     };
     options: TOptions;
     hookData?: THookReturn;
-    fieldMetadata?: any;
     formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
     pluginName: string;
 };

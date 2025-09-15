@@ -15,7 +15,7 @@ import { getGlobalStore, ValidationError, ValidationSeverity } from './store';
 import { useInView } from 'react-intersection-observer';
 import { v4 as uuidv4 } from 'uuid';
 import { isDeepEqual } from './utility';
-import { useStore } from 'zustand';
+
 const {
   getInitialOptions,
 
@@ -232,14 +232,12 @@ export function FormElementWrapper({
   // Get the shadow node to access typeInfo and schema
   const shadowNode = getGlobalStore.getState().getShadowNode(stateKey, path);
   const typeInfo = shadowNode?._meta?.typeInfo;
-  const fieldSchema = typeInfo?.schema; // The actual Zod schema for this field
-  console.log('fieldSchema', fieldSchema);
+  const fieldSchema = typeInfo?.schema;
+
   const globalStateValue = getShadowValue(stateKey, path);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  const cogsState = stateHandlers.get(stateKey);
 
   // 2. Memoize the list of active form wrappers to avoid re-calculating on every render.
   const activeFormWrappers = useMemo(() => {
@@ -291,12 +289,11 @@ export function FormElementWrapper({
   const validateField = useCallback(
     (value: any, trigger: 'onChange' | 'onBlur') => {
       const validationOptions = getInitialOptions(stateKey)?.validation;
-      console.log('validationOptions', validationOptions);
       if (!validationOptions) return;
 
       const currentMeta = getShadowMetadata(stateKey, path) || {};
       const currentStatus = currentMeta?.validation?.status;
-
+      console.log('currentMeta', fieldSchema, currentMeta, validationOptions);
       let shouldValidate = false;
       let severity: 'error' | 'warning' | undefined;
 
@@ -309,101 +306,45 @@ export function FormElementWrapper({
           severity = validationOptions.onChange;
         } else if (currentStatus === 'INVALID') {
           shouldValidate = true;
-          severity = 'warning';
+          severity = 'warning'; // Re-validate on change if already invalid
         }
       }
-      console.log('shouldValidate', shouldValidate);
+      console.log(
+        'fieldSchemafieldSchemafieldSchemafieldSchema shouldValidate',
+        fieldSchema,
+        shouldValidate
+      );
       if (!shouldValidate) return;
 
+      // --- CORE CHANGE ---
+      // If there's no specific schema on the field's metadata, DO NOTHING.
+      // This completely removes the complex and buggy fallback logic.
+      if (!fieldSchema) {
+        return;
+      }
+
+      // At this point, we know we should validate AND we have a schema.
+      // The logic is now simple and direct.
       let validationResult: { success: boolean; message?: string } | null =
         null;
 
-      if (fieldSchema && shouldValidate) {
-        // Direct field validation using its own schema
-        const result = fieldSchema.safeParse(value);
+      const result = fieldSchema.safeParse(value);
+      console.log('resultresultresultresultresultresult', result);
+      if (!result.success) {
+        const errors =
+          'issues' in result.error
+            ? result.error.issues
+            : (result.error as any).errors;
 
-        if (!result.success) {
-          const errors =
-            'issues' in result.error
-              ? result.error.issues
-              : (result.error as any).errors;
-
-          validationResult = {
-            success: false,
-            message: errors[0]?.message || 'Invalid value',
-          };
-        } else {
-          validationResult = { success: true };
-        }
+        validationResult = {
+          success: false,
+          message: errors[0]?.message || 'Invalid value',
+        };
       } else {
-        // Fallback: validate using the entire schema
-        const zodSchema =
-          validationOptions.zodSchemaV4 || validationOptions.zodSchemaV3;
-        if (!zodSchema) return;
-
-        // Create a test state with the new value at the correct path
-        const fullState = getShadowValue(stateKey, []);
-        const testState = JSON.parse(JSON.stringify(fullState)); // Deep clone
-
-        // Set the value at the correct path
-        let current = testState;
-        for (let i = 0; i < path.length - 1; i++) {
-          if (!current[path[i]!]) current[path[i]!] = {};
-          current = current[path[i]!];
-        }
-        if (path.length > 0) {
-          current[path[path.length - 1]!] = value;
-        } else {
-          // Root level update
-          Object.assign(testState, value);
-        }
-
-        const result = zodSchema.safeParse(testState);
-
-        if (!result.success) {
-          const errors =
-            'issues' in result.error
-              ? result.error.issues
-              : (result.error as any).errors;
-
-          // Find errors for this specific path
-          const pathErrors = errors.filter((error: any) => {
-            // Handle array paths with id: prefixes
-            if (path.some((p) => p.startsWith('id:'))) {
-              const parentPath = path[0]!.startsWith('id:')
-                ? []
-                : path.slice(0, -1);
-              const arrayMeta = getGlobalStore
-                .getState()
-                .getShadowMetadata(stateKey, parentPath);
-
-              if (arrayMeta?.arrayKeys) {
-                const itemKey = path.slice(0, -1).join('.');
-                const itemIndex = arrayMeta.arrayKeys.findIndex(
-                  (k) => k === path[path.length - 2]
-                );
-                const zodPath = [...parentPath, itemIndex, ...path.slice(-1)];
-                return JSON.stringify(error.path) === JSON.stringify(zodPath);
-              }
-            }
-
-            return JSON.stringify(error.path) === JSON.stringify(path);
-          });
-
-          if (pathErrors.length > 0) {
-            validationResult = {
-              success: false,
-              message: pathErrors[0]?.message,
-            };
-          } else {
-            validationResult = { success: true };
-          }
-        } else {
-          validationResult = { success: true };
-        }
+        validationResult = { success: true };
       }
 
-      // Update validation state based on result
+      // Update validation state based on the direct result
       if (validationResult) {
         if (!validationResult.success) {
           setShadowMetadata(stateKey, path, {
