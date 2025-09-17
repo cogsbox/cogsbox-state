@@ -1,63 +1,63 @@
-import { z as r } from "zod";
+import { z as D } from "zod";
 import { getGlobalStore as M } from "./store.js";
-const $ = () => r.object({
-  __key: r.literal("keyed"),
-  map: r.any()
+const $ = () => D.object({
+  __key: D.literal("keyed"),
+  map: D.any()
 });
 function j(e) {
   return {
     initialiseState: (t) => {
-      console.log("initialiseState", t), e.$initializeAndMergeShadowState(t);
+      e.$initializeAndMergeShadowState(t);
     },
-    applyOperation: (t, i) => e.$applyOperation(t, i),
+    applyOperation: (t, a) => e.$applyOperation(t, a),
     addZodErrors: (t) => e.$addZodValidation(t),
     getState: () => e.$get(),
     setOptions: (t) => {
-      console.log("setOptions", t), e.$setOptions(t);
+      e.$setOptions(t);
     }
   };
 }
 function v(e, t) {
   return {
     getPluginMetaData: () => M.getState().getPluginMetaDataMap(e, [])?.get(t),
-    setPluginMetaData: (i) => M.getState().setPluginMetaData(e, [], t, i),
+    setPluginMetaData: (a) => M.getState().setPluginMetaData(e, [], t, a),
     removePluginMetaData: () => M.getState().removePluginMetaData(e, [], t),
-    getFieldMetaData: (i) => M.getState().getPluginMetaDataMap(e, i)?.get(t),
-    setFieldMetaData: (i, l) => M.getState().setPluginMetaData(e, i, t, l),
-    removeFieldMetaData: (i) => M.getState().removePluginMetaData(e, i, t)
+    getFieldMetaData: (a) => M.getState().getPluginMetaDataMap(e, a)?.get(t),
+    setFieldMetaData: (a, r) => M.getState().setPluginMetaData(e, a, t, r),
+    removeFieldMetaData: (a) => M.getState().removePluginMetaData(e, a, t)
   };
 }
-function x(e) {
-  function t(i) {
-    const l = (a, o, n, g, c) => ({
-      name: i,
-      useHook: a,
+function d(e) {
+  function t(a) {
+    const r = (i, o, g, n, c) => ({
+      name: a,
+      useHook: i,
       transformState: o,
-      onUpdate: n,
-      onFormUpdate: g,
+      onUpdate: g,
+      onFormUpdate: n,
       formWrapper: c
     });
-    function u(a, o, n, g, c) {
-      const D = l(
-        a,
+    function s(i, o, g, n, c) {
+      const P = r(
+        i,
         o,
-        n,
         g,
+        n,
         c
       ), S = {};
-      return o || (S.transformState = (s) => u(a, s, n, g, c)), n || (S.onUpdate = (s) => u(a, o, s, g, c)), g || (S.onFormUpdate = (s) => u(
-        a,
+      return o || (S.transformState = (u) => s(i, u, g, n, c)), g || (S.onUpdate = (u) => s(i, o, u, n, c)), n || (S.onFormUpdate = (u) => s(
+        i,
         o,
-        n,
-        s,
+        g,
+        u,
         c
-      )), c || (S.formWrapper = (s) => u(a, o, n, g, s)), Object.assign(D, S);
+      )), c || (S.formWrapper = (u) => s(i, o, g, n, u)), Object.assign(P, S);
     }
     return Object.assign(
-      u(),
+      s(),
       {
-        useHook(a) {
-          return u(a);
+        useHook(i) {
+          return s(i);
         }
       }
     );
@@ -66,7 +66,7 @@ function x(e) {
 }
 export {
   v as createMetadataContext,
-  x as createPluginContext,
+  d as createPluginContext,
   $ as keyedSchema,
   j as toDeconstructedMethods
 };

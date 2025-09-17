@@ -440,7 +440,6 @@ export function buildShadowNode(
 
   // Handle arrays
   if (Array.isArray(value)) {
-    // --- START: CORRECTED LOGIC ---
     // 1. Create the node for the array.
     const node: ShadowNode = { _meta: { arrayKeys: [] } };
 
@@ -462,12 +461,10 @@ export function buildShadowNode(
     });
 
     return node;
-    // --- END: CORRECTED LOGIC ---
   }
 
   // Handle objects
   if (value.constructor === Object) {
-    // --- START: CORRECTED LOGIC ---
     // 1. Create the node for the object.
     const node: ShadowNode = { _meta: {} };
 
@@ -489,9 +486,6 @@ export function buildShadowNode(
     }
 
     return node;
-    // --- END: CORRECTED LOGIC ---
-    // Note: The "simple object" optimization was removed as it complicates this clean logic.
-    // The recursive path is more robust and now more efficient.
   }
 
   // Fallback for other object types (Date, class instances, etc.)
@@ -515,7 +509,6 @@ function getTypeInfoForPath(value: any, context?: BuildContext): TypeInfo {
           ? context.schemas.zodV4
           : getSchemaAtPath(context.schemas.zodV4, context.path);
       if (schema) {
-        console.log('uuuuuuuuuuuuuuuuuuuuuuuuuuuuuu', schema);
         typeInfo = getTypeFromZodSchema(schema, 'zod4');
       }
     }
@@ -553,10 +546,9 @@ export function updateShadowTypeInfo(
   function updateNodeTypeInfo(node: any, path: string[]) {
     if (!node || typeof node !== 'object') return;
     const fieldSchema = getSchemaAtPath(rootSchema, path);
-    console.log('fieldSchema', fieldSchema, path);
+
     if (fieldSchema) {
       const typeInfo = getTypeFromZodSchema(fieldSchema, source);
-      console.log('typeInfo', typeInfo);
       if (typeInfo) {
         if (!node._meta) node._meta = {};
         node._meta.typeInfo = {
@@ -565,16 +557,11 @@ export function updateShadowTypeInfo(
         };
       }
     }
-    console.log('nodenodenodenodenodenode', node);
+
     // Recursively update children
     if (node._meta?.arrayKeys) {
       node._meta.arrayKeys.forEach((itemKey: string) => {
         if (node[itemKey]) {
-          console.log(
-            'updating type info for array item',
-            node[itemKey],
-            itemKey
-          );
           updateNodeTypeInfo(node[itemKey], [...path, '0']); // Use index 0 for array item schema
         }
       });
@@ -850,16 +837,12 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       options?.validation?.zodSchemaV4 || options?.validation?.zodSchemaV3;
     if (hasSchema) {
       if (options.validation?.zodSchemaV4) {
-        console.log('updating type info for zod4', key);
         updateShadowTypeInfo(key, options.validation.zodSchemaV4, 'zod4');
       } else if (options.validation?.zodSchemaV3) {
         updateShadowTypeInfo(key, options.validation.zodSchemaV3, 'zod3');
       }
     }
-    console.log(
-      'shadowStateStoreshadowStateStore >>>>>>>>>>>>>>>>>>>>>',
-      shadowStateStore
-    );
+
     // Cleanup logic is restored
     if (storageKey === key) {
       shadowStateStore.delete(`[${key}`);
@@ -963,10 +946,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     if (!current._meta) {
       current._meta = {};
     }
-    if (path.length > 0) {
-      console.log('current._meta', path, current._meta);
-      console.log('newMetadata', path, newMetadata);
-    }
+
     Object.assign(current._meta, newMetadata);
   },
   getShadowValue: (key: string, path: string[], validArrayIds?: string[]) => {

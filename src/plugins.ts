@@ -26,13 +26,6 @@ export type InferPerKeyValueMap<
   [K in keyof TMap]: InferZodObject<TMap[K]>;
 };
 
-// Keep your field metadata extension mechanism
-type ExtractFieldExtensions<THookReturn, TBase> = THookReturn extends {
-  __fieldMetaExtensions: infer E;
-}
-  ? TBase & E
-  : TBase;
-
 // Deconstructed cogs methods (no TState)
 type DeconstructedCogsMethods<TStateSlice = any> = {
   initialiseState: (data: TStateSlice) => void;
@@ -41,10 +34,10 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
   getState: () => TStateSlice;
   setOptions: (options: any) => void;
 };
+
 export function toDeconstructedMethods(stateHandler: StateObject<any>) {
   return {
     initialiseState: (data: any) => {
-      console.log('initialiseState', data);
       stateHandler.$initializeAndMergeShadowState(data);
     },
     applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) =>
@@ -52,12 +45,12 @@ export function toDeconstructedMethods(stateHandler: StateObject<any>) {
     addZodErrors: (errors: any[]) => stateHandler.$addZodValidation(errors),
     getState: () => stateHandler.$get(),
     setOptions: (opts: any) => {
-      console.log('setOptions', opts);
       stateHandler.$setOptions(opts);
     },
   };
 }
-// UseHook now uses the base field metadata type (no extensions)
+
+// Simplified: All params use the same TFieldMetaData type
 export type UseHookParams<
   TOptions,
   TPluginMetaData,
@@ -79,7 +72,6 @@ export type UseHookParams<
   isInitialMount: boolean;
 };
 
-// All other contexts use the extended field meta type (based on hook return)
 export type TransformStateParams<
   TOptions,
   THookReturn,
@@ -93,13 +85,8 @@ export type TransformStateParams<
   setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
   removePluginMetaData: () => void;
 
-  getFieldMetaData: (
-    path: string[]
-  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
-  setFieldMetaData: (
-    path: string[],
-    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
-  ) => void;
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: (path: string[]) => void;
 
   options: TOptions;
@@ -122,13 +109,8 @@ export type OnUpdateParams<
   setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
   removePluginMetaData: () => void;
 
-  getFieldMetaData: (
-    path: string[]
-  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
-  setFieldMetaData: (
-    path: string[],
-    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
-  ) => void;
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: (path: string[]) => void;
 
   update: UpdateTypeDetail;
@@ -157,13 +139,8 @@ export type OnFormUpdateParams<
   setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
   removePluginMetaData: () => void;
 
-  getFieldMetaData: (
-    path: string[]
-  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
-  setFieldMetaData: (
-    path: string[],
-    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
-  ) => void;
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: (path: string[]) => void;
 
   path: string[];
@@ -206,19 +183,14 @@ export type FormWrapperParams<
   setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
   removePluginMetaData: () => void;
 
-  getFieldMetaData: (
-    path: string[]
-  ) => ExtractFieldExtensions<THookReturn, TFieldMetaData> | undefined;
-  setFieldMetaData: (
-    path: string[],
-    data: Partial<ExtractFieldExtensions<THookReturn, TFieldMetaData>>
-  ) => void;
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: (path: string[]) => void;
 
   pluginName: string;
 };
 
-// Unified plugin definition (no TState anywhere)
+// Unified plugin definition
 export type CogsPlugin<
   TName extends string,
   TOptions,
@@ -273,7 +245,7 @@ export type CogsPlugin<
   ) => React.ReactNode;
 };
 
-// Optional: still useful if you collect plugins as a tuple
+// Extract plugin options helper
 export type ExtractPluginOptions<
   TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
 > = {
@@ -288,7 +260,7 @@ export type ExtractPluginOptions<
     : never;
 };
 
-// Same metadata helpers (now independent of TState)
+// Metadata helpers
 export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   stateKey: string,
   pluginName: string
@@ -326,29 +298,21 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   };
 }
 
-// ======================================================================
-// New schema-driven context factory (no TState)
-// ======================================================================
+type ZodObjOutput<T extends z.ZodObject<any>> = {
+  [K in keyof T['shape']]: z.output<T['shape'][K]>;
+};
+type OutputOf<T extends z.ZodTypeAny> =
+  T extends z.ZodObject<any> ? ZodObjOutput<T> : z.output<T>;
+
 export function createPluginContext<
-  TOptionsSchema extends z.ZodTypeAny,
-  TPluginMetaDataSchema extends z.ZodTypeAny = z.ZodTypeAny,
-  TFieldMetaDataSchema extends z.ZodTypeAny = z.ZodTypeAny,
->(schemas: {
-  options: TOptionsSchema;
-  pluginMetaData?: TPluginMetaDataSchema;
-  fieldMetaData?: TFieldMetaDataSchema;
-}) {
-  type Options = z.infer<TOptionsSchema>;
-  type PluginMetaData = z.infer<
-    TPluginMetaDataSchema extends z.ZodTypeAny
-      ? TPluginMetaDataSchema
-      : z.ZodTypeAny
-  >;
-  type FieldMetaData = z.infer<
-    TFieldMetaDataSchema extends z.ZodTypeAny
-      ? TFieldMetaDataSchema
-      : z.ZodTypeAny
-  >;
+  O extends z.ZodTypeAny,
+  PM extends z.ZodTypeAny | undefined = undefined,
+  FM extends z.ZodTypeAny | undefined = undefined,
+>(schemas: { options: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
+  // Crucial: compute from the generic params, not from an object-indexed optional type
+  type Options = OutputOf<O>;
+  type PluginMetaData = PM extends z.ZodTypeAny ? OutputOf<PM> : unknown;
+  type FieldMetaData = FM extends z.ZodTypeAny ? OutputOf<FM> : unknown;
 
   function createPlugin<TName extends string>(name: TName) {
     type TransformFn<THookReturn> = (
@@ -513,7 +477,6 @@ export function createPluginContext<
             HasWrapper
           >(hookFn, fn, updateHandler, formUpdateHandler, formWrapper);
       }
-
       if (!updateHandler) {
         (methods as any).onUpdate = (fn: UpdateFn<THookReturn>) =>
           createBuilder<
@@ -524,7 +487,6 @@ export function createPluginContext<
             HasWrapper
           >(hookFn, transformFn, fn, formUpdateHandler, formWrapper);
       }
-
       if (!formUpdateHandler) {
         (methods as any).onFormUpdate = (fn: FormUpdateFn<THookReturn>) =>
           createBuilder<THookReturn, HasTransform, HasUpdate, true, HasWrapper>(
@@ -535,7 +497,6 @@ export function createPluginContext<
             formWrapper
           );
       }
-
       if (!formWrapper) {
         (methods as any).formWrapper = (fn: FormWrapperFn<THookReturn>) =>
           createBuilder<

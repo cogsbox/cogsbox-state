@@ -1,4 +1,9 @@
-import { FormElementParams, StateObject, type FormOptsType } from './CogsState';
+import {
+  FormElementParams,
+  StateObject,
+  UpdateTypeDetail,
+  type FormOptsType,
+} from './CogsState';
 import { pluginStore } from './pluginStore';
 import { createMetadataContext, toDeconstructedMethods } from './plugins';
 import React, {
@@ -15,6 +20,7 @@ import { getGlobalStore, ValidationError, ValidationSeverity } from './store';
 import { useInView } from 'react-intersection-observer';
 import { v4 as uuidv4 } from 'uuid';
 import { isDeepEqual } from './utility';
+import { runValidation } from './validation';
 
 const {
   getInitialOptions,
@@ -285,100 +291,6 @@ export function FormElementWrapper({
     };
   }, []);
 
-  // Separate validation function that uses the field's schema
-  const validateField = useCallback(
-    (value: any, trigger: 'onChange' | 'onBlur') => {
-      const validationOptions = getInitialOptions(stateKey)?.validation;
-      if (!validationOptions) return;
-
-      const currentMeta = getShadowMetadata(stateKey, path) || {};
-      const currentStatus = currentMeta?.validation?.status;
-      console.log('currentMeta', fieldSchema, currentMeta, validationOptions);
-      let shouldValidate = false;
-      let severity: 'error' | 'warning' | undefined;
-
-      if (trigger === 'onBlur' && validationOptions.onBlur) {
-        shouldValidate = true;
-        severity = validationOptions.onBlur ?? 'error';
-      } else if (trigger === 'onChange') {
-        if (validationOptions.onChange) {
-          shouldValidate = true;
-          severity = validationOptions.onChange;
-        } else if (currentStatus === 'INVALID') {
-          shouldValidate = true;
-          severity = 'warning'; // Re-validate on change if already invalid
-        }
-      }
-      console.log(
-        'fieldSchemafieldSchemafieldSchemafieldSchema shouldValidate',
-        fieldSchema,
-        shouldValidate
-      );
-      if (!shouldValidate) return;
-
-      // --- CORE CHANGE ---
-      // If there's no specific schema on the field's metadata, DO NOTHING.
-      // This completely removes the complex and buggy fallback logic.
-      if (!fieldSchema) {
-        return;
-      }
-
-      // At this point, we know we should validate AND we have a schema.
-      // The logic is now simple and direct.
-      let validationResult: { success: boolean; message?: string } | null =
-        null;
-
-      const result = fieldSchema.safeParse(value);
-      console.log('resultresultresultresultresultresult', result);
-      if (!result.success) {
-        const errors =
-          'issues' in result.error
-            ? result.error.issues
-            : (result.error as any).errors;
-
-        validationResult = {
-          success: false,
-          message: errors[0]?.message || 'Invalid value',
-        };
-      } else {
-        validationResult = { success: true };
-      }
-
-      // Update validation state based on the direct result
-      if (validationResult) {
-        if (!validationResult.success) {
-          setShadowMetadata(stateKey, path, {
-            ...currentMeta,
-            validation: {
-              status: 'INVALID',
-              errors: [
-                {
-                  source: 'client' as const,
-                  message: validationResult.message!,
-                  severity: severity!,
-                },
-              ],
-              lastValidated: Date.now(),
-              validatedValue: value,
-            },
-          });
-        } else {
-          setShadowMetadata(stateKey, path, {
-            ...currentMeta,
-            validation: {
-              status: 'VALID',
-              errors: [],
-              lastValidated: Date.now(),
-              validatedValue: value,
-            },
-          });
-        }
-      }
-      forceUpdate({});
-    },
-    [stateKey, path, fieldSchema]
-  );
-
   const debouncedUpdate = useCallback(
     (newValue: any) => {
       if (typeInfo) {
@@ -415,8 +327,19 @@ export function FormElementWrapper({
         value: newValue,
       });
       // Validate immediately on change (will only run if configured or clearing errors)
-      validateField(newValue, 'onChange');
+      const virtualOperation: UpdateTypeDetail = {
+        stateKey,
+        path,
+        newValue: newValue,
+        updateType: 'update',
 
+        timeStamp: Date.now(),
+        status: 'new',
+        oldValue: globalStateValue,
+      };
+
+      // Call the one function with the 'onChange' trigger
+      runValidation(virtualOperation, 'onChange');
       isCurrentlyDebouncing.current = true;
 
       if (debounceTimeoutRef.current) {
@@ -428,17 +351,13 @@ export function FormElementWrapper({
       // Debounce only the state update, not the validation
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
-        setState(newValue, path, { updateType: 'update' });
+        setState(newValue, path, {
+          updateType: 'update',
+          validationTrigger: 'onChange',
+        });
       }, debounceTime);
     },
-    [
-      setState,
-      path,
-      formOpts?.debounceTime,
-      validateField,
-      typeInfo,
-      globalStateValue,
-    ]
+    [setState, path, formOpts?.debounceTime, typeInfo, globalStateValue]
   );
   const virtualFocusPath = `${stateKey}.__focusedElement`;
   const newFocusedElement = { path, ref: formElementRef };
@@ -463,9 +382,12 @@ export function FormElementWrapper({
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
-      setState(localValue, path, { updateType: 'update' });
+      setState(localValue, path, {
+        updateType: 'update',
+        validationTrigger: 'onBlur',
+      });
     }
-    console.log('handleBlur');
+
     queueMicrotask(() => {
       const rootMeta =
         getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
@@ -485,9 +407,25 @@ export function FormElementWrapper({
         });
       }
     });
-    console.log('handleBlur', localValue);
-    validateField(localValue, 'onBlur');
-  }, [localValue, setState, path, validateField, stateKey]);
+
+    const validationOptions = getInitialOptions(stateKey)?.validation;
+    if (validationOptions?.onBlur) {
+      // Create the complete operation object. It has all the f--king details.
+      const virtualOperation: UpdateTypeDetail = {
+        stateKey,
+        path,
+        newValue: localValue, // Use the current value from the input's state
+        updateType: 'update',
+
+        timeStamp: Date.now(),
+        status: 'new',
+        oldValue: globalStateValue,
+      };
+
+      // Call the one function with the 'onBlur' trigger
+      runValidation(virtualOperation, 'onBlur');
+    }
+  }, [localValue, setState, path, stateKey]);
 
   const baseState = rebuildStateShape({
     path: path,

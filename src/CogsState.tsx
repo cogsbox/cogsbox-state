@@ -47,6 +47,7 @@ import { Operation } from 'fast-json-patch';
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
 import { get } from 'http';
+import { runValidation } from './validation';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
@@ -326,6 +327,7 @@ type EffectiveSetStateArg<
 
 type UpdateOptions = {
   updateType: 'insert' | 'cut' | 'update' | 'insert_many';
+  validationTrigger?: 'onBlur' | 'onChange' | 'programmatic';
   itemId?: string;
   index?: number;
   metaData?: Record<string, any>;
@@ -642,12 +644,7 @@ function setOptions<StateKey, Opt>({
     const hasNewSchemaV3 =
       mergedOptions.validation?.zodSchemaV3 &&
       !initialOptions?.validation?.zodSchemaV3;
-    console.log(
-      '!bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      hadSchema,
-      hasNewSchemaV4,
-      hasNewSchemaV3
-    );
+
     if (!hadSchema && (hasNewSchemaV4 || hasNewSchemaV3)) {
       if (hasNewSchemaV4) {
         updateShadowTypeInfo(
@@ -667,7 +664,7 @@ function setOptions<StateKey, Opt>({
       notifyComponents(stateKey as string);
     }
   }
-  console.log('merged optipons', mergedOptions);
+
   return mergedOptions;
 }
 export function addStateOptions<T>(
@@ -1458,7 +1455,7 @@ function createEffectiveSetState<T>(
     if (latestInitialOptionsRef.current?.middleware) {
       latestInitialOptionsRef.current.middleware({ update: newUpdate });
     }
-
+    runValidation(newUpdate, options.validationTrigger || 'programmatic');
     notifyUpdate(newUpdate);
   }
 }
@@ -3388,33 +3385,33 @@ function createProxyHandler<T>(
               },
               metaData?: Record<string, any>
             ) => {
-              const validationErrorsFromServer = operation.validation || [];
+              // const validationErrorsFromServer = operation.validation || [];
 
-              if (!operation || !operation.path) {
-                console.error(
-                  'Invalid operation received by $applyOperation:',
-                  operation
-                );
-                return;
-              }
+              // if (!operation || !operation.path) {
+              //   console.error(
+              //     'Invalid operation received by $applyOperation:',
+              //     operation
+              //   );
+              //   return;
+              // }
 
-              const newErrors: ValidationError[] =
-                validationErrorsFromServer.map((err) => ({
-                  source: 'sync_engine',
-                  message: err.message,
-                  severity: 'warning',
-                  code: err.code,
-                }));
-              console.log('newErrors', newErrors);
-              getGlobalStore
-                .getState()
-                .setShadowMetadata(stateKey, operation.path, {
-                  validation: {
-                    status: newErrors.length > 0 ? 'INVALID' : 'VALID',
-                    errors: newErrors,
-                    lastValidated: Date.now(),
-                  },
-                });
+              // const newErrors: ValidationError[] =
+              //   validationErrorsFromServer.map((err) => ({
+              //     source: 'sync_engine',
+              //     message: err.message,
+              //     severity: 'warning',
+              //     code: err.code,
+              //   }));
+              // console.log('newErrors', newErrors);
+              // getGlobalStore
+              //   .getState()
+              //   .setShadowMetadata(stateKey, operation.path, {
+              //     validation: {
+              //       status: newErrors.length > 0 ? 'INVALID' : 'VALID',
+              //       errors: newErrors,
+              //       lastValidated: Date.now(),
+              //     },
+              //   });
               console.log(
                 'getGlobalStore',
                 getGlobalStore
