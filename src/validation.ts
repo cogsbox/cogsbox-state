@@ -44,16 +44,12 @@ export function runValidation(
     shouldValidate = true;
     severity = 'warning';
   } else if (trigger === 'programmatic') {
-    // --- THIS IS THE FIX ---
-    // A programmatic update (from a remote client or a debounced setState)
-    // should ONLY trigger validation IF a UI validation trigger is configured.
     if (validationOptions.onBlur || validationOptions.onChange) {
       shouldValidate = true;
-      // Default to the strictest validation trigger configured.
+
       severity =
         validationOptions.onBlur || validationOptions.onChange || 'error';
     }
-    // --- END OF FIX ---
   }
 
   if (!shouldValidate || !fieldSchema) {

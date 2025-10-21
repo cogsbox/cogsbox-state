@@ -58,7 +58,7 @@ export type ValidationState = {
   lastValidated?: number;
   validatedValue?: any;
 };
-export type TypeInfo = {
+export type SchemaTypeInfo = {
   type:
     | 'string'
     | 'number'
@@ -73,19 +73,66 @@ export type TypeInfo = {
   nullable?: boolean;
   optional?: boolean;
 };
+export type ClientActivityState = {
+  // ALL elements currently mounted for this path
+  elements: Map<
+    string,
+    {
+      // componentId -> element info
+      domRef: React.RefObject<HTMLElement>;
+      elementType:
+        | 'input'
+        | 'textarea'
+        | 'select'
+        | 'checkbox'
+        | 'radio'
+        | 'range'
+        | 'file'
+        | 'custom';
+      inputType?: string; // For input elements: 'text', 'number', 'date', etc.
+      mountedAt: number;
 
-export type UIState = {
-  isFocused?: boolean;
-  isTouched?: boolean;
-  isHovered?: boolean;
+      // Current activity for THIS specific element
+      currentActivity?: {
+        type:
+          | 'focus'
+          | 'blur'
+          | 'input'
+          | 'select'
+          | 'hover'
+          | 'scroll'
+          | 'cursor';
+        startTime: number;
+        details?: {
+          value?: any;
+          previousValue?: any;
+          inputLength?: number;
+          changeType?: 'keyboard' | 'paste' | 'drop' | 'select' | 'clear';
+          selectionStart?: number;
+          selectionEnd?: number;
+          selectedText?: string;
+          cursorPosition?: number;
+          scrollTop?: number;
+          scrollLeft?: number;
+          isComposing?: boolean;
+          keystrokeCount?: number;
+          key?: string;
+          optionCount?: number;
+          selectedIndex?: number;
+          checked?: boolean;
+          arrayOperation?: 'insert' | 'remove' | 'reorder';
+          arrayIndex?: number;
+          arrayLength?: number;
+        };
+      };
+    }
+  >;
 };
-
 // Update ShadowMetadata to include typeInfo
 export type ShadowMetadata = {
   value?: any;
-
   id?: string;
-  typeInfo?: TypeInfo;
+  typeInfo?: SchemaTypeInfo;
   stateSource?: 'default' | 'server' | 'localStorage';
   lastServerSync?: number;
   isDirty?: boolean;
@@ -125,8 +172,9 @@ export type ShadowMetadata = {
     }
   >;
   pluginMetaData?: Map<string, Record<string, any>>;
-  formRef?: React.RefObject<any>;
-  focusedElement?: { path: string[]; ref: React.RefObject<any> } | null;
+  // formRef?: React.RefObject<any>;
+  // focusedElement?: { path: string[]; ref: React.RefObject<any> } | null;
+  clientActivityState?: ClientActivityState;
 } & ComponentsType;
 
 type ShadowNode = {
@@ -249,7 +297,7 @@ export type CogsGlobalState = {
 function getTypeFromZodSchema(
   schema: any,
   source: 'zod4' | 'zod3' | 'sync' = 'zod4'
-): TypeInfo | null {
+): SchemaTypeInfo | null {
   if (!schema) return null;
 
   let current = schema;
@@ -377,7 +425,7 @@ function getTypeFromZodSchema(
 }
 
 // Helper to get type info from runtime value
-function getTypeFromValue(value: any): TypeInfo {
+function getTypeFromValue(value: any): SchemaTypeInfo {
   if (value === null) {
     return {
       type: 'unknown',
@@ -498,10 +546,13 @@ export function buildShadowNode(
 }
 
 // Helper function to get type info (extracted for clarity)
-function getTypeInfoForPath(value: any, context?: BuildContext): TypeInfo {
+function getTypeInfoForPath(
+  value: any,
+  context?: BuildContext
+): SchemaTypeInfo {
   if (context) {
     // Try to get schema-based type info
-    let typeInfo: TypeInfo | null = null;
+    let typeInfo: SchemaTypeInfo | null = null;
 
     if (context.schemas.zodV4) {
       const schema =

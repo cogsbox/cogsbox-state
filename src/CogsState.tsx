@@ -34,7 +34,6 @@ import { v4 as uuidv4 } from 'uuid';
 
 import {
   getGlobalStore,
-  shadowStateStore,
   updateShadowTypeInfo,
   ValidationError,
   ValidationSeverity,
@@ -46,7 +45,7 @@ import { Operation } from 'fast-json-patch';
 
 import * as z3 from 'zod/v3';
 import * as z4 from 'zod/v4';
-import { get } from 'http';
+
 import { runValidation } from './validation';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
@@ -227,10 +226,7 @@ export type EndType<T, IsArrayElement = false> = {
   $addPluginMetaData: (key: string, data: Record<string, any>) => void;
   $removePluginMetaData: (key: string) => void;
   $setOptions: (options: OptionsType<T>) => void;
-  $useFocusedFormElement: () => {
-    path: string[];
-    ref: React.RefObject<any>;
-  } | null;
+
   $addZodValidation: (
     errors: ValidationError[],
     source?: 'client' | 'sync_engine' | 'api'
@@ -3143,54 +3139,54 @@ function createProxyHandler<T>(
             });
         }
 
-        if (prop === '$formInput') {
-          const _getFormElement = (path: string[]): HTMLElement | null => {
-            const metadata = getShadowMetadata(stateKey, path);
-            if (metadata?.formRef?.current) {
-              return metadata.formRef.current;
-            }
-            // This warning is helpful for debugging if a ref is missing.
-            console.warn(
-              `Form element ref not found for stateKey "${stateKey}" at path "${path.join('.')}"`
-            );
-            return null;
-          };
-          return {
-            setDisabled: (isDisabled: boolean) => {
-              const element = _getFormElement(path) as HTMLInputElement | null;
-              if (element) {
-                element.disabled = isDisabled;
-              }
-            },
-            focus: () => {
-              const element = _getFormElement(path);
-              element?.focus();
-            },
-            blur: () => {
-              const element = _getFormElement(path);
-              element?.blur();
-            },
-            scrollIntoView: (options?: ScrollIntoViewOptions) => {
-              const element = _getFormElement(path);
-              element?.scrollIntoView(
-                options ?? { behavior: 'smooth', block: 'center' }
-              );
-            },
-            click: () => {
-              const element = _getFormElement(path);
-              element?.click();
-            },
-            selectText: () => {
-              const element = _getFormElement(path) as
-                | HTMLInputElement
-                | HTMLTextAreaElement
-                | null;
-              if (element && typeof element.select === 'function') {
-                element.select();
-              }
-            },
-          };
-        }
+        // if (prop === '$formInput') {
+        //   const _getFormElement = (path: string[]): HTMLElement | null => {
+        //     const metadata = getShadowMetadata(stateKey, path);
+        //     if (metadata?.formRef?.current) {
+        //       return metadata.formRef.current;
+        //     }
+        //     // This warning is helpful for debugging if a ref is missing.
+        //     console.warn(
+        //       `Form element ref not found for stateKey "${stateKey}" at path "${path.join('.')}"`
+        //     );
+        //     return null;
+        //   };
+        //   return {
+        //     setDisabled: (isDisabled: boolean) => {
+        //       const element = _getFormElement(path) as HTMLInputElement | null;
+        //       if (element) {
+        //         element.disabled = isDisabled;
+        //       }
+        //     },
+        //     focus: () => {
+        //       const element = _getFormElement(path);
+        //       element?.focus();
+        //     },
+        //     blur: () => {
+        //       const element = _getFormElement(path);
+        //       element?.blur();
+        //     },
+        //     scrollIntoView: (options?: ScrollIntoViewOptions) => {
+        //       const element = _getFormElement(path);
+        //       element?.scrollIntoView(
+        //         options ?? { behavior: 'smooth', block: 'center' }
+        //       );
+        //     },
+        //     click: () => {
+        //       const element = _getFormElement(path);
+        //       element?.click();
+        //     },
+        //     selectText: () => {
+        //       const element = _getFormElement(path) as
+        //         | HTMLInputElement
+        //         | HTMLTextAreaElement
+        //         | null;
+        //       if (element && typeof element.select === 'function') {
+        //         element.select();
+        //       }
+        //     },
+        //   };
+        // }
         if (prop === '$$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
@@ -3273,33 +3269,6 @@ function createProxyHandler<T>(
             };
           }
 
-          if (prop === '$useFocusedFormElement') {
-            // The returned function is the hook.
-            return () => {
-              const { subscribeToPath } = getGlobalStore.getState();
-
-              // Define the virtual path consistently.
-              const virtualFocusPath = `${stateKey}.__focusedElement`;
-
-              const [focusedElement, setFocusedElement] = useState(
-                // Lazily get the initial value from the root metadata.
-                () => getShadowMetadata(stateKey, [])?.focusedElement || null
-              );
-
-              useEffect(() => {
-                // Subscribe specifically to the virtual path. The callback is the state setter.
-                const unsubscribe = subscribeToPath(
-                  virtualFocusPath,
-                  setFocusedElement
-                );
-
-                // The cleanup function is returned by the existing subscription system.
-                return unsubscribe;
-              }, [stateKey]); // Only subscribe once for the lifetime of the component.
-
-              return focusedElement;
-            };
-          }
           if (prop === '$_applyUpdate') {
             return (
               value: any,

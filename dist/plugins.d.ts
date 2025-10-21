@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { default as React } from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 
+type Prettify<T> = {
+    [K in keyof T]: T[K];
+} & {};
 export type KeyedTypes<TMap extends Record<string, any>> = {
     __key: 'keyed';
     map: {
@@ -140,7 +143,7 @@ export declare function createMetadataContext<TPluginMetaData, TFieldMetaData>(s
 type ZodObjOutput<T extends z.ZodObject<any>> = {
     [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };
-type OutputOf<T extends z.ZodTypeAny> = T extends z.ZodObject<any> ? ZodObjOutput<T> : z.output<T>;
+type OutputOf<T extends z.ZodTypeAny> = T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
 export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z.ZodTypeAny | undefined = undefined, FM extends z.ZodTypeAny | undefined = undefined>(schemas: {
     options: O;
     pluginMetaData?: PM;

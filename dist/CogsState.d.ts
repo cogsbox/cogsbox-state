@@ -121,10 +121,6 @@ export type EndType<T, IsArrayElement = false> = {
     $addPluginMetaData: (key: string, data: Record<string, any>) => void;
     $removePluginMetaData: (key: string) => void;
     $setOptions: (options: OptionsType<T>) => void;
-    $useFocusedFormElement: () => {
-        path: string[];
-        ref: React.RefObject<any>;
-    } | null;
     $addZodValidation: (errors: ValidationError[], source?: 'client' | 'sync_engine' | 'api') => void;
     $clearZodValidation: (paths?: string[]) => void;
     $applyOperation: (operation: UpdateTypeDetail, metaData?: Record<string, any>) => void;

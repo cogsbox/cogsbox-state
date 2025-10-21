@@ -302,7 +302,7 @@ type ZodObjOutput<T extends z.ZodObject<any>> = {
   [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };
 type OutputOf<T extends z.ZodTypeAny> =
-  T extends z.ZodObject<any> ? ZodObjOutput<T> : z.output<T>;
+  T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
 
 export function createPluginContext<
   O extends z.ZodTypeAny,

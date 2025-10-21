@@ -238,7 +238,6 @@ export function FormElementWrapper({
   // Get the shadow node to access typeInfo and schema
   const shadowNode = getGlobalStore.getState().getShadowNode(stateKey, path);
   const typeInfo = shadowNode?._meta?.typeInfo;
-  const fieldSchema = typeInfo?.schema;
 
   const globalStateValue = getShadowValue(stateKey, path);
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
@@ -266,9 +265,42 @@ export function FormElementWrapper({
   }, [globalStateValue]);
 
   useEffect(() => {
-    const { setShadowMetadata } = getGlobalStore.getState();
-    setShadowMetadata(stateKey, path, { formRef: formElementRef });
+    const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
 
+    // Initialize clientActivityState if needed
+    const currentMeta = getShadowMetadata(stateKey, path) || {};
+    if (!currentMeta.clientActivityState) {
+      currentMeta.clientActivityState = { elements: new Map() };
+    }
+
+    // Detect element type from the ref
+    const detectElementType = () => {
+      const el = formElementRef.current;
+      if (!el) return 'input';
+      const tagName = el.tagName.toLowerCase();
+      if (tagName === 'textarea') return 'textarea';
+      if (tagName === 'select') return 'select';
+      if (tagName === 'input') {
+        const type = (el as HTMLInputElement).type;
+        if (type === 'checkbox') return 'checkbox';
+        if (type === 'radio') return 'radio';
+        if (type === 'range') return 'range';
+        if (type === 'file') return 'file';
+      }
+      return 'input';
+    };
+
+    // Add this element to the Map
+    currentMeta.clientActivityState.elements.set(componentId, {
+      domRef: formElementRef,
+      elementType: detectElementType(),
+      inputType: formElementRef.current?.type,
+      mountedAt: Date.now(),
+    });
+
+    setShadowMetadata(stateKey, path, currentMeta);
+
+    // Subscribe to path updates
     const unsubscribe = getGlobalStore
       .getState()
       .subscribeToPath(stateKeyPathKey, (newValue) => {
@@ -276,23 +308,28 @@ export function FormElementWrapper({
           forceUpdate({});
         }
       });
+
+    // Cleanup
     return () => {
       unsubscribe();
+
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
         isCurrentlyDebouncing.current = false;
       }
-      const currentMeta = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, path);
-      if (currentMeta && currentMeta.formRef) {
-        setShadowMetadata(stateKey, path, { formRef: undefined });
+
+      // Remove element from Map
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (meta?.clientActivityState?.elements) {
+        meta.clientActivityState.elements.delete(componentId);
+        setShadowMetadata(stateKey, path, meta);
       }
     };
   }, []);
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
+      // Type conversion logic (keep existing)
       if (typeInfo) {
         if (typeInfo.type === 'number' && typeof newValue === 'string') {
           newValue =
@@ -310,45 +347,62 @@ export function FormElementWrapper({
           newValue = new Date(newValue);
         }
       } else {
-        // Fallback to old behavior if no typeInfo
-
         const currentType = typeof globalStateValue;
-
         if (currentType === 'number' && typeof newValue === 'string') {
           newValue = newValue === '' ? 0 : Number(newValue);
         }
       }
 
       setLocalValue(newValue);
+
+      // Update input activity details
+      const { getShadowMetadata, setShadowMetadata } =
+        getGlobalStore.getState();
+      const meta = getShadowMetadata(stateKey, path);
+      if (meta?.clientActivityState?.elements?.has(componentId)) {
+        const element = meta.clientActivityState.elements.get(componentId);
+        if (element && element.currentActivity?.type === 'focus') {
+          element!.currentActivity.details = {
+            ...element!.currentActivity.details,
+            value: newValue,
+            previousValue:
+              element!.currentActivity.details?.value || globalStateValue,
+            inputLength:
+              typeof newValue === 'string' ? newValue.length : undefined,
+            keystrokeCount:
+              (element!.currentActivity.details?.keystrokeCount || 0) + 1,
+          };
+          setShadowMetadata(stateKey, path, meta);
+        }
+      }
+
+      // Notify plugins
       notifyFormUpdate({
         stateKey,
         type: 'input',
         path,
         value: newValue,
       });
-      // Validate immediately on change (will only run if configured or clearing errors)
+
+      // Validation (keep existing)
       const virtualOperation: UpdateTypeDetail = {
         stateKey,
         path,
         newValue: newValue,
         updateType: 'update',
-
         timeStamp: Date.now(),
         status: 'new',
         oldValue: globalStateValue,
       };
-
-      // Call the one function with the 'onChange' trigger
       runValidation(virtualOperation, 'onChange');
-      isCurrentlyDebouncing.current = true;
 
+      // Debounce state update (keep existing)
+      isCurrentlyDebouncing.current = true;
       if (debounceTimeoutRef.current) {
         clearTimeout(debounceTimeoutRef.current);
       }
 
       const debounceTime = formOpts?.debounceTime ?? 200;
-
-      // Debounce only the state update, not the validation
       debounceTimeoutRef.current = setTimeout(() => {
         isCurrentlyDebouncing.current = false;
         setState(newValue, path, {
@@ -357,27 +411,48 @@ export function FormElementWrapper({
         });
       }, debounceTime);
     },
-    [setState, path, formOpts?.debounceTime, typeInfo, globalStateValue]
+    [
+      setState,
+      path,
+      formOpts?.debounceTime,
+      typeInfo,
+      globalStateValue,
+      stateKey,
+      componentId,
+    ]
   );
-  const virtualFocusPath = `${stateKey}.__focusedElement`;
-  const newFocusedElement = { path, ref: formElementRef };
+
   const handleFocus = useCallback(() => {
-    const rootMeta =
-      getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
-    setShadowMetadata(stateKey, [], {
-      ...rootMeta,
-      focusedElement: { path, ref: formElementRef },
-    });
-    notifyPathSubscribers(virtualFocusPath, newFocusedElement);
+    const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
+
+    // Update element's current activity
+    const meta = getShadowMetadata(stateKey, path);
+    if (meta?.clientActivityState?.elements?.has(componentId)) {
+      const element = meta.clientActivityState.elements.get(componentId)!;
+      element.currentActivity = {
+        type: 'focus',
+        startTime: Date.now(),
+        details: {
+          value: localValue,
+          inputLength:
+            typeof localValue === 'string' ? localValue.length : undefined,
+        },
+      };
+      setShadowMetadata(stateKey, path, meta);
+    }
+
+    // Notify plugins
     notifyFormUpdate({
       stateKey,
       type: 'focus',
       path,
       value: localValue,
     });
-  }, [stateKey, path, formElementRef]);
-
+  }, [stateKey, path, componentId, localValue]);
   const handleBlur = useCallback(() => {
+    const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
+
+    // Clear debounce if active
     if (debounceTimeoutRef.current) {
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
@@ -388,44 +463,37 @@ export function FormElementWrapper({
       });
     }
 
-    queueMicrotask(() => {
-      const rootMeta =
-        getGlobalStore.getState().getShadowMetadata(stateKey, []) || {};
-      if (
-        rootMeta.focusedElement &&
-        JSON.stringify(rootMeta.focusedElement.path) === JSON.stringify(path)
-      ) {
-        setShadowMetadata(stateKey, [], {
-          focusedElement: null,
-        });
-        notifyPathSubscribers(virtualFocusPath, null);
-        notifyFormUpdate({
-          stateKey,
-          type: 'blur',
-          path,
-          value: localValue,
-        });
-      }
+    // Clear element's current activity
+    const meta = getShadowMetadata(stateKey, path);
+    if (meta?.clientActivityState?.elements?.has(componentId)) {
+      const element = meta.clientActivityState.elements.get(componentId)!;
+      element.currentActivity = undefined;
+      setShadowMetadata(stateKey, path, meta);
+    }
+
+    // Notify plugins
+    notifyFormUpdate({
+      stateKey,
+      type: 'blur',
+      path,
+      value: localValue,
     });
 
+    // Run validation if configured
     const validationOptions = getInitialOptions(stateKey)?.validation;
     if (validationOptions?.onBlur) {
-      // Create the complete operation object. It has all the f--king details.
       const virtualOperation: UpdateTypeDetail = {
         stateKey,
         path,
-        newValue: localValue, // Use the current value from the input's state
+        newValue: localValue,
         updateType: 'update',
-
         timeStamp: Date.now(),
         status: 'new',
         oldValue: globalStateValue,
       };
-
-      // Call the one function with the 'onBlur' trigger
       runValidation(virtualOperation, 'onBlur');
     }
-  }, [localValue, setState, path, stateKey]);
+  }, [localValue, setState, path, stateKey, componentId, globalStateValue]);
 
   const baseState = rebuildStateShape({
     path: path,

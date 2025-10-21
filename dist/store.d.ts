@@ -40,7 +40,7 @@ export type ValidationState = {
     lastValidated?: number;
     validatedValue?: any;
 };
-export type TypeInfo = {
+export type SchemaTypeInfo = {
     type: 'string' | 'number' | 'boolean' | 'array' | 'object' | 'date' | 'unknown';
     schema: any;
     source: 'sync' | 'zod4' | 'zod3' | 'runtime' | 'default';
@@ -48,15 +48,43 @@ export type TypeInfo = {
     nullable?: boolean;
     optional?: boolean;
 };
-export type UIState = {
-    isFocused?: boolean;
-    isTouched?: boolean;
-    isHovered?: boolean;
+export type ClientActivityState = {
+    elements: Map<string, {
+        domRef: React.RefObject<HTMLElement>;
+        elementType: 'input' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'range' | 'file' | 'custom';
+        inputType?: string;
+        mountedAt: number;
+        currentActivity?: {
+            type: 'focus' | 'blur' | 'input' | 'select' | 'hover' | 'scroll' | 'cursor';
+            startTime: number;
+            details?: {
+                value?: any;
+                previousValue?: any;
+                inputLength?: number;
+                changeType?: 'keyboard' | 'paste' | 'drop' | 'select' | 'clear';
+                selectionStart?: number;
+                selectionEnd?: number;
+                selectedText?: string;
+                cursorPosition?: number;
+                scrollTop?: number;
+                scrollLeft?: number;
+                isComposing?: boolean;
+                keystrokeCount?: number;
+                key?: string;
+                optionCount?: number;
+                selectedIndex?: number;
+                checked?: boolean;
+                arrayOperation?: 'insert' | 'remove' | 'reorder';
+                arrayIndex?: number;
+                arrayLength?: number;
+            };
+        };
+    }>;
 };
 export type ShadowMetadata = {
     value?: any;
     id?: string;
-    typeInfo?: TypeInfo;
+    typeInfo?: SchemaTypeInfo;
     stateSource?: 'default' | 'server' | 'localStorage';
     lastServerSync?: number;
     isDirty?: boolean;
@@ -94,11 +122,7 @@ export type ShadowMetadata = {
         flushTimer: NodeJS.Timeout | null;
     }>;
     pluginMetaData?: Map<string, Record<string, any>>;
-    formRef?: React.RefObject<any>;
-    focusedElement?: {
-        path: string[];
-        ref: React.RefObject<any>;
-    } | null;
+    clientActivityState?: ClientActivityState;
 } & ComponentsType;
 type ShadowNode = {
     _meta?: ShadowMetadata;
