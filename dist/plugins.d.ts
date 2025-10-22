@@ -20,6 +20,7 @@ export type InferPerKeyValueMap<TMap extends Record<string, Record<string, z.Zod
 };
 type DeconstructedCogsMethods<TStateSlice = any> = {
     initialiseState: (data: TStateSlice) => void;
+    initialiseShadowState: (data: any) => void;
     applyOperation: (patch: any, meta?: {
         dontUpdate?: boolean;
     }) => void;
@@ -29,6 +30,7 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
 };
 export declare function toDeconstructedMethods(stateHandler: StateObject<any>): {
     initialiseState: (data: any) => void;
+    initialiseShadowState: (data: any) => void;
     applyOperation: (patch: any, meta?: {
         dontUpdate?: boolean;
     }) => void;
@@ -107,6 +109,7 @@ export type FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMeta
     fieldType?: string;
     wrapperDepth?: number;
     initialiseState: (data: TStateSlice) => void;
+    initialiseShadowState: (data: any) => void;
     applyOperation: (patch: any, meta?: {
         dontUpdate?: boolean;
     }) => void;

@@ -1175,19 +1175,28 @@ function getComponentNotifications(
     result.type === 'cut' ||
     result.type === 'insert_many'
   ) {
-    // For array structural changes (add/remove), notify components listening to the parent array.
+    // This path is the array itself (e.g., ['pets'])
     const parentArrayPath = result.type === 'insert' ? path : path.slice(0, -1);
-    const parentMeta = getShadowMetadata(stateKey, parentArrayPath);
 
-    if (parentMeta?.pathComponents) {
-      parentMeta.pathComponents.forEach((componentId: string) => {
-        const component = rootMeta.components?.get(componentId);
-        // NEW: Add component to the set
-        if (component) {
-          componentsToNotify.add(component);
-        }
-      });
+    // --- FIX: ADD BUBBLE-UP LOGIC HERE ---
+    // Start from the array's path and go up to the root
+    let currentPath = [...parentArrayPath];
+    while (true) {
+      const pathMeta = getShadowMetadata(stateKey, currentPath);
+
+      if (pathMeta?.pathComponents) {
+        pathMeta.pathComponents.forEach((componentId: string) => {
+          const component = rootMeta.components?.get(componentId);
+          if (component) {
+            componentsToNotify.add(component);
+          }
+        });
+      }
+
+      if (currentPath.length === 0) break;
+      currentPath.pop(); // Go up one level
     }
+    // --- END FIX ---
   }
 
   // --- PASS 2: Handle 'all' and 'deps' reactivity types ---
@@ -1935,6 +1944,7 @@ function createProxyHandler<T>(
     const derivationSignature = meta
       ? JSON.stringify(meta.arrayViews || meta.transforms)
       : '';
+
     const cacheKey =
       path.join('.') + ':' + componentId + ':' + derivationSignature;
     if (proxyCache.has(cacheKey)) {
@@ -1947,10 +1957,17 @@ function createProxyHandler<T>(
 
     const handler = {
       get(target: any, prop: string) {
+        if (typeof prop !== 'string') {
+          // This is a Symbol. Let the default "get" behavior happen.
+          // This allows internal JS operations and dev tools to work correctly
+          // without interfering with your state logic.
+          return Reflect.get(target, prop);
+        }
         if (path.length === 0 && prop in rootLevelMethods) {
           return rootLevelMethods[prop as keyof typeof rootLevelMethods];
         }
-        if (!prop.startsWith('$')) {
+
+        if (typeof prop === 'string' && !prop.startsWith('$')) {
           const nextPath = [...path, prop];
           return rebuildStateShape({
             path: nextPath,
@@ -2996,6 +3013,7 @@ function createProxyHandler<T>(
         if (prop === '$cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
             const shadowMeta = getShadowMetadata(stateKey, path);
+            console.log('shadowMeta ->>>>>>>>>>>>>>>>', shadowMeta);
             if (!shadowMeta?.arrayKeys || shadowMeta.arrayKeys.length === 0)
               return;
 
@@ -3006,8 +3024,11 @@ function createProxyHandler<T>(
                   ? index
                   : shadowMeta.arrayKeys.length - 1;
 
+            console.log('indexToCut ->>>>>>>>>>>>>>>>', indexToCut);
+
             const idToCut = shadowMeta.arrayKeys[indexToCut];
             if (!idToCut) return;
+            console.log('idToCut ->>>>>>>>>>>>>>>>', idToCut);
 
             effectiveSetState(null, [...path, idToCut], {
               updateType: 'cut',

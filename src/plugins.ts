@@ -29,6 +29,7 @@ export type InferPerKeyValueMap<
 // Deconstructed cogs methods (no TState)
 type DeconstructedCogsMethods<TStateSlice = any> = {
   initialiseState: (data: TStateSlice) => void;
+  initialiseShadowState: (data: any) => void;
   applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) => void;
   addZodErrors: (errors: any[]) => void;
   getState: () => TStateSlice;
@@ -38,6 +39,9 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
 export function toDeconstructedMethods(stateHandler: StateObject<any>) {
   return {
     initialiseState: (data: any) => {
+      stateHandler.$update(data);
+    },
+    initialiseShadowState: (data: any) => {
       stateHandler.$initializeAndMergeShadowState(data);
     },
     applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) =>
@@ -174,6 +178,7 @@ export type FormWrapperParams<
 
   // Deconstructed methods
   initialiseState: (data: TStateSlice) => void;
+  initialiseShadowState: (data: any) => void;
   applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) => void;
   addZodErrors: (errors: any[]) => void;
   getState: () => TStateSlice;

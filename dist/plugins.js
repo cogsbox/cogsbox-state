@@ -1,12 +1,15 @@
-import { z as D } from "zod";
+import { z as r } from "zod";
 import { getGlobalStore as M } from "./store.js";
-const $ = () => D.object({
-  __key: D.literal("keyed"),
-  map: D.any()
+const b = () => r.object({
+  __key: r.literal("keyed"),
+  map: r.any()
 });
-function j(e) {
+function d(e) {
   return {
     initialiseState: (t) => {
+      e.$update(t);
+    },
+    initialiseShadowState: (t) => {
       e.$initializeAndMergeShadowState(t);
     },
     applyOperation: (t, a) => e.$applyOperation(t, a),
@@ -17,19 +20,19 @@ function j(e) {
     }
   };
 }
-function v(e, t) {
+function j(e, t) {
   return {
     getPluginMetaData: () => M.getState().getPluginMetaDataMap(e, [])?.get(t),
     setPluginMetaData: (a) => M.getState().setPluginMetaData(e, [], t, a),
     removePluginMetaData: () => M.getState().removePluginMetaData(e, [], t),
     getFieldMetaData: (a) => M.getState().getPluginMetaDataMap(e, a)?.get(t),
-    setFieldMetaData: (a, r) => M.getState().setPluginMetaData(e, a, t, r),
+    setFieldMetaData: (a, D) => M.getState().setPluginMetaData(e, a, t, D),
     removeFieldMetaData: (a) => M.getState().removePluginMetaData(e, a, t)
   };
 }
-function d(e) {
+function v(e) {
   function t(a) {
-    const r = (i, o, g, n, c) => ({
+    const D = (i, o, g, n, c) => ({
       name: a,
       useHook: i,
       transformState: o,
@@ -38,7 +41,7 @@ function d(e) {
       formWrapper: c
     });
     function s(i, o, g, n, c) {
-      const P = r(
+      const P = D(
         i,
         o,
         g,
@@ -65,9 +68,9 @@ function d(e) {
   return { createPlugin: t };
 }
 export {
-  v as createMetadataContext,
-  d as createPluginContext,
-  $ as keyedSchema,
-  j as toDeconstructedMethods
+  j as createMetadataContext,
+  v as createPluginContext,
+  b as keyedSchema,
+  d as toDeconstructedMethods
 };
 //# sourceMappingURL=plugins.js.map
