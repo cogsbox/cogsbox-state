@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "0.5.472",
+  "version": "0.5.473",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
@@ -36,7 +36,7 @@
     "superjson": "^2.2.2",
     "uuid": "^9.0.1",
     "zustand": "^5.0.3"
-  },  
+  },
   "peerDependenciesMeta": {
     "react": {
       "optional": false
@@ -51,7 +51,7 @@
     "zod": "^3.25.0 || ^4.0.0"
   },
   "devDependencies": {
-       "react": "^18.3.1",
+    "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "@testing-library/react": "^16.3.0",
     "@types/node": "^22.14.0",
