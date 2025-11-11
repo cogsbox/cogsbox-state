@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { default as React } from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
+import { ClientActivityEvent } from './pluginStore';
 
 type Prettify<T> = {
     [K in keyof T]: T[K];
@@ -90,11 +91,7 @@ export type OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMet
     setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
     removeFieldMetaData: (path: string[]) => void;
     path: string[];
-    event: {
-        type: 'focus' | 'blur' | 'input';
-        value?: any;
-        path: string[];
-    };
+    event: ClientActivityEvent;
     options: TOptions;
     hookData?: THookReturn;
     formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';

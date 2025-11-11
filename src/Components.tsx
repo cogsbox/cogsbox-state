@@ -375,15 +375,24 @@ export function FormElementWrapper({
           setShadowMetadata(stateKey, path, meta);
         }
       }
+      const element = meta?.clientActivityState?.elements?.get(componentId);
 
       // Notify plugins
       notifyFormUpdate({
         stateKey,
-        type: 'input',
+        activityType: 'input', // Changed from 'type'
         path,
-        value: newValue,
+        timestamp: Date.now(),
+        details: {
+          value: newValue,
+          inputLength:
+            typeof newValue === 'string' ? newValue.length : undefined,
+          isComposing: false, // You'd need to track this from the actual input event
+          isPasting: false, // You'd need to track this from paste events
+          keystrokeCount:
+            (element?.currentActivity?.details?.keystrokeCount || 0) + 1,
+        },
       });
-
       // Validation (keep existing)
       const virtualOperation: UpdateTypeDetail = {
         stateKey,
@@ -444,9 +453,12 @@ export function FormElementWrapper({
     // Notify plugins
     notifyFormUpdate({
       stateKey,
-      type: 'focus',
+      activityType: 'focus', // Changed from 'type'
       path,
-      value: localValue,
+      timestamp: Date.now(),
+      details: {
+        cursorPosition: formElementRef.current?.selectionStart,
+      },
     });
   }, [stateKey, path, componentId, localValue]);
   const handleBlur = useCallback(() => {
@@ -470,13 +482,20 @@ export function FormElementWrapper({
       element.currentActivity = undefined;
       setShadowMetadata(stateKey, path, meta);
     }
+    const focusStartTime =
+      meta?.clientActivityState?.elements?.get(componentId)?.currentActivity
+        ?.startTime;
 
     // Notify plugins
     notifyFormUpdate({
       stateKey,
-      type: 'blur',
+      activityType: 'blur', // Changed from 'type'
       path,
-      value: localValue,
+      timestamp: Date.now(),
+      duration: focusStartTime ? Date.now() - focusStartTime : undefined,
+      details: {
+        duration: focusStartTime ? Date.now() - focusStartTime : 0,
+      },
     });
 
     // Run validation if configured

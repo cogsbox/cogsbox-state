@@ -19,8 +19,30 @@ Cogsbox State is a React state management library that creates a **nested state 
 ```typescript
 import { createCogsState } from 'cogsbox-state';
 
+type Todo = {
+  id: number;
+  text: string;
+  done: boolean;
+}
+
+type AppState = {
+  user: {
+    name: string;
+    stats: {
+      counter: number;
+      lastUpdated: number | null; // Be specific with types
+    },
+    age: number;
+    online: boolean;
+  };
+  todos: Todo[]; // Use the interface here
+  settings: {
+    darkMode: boolean;
+    notifications: boolean;
+  }
+}
 // 1. Define your initial state structure
-const initialState = {
+const initialState: AppState = {
   user: {
     name: "John",
     stats: {
@@ -61,7 +83,7 @@ function TodoComponent() {
   return (
     <div>
       <p>Todo count: {todos.$get().length}</p>
-      <button onClick={() => todos.insert({ id: Date.now(), text: 'New todo', done: false })}>
+      <button onClick={() => todos.$insert({ id: Date.now(), text: 'New todo', done: false })}>
         Add Todo
       </button>
     </div>
@@ -80,8 +102,8 @@ Every state property gets these core methods:
 - `.$get()` - read values reactively
 - `.$update()` - set values
 - `.$toggle()` - flip booleans
-- `.$get()` - non-reactive read (signals)
-- `.$derive()` - computed signals
+- `.$$get()` - non-reactive read (signals)
+- `.$$derive()` - computed signals
 
 #### Objects
 
@@ -191,7 +213,7 @@ const todos = useCogsState('todos');
   <div key={todoState.id.$get()}>
     <span>{todoState.text.$get()}</span>
     <button onClick={() => todoState.done.$toggle()}>Toggle</button>
-    <button onClick={() => arrayState.cut(index)}>Delete</button>
+    <button onClick={() => arrayState.$cut(index)}>Delete</button>
   </div>
 ))}
 ```
@@ -351,29 +373,40 @@ Cogsbox excels at form handling with automatic debouncing and validation:
 ### Basic Form Elements
 
 ```typescript
+import { createCogsState } from 'cogsbox-state';
 import { z } from 'zod';
 
-// Define validation schema
+// 1. Define the validation schema. This is your single source of truth.
 const userSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email"),
   age: z.number().min(18, "Must be 18+")
 });
 
-// Create state with validation
+// 2. Best Practice: Infer the TypeScript type directly from the schema.
+type UserFormData = z.infer<typeof userSchema>;
+
+// 3. Define the initial state for the form using the inferred type.
+const initialUserFormState: UserFormData = {
+  name: "",
+  email: "",
+  age: 18
+};
+
+// 4. Create the state manager.
 const { useCogsState } = createCogsState({
   userForm: {
-    initialState: { name: "", email: "", age: 18 },
+    initialState: initialUserFormState,
     validation: {
       key: "userValidation",
-      zodSchemaV4: userSchema,
-      onBlur: true // Validate on blur
+      zodSchemaV4: userSchema, // Pass the schema for runtime validation
+      onBlur: 'error'
     },
     formElements: {
-      validation: ({ children, active, message }) => (
+      validation: ({ children, hasErrors, message }) => (
         <div className="form-field">
           {children}
-          {active && <span className="error">{message}</span>}
+          {hasErrors && <span className="error">{message}</span>}
         </div>
       )
     }
@@ -386,7 +419,7 @@ function UserForm() {
   return (
     <form>
       {/* Auto-debounced input with validation wrapper */}
-      {userForm.name.formElement(({ inputProps }) => (
+      {userForm.name.$formElement(({ $inputProps }) => (
         <>
           <label>Name</label>
           <input {...$inputProps} />
@@ -394,16 +427,15 @@ function UserForm() {
       ))}
 
       {/* Custom debounce time */}
-      {userForm.email.formElement(({ inputProps, $get, $update }) => (
+      {userForm.email.$formElement(({ $inputProps }) => (
         <>
           <label>Email</label>
           <input {...$inputProps} />
-          <small>Current: {$get()}</small>
         </>
       ), { debounceTime: 500 })}
 
       {/* Custom form control */}
-      {userForm.age.formElement(({ $get, $update }) => (
+      {userForm.age.$formElement(({ $get, $update }) => (
         <>
           <label>Age</label>
           <input
@@ -413,8 +445,6 @@ function UserForm() {
           />
         </>
       ))}
-
-
     </form>
   );
 }

@@ -1,10 +1,10 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
-import { pluginStore } from './pluginStore';
+import { ClientActivityEvent, pluginStore } from './pluginStore';
 import { isDeepEqual } from './utility';
 import { createMetadataContext, toDeconstructedMethods } from './plugins';
 import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
-import { FormEventType } from './store';
+import { ClientActivityState, FormEventType } from './store';
 
 const { setHookResult, removeHookResult } = pluginStore.getState();
 
@@ -122,19 +122,14 @@ const PluginInstance = React.memo(
       if (!plugin.onFormUpdate) return;
 
       const handleFormUpdate = (
-        event: FormEventType & { stateKey: string }
+        event: ClientActivityEvent // Use the proper type
       ) => {
         if (event.stateKey === stateKey) {
-          const path = event.path;
           plugin.onFormUpdate!({
             stateKey,
             pluginName: plugin.name,
-            path,
-            event: {
-              type: event.type,
-              value: event.value,
-              path,
-            },
+            path: event.path,
+            event: event, // Pass the whole event through, not a transformed version
             options,
             hookData: hookDataRef.current,
             ...deconstructed,

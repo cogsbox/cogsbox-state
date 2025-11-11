@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type React from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 import { getGlobalStore } from './store';
+import { ClientActivityEvent } from './pluginStore';
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -129,7 +130,6 @@ export type OnUpdateParams<
 
   pluginName: string;
 };
-
 export type OnFormUpdateParams<
   TOptions,
   THookReturn,
@@ -148,11 +148,7 @@ export type OnFormUpdateParams<
   removeFieldMetaData: (path: string[]) => void;
 
   path: string[];
-  event: {
-    type: 'focus' | 'blur' | 'input';
-    value?: any;
-    path: string[];
-  };
+  event: ClientActivityEvent; // Update this to use the full event type
 
   options: TOptions;
   hookData?: THookReturn;

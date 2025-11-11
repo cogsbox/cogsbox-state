@@ -817,7 +817,6 @@ export const createCogsState = <
       }
     }, [stateKey, options]);
     useEffect(() => {
-      console.log('adding handler 1', stateKey, updater);
       pluginStore
         .getState()
         .stateHandlers.set(stateKey as string, updater as any);
