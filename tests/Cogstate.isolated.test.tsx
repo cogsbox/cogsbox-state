@@ -496,11 +496,11 @@ describe('$isolate and $formElement interaction', () => {
         state.$revertToInitialState();
       }, []);
 
-      const activeUsers = state.users.$stateFilter((u) => u.active);
+      const activeUsers = state.users.$filter((u) => u.active);
 
       return (
         <div>
-          {activeUsers.$stateList((user, index) => (
+          {activeUsers.$list((user, index) => (
             <div key={index}>
               {user.name.$formElement((params) => (
                 <input
@@ -594,7 +594,7 @@ describe('$isolate and $formElement interaction', () => {
             <div data-testid="tags-count">Count: {tags.$get().length}</div>
           ))}
 
-          {state.tags.$stateList((tag, index) => (
+          {state.tags.$list((tag, index) => (
             <div key={index}>
               {tag.$formElement((params) => (
                 <input

@@ -377,8 +377,8 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     // Filter for electronics, then sort by price ascending.
     // The list will be: Keyboard (p7, $75), Headphones (p4, $150), Laptop (p1, $1200)
     const sortedElectronicsProxy = setter.products
-      .$stateFilter((p) => p.category === 'electronics')
-      .$stateSort((a, b) => a.price - b.price);
+      .$filter((p) => p.category === 'electronics')
+      .$sort((a, b) => a.price - b.price);
 
     // Sanity check the order
     expect(sortedElectronicsProxy.$get().map((p) => p.id)).toEqual([
@@ -408,7 +408,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     expect(updatedLaptop?.inStock).toBe(false);
 
     // --- STEP 5: Test edge case where the filter results in an empty array ---
-    const emptyProxy = setter.products.$stateFilter((p) => !p.category);
+    const emptyProxy = setter.products.$filter((p) => !p.category);
     console.log('emptyProxy', emptyProxy.$get());
     expect(emptyProxy.$get().length).toBe(0);
     // Calling .last() on an empty derived array should result in an undefined value
@@ -416,7 +416,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
   });
   it('should filter by one key, then sort the result by another', () => {
     // 1. Filter for all 'electronics' products
-    const electronicsProxy = setter.products.$stateFilter(
+    const electronicsProxy = setter.products.$filter(
       (p) => p.category === 'electronics'
     );
 
@@ -425,7 +425,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     expect(filteredData.map((p) => p.id)).toEqual(['p1', 'p4', 'p7']);
 
     // 2. Sort the *filtered* proxy by price, descending
-    const sortedElectronicsProxy = electronicsProxy.$stateSort(
+    const sortedElectronicsProxy = electronicsProxy.$sort(
       (a, b) => b.price - a.price
     );
     let sortedData = sortedElectronicsProxy.$get();
@@ -436,8 +436,8 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     // 1. Filter for 'apparel'
     // 2. Sort by price ascending
     const sortedApparelProxy = setter.products
-      .$stateFilter((p) => p.category === 'apparel')
-      .$stateSort((a, b) => a.price - b.price);
+      .$filter((p) => p.category === 'apparel')
+      .$sort((a, b) => a.price - b.price);
 
     const apparelData = sortedApparelProxy.$get();
     expect(apparelData.map((p) => p.id)).toEqual(['p2', 'p5']); // T-Shirt, Jeans
@@ -447,7 +447,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
 
   it('should handle selections correctly within a derived (filtered) array', () => {
     // 1. Get a derived proxy for all items that are in stock
-    const inStockProxy = setter.products.$stateFilter((p) => p.inStock);
+    const inStockProxy = setter.products.$filter((p) => p.inStock);
 
     const inStockData = inStockProxy.$get();
     expect(inStockData.map((p) => p.id)).toEqual([
@@ -482,8 +482,8 @@ describe('CogsState - Advanced Chained Array Operations', () => {
   it('should update an item through a derived proxy and reflect it in the original state', () => {
     // 1. Filter for books, sort by price
     const booksProxy = setter.products
-      .$stateFilter((p) => p.category === 'books')
-      .$stateSort((a, b) => a.price - b.price);
+      .$filter((p) => p.category === 'books')
+      .$sort((a, b) => a.price - b.price);
 
     // Original state: 'The Great Gatsby' (p3) is not in stock.
     expect(booksProxy.$get()[0].name).toBe('The Great Gatsby');
@@ -505,18 +505,16 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     expect(originalGatsbyObject?.inStock).toBe(true);
   });
 
-  it('should update an original item using the item setter from stateMap on a filtered array', () => {
+  it('should update an original item using the item setter from map on a filtered array', () => {
     // 1. Filter for books. 'The Great Gatsby' (p3) is initially out of stock.
-    const booksProxy = setter.products.$stateFilter(
-      (p) => p.category === 'books'
-    );
+    const booksProxy = setter.products.$filter((p) => p.category === 'books');
     // Sanity check initial state
     const originalGatsby = setter.products.$get().find((p) => p.id === 'p3');
     expect(originalGatsby?.inStock).toBe(false);
 
-    // 2. Use stateMap on the filtered proxy. Inside the map, we get a setter for each item.
+    // 2. Use map on the filtered proxy. Inside the map, we get a setter for each item.
     // This setter should point back to the item in the *original* array.
-    booksProxy.$stateMap((itemSetter) => {
+    booksProxy.$map((itemSetter) => {
       // Find the specific book we want to modify and use its dedicated setter
       if (itemSetter.id.$get() === 'p3') {
         itemSetter.inStock.$update(true);
@@ -529,17 +527,17 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     expect(gatsbyViaProxy.inStock.$get()).toBe(true);
   });
 
-  it('should insert into the original array using the array setter from stateMap', () => {
+  it('should insert into the original array using the array setter from map', () => {
     // 1. Filter for apparel
 
-    const apparelProxy = setter.products.$stateFilter(
+    const apparelProxy = setter.products.$filter(
       (p) => p.category === 'apparel'
     );
     const initialFullLength = setter.products.$get().length;
 
-    // 2. Use stateMap. The last argument is a setter for the array being mapped over.
+    // 2. Use map. The last argument is a setter for the array being mapped over.
     // In this case of a derived (filtered) proxy, it should point to the ORIGINAL array.
-    apparelProxy.$stateMap((_itemSetter, index, arraySetter) => {
+    apparelProxy.$map((_itemSetter, index, arraySetter) => {
       // To avoid inserting multiple times, we only do it on the first iteration.
       if (index === 0) {
         arraySetter.$insert({
@@ -627,8 +625,8 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     // 2. Sort them by price, ASCENDING.
     // 3. Map over this filtered, sorted list to perform multiple side-effects.
     const sortedElectronicsProxy = setter.products
-      .$stateFilter((p) => p.category === 'electronics')
-      .$stateSort((a, b) => a.price - b.price);
+      .$filter((p) => p.category === 'electronics')
+      .$sort((a, b) => a.price - b.price);
 
     // Initial check on the derived proxy's data before the map
     // Expected order: Keyboard (75), Headphones (150), Laptop (1200)
@@ -638,35 +636,33 @@ describe('CogsState - Advanced Chained Array Operations', () => {
       'p1',
     ]);
 
-    // 4. Perform multiple, mixed operations within a stateMap on the derived proxy
-    sortedElectronicsProxy.$stateMap(
-      (itemSetter, index, derivedArraySetter) => {
-        // ACTION A
-        if (itemSetter.$get().id === 'p4') {
-          itemSetter.inStock.$update(false);
-        }
-
-        // ACTION B - This needs to use the ORIGINAL array proxy to insert
-        // We can't use the derivedArraySetter for this.
-        if (index === 0) {
-          // To insert, we must use a proxy to the original array.
-          // The `arraySetter` from the map callback is derived and cannot be used for insertion.
-          // We use the top-level `setter.products` for this.
-          setter.products.$insert({
-            id: 'p-mouse',
-            name: 'Gaming Mouse',
-            category: 'electronics',
-            price: 65,
-            inStock: true,
-          });
-        }
-
-        // ACTION C: Select the LAST item in the DERIVED view.
-        if (index === derivedArraySetter.$get().length - 1) {
-          itemSetter.$setSelected(true);
-        }
+    // 4. Perform multiple, mixed operations within a map on the derived proxy
+    sortedElectronicsProxy.$map((itemSetter, index, derivedArraySetter) => {
+      // ACTION A
+      if (itemSetter.$get().id === 'p4') {
+        itemSetter.inStock.$update(false);
       }
-    );
+
+      // ACTION B - This needs to use the ORIGINAL array proxy to insert
+      // We can't use the derivedArraySetter for this.
+      if (index === 0) {
+        // To insert, we must use a proxy to the original array.
+        // The `arraySetter` from the map callback is derived and cannot be used for insertion.
+        // We use the top-level `setter.products` for this.
+        setter.products.$insert({
+          id: 'p-mouse',
+          name: 'Gaming Mouse',
+          category: 'electronics',
+          price: 65,
+          inStock: true,
+        });
+      }
+
+      // ACTION C: Select the LAST item in the DERIVED view.
+      if (index === derivedArraySetter.$get().length - 1) {
+        itemSetter.$setSelected(true);
+      }
+    });
     // --- Assertions: Verify every side-effect ---
 
     const finalGlobalState = setter.$get();
@@ -821,12 +817,10 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
   it('should handle moving items between filtered sets', () => {
     // --- SETUP ---
     // Get initial state of the filters
-    const initialElectronics = setter.products.$stateFilter(
+    const initialElectronics = setter.products.$filter(
       (p) => p.category === 'electronics'
     );
-    const initialBooks = setter.products.$stateFilter(
-      (p) => p.category === 'books'
-    );
+    const initialBooks = setter.products.$filter((p) => p.category === 'books');
 
     const initialElectronicsCount = initialElectronics.$get().length;
     const initialBooksCount = initialBooks.$get().length;
@@ -837,12 +831,10 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
 
     // --- ASSERTION ---
     // **CRUCIAL STEP**: Re-run the filters to get the new, updated views
-    const currentElectronics = setter.products.$stateFilter(
+    const currentElectronics = setter.products.$filter(
       (p) => p.category === 'electronics'
     );
-    const currentBooks = setter.products.$stateFilter(
-      (p) => p.category === 'books'
-    );
+    const currentBooks = setter.products.$filter((p) => p.category === 'books');
 
     // Now, test the results of the NEW filters
     expect(currentElectronics.$get().length).toBe(initialElectronicsCount + 1);
@@ -858,7 +850,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     setter.products.$findWith('id', 'p4').$setSelected(true);
 
     // Create filtered view that includes selected item
-    let electronics = setter.products.$stateFilter(
+    let electronics = setter.products.$filter(
       (p) => p.category === 'electronics'
     );
 
@@ -866,7 +858,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
 
     // Change the selected item's category so it's filtered out
     setter.products.$findWith('id', 'p4').category.$update('books');
-    electronics = setter.products.$stateFilter((p) => {
+    electronics = setter.products.$filter((p) => {
       return p.category === 'electronics';
     });
 
@@ -901,7 +893,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
       inStock: true,
     });
 
-    const sorted = setter.products.$stateSort((a, b) => a.price - b.price);
+    const sorted = setter.products.$sort((a, b) => a.price - b.price);
     const sortedPrices = sorted.$get().map((p) => p.price);
 
     // Should be sorted with all 50s together
@@ -911,7 +903,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     sorted.$findWith('id', 'dup2').price.$update(51);
 
     // Re-sort and verify order changed
-    const reSorted = setter.products.$stateSort((a, b) => a.price - b.price);
+    const reSorted = setter.products.$sort((a, b) => a.price - b.price);
     const dup2Index = reSorted.$get().findIndex((p) => p.id === 'dup2');
     const dup1Index = reSorted.$get().findIndex((p) => p.id === 'dup1');
     expect(dup2Index).toBeGreaterThan(dup1Index);
@@ -920,23 +912,21 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
   it('should handle complex array transformations', () => {
     // Get all products, group by category, then flatten back
     const byCategory = {
-      electronics: setter.products.$stateFilter(
-        (p) => p.category === 'electronics'
-      ),
-      books: setter.products.$stateFilter((p) => p.category === 'books'),
-      apparel: setter.products.$stateFilter((p) => p.category === 'apparel'),
+      electronics: setter.products.$filter((p) => p.category === 'electronics'),
+      books: setter.products.$filter((p) => p.category === 'books'),
+      apparel: setter.products.$filter((p) => p.category === 'apparel'),
     };
 
     // Modify each category differently
-    byCategory.electronics.$stateMap((setter) => {
+    byCategory.electronics.$map((setter) => {
       setter.price.$update((p) => p * 0.9); // 10% discount
     });
 
-    byCategory.books.$stateMap((setter) => {
+    byCategory.books.$map((setter) => {
       setter.inStock.$update(true); // All books in stock
     });
 
-    byCategory.apparel.$stateMap((setter) => {
+    byCategory.apparel.$map((setter) => {
       setter.name.$update((n) => `Sale: ${n}`); // Add sale prefix
     });
     // Verify transformations
@@ -962,7 +952,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
 
   it('should filter and sort both outer and inner arrays independently', () => {
     // OUTER ARRAY: Filter orders to only get high-value orders (total >= 100)
-    const highValueOrdersProxy = setter.orders.$stateFilter(
+    const highValueOrdersProxy = setter.orders.$filter(
       (order) => order.total >= 100
     );
     const highValueOrders = highValueOrdersProxy.$get();
@@ -975,7 +965,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
     ]);
 
     // OUTER ARRAY: Sort high-value orders by total (descending)
-    const sortedHighValueOrdersProxy = highValueOrdersProxy.$stateSort(
+    const sortedHighValueOrdersProxy = highValueOrdersProxy.$sort(
       (a, b) => b.total - a.total
     );
     const sortedHighValueOrders = sortedHighValueOrdersProxy.$get();
@@ -991,7 +981,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
     // For Charlie's order (first in sorted list), get expensive items (price >= 50)
     const charlieExpensiveItemsProxy = sortedHighValueOrdersProxy
       .$index(0)
-      .items.$stateFilter((item) => item.price >= 50);
+      .items.$filter((item) => item.price >= 50);
     const charlieExpensiveItems = charlieExpensiveItemsProxy.$get();
 
     // Should have 2 items: Monitor ($150) and Keyboard ($50)
@@ -1002,7 +992,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
     ]);
 
     // Sort Charlie's expensive items by price (ascending)
-    const charlieSortedItemsProxy = charlieExpensiveItemsProxy.$stateSort(
+    const charlieSortedItemsProxy = charlieExpensiveItemsProxy.$sort(
       (a, b) => a.price - b.price
     );
     const charlieSortedItems = charlieSortedItemsProxy.$get();
@@ -1016,7 +1006,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
     // For Alice's order (second in sorted list), get bulk items (quantity >= 2)
     const aliceBulkItemsProxy = sortedHighValueOrdersProxy
       .$index(1)
-      .items.$stateFilter((item) => item.quantity >= 2);
+      .items.$filter((item) => item.quantity >= 2);
     const aliceBulkItems = aliceBulkItemsProxy.$get();
 
     // Should have 1 item: Mouse (quantity 2)
@@ -1025,7 +1015,7 @@ describe('CogsState - Nested Arrays Filter and Sort', () => {
     expect(aliceBulkItems[0].quantity).toBe(2);
 
     // Sort Alice's bulk items by quantity (descending) - only one item but test the chaining
-    const aliceSortedBulkItemsProxy = aliceBulkItemsProxy.$stateSort(
+    const aliceSortedBulkItemsProxy = aliceBulkItemsProxy.$sort(
       (a, b) => b.quantity - a.quantity
     );
     const aliceSortedBulkItems = aliceSortedBulkItemsProxy.$get();

@@ -5,7 +5,11 @@ import {
   type FormOptsType,
 } from './CogsState';
 import { pluginStore } from './pluginStore';
-import { createMetadataContext, toDeconstructedMethods } from './plugins';
+import {
+  createMetadataContext,
+  createScopedMetadataContext,
+  toDeconstructedMethods,
+} from './plugins';
 import React, {
   memo,
   RefObject,
@@ -78,6 +82,34 @@ export function ValidationWrapper({
       : warningMessages.length > 0
         ? 'warning'
         : undefined;
+  const { registeredPlugins } = pluginStore.getState();
+  const pluginsApi: any = {};
+
+  // We iterate over ALL registered plugins in the app.
+  registeredPlugins.forEach((plugin) => {
+    // A plugin is considered "active" for this state key if its name
+    // exists as a key in the options (e.g., options.syncPlugin exists).
+    if (thisStateOpts && thisStateOpts.hasOwnProperty(plugin.name)) {
+      const pluginName = plugin.name;
+
+      // Now we can safely build the API for this active plugin.
+      const hookData = pluginStore
+        .getState()
+        .getHookResult(stateKey, pluginName);
+
+      const scopedMetadata = createScopedMetadataContext(
+        stateKey,
+        pluginName,
+        path
+      );
+
+      pluginsApi[pluginName] = {
+        hookData,
+        getFieldMetaData: scopedMetadata.getFieldMetaData,
+        setFieldMetaData: scopedMetadata.setFieldMetaData,
+      };
+    }
+  });
   return (
     <>
       {thisStateOpts?.formElements?.validation &&
@@ -96,6 +128,7 @@ export function ValidationWrapper({
           allErrors: errors,
           path: path,
           getData: () => getShadowValue(stateKey!, path),
+          plugins: pluginsApi,
         })
       ) : (
         <React.Fragment key={path.toString()}>{children}</React.Fragment>
@@ -243,17 +276,6 @@ export function FormElementWrapper({
   const [localValue, setLocalValue] = useState<any>(globalStateValue);
   const isCurrentlyDebouncing = useRef(false);
   const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // 2. Memoize the list of active form wrappers to avoid re-calculating on every render.
-  const activeFormWrappers = useMemo(() => {
-    return (
-      pluginStore
-        .getState()
-        .getPluginConfigsForState(stateKey)
-        // We only care about plugins that have defined a formWrapper
-        .filter((config) => typeof config.plugin.formWrapper === 'function')
-    );
-  }, [stateKey]);
 
   useEffect(() => {
     if (
@@ -540,23 +562,9 @@ export function FormElementWrapper({
 
   const initialElement = renderFn(stateWithInputProps);
 
-  const wrappedElement = activeFormWrappers.reduceRight(
-    (currentElement, config, index) => (
-      <PluginWrapper
-        stateKey={stateKey}
-        path={path}
-        pluginName={config.plugin.name}
-        wrapperDepth={activeFormWrappers.length - 1 - index}
-      >
-        {currentElement}
-      </PluginWrapper>
-    ),
-    initialElement
-  );
-
   return (
     <ValidationWrapper formOpts={formOpts} path={path} stateKey={stateKey}>
-      {wrappedElement}
+      {initialElement}
     </ValidationWrapper>
   );
 }
@@ -718,16 +726,20 @@ const PluginWrapper = memo(function PluginWrapper({
     return <>{children}</>;
   }
 
-  const metadataContext = createMetadataContext(stateKey, plugin.name);
   const deconstructed = toDeconstructedMethods(stateHandler);
-
+  const scopedMetadataContext = createScopedMetadataContext(
+    stateKey,
+    plugin.name,
+    path
+  );
   return plugin.formWrapper({
     element: children,
     path,
     stateKey,
     pluginName: plugin.name,
     ...deconstructed,
-    ...metadataContext,
+
+    ...scopedMetadataContext,
     options,
     hookData,
     fieldType: typeInfo?.type,

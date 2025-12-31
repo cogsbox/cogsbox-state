@@ -58,18 +58,6 @@ export type VirtualViewOptions = {
   scrollStickTolerance?: number;
 };
 
-// The result now returns a real StateObject
-export type VirtualStateObjectResult<T extends any[]> = {
-  virtualState: StateObject<T>;
-  virtualizerProps: {
-    outer: { ref: RefObject<HTMLDivElement>; style: CSSProperties };
-    inner: { style: CSSProperties };
-    list: { style: CSSProperties };
-  };
-  scrollToBottom: (behavior?: ScrollBehavior) => void;
-  scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
-};
-
 export type SyncInfo = {
   timeStamp: number;
   userId: number;
@@ -123,7 +111,10 @@ export type StreamHandle<T> = {
   resume: () => void;
 };
 
-export type ArrayEndType<TShape extends unknown> = {
+export type ArrayEndType<
+  TShape extends unknown,
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
+> = {
   $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
     options?: StreamOptions<T, R>
   ) => StreamHandle<T>;
@@ -141,24 +132,21 @@ export type ArrayEndType<TShape extends unknown> = {
   $cutSelected: () => void;
   $cutByValue: (value: string | number | boolean) => void;
   $toggleByValue: (value: string | number | boolean) => void;
-  $stateSort: (
+  $sort: (
     compareFn: (
       a: Prettify<InferArrayElement<TShape>>,
       b: Prettify<InferArrayElement<TShape>>
     ) => number
-  ) => ArrayEndType<TShape>;
-  $useVirtualView: (
-    options: VirtualViewOptions
-  ) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
+  ) => ArrayEndType<TShape, TPlugins>;
 
-  $stateList: (
+  $list: (
     callbackfn: (
       setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
       arraySetter: StateObject<TShape>
     ) => void
   ) => any;
-  $stateMap: <U>(
+  $map: <U>(
     callbackfn: (
       setter: StateObject<Prettify<InferArrayElement<TShape>>>,
       index: number,
@@ -174,18 +162,18 @@ export type ArrayEndType<TShape extends unknown> = {
     fields?: (keyof Prettify<InferArrayElement<TShape>>)[],
     onMatch?: (existingItem: any) => any
   ) => void;
-  $stateFind: (
+  $find: (
     callbackfn: (
       value: Prettify<InferArrayElement<TShape>>,
       index: number
     ) => boolean
   ) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-  $stateFilter: (
+  $filter: (
     callbackfn: (
       value: Prettify<InferArrayElement<TShape>>,
       index: number
     ) => void
-  ) => ArrayEndType<TShape>;
+  ) => ArrayEndType<TShape, TPlugins>;
   $getSelected: () =>
     | StateObject<Prettify<InferArrayElement<TShape>>>
     | undefined;
@@ -221,7 +209,17 @@ export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
-export type EndType<T, IsArrayElement = false> = {
+export type PerPathFormOptsType<
+  TState,
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
+> = Omit<FormOptsType, 'formElements'> & {
+  formElements?: FormsElementsType<TState, TPlugins>;
+};
+export type EndType<
+  T,
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
+  IsArrayElement = false,
+> = {
   $getPluginMetaData: (pluginName: string) => Record<string, any>;
   $addPluginMetaData: (key: string, data: Record<string, any>) => void;
   $removePluginMetaData: (key: string) => void;
@@ -241,9 +239,12 @@ export type EndType<T, IsArrayElement = false> = {
   $_path: string[];
   $_stateKey: string;
   $isolate: (
-    renderFn: (state: StateObject<T>) => React.ReactNode
+    renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
   ) => JSX.Element;
-  $formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
+  $formElement: (
+    control: FormControl<T>,
+    opts?: PerPathFormOptsType<T, TPlugins>
+  ) => JSX.Element;
   $get: () => T;
   $$get: () => T;
   $$derive: <R>(fn: EffectFunction<T, R>) => R;
@@ -252,7 +253,7 @@ export type EndType<T, IsArrayElement = false> = {
   $showValidationErrors: () => string[];
   $setValidation: (ctx: string) => void;
   $removeValidation: (ctx: string) => void;
-  $ignoreFields: (fields: string[]) => StateObject<T>;
+
   $isSelected: boolean;
   $setSelected: (value: boolean) => void;
   $toggleSelected: () => void;
@@ -276,14 +277,22 @@ export type EndType<T, IsArrayElement = false> = {
   $lastSynced?: SyncInfo;
 } & (IsArrayElement extends true ? { $cutThis: () => void } : {});
 
-export type StateObject<T> = (T extends any[]
-  ? ArrayEndType<T>
+export type StateObject<
+  T,
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
+> = {
+  // A. Callable Getter: state.count()
+  (): T;
+  // B. Callable Setter: state.count(5)
+  (newValue: T | ((prev: T) => T)): void;
+} & (T extends any[]
+  ? ArrayEndType<T, TPlugins>
   : T extends Record<string, unknown> | object
-    ? { [K in keyof T]-?: StateObject<T[K]> }
+    ? { [K in keyof T]-?: StateObject<T[K], TPlugins> }
     : T extends string | number | boolean | null
-      ? EndType<T, true>
+      ? EndType<T, TPlugins, true>
       : never) &
-  EndType<T, true> & {
+  EndType<T, TPlugins, true> & {
     $toggle: T extends boolean ? () => void : never;
 
     $_componentId: string | null;
@@ -439,7 +448,12 @@ export type OptionsType<
 
   dependencies?: any[];
 };
-
+type ScopedPluginApi<THookReturn, TFieldMetaData> = {
+  hookData: THookReturn;
+  getFieldMetaData: () => TFieldMetaData | undefined;
+  setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
+  // Add any other scoped functions or data a plugin might need here
+};
 export type FormsElementsType<
   TState,
   TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
@@ -455,6 +469,19 @@ export type FormsElementsType<
     path: string[];
     message?: string;
     getData?: () => TState;
+    plugins: {
+      // It maps over the plugins...
+      [P in TPlugins[number] as P['name']]: P extends CogsPlugin<
+        any,
+        any,
+        infer THookReturn,
+        any,
+        infer TFieldMetaData
+      >
+        ? // ...and provides the scoped API for each one.
+          ScopedPluginApi<THookReturn, TFieldMetaData>
+        : never;
+    };
   }) => React.ReactNode;
   syncRender?: (options: {
     children: React.ReactNode;
@@ -462,16 +489,6 @@ export type FormsElementsType<
     data?: TState;
     key?: string;
   }) => React.ReactNode;
-} & {
-  // For each plugin `P` in the TPlugins array...
-  [P in TPlugins[number] as P['name']]?: P['formWrapper'] extends (
-    // ...check if its `formWrapper` property is a function...
-    arg: any
-  ) => any
-    ? // ...if it is, infer the type of its FIRST PARAMETER. This is the key.
-      Parameters<P['formWrapper']>[0]
-    : // Otherwise, the type is invalid.
-      never;
 };
 export type CogsInitialState<T> =
   | {
@@ -796,18 +813,21 @@ export const createCogsState = <
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
 
-    const updater = useCogsStateFn<(typeof statePart)[StateKey]>(thiState, {
-      stateKey: stateKey as string,
-      syncUpdate: options?.syncUpdate,
-      componentId,
-      localStorage: options?.localStorage,
-      middleware: options?.middleware,
-      reactiveType: options?.reactiveType,
-      reactiveDeps: options?.reactiveDeps,
-      defaultState: options?.defaultState as any,
-      dependencies: options?.dependencies,
-      serverState: options?.serverState,
-    });
+    const updater = useCogsStateFn<(typeof statePart)[StateKey], TPlugins>(
+      thiState,
+      {
+        stateKey: stateKey as string,
+        syncUpdate: options?.syncUpdate,
+        componentId,
+        localStorage: options?.localStorage,
+        middleware: options?.middleware,
+        reactiveType: options?.reactiveType,
+        reactiveDeps: options?.reactiveDeps,
+        defaultState: options?.defaultState as any,
+        dependencies: options?.dependencies,
+        serverState: options?.serverState,
+      }
+    );
 
     useEffect(() => {
       if (options) {
@@ -831,62 +851,58 @@ export const createCogsState = <
 
   function setCogsOptionsByKey<StateKey extends StateKeys>(
     stateKey: StateKey,
-    options: OptionsType<(typeof statePart)[StateKey]>
+    options: CreateStateOptionsType<(typeof statePart)[StateKey], TPlugins> &
+      Omit<
+        OptionsType<(typeof statePart)[StateKey]>,
+        keyof CreateStateOptionsType
+      >
   ) {
-    setOptions({ stateKey, options, initialOptionsPart });
+    setOptions({ stateKey, options, initialOptionsPart } as any);
 
     if (options.localStorage) {
       loadAndApplyLocalStorage(stateKey as string, options);
     }
+    if (options.formElements) {
+      const currentPlugins = pluginStore.getState().registeredPlugins;
 
+      const updatedPlugins = currentPlugins.map((plugin) => {
+        // Use `options.formElements` as the source
+        if (options.formElements!.hasOwnProperty(plugin.name)) {
+          return {
+            ...plugin,
+            formWrapper: (options.formElements as any)[plugin.name],
+          };
+        }
+        return plugin;
+      });
+
+      pluginStore.getState().setRegisteredPlugins(updatedPlugins as any);
+    }
     notifyComponents(stateKey as string);
   }
-
-  function setCogsFormElements(
-    formElements: FormsElementsType<State, TPlugins>
+  function setCogsOptions(
+    // The type allows any valid options, but uses a generic `unknown` for the
+    // state type because it applies to multiple different state shapes.
+    // The `TPlugins` generic is correctly preserved.
+    globalOptions: CreateStateOptionsType<unknown, TPlugins> &
+      Omit<OptionsType<unknown>, keyof CreateStateOptionsType>
   ) {
-    // Get the current list of registered plugins from the store.
-    const currentPlugins = pluginStore.getState().registeredPlugins;
+    // Get all the state keys that this instance manages
+    const allStateKeys = Object.keys(statePart) as StateKeys[];
 
-    // Create a new array by mapping over the current plugins.
-    // This is crucial for immutability and ensuring Zustand detects the change.
-    const updatedPlugins = currentPlugins.map((plugin) => {
-      // Check if the formElements object has a wrapper for this specific plugin by name.
-      if (formElements.hasOwnProperty(plugin.name)) {
-        // If it does, return a *new* plugin object.
-        // Spread the existing plugin properties and add/overwrite the formWrapper.
-        return {
-          ...plugin,
-          formWrapper: formElements[plugin.name as keyof typeof formElements],
-        };
-      }
-      // If there's no new wrapper for this plugin, return the original object.
-      return plugin;
-    });
-
-    // Use the store's dedicated setter function to update the registered plugins list.
-    // This will trigger a state update that components listening to the store will react to.
-    pluginStore.getState().setRegisteredPlugins(updatedPlugins as any);
-
-    // For good measure and consistency, we should still update the formElements
-    // in the initial options, in case any other part of the system relies on it.
-    const allStateKeys = Object.keys(statePart);
+    // Loop through every state key and apply the provided options
     allStateKeys.forEach((key) => {
-      const existingOptions = getInitialOptions(key) || {};
-      const finalOptions = {
-        ...existingOptions,
-        formElements: {
-          ...(existingOptions.formElements || {}),
-          ...formElements,
-        },
-      };
-      setInitialStateOptions(key, finalOptions);
+      // We use `as any` here because we are intentionally applying a single
+      // generic options object to many differently-typed state slices.
+      // The internal logic of setCogsOptionsByKey handles the merging correctly.
+      setCogsOptionsByKey(key, globalOptions as any);
     });
   }
+
   return {
     useCogsState,
     setCogsOptionsByKey,
-    setCogsFormElements,
+    setCogsOptions,
   };
 };
 
@@ -1233,11 +1249,14 @@ function handleUpdate(
   stateKey: string,
   path: string[],
   payload: any
-): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } {
+): { type: 'update'; oldValue: any; newValue: any; shadowMeta: any } | null {
   // ✅ FIX: Get the old value before the update.
   const oldValue = getGlobalStore.getState().getShadowValue(stateKey, path);
 
   const newValue = isFunction(payload) ? payload(oldValue) : payload;
+  if (isDeepEqual(oldValue, newValue)) {
+    return null; // <-- Abort the update
+  }
 
   // ✅ FIX: The new `updateShadowAtPath` handles metadata preservation automatically.
   // The manual loop has been removed.
@@ -1427,6 +1446,10 @@ function createEffectiveSetState<T>(
         result = handleCut(stateKey, path);
         break;
     }
+
+    if (result === null) {
+      return;
+    }
     result.stateKey = stateKey;
     result.path = path;
     updateBatchQueue.push(result);
@@ -1464,7 +1487,10 @@ function createEffectiveSetState<T>(
   }
 }
 
-export function useCogsStateFn<TStateObject extends unknown>(
+export function useCogsStateFn<
+  TStateObject extends unknown,
+  const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
+>(
   stateObject: TStateObject,
   {
     stateKey,
@@ -1774,7 +1800,7 @@ export function useCogsStateFn<TStateObject extends unknown>(
   }
 
   const updaterFinal = useMemo(() => {
-    const handler = createProxyHandler<TStateObject>(
+    const handler = createProxyHandler<TStateObject, TPlugins>(
       thisKey,
       effectiveSetState,
       componentIdRef.current,
@@ -1923,12 +1949,15 @@ function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
   };
 }
 
-function createProxyHandler<T>(
+function createProxyHandler<
+  T,
+  const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
+>(
   stateKey: string,
   effectiveSetState: EffectiveSetState<T>,
   outerComponentId: string,
   sessionId?: string
-): StateObject<T> {
+): StateObject<T, TPlugins> {
   const proxyCache = new Map<string, any>();
 
   function rebuildStateShape({
@@ -1951,15 +1980,31 @@ function createProxyHandler<T>(
     }
     const stateKeyPathKey = [stateKey, ...path].join('.');
 
-    // We attach baseObj properties *inside* the get trap now to avoid recursion
-    // This is a placeholder for the proxy.
+    const proxyTarget = () => {};
 
     const handler = {
-      get(target: any, prop: string) {
+      apply(target: any, thisArg: any, args: any) {
+        if (args.length === 0) {
+          // FIX: Calculate viewIds from meta so filters/sorts are respected
+          const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
+          const viewIds = meta?.arrayViews?.[arrayPathKey];
+
+          // Pass viewIds to getShadowValue to get the filtered/sorted data
+          return getShadowValue(stateKey, path, viewIds);
+        }
+
+        // Setter: state.count(5)
+        const newValue = args[0];
+        effectiveSetState(newValue, path, { updateType: 'update' });
+        return true;
+      },
+
+      get(target: any, prop: string, receiver: any) {
+        if (prop === 'call' || prop === 'apply' || prop === 'bind') {
+          return Reflect.get(target, prop, receiver);
+        }
+
         if (typeof prop !== 'string') {
-          // This is a Symbol. Let the default "get" behavior happen.
-          // This allows internal JS operations and dev tools to work correctly
-          // without interfering with your state logic.
           return Reflect.get(target, prop);
         }
         if (path.length === 0 && prop in rootLevelMethods) {
@@ -2044,7 +2089,7 @@ function createProxyHandler<T>(
           const getStatusFunc = () => {
             // ✅ Use the optimized helper to get all data in one efficient call
             const { shadowMeta, value } = getScopedData(stateKey, path, meta);
-            console.log('getStatusFunc', path, shadowMeta, value);
+
             if (shadowMeta?.isDirty === true) {
               return 'dirty';
             }
@@ -2181,357 +2226,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === '$useVirtualView') {
-          return (
-            options: VirtualViewOptions
-          ): VirtualStateObjectResult<any[]> => {
-            const {
-              itemHeight = 50,
-              overscan = 6,
-              stickToBottom = false,
-              scrollStickTolerance = 75,
-            } = options;
-
-            const containerRef = useRef<HTMLDivElement | null>(null);
-            const [range, setRange] = useState({
-              startIndex: 0,
-              endIndex: 10,
-            });
-            const [rerender, forceUpdate] = useState({});
-            const initialScrollRef = useRef(true);
-
-            useEffect(() => {
-              const interval = setInterval(() => {
-                forceUpdate({});
-              }, 1000);
-              return () => clearInterval(interval);
-            }, []);
-
-            // Scroll state management
-            const scrollStateRef = useRef({
-              isUserScrolling: false,
-              lastScrollTop: 0,
-              scrollUpCount: 0,
-              isNearBottom: true,
-            });
-
-            // Measurement cache
-            const measurementCache = useRef(
-              new Map<string, { height: number; offset: number }>()
-            );
-            const { keys: arrayKeys } = getArrayData(stateKey, path, meta);
-
-            // Subscribe to state changes like stateList does
-            useEffect(() => {
-              const stateKeyPathKey = [stateKey, ...path].join('.');
-              const unsubscribe = getGlobalStore
-                .getState()
-                .subscribeToPath(stateKeyPathKey, (e) => {
-                  if (e.type === 'GET_SELECTED') {
-                    return;
-                  }
-                  if (e.type === 'SERVER_STATE_UPDATE') {
-                    //  forceUpdate({});
-                  }
-                });
-
-              return () => {
-                unsubscribe();
-              };
-            }, [componentId, stateKey, path.join('.')]);
-
-            // YOUR ORIGINAL INITIAL POSITIONING - KEEPING EXACTLY AS IS
-            useLayoutEffect(() => {
-              if (
-                stickToBottom &&
-                arrayKeys.length > 0 &&
-                containerRef.current &&
-                !scrollStateRef.current.isUserScrolling &&
-                initialScrollRef.current
-              ) {
-                const container = containerRef.current;
-
-                const waitForContainer = () => {
-                  if (container.clientHeight > 0) {
-                    const visibleCount = Math.ceil(
-                      container.clientHeight / itemHeight
-                    );
-                    const endIndex = arrayKeys.length - 1;
-                    const startIndex = Math.max(
-                      0,
-                      endIndex - visibleCount - overscan
-                    );
-
-                    setRange({ startIndex, endIndex });
-
-                    requestAnimationFrame(() => {
-                      scrollToBottom('instant');
-                      initialScrollRef.current = false;
-                    });
-                  } else {
-                    requestAnimationFrame(waitForContainer);
-                  }
-                };
-
-                waitForContainer();
-              }
-            }, [arrayKeys.length, stickToBottom, itemHeight, overscan]);
-
-            const rangeRef = useRef(range);
-            useLayoutEffect(() => {
-              rangeRef.current = range;
-            }, [range]);
-
-            const arrayKeysRef = useRef(arrayKeys);
-            useLayoutEffect(() => {
-              arrayKeysRef.current = arrayKeys;
-            }, [arrayKeys]);
-
-            const handleScroll = useCallback(() => {
-              const container = containerRef.current;
-              if (!container) return;
-
-              const currentScrollTop = container.scrollTop;
-              const { scrollHeight, clientHeight } = container;
-              const scrollState = scrollStateRef.current;
-
-              // Check if user is near bottom
-              const distanceFromBottom =
-                scrollHeight - (currentScrollTop + clientHeight);
-              const wasNearBottom = scrollState.isNearBottom;
-              scrollState.isNearBottom =
-                distanceFromBottom <= scrollStickTolerance;
-
-              // Detect scroll direction
-              if (currentScrollTop < scrollState.lastScrollTop) {
-                // User scrolled up
-                scrollState.scrollUpCount++;
-
-                if (scrollState.scrollUpCount > 3 && wasNearBottom) {
-                  // User has deliberately scrolled away from bottom
-                  scrollState.isUserScrolling = true;
-                  console.log('User scrolled away from bottom');
-                }
-              } else if (scrollState.isNearBottom) {
-                // Reset if we're back near the bottom
-                scrollState.isUserScrolling = false;
-                scrollState.scrollUpCount = 0;
-              }
-
-              scrollState.lastScrollTop = currentScrollTop;
-
-              // Update visible range
-              let newStartIndex = 0;
-              for (let i = 0; i < arrayKeys.length; i++) {
-                const itemKey = arrayKeys[i];
-                const item = measurementCache.current.get(itemKey!);
-                if (item && item.offset + item.height > currentScrollTop) {
-                  newStartIndex = i;
-                  break;
-                }
-              }
-              console.log(
-                'hadnlescroll ',
-                measurementCache.current,
-                newStartIndex,
-                range
-              );
-              // Only update if range actually changed
-              if (newStartIndex !== range.startIndex && range.startIndex != 0) {
-                const visibleCount = Math.ceil(clientHeight / itemHeight);
-                setRange({
-                  startIndex: Math.max(0, newStartIndex - overscan),
-                  endIndex: Math.min(
-                    arrayKeys.length - 1,
-                    newStartIndex + visibleCount + overscan
-                  ),
-                });
-              }
-            }, [
-              arrayKeys.length,
-              range.startIndex,
-              itemHeight,
-              overscan,
-              scrollStickTolerance,
-            ]);
-
-            // Set up scroll listener
-            useEffect(() => {
-              const container = containerRef.current;
-              if (!container) return;
-
-              container.addEventListener('scroll', handleScroll, {
-                passive: true,
-              });
-              return () => {
-                container.removeEventListener('scroll', handleScroll);
-              };
-            }, [handleScroll, stickToBottom]);
-
-            // YOUR ORIGINAL SCROLL TO BOTTOM FUNCTION - KEEPING EXACTLY AS IS
-            const scrollToBottom = useCallback(
-              (behavior: ScrollBehavior = 'smooth') => {
-                const container = containerRef.current;
-                if (!container) return;
-
-                scrollStateRef.current.isUserScrolling = false;
-                scrollStateRef.current.isNearBottom = true;
-                scrollStateRef.current.scrollUpCount = 0;
-
-                const performScroll = () => {
-                  const attemptScroll = (attempts = 0) => {
-                    if (attempts > 5) return;
-
-                    const currentHeight = container.scrollHeight;
-                    const currentScroll = container.scrollTop;
-                    const clientHeight = container.clientHeight;
-
-                    if (currentScroll + clientHeight >= currentHeight - 1) {
-                      return;
-                    }
-
-                    container.scrollTo({
-                      top: currentHeight,
-                      behavior: behavior,
-                    });
-
-                    setTimeout(() => {
-                      const newHeight = container.scrollHeight;
-                      const newScroll = container.scrollTop;
-
-                      if (
-                        newHeight !== currentHeight ||
-                        newScroll + clientHeight < newHeight - 1
-                      ) {
-                        attemptScroll(attempts + 1);
-                      }
-                    }, 50);
-                  };
-
-                  attemptScroll();
-                };
-
-                if ('requestIdleCallback' in window) {
-                  requestIdleCallback(performScroll, { timeout: 100 });
-                } else {
-                  requestAnimationFrame(() => {
-                    requestAnimationFrame(performScroll);
-                  });
-                }
-              },
-              []
-            );
-
-            // YOUR ORIGINAL AUTO-SCROLL EFFECTS - KEEPING ALL OF THEM
-            useEffect(() => {
-              if (!stickToBottom || !containerRef.current) return;
-
-              const container = containerRef.current;
-              const scrollState = scrollStateRef.current;
-
-              let scrollTimeout: NodeJS.Timeout;
-              const debouncedScrollToBottom = () => {
-                clearTimeout(scrollTimeout);
-                scrollTimeout = setTimeout(() => {
-                  if (
-                    !scrollState.isUserScrolling &&
-                    scrollState.isNearBottom
-                  ) {
-                    scrollToBottom(
-                      initialScrollRef.current ? 'instant' : 'smooth'
-                    );
-                  }
-                }, 100);
-              };
-
-              const observer = new MutationObserver(() => {
-                if (!scrollState.isUserScrolling) {
-                  debouncedScrollToBottom();
-                }
-              });
-
-              observer.observe(container, {
-                childList: true,
-                subtree: true,
-                attributes: true,
-                attributeFilter: ['style', 'class'],
-              });
-
-              if (initialScrollRef.current) {
-                setTimeout(() => {
-                  scrollToBottom('instant');
-                }, 0);
-              } else {
-                debouncedScrollToBottom();
-              }
-
-              return () => {
-                clearTimeout(scrollTimeout);
-                observer.disconnect();
-              };
-            }, [stickToBottom, arrayKeys.length, scrollToBottom]);
-
-            // Create virtual state - NO NEED to get values, only IDs!
-            const virtualState = useMemo(() => {
-              // 2. Physically slice the corresponding keys.
-              const slicedKeys = Array.isArray(arrayKeys)
-                ? arrayKeys.slice(range.startIndex, range.endIndex + 1)
-                : [];
-
-              // Use the same keying as getArrayData (empty string for root)
-              const arrayPath = path.length > 0 ? path.join('.') : 'root';
-              return rebuildStateShape({
-                path,
-                componentId: componentId!,
-                meta: {
-                  ...meta,
-                  arrayViews: { [arrayPath]: slicedKeys },
-                  serverStateIsUpStream: true,
-                },
-              });
-            }, [range.startIndex, range.endIndex, arrayKeys, meta]);
-
-            return {
-              virtualState,
-              virtualizerProps: {
-                outer: {
-                  ref: containerRef,
-                  style: {
-                    overflowY: 'auto' as const,
-                    height: '100%',
-                    position: 'relative' as const,
-                  },
-                },
-                inner: {
-                  style: {
-                    position: 'relative' as const,
-                  },
-                },
-                list: {
-                  style: {
-                    transform: `translateY(${
-                      measurementCache.current.get(arrayKeys[range.startIndex]!)
-                        ?.offset || 0
-                    }px)`,
-                  },
-                },
-              },
-              scrollToBottom,
-              scrollToIndex: (
-                index: number,
-                behavior: ScrollBehavior = 'smooth'
-              ) => {
-                if (containerRef.current && arrayKeys[index]) {
-                  const offset =
-                    measurementCache.current.get(arrayKeys[index]!)?.offset ||
-                    0;
-                  containerRef.current.scrollTo({ top: offset, behavior });
-                }
-              },
-            };
-          };
-        }
-        if (prop === '$stateMap') {
+        if (prop === '$map') {
           return (
             callbackfn: (setter: any, index: number, arraySetter: any) => void
           ) => {
@@ -2571,7 +2266,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === '$stateFilter') {
+        if (prop === '$filter') {
           return (callbackfn: (value: any, index: number) => boolean) => {
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
@@ -2583,7 +2278,7 @@ function createProxyHandler<T>(
             );
 
             if (!Array.isArray(array)) {
-              throw new Error('stateFilter can only be used on arrays');
+              throw new Error('filter can only be used on arrays');
             }
 
             // Filter the array and collect the IDs of the items that pass
@@ -2616,7 +2311,7 @@ function createProxyHandler<T>(
             });
           };
         }
-        if (prop === '$stateSort') {
+        if (prop === '$sort') {
           return (compareFn: (a: any, b: any) => number) => {
             const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
@@ -2759,7 +2454,7 @@ function createProxyHandler<T>(
           };
         }
 
-        if (prop === '$stateList') {
+        if (prop === '$list') {
           return (
             callbackfn: (
               setter: any,
@@ -2767,7 +2462,7 @@ function createProxyHandler<T>(
               arraySetter: any
             ) => ReactNode
           ) => {
-            const StateListWrapper = () => {
+            const ListWrapper = () => {
               const componentIdsRef = useRef<Map<string, string>>(new Map());
 
               const [updateTrigger, forceUpdate] = useState({});
@@ -2877,7 +2572,7 @@ function createProxyHandler<T>(
               return <>{returnValue}</>;
             };
 
-            return <StateListWrapper />;
+            return <ListWrapper />;
           };
         }
         if (prop === '$stateFlattenOn') {
@@ -3159,54 +2854,6 @@ function createProxyHandler<T>(
             });
         }
 
-        // if (prop === '$formInput') {
-        //   const _getFormElement = (path: string[]): HTMLElement | null => {
-        //     const metadata = getShadowMetadata(stateKey, path);
-        //     if (metadata?.formRef?.current) {
-        //       return metadata.formRef.current;
-        //     }
-        //     // This warning is helpful for debugging if a ref is missing.
-        //     console.warn(
-        //       `Form element ref not found for stateKey "${stateKey}" at path "${path.join('.')}"`
-        //     );
-        //     return null;
-        //   };
-        //   return {
-        //     setDisabled: (isDisabled: boolean) => {
-        //       const element = _getFormElement(path) as HTMLInputElement | null;
-        //       if (element) {
-        //         element.disabled = isDisabled;
-        //       }
-        //     },
-        //     focus: () => {
-        //       const element = _getFormElement(path);
-        //       element?.focus();
-        //     },
-        //     blur: () => {
-        //       const element = _getFormElement(path);
-        //       element?.blur();
-        //     },
-        //     scrollIntoView: (options?: ScrollIntoViewOptions) => {
-        //       const element = _getFormElement(path);
-        //       element?.scrollIntoView(
-        //         options ?? { behavior: 'smooth', block: 'center' }
-        //       );
-        //     },
-        //     click: () => {
-        //       const element = _getFormElement(path);
-        //       element?.click();
-        //     },
-        //     selectText: () => {
-        //       const element = _getFormElement(path) as
-        //         | HTMLInputElement
-        //         | HTMLTextAreaElement
-        //         | null;
-        //       if (element && typeof element.select === 'function') {
-        //         element.select();
-        //       }
-        //     },
-        //   };
-        // }
         if (prop === '$$get') {
           return () =>
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
@@ -3374,33 +3021,6 @@ function createProxyHandler<T>(
               },
               metaData?: Record<string, any>
             ) => {
-              // const validationErrorsFromServer = operation.validation || [];
-
-              // if (!operation || !operation.path) {
-              //   console.error(
-              //     'Invalid operation received by $applyOperation:',
-              //     operation
-              //   );
-              //   return;
-              // }
-
-              // const newErrors: ValidationError[] =
-              //   validationErrorsFromServer.map((err) => ({
-              //     source: 'sync_engine',
-              //     message: err.message,
-              //     severity: 'warning',
-              //     code: err.code,
-              //   }));
-              // console.log('newErrors', newErrors);
-              // getGlobalStore
-              //   .getState()
-              //   .setShadowMetadata(stateKey, operation.path, {
-              //     validation: {
-              //       status: newErrors.length > 0 ? 'INVALID' : 'VALID',
-              //       errors: newErrors,
-              //       lastValidated: Date.now(),
-              //     },
-              //   });
               console.log(
                 'getGlobalStore',
                 getGlobalStore
@@ -3626,12 +3246,13 @@ function createProxyHandler<T>(
       },
     };
 
-    const proxyInstance = new Proxy({}, handler);
+    const proxyInstance = new Proxy(proxyTarget, handler);
     proxyCache.set(cacheKey, proxyInstance);
 
     return proxyInstance;
   }
 
+  // ... (rest of the function: rootLevelMethods, returnShape, etc.)
   const rootLevelMethods = {
     $revertToInitialState: (obj?: { validationKey?: string }) => {
       const shadowMeta = getGlobalStore

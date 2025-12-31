@@ -1,10 +1,10 @@
-import { z as r } from "zod";
-import { getGlobalStore as M } from "./store.js";
-const b = () => r.object({
-  __key: r.literal("keyed"),
-  map: r.any()
+import { z as l } from "zod";
+import { getGlobalStore as u } from "./store.js";
+const f = () => l.object({
+  __key: l.literal("keyed"),
+  map: l.any()
 });
-function d(e) {
+function m(e) {
   return {
     initialiseState: (t) => {
       e.$update(t);
@@ -20,47 +20,58 @@ function d(e) {
     }
   };
 }
-function j(e, t) {
+function S(e, t) {
   return {
-    getPluginMetaData: () => M.getState().getPluginMetaDataMap(e, [])?.get(t),
-    setPluginMetaData: (a) => M.getState().setPluginMetaData(e, [], t, a),
-    removePluginMetaData: () => M.getState().removePluginMetaData(e, [], t),
-    getFieldMetaData: (a) => M.getState().getPluginMetaDataMap(e, a)?.get(t),
-    setFieldMetaData: (a, D) => M.getState().setPluginMetaData(e, a, t, D),
-    removeFieldMetaData: (a) => M.getState().removePluginMetaData(e, a, t)
+    getPluginMetaData: () => u.getState().getPluginMetaDataMap(e, [])?.get(t),
+    setPluginMetaData: (a) => u.getState().setPluginMetaData(e, [], t, a),
+    removePluginMetaData: () => u.getState().removePluginMetaData(e, [], t),
+    getFieldMetaData: (a) => u.getState().getPluginMetaDataMap(e, a)?.get(t),
+    setFieldMetaData: (a, i) => u.getState().setPluginMetaData(e, a, t, i),
+    removeFieldMetaData: (a) => u.getState().removePluginMetaData(e, a, t)
   };
 }
-function v(e) {
+function O(e, t, a) {
+  const i = S(
+    e,
+    t
+  );
+  return {
+    // Return the global methods for plugin metadata
+    ...i,
+    // Override the field methods with new, path-scoped versions
+    getFieldMetaData: () => i.getFieldMetaData(a),
+    setFieldMetaData: (n) => i.setFieldMetaData(a, n),
+    removeFieldMetaData: () => i.removeFieldMetaData(a)
+  };
+}
+function b(e) {
   function t(a) {
-    const D = (i, o, g, n, c) => ({
+    const i = (o, r, g, c) => ({
       name: a,
-      useHook: i,
-      transformState: o,
+      useHook: o,
+      transformState: r,
       onUpdate: g,
-      onFormUpdate: n,
-      formWrapper: c
+      onFormUpdate: c
     });
-    function s(i, o, g, n, c) {
-      const P = D(
-        i,
+    function n(o, r, g, c) {
+      const D = i(
         o,
+        r,
         g,
-        n,
         c
-      ), S = {};
-      return o || (S.transformState = (u) => s(i, u, g, n, c)), g || (S.onUpdate = (u) => s(i, o, u, n, c)), n || (S.onFormUpdate = (u) => s(
-        i,
+      ), s = {};
+      return r || (s.transformState = (M) => n(o, M, g, c)), g || (s.onUpdate = (M) => n(o, r, M, c)), c || (s.onFormUpdate = (M) => n(
         o,
+        r,
         g,
-        u,
-        c
-      )), c || (S.formWrapper = (u) => s(i, o, g, n, u)), Object.assign(P, S);
+        M
+      )), Object.assign(D, s);
     }
     return Object.assign(
-      s(),
+      n(),
       {
-        useHook(i) {
-          return s(i);
+        useHook(o) {
+          return n(o);
         }
       }
     );
@@ -68,9 +79,10 @@ function v(e) {
   return { createPlugin: t };
 }
 export {
-  j as createMetadataContext,
-  v as createPluginContext,
-  b as keyedSchema,
-  d as toDeconstructedMethods
+  S as createMetadataContext,
+  b as createPluginContext,
+  O as createScopedMetadataContext,
+  f as keyedSchema,
+  m as toDeconstructedMethods
 };
 //# sourceMappingURL=plugins.js.map

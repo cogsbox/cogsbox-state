@@ -54,28 +54,36 @@ export function toDeconstructedMethods(stateHandler: StateObject<any>) {
     },
   };
 }
+type ScopedMetadataMethods<TFieldMetaData> = {
+  getFieldMetaData: () => TFieldMetaData | undefined;
+  setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
+  removeFieldMetaData: () => void;
+};
 
+// These are the existing global methods that still require a path.
+type GlobalMetadataMethods<TFieldMetaData> = {
+  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
+  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
+  removeFieldMetaData: (path: string[]) => void;
+};
 // Simplified: All params use the same TFieldMetaData type
 export type UseHookParams<
   TOptions,
   TPluginMetaData,
   TFieldMetaData,
   TStateSlice = any,
-> = DeconstructedCogsMethods<TStateSlice> & {
-  stateKey: string;
+> = DeconstructedCogsMethods<TStateSlice> &
+  GlobalMetadataMethods<TFieldMetaData> & {
+    stateKey: string;
 
-  getPluginMetaData: () => TPluginMetaData | undefined;
-  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-  removePluginMetaData: () => void;
+    getPluginMetaData: () => TPluginMetaData | undefined;
+    setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+    removePluginMetaData: () => void;
 
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-  removeFieldMetaData: (path: string[]) => void;
-
-  options: TOptions;
-  pluginName: string;
-  isInitialMount: boolean;
-};
+    options: TOptions;
+    pluginName: string;
+    isInitialMount: boolean;
+  };
 
 export type TransformStateParams<
   TOptions,
@@ -83,23 +91,20 @@ export type TransformStateParams<
   TPluginMetaData,
   TFieldMetaData,
   TStateSlice = any,
-> = DeconstructedCogsMethods<TStateSlice> & {
-  stateKey: string;
+> = DeconstructedCogsMethods<TStateSlice> &
+  GlobalMetadataMethods<TFieldMetaData> & {
+    stateKey: string;
 
-  getPluginMetaData: () => TPluginMetaData | undefined;
-  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-  removePluginMetaData: () => void;
+    getPluginMetaData: () => TPluginMetaData | undefined;
+    setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+    removePluginMetaData: () => void;
 
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-  removeFieldMetaData: (path: string[]) => void;
-
-  options: TOptions;
-  hookData?: THookReturn;
-  previousState?: TStateSlice;
-  isInitialTransform: boolean;
-  pluginName: string;
-};
+    options: TOptions;
+    hookData?: THookReturn;
+    previousState?: TStateSlice;
+    isInitialTransform: boolean;
+    pluginName: string;
+  };
 
 export type OnUpdateParams<
   TOptions,
@@ -107,55 +112,49 @@ export type OnUpdateParams<
   TPluginMetaData,
   TFieldMetaData,
   TStateSlice = any,
-> = DeconstructedCogsMethods<TStateSlice> & {
-  stateKey: string;
+> = DeconstructedCogsMethods<TStateSlice> &
+  ScopedMetadataMethods<TFieldMetaData> & {
+    stateKey: string;
 
-  getPluginMetaData: () => TPluginMetaData | undefined;
-  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-  removePluginMetaData: () => void;
+    getPluginMetaData: () => TPluginMetaData | undefined;
+    setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+    removePluginMetaData: () => void;
 
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-  removeFieldMetaData: (path: string[]) => void;
+    update: UpdateTypeDetail;
+    path?: string[];
 
-  update: UpdateTypeDetail;
-  path?: string[];
+    options: TOptions;
+    hookData?: THookReturn;
 
-  options: TOptions;
-  hookData?: THookReturn;
+    previousValue?: any;
+    nextValue?: any;
+    updateSource?: 'user' | 'plugin' | 'system';
 
-  previousValue?: any;
-  nextValue?: any;
-  updateSource?: 'user' | 'plugin' | 'system';
-
-  pluginName: string;
-};
+    pluginName: string;
+  };
 export type OnFormUpdateParams<
   TOptions,
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
   TStateSlice = any,
-> = DeconstructedCogsMethods<TStateSlice> & {
-  stateKey: string;
+> = DeconstructedCogsMethods<TStateSlice> &
+  ScopedMetadataMethods<TFieldMetaData> & {
+    stateKey: string;
 
-  getPluginMetaData: () => TPluginMetaData | undefined;
-  setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
-  removePluginMetaData: () => void;
+    getPluginMetaData: () => TPluginMetaData | undefined;
+    setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
+    removePluginMetaData: () => void;
 
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-  removeFieldMetaData: (path: string[]) => void;
+    path: string[];
+    event: ClientActivityEvent; // Update this to use the full event type
 
-  path: string[];
-  event: ClientActivityEvent; // Update this to use the full event type
+    options: TOptions;
+    hookData?: THookReturn;
 
-  options: TOptions;
-  hookData?: THookReturn;
-
-  formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
-  pluginName: string;
-};
+    formState?: 'pristine' | 'dirty' | 'submitting' | 'submitted';
+    pluginName: string;
+  };
 
 export type FormWrapperParams<
   TOptions,
@@ -163,7 +162,7 @@ export type FormWrapperParams<
   TPluginMetaData,
   TFieldMetaData,
   TStateSlice = any,
-> = {
+> = ScopedMetadataMethods<TFieldMetaData> & {
   element: React.ReactNode;
   path: string[];
   stateKey: string;
@@ -183,10 +182,6 @@ export type FormWrapperParams<
   getPluginMetaData: () => TPluginMetaData | undefined;
   setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
   removePluginMetaData: () => void;
-
-  getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
-  setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
-  removeFieldMetaData: (path: string[]) => void;
 
   pluginName: string;
 };
@@ -246,21 +241,6 @@ export type CogsPlugin<
   ) => React.ReactNode;
 };
 
-// Extract plugin options helper
-export type ExtractPluginOptions<
-  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
-> = {
-  [P in TPlugins[number] as P['name']]?: P extends CogsPlugin<
-    any,
-    infer O,
-    any,
-    any,
-    any
-  >
-    ? O
-    : never;
-};
-
 // Metadata helpers
 export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   stateKey: string,
@@ -299,6 +279,29 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
   };
 }
 
+export function createScopedMetadataContext<TPluginMetaData, TFieldMetaData>(
+  stateKey: string,
+  pluginName: string,
+  path: string[]
+) {
+  const globalContext = createMetadataContext<TPluginMetaData, TFieldMetaData>(
+    stateKey,
+    pluginName
+  );
+
+  return {
+    // Return the global methods for plugin metadata
+    ...globalContext,
+    // Override the field methods with new, path-scoped versions
+    getFieldMetaData: (): TFieldMetaData | undefined =>
+      globalContext.getFieldMetaData(path),
+
+    setFieldMetaData: (data: Partial<TFieldMetaData>) =>
+      globalContext.setFieldMetaData(path, data),
+
+    removeFieldMetaData: () => globalContext.removeFieldMetaData(path),
+  };
+}
 type ZodObjOutput<T extends z.ZodObject<any>> = {
   [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };
@@ -343,15 +346,6 @@ export function createPluginContext<
       >
     ) => void;
 
-    type FormWrapperFn<THookReturn> = (
-      params: FormWrapperParams<
-        Options,
-        THookReturn,
-        PluginMetaData,
-        FieldMetaData
-      >
-    ) => React.ReactNode;
-
     type Plugin<THookReturn> = Prettify<
       CogsPlugin<TName, Options, THookReturn, PluginMetaData, FieldMetaData>
     >;
@@ -362,8 +356,7 @@ export function createPluginContext<
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>,
-      formWrapper?: FormWrapperFn<THookReturn>
+      formUpdateHandler?: FormUpdateFn<THookReturn>
     ): Plugin<THookReturn> => {
       return {
         name,
@@ -371,7 +364,6 @@ export function createPluginContext<
         transformState: transformFn as any,
         onUpdate: updateHandler as any,
         onFormUpdate: formUpdateHandler as any,
-        formWrapper: formWrapper as any,
       };
     };
 
@@ -414,19 +406,6 @@ export function createPluginContext<
             onFormUpdate(
               fn: FormUpdateFn<THookReturn>
             ): BuildRet<THookReturn, HasTransform, HasUpdate, true, HasWrapper>;
-          }) &
-      (HasWrapper extends true
-        ? {}
-        : {
-            formWrapper(
-              fn: FormWrapperFn<THookReturn>
-            ): BuildRet<
-              THookReturn,
-              HasTransform,
-              HasUpdate,
-              HasFormUpdate,
-              true
-            >;
           });
 
     function createBuilder<
@@ -441,8 +420,7 @@ export function createPluginContext<
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>,
-      formWrapper?: FormWrapperFn<THookReturn>
+      formUpdateHandler?: FormUpdateFn<THookReturn>
     ): BuildRet<
       THookReturn,
       HasTransform,
@@ -454,8 +432,7 @@ export function createPluginContext<
         hookFn,
         transformFn,
         updateHandler,
-        formUpdateHandler,
-        formWrapper
+        formUpdateHandler
       );
 
       const methods = {} as Partial<
@@ -476,7 +453,7 @@ export function createPluginContext<
             HasUpdate,
             HasFormUpdate,
             HasWrapper
-          >(hookFn, fn, updateHandler, formUpdateHandler, formWrapper);
+          >(hookFn, fn, updateHandler, formUpdateHandler);
       }
       if (!updateHandler) {
         (methods as any).onUpdate = (fn: UpdateFn<THookReturn>) =>
@@ -486,7 +463,7 @@ export function createPluginContext<
             true,
             HasFormUpdate,
             HasWrapper
-          >(hookFn, transformFn, fn, formUpdateHandler, formWrapper);
+          >(hookFn, transformFn, fn, formUpdateHandler);
       }
       if (!formUpdateHandler) {
         (methods as any).onFormUpdate = (fn: FormUpdateFn<THookReturn>) =>
@@ -494,19 +471,8 @@ export function createPluginContext<
             hookFn,
             transformFn,
             updateHandler,
-            fn,
-            formWrapper
+            fn
           );
-      }
-      if (!formWrapper) {
-        (methods as any).formWrapper = (fn: FormWrapperFn<THookReturn>) =>
-          createBuilder<
-            THookReturn,
-            HasTransform,
-            HasUpdate,
-            HasFormUpdate,
-            true
-          >(hookFn, transformFn, updateHandler, formUpdateHandler, fn);
       }
 
       return Object.assign(plugin, methods) as BuildRet<

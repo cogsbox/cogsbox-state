@@ -187,13 +187,13 @@ const lastTodo = todos.$last();
 
 ### Array Iteration and Rendering
 
-#### `stateMap()` - Enhanced Array Mapping
+#### `$map()` - Enhanced Array Mapping
 
 ```typescript
 const todos = useCogsState('todos');
 
 // Returns transformed array, each item is a full state object
-const todoElements = todos.$stateMap((todoState, index, arrayState) => (
+const todoElements = todos.$map((todoState, index, arrayState) => (
   <TodoItem
     key={todoState.id.$get()}
     todo={todoState}
@@ -203,13 +203,13 @@ const todoElements = todos.$stateMap((todoState, index, arrayState) => (
 ));
 ```
 
-#### `stateList()` - JSX List Rendering
+#### `$list()` - JSX List Rendering
 
 ```typescript
 const todos = useCogsState('todos');
 
 // Renders directly in place with automatic key management
-{todos.$stateList((todoState, index, arrayState) => (
+{todos.$list((todoState, index, arrayState) => (
   <div key={todoState.id.$get()}>
     <span>{todoState.text.$get()}</span>
     <button onClick={() => todoState.done.$toggle()}>Toggle</button>
@@ -226,16 +226,16 @@ const todos = useCogsState('todos');
 const todos = useCogsState('todos');
 
 // Filter items (returns new state object with filtered view)
-const completedTodos = todos.$stateFilter((todo) => todo.done);
-const incompleteTodos = todos.$stateFilter((todo) => !todo.done);
+const completedTodos = todos.$filter((todo) => todo.done);
+const incompleteTodos = todos.$filter((todo) => !todo.done);
 
 // Sort items (returns new state object with sorted view)
-const sortedTodos = todos.$stateSort((a, b) => a.text.localeCompare(b.text));
+const sortedTodos = todos.$sort((a, b) => a.text.localeCompare(b.text));
 
 // Chain operations
 const sortedCompletedTodos = todos
-  .$stateFilter((todo) => todo.done)
-  .$stateSort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  .$filter((todo) => todo.done)
+  .$sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 ```
 
 #### Finding and Searching
@@ -250,7 +250,7 @@ if (todoById) {
 }
 
 // Find with custom function
-const firstIncompleteTodo = todos.$stateFind((todo) => !todo.done);
+const firstIncompleteTodo = todos.$find((todo) => !todo.done);
 ```
 
 #### Unique Operations
@@ -309,7 +309,7 @@ function MessageList() {
     <div {...virtualizerProps.outer} className="h-96 overflow-auto">
       <div style={virtualizerProps.inner.style}>
         <div style={virtualizerProps.list.style}>
-          {virtualState.stateList((messageState, index) => (
+          {virtualState.list((messageState, index) => (
             <MessageItem key={messageState.id.$get()} message={messageState} />
           ))}
         </div>

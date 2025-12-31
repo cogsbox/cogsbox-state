@@ -52,25 +52,25 @@ const { useCogsState } = createCogsState({
   },
 });
 
-describe('nested stateList with conflicting filter properties', () => {
+describe('nested list with conflicting filter properties', () => {
   it('should apply filters correctly to each level despite same property name', () => {
     const TestComponent = () => {
       const state = useCogsState('testState');
 
       // Filter categories where active === true
-      const activeCategories = state.categories.$stateFilter(
+      const activeCategories = state.categories.$filter(
         (cat) => cat.active === true
       );
 
       return (
         <div>
-          {activeCategories.$stateList((category, catIndex) => (
+          {activeCategories.$list((category, catIndex) => (
             <div key={catIndex} data-testid={`category-${catIndex}`}>
               <h3>{category.name.$get()}</h3>
               {/* Filter items where active === false (opposite of category filter!) */}
               {category.items
-                .$stateFilter((item) => item.active === false)
-                .$stateList((item, itemIndex) => (
+                .$filter((item) => item.active === false)
+                .$list((item, itemIndex) => (
                   <div
                     key={itemIndex}
                     data-testid={`cat-${catIndex}-item-${itemIndex}`}
@@ -105,10 +105,10 @@ describe('nested stateList with conflicting filter properties', () => {
     expect(screen.queryByText('yogurt')).not.toBeInTheDocument(); // yogurt.active === true, should be filtered out
   });
 
-  it('should update stateList rendering when pushing new items', async () => {
+  it('should update list rendering when pushing new items', async () => {
     const TestComponent = () => {
       const state = useCogsState('testState', { reactiveType: 'none' });
-      const activeCategories = state.categories.$stateFilter(
+      const activeCategories = state.categories.$filter(
         (cat) => cat.active === true
       );
 
@@ -130,15 +130,14 @@ describe('nested stateList with conflicting filter properties', () => {
 
       return (
         <div>
-          {activeCategories.$stateList((category, catIndex) => (
+          {activeCategories.$list((category, catIndex) => (
             <div key={catIndex} data-testid={`category-${catIndex}`}>
               <h3>{category.name.$get()}</h3>
               <div data-testid={`inactive-items-${catIndex}`}>
                 {
                   // ✅ THE ONLY CHANGE IS HERE:
-                  category.items
-                    .$stateFilter((item) => item.active === false)
-                    .$get().length
+                  category.items.$filter((item) => item.active === false).$get()
+                    .length
                 }
               </div>
             </div>

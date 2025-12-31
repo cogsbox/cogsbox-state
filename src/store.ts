@@ -1232,7 +1232,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
         `Array not found at path: ${[key, ...arrayPath].join('.')}`
       );
     }
-    console.log('OOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOO');
+
     const newItemId = itemId || `${generateId(key)}`;
 
     // BUILD AND ADD the node directly - no need for addItemsToArrayNode

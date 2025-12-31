@@ -24,7 +24,8 @@
   "scripts": {
     "build": "rimraf dist && vite build && npm pack && node scripts/rename-pack.cjs",
     "lint": "eslint src --ext ts,tsx",
-    "format": "prettier --write \"src/**/*.{ts,tsx}\""
+    "format": "prettier --write \"src/**/*.{ts,tsx}\"",
+    "test": "vitest"
   },
   "dependencies": {
     "@testing-library/jest-dom": "^6.6.4",

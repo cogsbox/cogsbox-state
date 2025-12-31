@@ -65,7 +65,7 @@ export type StreamHandle<T> = {
     pause: () => void;
     resume: () => void;
 };
-export type ArrayEndType<TShape extends unknown> = {
+export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]> = {
     $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
     $findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
     $index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
@@ -79,14 +79,14 @@ export type ArrayEndType<TShape extends unknown> = {
     $cutSelected: () => void;
     $cutByValue: (value: string | number | boolean) => void;
     $toggleByValue: (value: string | number | boolean) => void;
-    $stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape>;
+    $stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape, TPlugins>;
     $useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
     $stateList: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
     $stateMap: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
     $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
     $uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
     $stateFind: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    $stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape>;
+    $stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape, TPlugins>;
     $getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
     $clearSelected: () => void;
     $getSelectedIndex: () => number;
@@ -116,7 +116,10 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => {
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 type EffectFunction<T, R> = (state: T, deps: any[]) => R;
-export type EndType<T, IsArrayElement = false> = {
+export type PerPathFormOptsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = Omit<FormOptsType, 'formElements'> & {
+    formElements?: FormsElementsType<TState, TPlugins>;
+};
+export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [], IsArrayElement = false> = {
     $getPluginMetaData: (pluginName: string) => Record<string, any>;
     $addPluginMetaData: (key: string, data: Record<string, any>) => void;
     $removePluginMetaData: (key: string) => void;
@@ -128,8 +131,8 @@ export type EndType<T, IsArrayElement = false> = {
     $update: UpdateType<T>;
     $_path: string[];
     $_stateKey: string;
-    $isolate: (renderFn: (state: StateObject<T>) => React.ReactNode) => JSX.Element;
-    $formElement: (control: FormControl<T>, opts?: FormOptsType) => JSX.Element;
+    $isolate: (renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode) => JSX.Element;
+    $formElement: (control: FormControl<T>, opts?: PerPathFormOptsType<T, TPlugins>) => JSX.Element;
     $get: () => T;
     $$get: () => T;
     $$derive: <R>(fn: EffectFunction<T, R>) => R;
@@ -138,7 +141,7 @@ export type EndType<T, IsArrayElement = false> = {
     $showValidationErrors: () => string[];
     $setValidation: (ctx: string) => void;
     $removeValidation: (ctx: string) => void;
-    $ignoreFields: (fields: string[]) => StateObject<T>;
+    $ignoreFields: (fields: string[]) => StateObject<T, TPlugins>;
     $isSelected: boolean;
     $setSelected: (value: boolean) => void;
     $toggleSelected: () => void;
@@ -160,9 +163,9 @@ export type EndType<T, IsArrayElement = false> = {
 } & (IsArrayElement extends true ? {
     $cutThis: () => void;
 } : {});
-export type StateObject<T> = (T extends any[] ? ArrayEndType<T> : T extends Record<string, unknown> | object ? {
-    [K in keyof T]-?: StateObject<T[K]>;
-} : T extends string | number | boolean | null ? EndType<T, true> : never) & EndType<T, true> & {
+export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = (T extends any[] ? ArrayEndType<T, TPlugins> : T extends Record<string, unknown> | object ? {
+    [K in keyof T]-?: StateObject<T[K], TPlugins>;
+} : T extends string | number | boolean | null ? EndType<T, TPlugins, true> : never) & EndType<T, TPlugins, true> & {
     $toggle: T extends boolean ? () => void : never;
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
@@ -260,6 +263,11 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = Creat
     defaultState?: T;
     dependencies?: any[];
 };
+type ScopedPluginApi<THookReturn, TFieldMetaData> = {
+    hookData: THookReturn;
+    getFieldMetaData: () => TFieldMetaData | undefined;
+    setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
+};
 export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     validation?: (options: {
         children: React.ReactNode;
@@ -271,6 +279,9 @@ export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, 
         path: string[];
         message?: string;
         getData?: () => TState;
+        plugins: {
+            [P in TPlugins[number] as P['name']]: P extends CogsPlugin<any, any, infer THookReturn, any, infer TFieldMetaData> ? ScopedPluginApi<THookReturn, TFieldMetaData> : never;
+        };
     }) => React.ReactNode;
     syncRender?: (options: {
         children: React.ReactNode;
@@ -278,8 +289,6 @@ export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, 
         data?: TState;
         key?: string;
     }) => React.ReactNode;
-} & {
-    [P in TPlugins[number] as P['name']]?: P['formWrapper'] extends (arg: any) => any ? Parameters<P['formWrapper']>[0] : never;
 };
 export type CogsInitialState<T> = {
     initialState: T;
@@ -346,9 +355,9 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
     } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
         __key: "keyed";
         map: infer TMap;
-    } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey]>;
-    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: OptionsType<TransformedStateType<State>[StateKey]>) => void;
-    setCogsFormElements: (formElements: FormsElementsType<State, TPlugins>) => void;
+    } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;
+    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: CreateStateOptionsType<TransformedStateType<State>[StateKey], TPlugins> & Omit<OptionsType<TransformedStateType<State>[StateKey]>, keyof CreateStateOptionsType>) => void;
+    setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
 };
 type LocalStorageData<T> = {
     state: T;
@@ -357,12 +366,12 @@ type LocalStorageData<T> = {
     baseServerState?: T;
     stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare function useCogsStateFn<TStateObject extends unknown>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
     syncOptions?: SyncOptionsType<any>;
-} & OptionsType<TStateObject>): StateObject<TStateObject>;
+} & OptionsType<TStateObject>): StateObject<TStateObject, TPlugins>;
 type MetaData = {
     arrayViews?: {
         [arrayPath: string]: string[];

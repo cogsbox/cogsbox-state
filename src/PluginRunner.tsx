@@ -1,7 +1,11 @@
 import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
 import { ClientActivityEvent, pluginStore } from './pluginStore';
 import { isDeepEqual } from './utility';
-import { createMetadataContext, toDeconstructedMethods } from './plugins';
+import {
+  createMetadataContext,
+  createScopedMetadataContext,
+  toDeconstructedMethods,
+} from './plugins';
 import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
 import { ClientActivityState, FormEventType } from './store';
@@ -99,6 +103,13 @@ const PluginInstance = React.memo(
 
       const handleUpdate = (update: UpdateTypeDetail) => {
         if (update.stateKey === stateKey) {
+          // Create a new, SCOPED context for this specific path
+          const scopedMetadata = createScopedMetadataContext(
+            stateKey,
+            plugin.name,
+            update.path
+          );
+
           plugin.onUpdate!({
             stateKey,
             pluginName: plugin.name,
@@ -107,7 +118,7 @@ const PluginInstance = React.memo(
             options,
             hookData: hookDataRef.current,
             ...deconstructed,
-            ...metadataContext,
+            ...scopedMetadata, // <-- Use the new scoped context
           });
         }
       };
@@ -116,7 +127,7 @@ const PluginInstance = React.memo(
         .getState()
         .subscribeToUpdates(handleUpdate);
       return unsubscribe;
-    }, [stateKey, plugin, options, deconstructed, metadataContext]);
+    }, [stateKey, plugin, options, deconstructed]);
 
     useEffect(() => {
       if (!plugin.onFormUpdate) return;
@@ -125,15 +136,22 @@ const PluginInstance = React.memo(
         event: ClientActivityEvent // Use the proper type
       ) => {
         if (event.stateKey === stateKey) {
+          // Create a new, SCOPED context for this specific path
+          const scopedMetadata = createScopedMetadataContext(
+            stateKey,
+            plugin.name,
+            event.path
+          );
+
           plugin.onFormUpdate!({
             stateKey,
             pluginName: plugin.name,
             path: event.path,
-            event: event, // Pass the whole event through, not a transformed version
+            event: event,
             options,
             hookData: hookDataRef.current,
             ...deconstructed,
-            ...metadataContext,
+            ...scopedMetadata, // <-- Use the new scoped context
           });
         }
       };
@@ -142,7 +160,7 @@ const PluginInstance = React.memo(
         .getState()
         .subscribeToFormUpdates(handleFormUpdate);
       return unsubscribe;
-    }, [stateKey, plugin, options, deconstructed, metadataContext]);
+    }, [stateKey, plugin, options, deconstructed]);
 
     return null;
   }
