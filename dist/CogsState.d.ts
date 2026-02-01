@@ -20,7 +20,6 @@ export type FormElementParams<T> = StateObject<T> & {
     };
 };
 export type StateKeys = string;
-type findWithFuncType<U> = (thisKey: keyof U, thisValue: U[keyof U]) => EndType<U> & StateObject<U>;
 type CutFunctionType<T> = (index?: number, options?: {
     waitForSync?: boolean;
 }) => StateObject<T>;
@@ -40,46 +39,6 @@ export type StreamHandle<T> = {
     pause: () => void;
     resume: () => void;
 };
-export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]> = {
-    (): TShape;
-    (newValue: TShape | ((prev: TShape) => TShape)): void;
-    $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
-    $findWith: findWithFuncType<Prettify<InferArrayElement<TShape>>>;
-    $index: (index: number) => StateObject<Prettify<InferArrayElement<TShape>>> & {
-        $insert: InsertTypeObj<Prettify<InferArrayElement<TShape>>>;
-        $cut: CutFunctionType<TShape>;
-        $_index: number;
-    } & EndType<Prettify<InferArrayElement<TShape>>>;
-    $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
-    $insertMany: (payload: InferArrayElement<TShape>[]) => void;
-    $cut: CutFunctionType<TShape>;
-    $cutSelected: () => void;
-    $cutByValue: (value: string | number | boolean) => void;
-    $toggleByValue: (value: string | number | boolean) => void;
-    $sort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape, TPlugins>;
-    $list: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
-    $map: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
-    $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
-    $uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
-    $find: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    $filter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape, TPlugins>;
-    $getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    $clearSelected: () => void;
-    $getSelectedIndex: () => number;
-    $last: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-} & EndType<TShape>;
-export type FormOptsType = {
-    validation?: {
-        hideMessage?: boolean;
-        message?: string;
-        props?: GenericObject;
-        disable?: boolean;
-    };
-    debounceTime?: number;
-    sync?: {
-        allowInvalidValues?: boolean;
-    };
-};
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type InsertParams<S> = S | ((prevState: {
@@ -95,7 +54,23 @@ type EffectFunction<T, R> = (state: T, deps: any[]) => R;
 export type PerPathFormOptsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = Omit<FormOptsType, 'formElements'> & {
     formElements?: FormsElementsType<TState, TPlugins>;
 };
-export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [], IsArrayElement = false> = {
+export type FormOptsType = {
+    validation?: {
+        hideMessage?: boolean;
+        message?: string;
+        props?: GenericObject;
+        disable?: boolean;
+    };
+    debounceTime?: number;
+    sync?: {
+        allowInvalidValues?: boolean;
+    };
+};
+export type ArrayElementExtras<TParentArray = unknown> = {
+    $cutThis: () => void;
+    $_index: number;
+};
+export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     $getPluginMetaData: (pluginName: string) => Record<string, any>;
     $addPluginMetaData: (key: string, data: Record<string, any>) => void;
     $removePluginMetaData: (key: string) => void;
@@ -138,15 +113,39 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
         hideMessage?: boolean;
     }) => JSX.Element;
     $lastSynced?: SyncInfo;
-} & (IsArrayElement extends true ? {
-    $cutThis: () => void;
-} : {});
+};
+export type ArrayElementState<TElement, TParentArray, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = StateObject<TElement, TPlugins> & ArrayElementExtras<TParentArray>;
+export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]> = {
+    (): TShape;
+    (newValue: TShape | ((prev: TShape) => TShape)): void;
+    $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
+    $findWith: <K extends keyof Prettify<InferArrayElement<TShape>>>(key: K, value: Prettify<InferArrayElement<TShape>>[K]) => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins> | undefined;
+    $index: (index: number) => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins>;
+    $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
+    $insertMany: (payload: InferArrayElement<TShape>[]) => void;
+    $cut: CutFunctionType<TShape>;
+    $cutSelected: () => void;
+    $cutByValue: (value: string | number | boolean) => void;
+    $toggleByValue: (value: string | number | boolean) => void;
+    $sort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => StateObject<TShape, TPlugins>;
+    $list: (callbackfn: (setter: ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins>, index: number, arraySetter: StateObject<TShape, TPlugins>) => void) => any;
+    $map: <U>(callbackfn: (setter: ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins>, index: number, arraySetter: StateObject<TShape, TPlugins>) => U) => U[];
+    $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[], TPlugins>;
+    $uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
+    $find: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins> | undefined;
+    $filter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<TShape, TPlugins>;
+    $getSelected: () => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins> | undefined;
+    $clearSelected: () => void;
+    $getSelectedIndex: () => number;
+    $last: () => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins> | undefined;
+} & EndType<TShape, TPlugins>;
 export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     (): T;
     (newValue: T | ((prev: T) => T)): void;
 } & (T extends any[] ? ArrayEndType<T, TPlugins> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K], TPlugins>;
-} : T extends string | number | boolean | null ? EndType<T, TPlugins, true> : never) & EndType<T, TPlugins, true> & {
+} : EndType<T, TPlugins>) & // primitives just get EndType
+EndType<T, TPlugins> & {
     $toggle: T extends boolean ? () => void : never;
     $validate: () => {
         success: boolean;

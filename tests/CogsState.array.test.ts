@@ -334,10 +334,10 @@ describe('CogsState - Basic Functionality', () => {
 
   it('should find an item in an array of objects with .$findWith()', () => {
     const taskProxy = setter.tasks.$findWith('id', 2);
-    expect(taskProxy.text.$get()).toBe('Task 2');
+    expect(taskProxy?.text.$get()).toBe('Task 2');
 
     // Update it to be sure we have the right proxy
-    taskProxy.text.$update('Finish this');
+    taskProxy?.text.$update('Finish this');
     expect(setter.tasks.$get()[1].text).toBe('Finish this');
   });
 
@@ -525,7 +525,7 @@ describe('CogsState - Advanced Chained Array Operations', () => {
     // 4 Also assert that the change is reflected through the original proxy
     const gatsbyViaProxy = setter.products.$findWith('id', 'p3');
 
-    expect(gatsbyViaProxy.inStock.$get()).toBe(true);
+    expect(gatsbyViaProxy?.inStock.$get()).toBe(true);
   });
 
   it('should insert into the original array using the array setter from map', () => {
@@ -563,13 +563,13 @@ describe('CogsState - Advanced Chained Array Operations', () => {
   describe('Update function behavior', () => {
     it('should update a primitive value directly', () => {
       const laptopProxy = setter.products.$findWith('id', 'p1');
-      expect(laptopProxy.price.$get()).toBe(1200);
+      expect(laptopProxy?.price.$get()).toBe(1200);
 
       // Act
-      laptopProxy.price.$update(1337);
+      laptopProxy?.price.$update(1337);
 
       // Assert
-      expect(laptopProxy.price.$get()).toBe(1337);
+      expect(laptopProxy?.price.$get()).toBe(1337);
       const updatedState = setter.$get();
 
       expect(updatedState.products.find((p) => p.id === 'p1')?.price).toBe(
@@ -579,20 +579,20 @@ describe('CogsState - Advanced Chained Array Operations', () => {
 
     it('should update a primitive value using a function', () => {
       const headphonesProxy = setter.products.$findWith('id', 'p4');
-      const initialPrice = headphonesProxy.price.$get(); // 150
+      const initialPrice = headphonesProxy?.price.$get(); // 150
 
       // Act
-      headphonesProxy.price.$update((p) => p + 50);
+      headphonesProxy?.price.$update((p) => p + 50);
 
       // Assert
-      expect(headphonesProxy.price.$get()).toBe(initialPrice + 50);
-      expect(headphonesProxy.price.$get()).toBe(200);
+      expect(headphonesProxy?.price.$get()).toBe(initialPrice! + 50);
+      expect(headphonesProxy?.price.$get()).toBe(200);
     });
 
     it('should update a whole object using a function', () => {
       const tShirtProxy = setter.products.$findWith('id', 'p2');
 
-      expect(tShirtProxy.$get()).toEqual({
+      expect(tShirtProxy?.$get()).toEqual({
         id: 'p2',
         name: 'T-Shirt',
         category: 'apparel',
@@ -601,19 +601,19 @@ describe('CogsState - Advanced Chained Array Operations', () => {
       });
 
       // Act: Update multiple fields at once
-      tShirtProxy.$update((shirt) => ({
+      tShirtProxy?.$update((shirt) => ({
         ...shirt,
         inStock: false,
         name: 'Faded T-Shirt',
       }));
 
       // Assert
-      const updatedShirt = tShirtProxy.$get();
-      expect(updatedShirt.name).toBe('Faded T-Shirt');
-      expect(updatedShirt.inStock).toBe(false);
+      const updatedShirt = tShirtProxy?.$get();
+      expect(updatedShirt?.name).toBe('Faded T-Shirt');
+      expect(updatedShirt?.inStock).toBe(false);
       // Ensure other fields are untouched
-      expect(updatedShirt.price).toBe(25);
-      expect(updatedShirt.id).toBe('p2');
+      expect(updatedShirt?.price).toBe(25);
+      expect(updatedShirt?.id).toBe('p2');
     });
   });
 
@@ -740,7 +740,7 @@ describe('CogsState - Deeply Nested Array Operations', () => {
     // Assert that we found the correct specific property.
     // This is where the original test was failing.
     expect(propertyProxy).toBeDefined();
-    const initialProperty = propertyProxy.$get();
+    const initialProperty = propertyProxy?.$get();
 
     expect(initialProperty).toEqual({
       itemcatprop_id: 'prop-b',
@@ -749,10 +749,10 @@ describe('CogsState - Deeply Nested Array Operations', () => {
     });
 
     // --- STEP 4: Test the update operation ---
-    propertyProxy.value.$update(99);
+    propertyProxy?.value.$update(99);
 
     // Assert that the update is reflected when GETTING the value again through the same proxy.
-    expect(propertyProxy.value.$get()).toBe(99); // --- STEP 5: Verify the update in the global state ---
+    expect(propertyProxy?.value.$get()).toBe(99); // --- STEP 5: Verify the update in the global state ---
     const finalState = setter.$get();
     const updatedProperty = finalState.itemInstances[0].properties.find(
       (p) => p.itemcatprop_id === propertyToFindId
@@ -788,7 +788,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     // Verify all items are accessible
     for (let i = 0; i < 10; i++) {
       const item = setter.products.$findWith('id', `rapid-${i}`);
-      expect(item.$get().name).toBe(`Rapid Product ${i}`);
+      expect(item?.$get().name).toBe(`Rapid Product ${i}`);
     }
   });
 
@@ -806,8 +806,8 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
       });
     }
     // Remove every other item
-    setter.products.$findWith('id', 'alt-1').$cutThis();
-    setter.products.$findWith('id', 'alt-3').$cutThis();
+    setter.products.$findWith('id', 'alt-1')?.$cutThis();
+    setter.products.$findWith('id', 'alt-3')?.$cutThis();
 
     expect(setter.products.$get().length).toBe(initialCount + 3);
     expect(setter.products.$findWith('id', 'alt-0')).toBeDefined();
@@ -818,6 +818,9 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
   it('should handle moving items between filtered sets', () => {
     // --- SETUP ---
     // Get initial state of the filters
+
+    let view = setter.products;
+    view = setter.products.$filter((p) => p.category === 'electronics');
     const initialElectronics = setter.products.$filter(
       (p) => p.category === 'electronics'
     );
@@ -828,7 +831,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
 
     // --- ACTION ---
     // Change a book to an electronic
-    setter.products.$findWith('id', 'p3').category.$update('electronics');
+    setter.products.$findWith('id', 'p3')?.category.$update('electronics');
 
     // --- ASSERTION ---
     // **CRUCIAL STEP**: Re-run the filters to get the new, updated views
@@ -848,7 +851,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
 
   it('should maintain selection state across filter changes', () => {
     // Select an item
-    setter.products.$findWith('id', 'p4').$setSelected(true);
+    setter.products.$findWith('id', 'p4')?.$setSelected(true);
 
     // Create filtered view that includes selected item
     let electronics = setter.products.$filter(
@@ -858,7 +861,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     expect(electronics.$getSelected()?.$get().id).toBe('p4');
 
     // Change the selected item's category so it's filtered out
-    setter.products.$findWith('id', 'p4').category.$update('books');
+    setter.products.$findWith('id', 'p4')?.category.$update('books');
     electronics = setter.products.$filter((p) => {
       return p.category === 'electronics';
     });
@@ -901,7 +904,7 @@ describe('CogsState - Shadow Store Edge Cases and Stress Tests', () => {
     expect(sortedPrices.filter((p) => p === 50).length).toBe(3);
 
     // Updating one of the duplicates
-    sorted.$findWith('id', 'dup2').price.$update(51);
+    sorted.$findWith('id', 'dup2')?.price.$update(51);
 
     // Re-sort and verify order changed
     const reSorted = setter.products.$sort((a, b) => a.price - b.price);
