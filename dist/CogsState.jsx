@@ -1,7 +1,7 @@
 "use client";
 import { jsx as Q, Fragment as Me } from "react/jsx-runtime";
 import { pluginStore as q } from "./pluginStore.js";
-import { useState as ee, useRef as x, useCallback as Ae, useEffect as J, useLayoutEffect as $e, useMemo as ye, createElement as ue, startTransition as Ee } from "react";
+import { useState as te, useRef as x, useCallback as Ae, useEffect as J, useLayoutEffect as $e, useMemo as ye, createElement as ue, startTransition as Ee } from "react";
 import { transformStateFunc as Ve, isFunction as R, isDeepEqual as Z, isArray as Te, getDifferences as be } from "./utility.js";
 import { ValidationWrapper as Ie, IsolatedComponentWrapper as Pe, FormElementWrapper as ke, MemoizedCogsItemWrapper as De } from "./Components.jsx";
 import Ce from "superjson";
@@ -23,7 +23,7 @@ const {
   removeShadowArrayElement: Ne,
   setInitialStateOptions: de,
   setServerStateUpdate: ge,
-  markAsDirty: ne,
+  markAsDirty: ae,
   addPathComponent: Fe,
   clearSelectedIndexesForState: ze,
   addStateLog: Re,
@@ -41,7 +41,7 @@ function U(e, a, l) {
   const c = a.length > 0 ? a.join(".") : "root", h = l?.arrayViews?.[c] ?? s.arrayKeys;
   return Array.isArray(h) && h.length === 0 ? { isArray: !0, value: [], keys: [] } : { isArray: !0, value: p.getState().getShadowValue(e, a, h), keys: h ?? [] };
 }
-function oe(e, a, l) {
+function se(e, a, l) {
   for (let s = 0; s < e.length; s++)
     if (l(e[s], s)) {
       const S = a[s];
@@ -50,7 +50,7 @@ function oe(e, a, l) {
     }
   return null;
 }
-function se(e, a) {
+function ie(e, a) {
   const s = {
     ...N(e) || {},
     ...a
@@ -127,7 +127,7 @@ const pt = (e, a) => {
     K(u, l[u]);
   });
   const S = (u, t) => {
-    const [o] = ee(t?.componentId ?? X()), y = ce({
+    const [o] = te(t?.componentId ?? X()), y = ce({
       stateKey: u,
       options: t,
       initialOptionsPart: s
@@ -186,7 +186,7 @@ const pt = (e, a) => {
     const h = `${s}-${a}-${c}`;
     let u;
     try {
-      u = ae(h)?.lastSyncedWithServer;
+      u = oe(h)?.lastSyncedWithServer;
     } catch {
     }
     const t = E(a, []), o = {
@@ -201,7 +201,7 @@ const pt = (e, a) => {
       JSON.stringify(y.json)
     );
   }
-}, ae = (e) => {
+}, oe = (e) => {
   if (!e) return null;
   try {
     const a = window.localStorage.getItem(e);
@@ -212,7 +212,7 @@ const pt = (e, a) => {
 }, Qe = (e, a) => {
   const l = D(e, []), { sessionId: s } = me(), S = R(a?.localStorage?.key) ? a.localStorage.key(l) : a?.localStorage?.key;
   if (S && s) {
-    const c = ae(
+    const c = oe(
       `${s}-${e}-${S}`
     );
     if (c && c.lastUpdated > (c.lastSyncedWithServer || 0))
@@ -229,7 +229,7 @@ const pt = (e, a) => {
     l.forEach((s) => s());
   });
 };
-function te(e, a, l, s) {
+function re(e, a, l, s) {
   const S = E(e, a);
   if (B(e, a, {
     ...S,
@@ -240,7 +240,7 @@ function te(e, a, l, s) {
     const c = E(e, a);
     c?.arrayKeys && c.arrayKeys.forEach((h, u) => {
       const t = [...a, h], o = l[u];
-      o !== void 0 && te(
+      o !== void 0 && re(
         e,
         t,
         o,
@@ -249,10 +249,10 @@ function te(e, a, l, s) {
     });
   } else l && typeof l == "object" && l.constructor === Object && Object.keys(l).forEach((c) => {
     const h = [...a, c], u = l[c];
-    te(e, h, u, s);
+    re(e, h, u, s);
   });
 }
-let re = [], le = !1;
+let ne = [], le = !1;
 function Ye() {
   le || (le = !0, queueMicrotask(() => {
     nt();
@@ -315,7 +315,7 @@ function Ke(e, a, l) {
   const s = p.getState().getShadowValue(e, a), S = R(l) ? l(s) : l;
   if (Z(s, S))
     return null;
-  je(e, a, S), ne(e, a, { bubble: !0 });
+  je(e, a, S), ae(e, a, { bubble: !0 });
   const c = E(e, a);
   return {
     type: "update",
@@ -325,7 +325,7 @@ function Ke(e, a, l) {
   };
 }
 function et(e, a, l) {
-  ve(e, a, l), ne(e, a, { bubble: !0 });
+  ve(e, a, l), ae(e, a, { bubble: !0 });
   const s = E(e, a);
   return {
     type: "insert_many",
@@ -348,7 +348,7 @@ function tt(e, a, l, s, S) {
     s,
     S
   );
-  ne(e, a, { bubble: !0 });
+  ae(e, a, { bubble: !0 });
   const u = E(e, a);
   let t;
   return u?.arrayKeys && s !== void 0 && s > 0 && (t = u.arrayKeys[s - 1]), {
@@ -362,11 +362,11 @@ function tt(e, a, l, s, S) {
 }
 function rt(e, a) {
   const l = a.slice(0, -1), s = D(e, a);
-  return Ne(e, a), ne(e, l, { bubble: !0 }), { type: "cut", oldValue: s, parentPath: l };
+  return Ne(e, a), ae(e, l, { bubble: !0 }), { type: "cut", oldValue: s, parentPath: l };
 }
 function nt() {
   const e = /* @__PURE__ */ new Set(), a = [], l = [];
-  for (const s of re) {
+  for (const s of ne) {
     if (s.status && s.updateType) {
       l.push(s);
       continue;
@@ -384,7 +384,7 @@ function nt() {
     Ze(s, S);
   }), e.forEach((s) => {
     s.forceUpdate();
-  }), re = [], le = !1;
+  }), ne = [], le = !1;
 }
 function at(e, a, l) {
   return (S, c, h) => {
@@ -414,7 +414,7 @@ function at(e, a, l) {
     }
     if (t === null)
       return;
-    t.stateKey = S, t.path = c, re.push(t), Ye();
+    t.stateKey = S, t.path = c, ne.push(t), Ye();
     const o = {
       timeStamp: Date.now(),
       stateKey: S,
@@ -427,7 +427,7 @@ function at(e, a, l) {
       insertAfterId: t.insertAfterId,
       metaData: u.metaData
     };
-    re.push(o), t.newValue !== void 0 && He(
+    ne.push(o), t.newValue !== void 0 && He(
       t.newValue,
       S,
       l.current,
@@ -446,9 +446,9 @@ function ot(e, {
   dependencies: t,
   serverState: o
 } = {}) {
-  const [y, $] = ee({}), { sessionId: V } = me();
+  const [y, $] = te({}), { sessionId: V } = me();
   let b = !a;
-  const [v] = ee(a ?? X()), F = x(h ?? X()), C = x(
+  const [v] = te(a ?? X()), F = x(h ?? X()), C = x(
     null
   );
   C.current = N(v) ?? null;
@@ -462,7 +462,7 @@ function ot(e, {
           timestamp: n.serverState.timestamp || Date.now()
         };
       if (n?.localStorage?.key && V) {
-        const d = R(n.localStorage.key) ? n.localStorage.key(i) : n.localStorage.key, m = ae(
+        const d = R(n.localStorage.key) ? n.localStorage.key(i) : n.localStorage.key, m = oe(
           `${V}-${v}-${d}`
         );
         if (m && m.lastUpdated > (n?.serverState?.timestamp || 0))
@@ -487,7 +487,7 @@ function ot(e, {
       const n = r.serverState;
       if (n?.status !== "success" || n.data === void 0)
         return;
-      se(v, { serverState: n });
+      ie(v, { serverState: n });
       const i = typeof n.merge == "object" ? n.merge : n.merge === !0 ? { strategy: "append", key: "id" } : null, f = D(v, []), d = n.data;
       if (i && i.strategy === "append" && "key" in i && Array.isArray(f) && Array.isArray(d)) {
         const m = i.key;
@@ -504,14 +504,14 @@ function ot(e, {
         );
         M.length > 0 && ve(v, [], M);
         const A = D(v, []);
-        te(
+        re(
           v,
           [],
           A,
           n.timestamp || Date.now()
         );
       } else
-        K(v, d), te(
+        K(v, d), re(
           v,
           [],
           d,
@@ -531,7 +531,7 @@ function ot(e, {
       features: n
     }), r?.defaultState !== void 0 || u !== void 0) {
       const m = r?.defaultState || u;
-      r?.defaultState || se(v, {
+      r?.defaultState || ie(v, {
         defaultState: m
       });
     }
@@ -543,7 +543,7 @@ function ot(e, {
       baseServerState: f === "server" ? i : void 0
     }), f === "server" && o && ge(v, o), L(v);
   }, [v, ...t || []]), $e(() => {
-    b && se(v, {
+    b && ie(v, {
       formElements: s,
       defaultState: u,
       localStorage: l,
@@ -597,7 +597,7 @@ const st = (e, a, l) => {
       return c.fn(t, o);
     });
   return s;
-}, ie = (e, a, l) => {
+}, ee = (e, a, l) => {
   const s = `${e}////${a}`, c = E(e, [])?.components?.get(s);
   !c || c.reactiveType === "none" || !(Array.isArray(c.reactiveType) ? c.reactiveType : [c.reactiveType]).includes("component") || Fe(e, l, s);
 }, Y = (e, a, l) => {
@@ -648,7 +648,7 @@ function we(e, a, l, s) {
       apply(G, g, H) {
         if (H.length === 0) {
           const r = t.length > 0 ? t.join(".") : "root", n = o?.arrayViews?.[r];
-          return D(e, t, n);
+          return ee(e, y, t), D(e, t, n);
         }
         const P = H[0];
         return a(P, t, { updateType: "update" }), !0;
@@ -752,7 +752,7 @@ function we(e, a, l, s) {
         if (g === "$getSelected")
           return () => {
             const r = [e, ...t].join(".");
-            ie(e, y, [
+            ee(e, y, [
               ...t,
               "getSelected"
             ]);
@@ -796,7 +796,7 @@ function we(e, a, l, s) {
               t,
               o
             );
-            if (ie(e, y, t), !i || !Array.isArray(n))
+            if (ee(e, y, t), !i || !Array.isArray(n))
               return [];
             const f = c({
               path: t,
@@ -937,7 +937,7 @@ function we(e, a, l, s) {
           };
         if (g === "$list")
           return (r) => /* @__PURE__ */ Q(() => {
-            const i = x(/* @__PURE__ */ new Map()), [f, d] = ee({}), m = t.length > 0 ? t.join(".") : "root", w = st(e, t, o), M = ye(() => ({
+            const i = x(/* @__PURE__ */ new Map()), [f, d] = te({}), m = t.length > 0 ? t.join(".") : "root", w = st(e, t, o), M = ye(() => ({
               ...o,
               arrayViews: {
                 ...o?.arrayViews || {},
@@ -1106,7 +1106,7 @@ function we(e, a, l, s) {
               keys: f
             } = U(e, t, o);
             if (!n) return;
-            const d = oe(i, f, (m) => m === r);
+            const d = se(i, f, (m) => m === r);
             d && a(null, [...t, d.key], {
               updateType: "cut"
             });
@@ -1119,7 +1119,7 @@ function we(e, a, l, s) {
               keys: f
             } = U(e, t, o);
             if (!n) return;
-            const d = oe(i, f, (m) => m === r);
+            const d = se(i, f, (m) => m === r);
             if (d) {
               const m = [...t, d.key];
               a(null, m, {
@@ -1133,7 +1133,7 @@ function we(e, a, l, s) {
             const { isArray: i, value: f, keys: d } = U(e, t, o);
             if (!i)
               throw new Error("findWith can only be used on arrays");
-            const m = oe(
+            const m = se(
               f,
               d,
               (w) => w?.[r] === n
@@ -1152,7 +1152,7 @@ function we(e, a, l, s) {
         }
         if (g === "$get")
           return () => {
-            ie(e, y, t);
+            ee(e, y, t);
             const { value: r } = W(e, t, o);
             return r;
           };
@@ -1170,7 +1170,7 @@ function we(e, a, l, s) {
           return We(r);
         }
         if (g == "getLocalStorage")
-          return (r) => ae(s + "-" + e + "-" + r);
+          return (r) => oe(s + "-" + e + "-" + r);
         if (g === "$isSelected") {
           const r = t.slice(0, -1);
           if (E(e, r)?.arrayKeys) {

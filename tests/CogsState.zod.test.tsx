@@ -686,4 +686,113 @@ describe('Zod Validation with Error/Warning Types', () => {
       expect(screen.queryByTestId('username-error')).not.toBeInTheDocument();
     });
   });
+  it('should clear validation on isolated child elements when $clearValidation is called on the root', async () => {
+    // 1. Setup State & Schema
+    const { useCogsState } = createCogsState(
+      {
+        form: {
+          name: '',
+          surname: '',
+          email: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: z.object({
+            name: z.string().min(1, 'Name required'),
+            surname: z.string().min(1, 'Surname required'),
+            email: z.string().email('Invalid email'),
+          }),
+          onBlur: 'error', // Trigger errors easily on blur
+        },
+      }
+    );
+
+    // 2. Component mimicking your exact structure
+    const TestForm = () => {
+      const form = useCogsState('form');
+      const [, setForceRender] = React.useState({}); // Mimics your setTe({})
+
+      const handleReset = () => {
+        // Call clear on the ROOT object
+        form.$clearValidation();
+
+        // Force parent re-render (mimics your setTe)
+        setForceRender({});
+      };
+
+      const handleSubmit = (e: any) => {
+        e.preventDefault();
+        form.$validate();
+      };
+
+      return (
+        <form onSubmit={handleSubmit}>
+          {/* Child 1: Name (Isolated) */}
+          {form.name.$formElement((params) => (
+            <div data-testid="group-name">
+              <input data-testid="input-name" {...params.$inputProps} />
+              {params.$showValidationErrors().map((err) => (
+                <span key={err} data-testid="error-name">
+                  {err}
+                </span>
+              ))}
+            </div>
+          ))}
+
+          {/* Child 2: Surname (Isolated) */}
+          {form.surname.$formElement((params) => (
+            <div data-testid="group-surname">
+              <input data-testid="input-surname" {...params.$inputProps} />
+              {params.$showValidationErrors().map((err) => (
+                <span key={err} data-testid="error-surname">
+                  {err}
+                </span>
+              ))}
+            </div>
+          ))}
+
+          <button type="button" onClick={handleReset} data-testid="btn-reset">
+            Reset
+          </button>
+          <button type="submit" data-testid="btn-submit">
+            Submit
+          </button>
+        </form>
+      );
+    };
+
+    render(<TestForm />);
+
+    const inputName = screen.getByTestId('input-name');
+    const inputSurname = screen.getByTestId('input-surname');
+    const btnSubmit = screen.getByTestId('btn-submit');
+    const btnReset = screen.getByTestId('btn-reset');
+
+    // 3. Trigger Validation Errors
+    // We click submit to validate the whole form at once (or blur inputs)
+    fireEvent.click(btnSubmit);
+
+    // 4. Verify errors exist initially
+    await waitFor(() => {
+      expect(screen.getByTestId('error-name')).toHaveTextContent(
+        'Name required'
+      );
+      expect(screen.getByTestId('error-surname')).toHaveTextContent(
+        'Surname required'
+      );
+    });
+
+    // 5. Click Reset
+    // This calls form.$clearValidation() (Root) + setTe({}) (Parent Render)
+    fireEvent.click(btnReset);
+
+    // 6. Verify errors are GONE from the children
+    // If the store logic is wrong, the isolated children won't know
+    // their specific paths (form.name) were cleared by the root call.
+    await waitFor(() => {
+      expect(screen.queryByTestId('error-name')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('error-surname')).not.toBeInTheDocument();
+    });
+  });
 });

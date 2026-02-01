@@ -1988,6 +1988,7 @@ function createProxyHandler<
           const viewIds = meta?.arrayViews?.[arrayPathKey];
 
           // Pass viewIds to getShadowValue to get the filtered/sorted data
+          registerComponentDependency(stateKey, componentId, path);
           return getShadowValue(stateKey, path, viewIds);
         }
 
