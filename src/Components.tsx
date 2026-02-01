@@ -633,36 +633,49 @@ const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
 };
 // Components.tsx
 
-// Generic isolated component wrapper
 export function IsolatedComponentWrapper({
   stateKey,
-  path,
+  path, // The path of the parent node (e.g. ['form'])
+  dependencies, // NEW: Optional array of Proxy objects or path arrays
   rebuildStateShape,
   renderFn,
 }: {
   stateKey: string;
   path: string[];
-  rebuildStateShape: (options: {
-    path: string[];
-    componentId: string;
-    meta?: any;
-  }) => any;
+  dependencies?: any[]; // The explicit list of dependencies
+  rebuildStateShape: (options: any) => any;
   renderFn: (state: any) => React.ReactNode;
 }) {
   const [componentId] = useState(() => uuidv4());
   const [, forceUpdate] = useState({});
 
-  const stateKeyPathKey = [stateKey, ...path].join('.');
   useRegisterComponent(stateKey, componentId, forceUpdate);
 
+  const pathsToSubscribe = useMemo(() => {
+    if (dependencies && dependencies.length > 0) {
+      return dependencies.map((dep) => {
+        return [stateKey, ...dep.$_path].join('.');
+      });
+    }
+
+    return [[stateKey, ...path].join('.')];
+  }, [stateKey, path, dependencies]);
+
+  // 2. Subscribe to ALL calculated paths
   useEffect(() => {
-    const unsubscribe = getGlobalStore
-      .getState()
-      .subscribeToPath(stateKeyPathKey, () => {
+    const store = getGlobalStore.getState();
+
+    // Create an array of unsubscribe functions
+    const unsubs = pathsToSubscribe.map((fullPathKey) => {
+      return store.subscribeToPath(fullPathKey, () => {
         forceUpdate({});
       });
-    return () => unsubscribe();
-  }, [stateKeyPathKey]);
+    });
+
+    return () => {
+      unsubs.forEach((unsub) => unsub());
+    };
+  }, [pathsToSubscribe]);
 
   const baseState = rebuildStateShape({
     path: path,
@@ -672,7 +685,6 @@ export function IsolatedComponentWrapper({
 
   return <>{renderFn(baseState)}</>;
 }
-
 // 1. Define the MINIMAL props needed.
 type PluginWrapperProps = {
   children: React.ReactNode;

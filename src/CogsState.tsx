@@ -230,9 +230,18 @@ export type EndType<
   $update: UpdateType<T>;
   $_path: string[];
   $_stateKey: string;
-  $isolate: (
-    renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
-  ) => JSX.Element;
+  $isolate: {
+    // Overload 1: Just the render function (Default behavior)
+    (
+      renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
+    ): JSX.Element;
+
+    // Overload 2: Dependencies array + render function (Optimized behavior)
+    (
+      dependencies: any[],
+      renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
+    ): JSX.Element;
+  };
   $formElement: (
     control: FormControl<T>,
     opts?: PerPathFormOptsType<T, TPlugins>
@@ -314,6 +323,7 @@ export type StateObject<
   };
 
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
+
 type EffectiveSetStateArg<
   T,
   UpdateType extends 'update' | 'insert' | 'cut',
@@ -349,7 +359,6 @@ export type UpdateTypeDetail = {
   oldValue: any;
   newValue: any;
   userId?: number;
-
   itemId?: string;
   insertAfterId?: string;
   metaData?: Record<string, any>;
@@ -511,14 +520,12 @@ const {
   addPathComponent,
   clearSelectedIndexesForState,
   addStateLog,
-  setSyncInfo,
   clearSelectedIndex,
   getSyncInfo,
   notifyPathSubscribers,
   getPluginMetaDataMap,
   setPluginMetaData,
   removePluginMetaData,
-  // Note: The old functions are no longer imported under their original names
 } = getGlobalStore.getState();
 
 const { notifyUpdate } = pluginStore.getState();
@@ -1069,9 +1076,7 @@ let isFlushScheduled = false;
 function scheduleFlush() {
   if (!isFlushScheduled) {
     isFlushScheduled = true;
-    console.log('Scheduling flush');
     queueMicrotask(() => {
-      console.log('Actually flushing');
       flushQueue();
     });
   }
@@ -2764,7 +2769,7 @@ function createProxyHandler<
         if (prop === '$cut') {
           return (index?: number, options?: { waitForSync?: boolean }) => {
             const shadowMeta = getShadowMetadata(stateKey, path);
-            console.log('shadowMeta ->>>>>>>>>>>>>>>>', shadowMeta);
+
             if (!shadowMeta?.arrayKeys || shadowMeta.arrayKeys.length === 0)
               return;
 
@@ -2775,12 +2780,8 @@ function createProxyHandler<
                   ? index
                   : shadowMeta.arrayKeys.length - 1;
 
-            console.log('indexToCut ->>>>>>>>>>>>>>>>', indexToCut);
-
             const idToCut = shadowMeta.arrayKeys[indexToCut];
             if (!idToCut) return;
-            console.log('idToCut ->>>>>>>>>>>>>>>>', idToCut);
-
             effectiveSetState(null, [...path, idToCut], {
               updateType: 'cut',
             });
@@ -3011,7 +3012,6 @@ function createProxyHandler<
               getPluginMetaDataMap(stateKey, path)?.get(pluginName);
           }
           if (prop === '$addPluginMetaData') {
-            console.log('$addPluginMetaDat');
             return (pluginName: string, data: Record<string, any>) =>
               setPluginMetaData(stateKey, path, pluginName, data);
           }
@@ -3078,12 +3078,6 @@ function createProxyHandler<
               },
               metaData?: Record<string, any>
             ) => {
-              console.log(
-                'getGlobalStore',
-                getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, operation.path)
-              );
               let index: number | undefined;
               if (
                 operation.insertAfterId &&
@@ -3269,11 +3263,29 @@ function createProxyHandler<
           };
         }
         if (prop === '$isolate') {
-          return (renderFn: (state: any) => React.ReactNode) => {
+          // We accept (renderFn) OR (deps, renderFn)
+          return (
+            arg1: any[] | ((state: any) => React.ReactNode),
+            arg2?: (state: any) => React.ReactNode
+          ) => {
+            // Check if the first argument is the dependency array
+            const hasDependencies = Array.isArray(arg1);
+
+            // Normalize arguments
+            const dependencies = hasDependencies ? arg1 : undefined;
+            const renderFn = hasDependencies ? arg2 : arg1;
+
+            if (!renderFn || typeof renderFn !== 'function') {
+              throw new Error(
+                'CogsState: $isolate requires a render function.'
+              );
+            }
+
             return (
               <IsolatedComponentWrapper
                 stateKey={stateKey}
-                path={path}
+                path={path} // The path of the node calling $isolate (e.g. "form")
+                dependencies={dependencies} // Pass the specific parts to watch
                 rebuildStateShape={rebuildStateShape}
                 renderFn={renderFn}
               />
