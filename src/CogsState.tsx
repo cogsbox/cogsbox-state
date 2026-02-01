@@ -243,7 +243,7 @@ export type EndType<
   $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $showValidationErrors: () => string[];
-  $validate: () => { success: boolean; data?: T; error?: any };
+
   $setValidation: (ctx: string) => void;
   $removeValidation: (ctx: string) => void;
 
@@ -287,7 +287,7 @@ export type StateObject<
       : never) &
   EndType<T, TPlugins, true> & {
     $toggle: T extends boolean ? () => void : never;
-
+    $validate: () => { success: boolean; data?: T; error?: any };
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
 
