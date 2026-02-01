@@ -516,4 +516,103 @@ describe('Zod Validation with Error/Warning Types', () => {
       );
     });
   });
+  it('should validate programmatically using $validate() and update UI', async () => {
+    const { useCogsState } = createCogsState(
+      {
+        userForm: {
+          username: '', // Invalid: min(3)
+          email: 'valid@test.com',
+          age: 20,
+          bio: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: userFormSchema,
+          onChange: undefined,
+          onBlur: undefined,
+        },
+      }
+    );
+
+    const TestComponent = () => {
+      const form = useCogsState('userForm');
+      const [submissionStatus, setSubmissionStatus] = React.useState('idle');
+      const [validationErrors, setValidationErrors] = React.useState<string[]>(
+        []
+      );
+
+      const handleManualValidate = () => {
+        const result = form.$validate();
+
+        console.log('Validation result:', result);
+        console.log('result.error:', result.error);
+
+        if (result.success) {
+          setSubmissionStatus('success');
+          setValidationErrors([]);
+        } else {
+          setSubmissionStatus('failed');
+          // Zod v4 uses 'issues', Zod v3 uses 'errors'
+          const issues = result.error?.issues || result.error?.errors || [];
+          const errors = issues.map((e: any) => e.message);
+          console.log('Extracted errors:', errors);
+          setValidationErrors(errors);
+        }
+      };
+
+      return (
+        <div>
+          <input
+            data-testid="username-input"
+            value={form.username.$get()}
+            onChange={(e) => form.username.$update(e.target.value)}
+          />
+          {validationErrors.map((err, i) => (
+            <span key={i} data-testid="username-error">
+              {err}
+            </span>
+          ))}
+
+          <button data-testid="validate-btn" onClick={handleManualValidate}>
+            Validate
+          </button>
+          <span data-testid="submission-status">{submissionStatus}</span>
+        </div>
+      );
+    };
+
+    render(<TestComponent />);
+    const input = screen.getByTestId('username-input');
+    const validateBtn = screen.getByTestId('validate-btn');
+
+    // 1. Check Initial State
+    expect(screen.queryByTestId('username-error')).not.toBeInTheDocument();
+
+    // 2. Trigger Validation (Should Fail)
+    fireEvent.click(validateBtn);
+
+    // Expect: UI shows error
+    await waitFor(() => {
+      expect(screen.getByTestId('username-error')).toHaveTextContent(
+        'Username must be at least 3 characters'
+      );
+      expect(screen.getByTestId('submission-status')).toHaveTextContent(
+        'failed'
+      );
+    });
+
+    // 3. Fix the data
+    fireEvent.change(input, { target: { value: 'ValidName' } });
+
+    // 4. Validate again
+    fireEvent.click(validateBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByTestId('username-error')).not.toBeInTheDocument();
+      expect(screen.getByTestId('submission-status')).toHaveTextContent(
+        'success'
+      );
+    });
+  });
 });

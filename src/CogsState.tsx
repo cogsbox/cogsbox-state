@@ -2129,43 +2129,39 @@ function createProxyHandler<
         if (prop === '$validate') {
           return () => {
             const store = getGlobalStore.getState();
-            // 1. Get current data and schema
+
+            // 1. Get Data & Schema
             const { value } = getScopedData(stateKey, path, meta);
             const opts = store.getInitialOptions(stateKey);
             const schema =
               opts?.validation?.zodSchemaV4 || opts?.validation?.zodSchemaV3;
 
+            // If no schema, assume valid
             if (!schema) {
               return { success: true, data: value };
             }
 
-            // 2. Run Zod
+            // 2. Run Zod Validation
             const result = (schema as any).safeParse(value);
 
-            // 3. Clear ANY existing errors for this path first (reset state)
-            // You might want to be smarter about this for nested objects,
-            // but effectively we need to wipe previous red borders before applying new ones.
-            // (Using the logic from $clearZodValidation)
-            const clearPath = (currentPath: string[]) => {
-              const currentMeta =
-                store.getShadowMetadata(stateKey, currentPath) || {};
-              store.setShadowMetadata(stateKey, currentPath, {
+            // 3. Update State Logic
+            if (result.success) {
+              const currentMeta = store.getShadowMetadata(stateKey, path) || {};
+              store.setShadowMetadata(stateKey, path, {
                 ...currentMeta,
                 validation: {
-                  status: 'NOT_VALIDATED',
+                  status: 'VALID',
                   errors: [],
                   lastValidated: Date.now(),
                 },
               });
-            };
-            // Note: Ideally you recursively clear errors here, but for now we proceed to add new ones.
+            } else {
+              // Zod v4 uses 'issues', Zod v3 uses 'errors'
+              const zodErrors =
+                result.error?.issues || result.error?.errors || [];
 
-            // 4. If Invalid, apply errors to State (This turns the UI red)
-            if (!result.success) {
-              result.error.errors.forEach((error: any) => {
-                // Calculate the exact path to the field with the error
+              zodErrors.forEach((error: any) => {
                 const errorPath = [...path, ...error.path.map(String)];
-
                 const currentMeta =
                   store.getShadowMetadata(stateKey, errorPath) || {};
 
@@ -2182,14 +2178,13 @@ function createProxyHandler<
                       },
                     ],
                     lastValidated: Date.now(),
-                    validatedValue: getShadowValue(stateKey, errorPath),
+                    validatedValue: store.getShadowValue(stateKey, errorPath),
                   },
                 });
               });
-
-              // Notify components to re-render and show the errors
-              notifyComponents(stateKey);
             }
+
+            notifyComponents(stateKey);
 
             return result;
           };
