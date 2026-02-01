@@ -36,14 +36,13 @@ export declare function FormElementWrapper({ stateKey, path, rebuildStateShape, 
     setState: any;
 }): import("react/jsx-runtime").JSX.Element;
 export declare function useRegisterComponent(stateKey: string, componentId: string, forceUpdate: (o: object) => void): void;
-export declare function IsolatedComponentWrapper({ stateKey, path, rebuildStateShape, renderFn, }: {
+export declare function IsolatedComponentWrapper({ stateKey, path, // The path of the parent node (e.g. ['form'])
+dependencies, // NEW: Optional array of Proxy objects or path arrays
+rebuildStateShape, renderFn, }: {
     stateKey: string;
     path: string[];
-    rebuildStateShape: (options: {
-        path: string[];
-        componentId: string;
-        meta?: any;
-    }) => any;
+    dependencies?: any[];
+    rebuildStateShape: (options: any) => any;
     renderFn: (state: any) => React.ReactNode;
 }): import("react/jsx-runtime").JSX.Element;
 //# sourceMappingURL=Components.d.ts.map

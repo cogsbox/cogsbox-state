@@ -105,7 +105,10 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $update: UpdateType<T>;
     $_path: string[];
     $_stateKey: string;
-    $isolate: (renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode) => JSX.Element;
+    $isolate: {
+        (renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode): JSX.Element;
+        (dependencies: any[], renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode): JSX.Element;
+    };
     $formElement: (control: FormControl<T>, opts?: PerPathFormOptsType<T, TPlugins>) => JSX.Element;
     $get: () => T;
     $$get: () => T;
