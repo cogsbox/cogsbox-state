@@ -107,6 +107,9 @@ export type ArrayEndType<
   TShape extends unknown,
   TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
 > = {
+  (): TShape;
+  // 2. Callable Setter: view([...]) sets the value
+  (newValue: TShape | ((prev: TShape) => TShape)): void;
   $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
     options?: StreamOptions<T, R>
   ) => StreamHandle<T>;
