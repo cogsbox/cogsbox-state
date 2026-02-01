@@ -615,4 +615,75 @@ describe('Zod Validation with Error/Warning Types', () => {
       );
     });
   });
+  it('should manually clear validation errors using $clearValidation() and update the UI', async () => {
+    const { useCogsState } = createCogsState(
+      {
+        userForm: {
+          username: '',
+          email: '',
+          age: 20,
+          bio: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: userFormSchema,
+          onBlur: 'error',
+        },
+      }
+    );
+
+    const TestComponent = () => {
+      const form = useCogsState('userForm');
+      console.log('rrrrrrrrrrrrrrrrrrrrrererererererer');
+      return (
+        <div>
+          {form.username.$formElement((params) => (
+            <>
+              <input data-testid="username-input" {...params.$inputProps} />
+              {/* Only render the error span if there are errors */}
+              {params.$showValidationErrors().length > 0 && (
+                <span data-testid="username-error">
+                  {params.$showValidationErrors()[0]}
+                </span>
+              )}
+
+              <button
+                data-testid="clear-btn"
+                onClick={() => {
+                  // Call the renamed method to clear errors for this specific field
+                  form.username.$clearValidation();
+                }}
+              >
+                Clear Errors
+              </button>
+            </>
+          ))}
+        </div>
+      );
+    };
+
+    render(<TestComponent />);
+    const input = screen.getByTestId('username-input');
+    const clearBtn = screen.getByTestId('clear-btn');
+
+    // 1. Trigger an error (Username too short)
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.blur(input);
+
+    // Verify error is visible
+    await waitFor(() => {
+      expect(screen.getByTestId('username-error')).toHaveTextContent(
+        'Username must be at least 3 characters'
+      );
+    });
+
+    // 2. Click button to clear validation
+    fireEvent.click(clearBtn);
+
+    // 3. Verify error is removed from the UI immediately
+    await waitFor(() => {
+      expect(screen.queryByTestId('username-error')).not.toBeInTheDocument();
+    });
+  });
 });

@@ -221,7 +221,7 @@ export type EndType<
     errors: ValidationError[],
     source?: 'client' | 'sync_engine' | 'api'
   ) => void;
-  $clearZodValidation: (paths?: string[]) => void;
+  $clearValidation: (paths?: string[]) => void;
   $applyOperation: (
     operation: UpdateTypeDetail,
     metaData?: Record<string, any>
@@ -2984,10 +2984,60 @@ function createProxyHandler<
             notifySelectionComponents(stateKey, parentPath);
           };
         }
-        if (prop === '$_componentId') {
-          return componentId;
+
+        if (prop === '$clearValidation') {
+          return (subPath?: string[]) => {
+            const targetPath = subPath ? [...path, ...subPath] : path;
+            const store = getGlobalStore.getState();
+
+            // 1. Get the node where we want to start clearing
+            const startNode = store.getShadowNode(stateKey, targetPath);
+            console.log('startNode ', startNode);
+            if (!startNode) return;
+
+            // 2. Define a stack for iterative traversal (avoids recursion depth issues)
+            // Stack items: [currentNode, currentPathArray]
+            const stack: [any, string[]][] = [[startNode, targetPath]];
+            console.log('stack ', stack);
+            while (stack.length > 0) {
+              const [node, currPath] = stack.pop()!;
+              console.log('while (stack.length ', node, currPath);
+              if (!node || typeof node !== 'object') continue;
+
+              // 3. Clear validation on the current node if it exists
+              if (node._meta?.validation) {
+                // Reset the validation object
+                node._meta.validation = {
+                  status: 'NOT_VALIDATED',
+                  errors: [],
+                  lastValidated: Date.now(),
+                  validatedValue: undefined,
+                };
+
+                // 4. Notify specific path subscribers so isolated fields update
+                const fullPathKey = [stateKey, ...currPath].join('.');
+                store.notifyPathSubscribers(fullPathKey, {
+                  type: 'VALIDATION_CLEAR',
+                });
+              }
+
+              // 5. Add children to stack to continue traversal
+              const keys = Object.keys(node);
+              for (const key of keys) {
+                if (key !== '_meta') {
+                  stack.push([node[key], [...currPath, key]]);
+                }
+              }
+            }
+
+            // 6. Notify root components
+            notifyComponents(stateKey);
+          };
         }
         if (path.length == 0) {
+          if (prop === '$_componentId') {
+            return componentId;
+          }
           if (prop === '$setOptions') {
             return (options: OptionsType<T>) => {
               setOptions({ stateKey, options, initialOptionsPart: {} });
@@ -3048,24 +3098,6 @@ function createProxyHandler<
                       validatedValue: undefined,
                     },
                   });
-              });
-            };
-          }
-          if (prop === '$clearZodValidation') {
-            return (path?: string[]) => {
-              if (!path) {
-                throw new Error('clearZodValidation requires a path');
-              }
-
-              const currentMeta = getShadowMetadata(stateKey, path) || {};
-
-              setShadowMetadata(stateKey, path, {
-                ...currentMeta,
-                validation: {
-                  status: 'NOT_VALIDATED',
-                  errors: [],
-                  lastValidated: Date.now(),
-                },
               });
             };
           }

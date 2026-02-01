@@ -1,6 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React, { useEffect } from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  act,
+} from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { createCogsState } from '../src/CogsState';
 
@@ -616,6 +622,83 @@ describe('$isolate and $formElement interaction', () => {
     await waitFor(() => {
       expect(screen.getByTestId('tags-count')).toHaveTextContent('Count: 3');
       expect(screen.getByTestId('tag-input-2')).toHaveValue('vue');
+    });
+  });
+  describe('$isolate with explicit dependencies (Overload)', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+    });
+
+    it('should only re-render when specified dependencies change, ignoring unrelated siblings', async () => {
+      const renderMonitor = vi.fn();
+
+      const TestComponent = () => {
+        const state = useCogsState('componentTestState');
+
+        useEffect(() => {
+          state.$revertToInitialState();
+        }, []);
+
+        return (
+          <div>
+            {state.$isolate([state.name], (proxy) => {
+              renderMonitor();
+              return (
+                <span data-testid="iso-name-explicit">{proxy.name.$get()}</span>
+              );
+            })}
+
+            <button
+              data-testid="btn-update-name"
+              onClick={() => state.name.$update('Updated Name')}
+            >
+              Update Name
+            </button>
+
+            <button
+              data-testid="btn-update-email"
+              onClick={() =>
+                state.users.$index(0).email.$update('new@test.com')
+              }
+            >
+              Update Email
+            </button>
+          </div>
+        );
+      };
+
+      render(<TestComponent />);
+
+      // Wait longer for ALL effects including $revertToInitialState to complete
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      });
+
+      // Clear after everything has settled
+      renderMonitor.mockClear();
+
+      // --- PHASE 1: Update Unrelated Sibling (Email) ---
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('btn-update-email'));
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      // ASSERT: Monitor should NOT have been called because we only subscribed to [name]
+      expect(renderMonitor).not.toHaveBeenCalled();
+
+      // --- PHASE 2: Update Dependency (Name) ---
+      await act(async () => {
+        fireEvent.click(screen.getByTestId('btn-update-name'));
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId('iso-name-explicit')).toHaveTextContent(
+          'Updated Name'
+        );
+      });
+
+      // ASSERT: Monitor SHOULD have been called
+      expect(renderMonitor).toHaveBeenCalled();
     });
   });
 });
