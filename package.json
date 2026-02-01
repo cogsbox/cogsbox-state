@@ -22,7 +22,7 @@
     "url": "git+https://github.com/cogsbox/cogsbox-state.git"
   },
   "scripts": {
-    "build": "rimraf dist && vite build && npm pack && node scripts/rename-pack.cjs",
+    "build": "rimraf dist && vite build",
     "lint": "eslint src --ext ts,tsx",
     "format": "prettier --write \"src/**/*.{ts,tsx}\"",
     "test": "vitest"

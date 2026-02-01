@@ -44,19 +44,11 @@ import { useCogsConfig } from './CogsStateClient.js';
 import { Operation } from 'fast-json-patch';
 
 import * as z3 from 'zod/v3';
-import * as z4 from 'zod/v4';
 
 import { runValidation } from './validation';
+import { ZodType } from 'zod/v4';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
-
-export type VirtualViewOptions = {
-  itemHeight?: number;
-  overscan?: number;
-  stickToBottom?: boolean;
-  dependencies?: any[];
-  scrollStickTolerance?: number;
-};
 
 export type SyncInfo = {
   timeStamp: number;
@@ -251,6 +243,7 @@ export type EndType<
   $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $showValidationErrors: () => string[];
+  $validate: () => { success: boolean; data?: T; error?: any };
   $setValidation: (ctx: string) => void;
   $removeValidation: (ctx: string) => void;
 
@@ -374,7 +367,7 @@ export type ReactivityType =
 type ValidationOptionsType = {
   key?: string;
   zodSchemaV3?: z3.ZodType<any, any, any>;
-  zodSchemaV4?: z4.ZodType<any, any, any>;
+  zodSchemaV4?: ZodType;
   onBlur?: 'error' | 'warning';
   onChange?: 'error' | 'warning';
   blockSync?: boolean;
@@ -2130,6 +2123,75 @@ function createProxyHandler<
               : initalOptionsGet?.localStorage?.key;
             const storageKey = `${sessionId}-${stateKey}-${localKey}`;
             if (storageKey) localStorage.removeItem(storageKey);
+          };
+        }
+
+        if (prop === '$validate') {
+          return () => {
+            const store = getGlobalStore.getState();
+            // 1. Get current data and schema
+            const { value } = getScopedData(stateKey, path, meta);
+            const opts = store.getInitialOptions(stateKey);
+            const schema =
+              opts?.validation?.zodSchemaV4 || opts?.validation?.zodSchemaV3;
+
+            if (!schema) {
+              return { success: true, data: value };
+            }
+
+            // 2. Run Zod
+            const result = (schema as any).safeParse(value);
+
+            // 3. Clear ANY existing errors for this path first (reset state)
+            // You might want to be smarter about this for nested objects,
+            // but effectively we need to wipe previous red borders before applying new ones.
+            // (Using the logic from $clearZodValidation)
+            const clearPath = (currentPath: string[]) => {
+              const currentMeta =
+                store.getShadowMetadata(stateKey, currentPath) || {};
+              store.setShadowMetadata(stateKey, currentPath, {
+                ...currentMeta,
+                validation: {
+                  status: 'NOT_VALIDATED',
+                  errors: [],
+                  lastValidated: Date.now(),
+                },
+              });
+            };
+            // Note: Ideally you recursively clear errors here, but for now we proceed to add new ones.
+
+            // 4. If Invalid, apply errors to State (This turns the UI red)
+            if (!result.success) {
+              result.error.errors.forEach((error: any) => {
+                // Calculate the exact path to the field with the error
+                const errorPath = [...path, ...error.path.map(String)];
+
+                const currentMeta =
+                  store.getShadowMetadata(stateKey, errorPath) || {};
+
+                store.setShadowMetadata(stateKey, errorPath, {
+                  ...currentMeta,
+                  validation: {
+                    status: 'INVALID',
+                    errors: [
+                      {
+                        source: 'client',
+                        message: error.message,
+                        severity: 'error',
+                        code: error.code,
+                      },
+                    ],
+                    lastValidated: Date.now(),
+                    validatedValue: getShadowValue(stateKey, errorPath),
+                  },
+                });
+              });
+
+              // Notify components to re-render and show the errors
+              notifyComponents(stateKey);
+            }
+
+            return result;
           };
         }
         if (prop === '$showValidationErrors') {

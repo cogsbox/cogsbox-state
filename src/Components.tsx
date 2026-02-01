@@ -576,18 +576,15 @@ export function useRegisterComponent(
   const fullComponentId = `${stateKey}////${componentId}`;
 
   useLayoutEffect(() => {
-    // Call the safe, centralized function to register
     registerComponent(stateKey, fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(),
       reactiveType: ['component'],
     });
-
-    // The cleanup now calls the safe, centralized unregister function
     return () => {
       unregisterComponent(stateKey, fullComponentId);
     };
-  }, [stateKey, fullComponentId]); // Dependencies are stable and correct
+  }, [stateKey, fullComponentId]);
 }
 
 const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
