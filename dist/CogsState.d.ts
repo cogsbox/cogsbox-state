@@ -1,37 +1,12 @@
 import { CogsPlugin } from './plugins';
-import { CSSProperties, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
+import { ZodType } from 'zod/v4';
 
 import * as z3 from 'zod/v3';
-import * as z4 from 'zod/v4';
 export type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
-export type VirtualViewOptions = {
-    itemHeight?: number;
-    overscan?: number;
-    stickToBottom?: boolean;
-    dependencies?: any[];
-    scrollStickTolerance?: number;
-};
-export type VirtualStateObjectResult<T extends any[]> = {
-    virtualState: StateObject<T>;
-    virtualizerProps: {
-        outer: {
-            ref: RefObject<HTMLDivElement>;
-            style: CSSProperties;
-        };
-        inner: {
-            style: CSSProperties;
-        };
-        list: {
-            style: CSSProperties;
-        };
-    };
-    scrollToBottom: (behavior?: ScrollBehavior) => void;
-    scrollToIndex: (index: number, behavior?: ScrollBehavior) => void;
-};
 export type SyncInfo = {
     timeStamp: number;
     userId: number;
@@ -79,14 +54,13 @@ export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsP
     $cutSelected: () => void;
     $cutByValue: (value: string | number | boolean) => void;
     $toggleByValue: (value: string | number | boolean) => void;
-    $stateSort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape, TPlugins>;
-    $useVirtualView: (options: VirtualViewOptions) => VirtualStateObjectResult<Prettify<InferArrayElement<TShape>>[]>;
-    $stateList: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
-    $stateMap: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
+    $sort: (compareFn: (a: Prettify<InferArrayElement<TShape>>, b: Prettify<InferArrayElement<TShape>>) => number) => ArrayEndType<TShape, TPlugins>;
+    $list: (callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => void) => any;
+    $map: <U>(callbackfn: (setter: StateObject<Prettify<InferArrayElement<TShape>>>, index: number, arraySetter: StateObject<TShape>) => U) => U[];
     $stateFlattenOn: <K extends keyof Prettify<InferArrayElement<TShape>>>(field: K) => StateObject<InferArrayElement<Prettify<InferArrayElement<TShape>>[K]>[]>;
     $uniqueInsert: (payload: InsertParams<Prettify<InferArrayElement<TShape>>>, fields?: (keyof Prettify<InferArrayElement<TShape>>)[], onMatch?: (existingItem: any) => any) => void;
-    $stateFind: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
-    $stateFilter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape, TPlugins>;
+    $find: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => boolean) => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
+    $filter: (callbackfn: (value: Prettify<InferArrayElement<TShape>>, index: number) => void) => ArrayEndType<TShape, TPlugins>;
     $getSelected: () => StateObject<Prettify<InferArrayElement<TShape>>> | undefined;
     $clearSelected: () => void;
     $getSelectedIndex: () => number;
@@ -141,7 +115,6 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $showValidationErrors: () => string[];
     $setValidation: (ctx: string) => void;
     $removeValidation: (ctx: string) => void;
-    $ignoreFields: (fields: string[]) => StateObject<T, TPlugins>;
     $isSelected: boolean;
     $setSelected: (value: boolean) => void;
     $toggleSelected: () => void;
@@ -163,10 +136,18 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
 } & (IsArrayElement extends true ? {
     $cutThis: () => void;
 } : {});
-export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = (T extends any[] ? ArrayEndType<T, TPlugins> : T extends Record<string, unknown> | object ? {
+export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
+    (): T;
+    (newValue: T | ((prev: T) => T)): void;
+} & (T extends any[] ? ArrayEndType<T, TPlugins> : T extends Record<string, unknown> | object ? {
     [K in keyof T]-?: StateObject<T[K], TPlugins>;
 } : T extends string | number | boolean | null ? EndType<T, TPlugins, true> : never) & EndType<T, TPlugins, true> & {
     $toggle: T extends boolean ? () => void : never;
+    $validate: () => {
+        success: boolean;
+        data?: T;
+        error?: any;
+    };
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
     $_initialState: T;
@@ -204,7 +185,7 @@ export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prett
 type ValidationOptionsType = {
     key?: string;
     zodSchemaV3?: z3.ZodType<any, any, any>;
-    zodSchemaV4?: z4.ZodType<any, any, any>;
+    zodSchemaV4?: ZodType;
     onBlur?: 'error' | 'warning';
     onChange?: 'error' | 'warning';
     blockSync?: boolean;

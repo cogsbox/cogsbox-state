@@ -228,6 +228,7 @@ describe('CogsState - Basic Functionality', () => {
     // Use the new 'basicTestState' key
     setter = useCogsState('basicTestState');
     // Ensure state is fresh before each test
+
     setter.$revertToInitialState();
   });
 
