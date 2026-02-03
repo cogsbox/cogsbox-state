@@ -162,23 +162,31 @@ export function ListItemWrapper({
   itemPath: string[];
   localIndex: number;
   arraySetter: any;
-  rebuildStateShape: any;
-  renderFn: any;
+
+  rebuildStateShape: (options: {
+    currentState: any;
+    path: string[];
+    componentId: string;
+    meta?: any;
+  }) => any;
+  renderFn: (
+    setter: any,
+    index: number,
+
+    arraySetter: any
+  ) => React.ReactNode;
 }) {
   const [, forceUpdate] = useState({});
   const { ref: inViewRef, inView } = useInView();
-  const elementRef = useRef<HTMLElement | null>(null); // Changed to HTMLElement to be generic
+  const elementRef = useRef<HTMLDivElement | null>(null);
 
-  const imagesLoaded = useImageLoaded(elementRef as any);
-  const hasReportedInitialHeight = useRef(false);
   const fullKey = [stateKey, ...itemPath].join('.');
-
   useRegisterComponent(stateKey, itemComponentId, forceUpdate);
 
   const setRefs = useCallback(
-    (element: HTMLElement | null) => {
+    (element: HTMLDivElement | null) => {
       elementRef.current = element;
-      inViewRef(element);
+      inViewRef(element); // This is the ref from useInView
     },
     [inViewRef]
   );
@@ -190,63 +198,19 @@ export function ListItemWrapper({
     return () => unsubscribe();
   }, [fullKey]);
 
-  useEffect(() => {
-    if (!inView || !imagesLoaded || hasReportedInitialHeight.current) {
-      return;
-    }
-    const element = elementRef.current;
-    if (element && element.offsetHeight > 0) {
-      hasReportedInitialHeight.current = true;
-      const newHeight = element.offsetHeight;
-
-      setShadowMetadata(stateKey, itemPath, {
-        virtualizer: { itemHeight: newHeight, domRef: element },
-      });
-
-      const arrayPath = itemPath.slice(0, -1);
-      const arrayPathKey = [stateKey, ...arrayPath].join('.');
-      notifyPathSubscribers(arrayPathKey, {
-        type: 'ITEMHEIGHT',
-        itemKey: itemPath.join('.'),
-        ref: elementRef.current,
-      });
-    }
-  }, [inView, imagesLoaded, stateKey, itemPath]);
-
   const itemValue = getShadowValue(stateKey, itemPath);
-  if (itemValue === undefined) return null;
+
+  if (itemValue === undefined) {
+    return null;
+  }
 
   const itemSetter = rebuildStateShape({
     currentState: itemValue,
     path: itemPath,
     componentId: itemComponentId,
   });
-
-  // 1. Render the user's content (e.g. the <tr>)
   const children = renderFn(itemSetter, localIndex, arraySetter);
 
-  // 2. AUTO-DETECT: If it is a single valid element (<tr>, <div>, <li>), inject the ref.
-  if (React.isValidElement(children)) {
-    // We clone the element and force our ref onto it
-    return React.cloneElement(children as React.ReactElement<any>, {
-      ref: (node: any) => {
-        // Apply our virtualization ref
-        setRefs(node);
-
-        // Preserve any ref the user might have put on the element themselves
-        const { ref: existingRef } = children as any;
-        if (typeof existingRef === 'function') {
-          existingRef(node);
-        } else if (existingRef && 'current' in existingRef) {
-          (existingRef as any).current = node;
-        }
-      },
-    });
-  }
-
-  // 3. Fallback: If they returned a Fragment or string, we MUST wrap it to measure it.
-  // (Note: This specific fallback will still break inside a <tbody>, but
-  // as long as you return a <tr> above, line 90 catches it).
   return <div ref={setRefs}>{children}</div>;
 }
 
@@ -593,52 +557,6 @@ export function useRegisterComponent(
     };
   }, [stateKey, fullComponentId]);
 }
-
-const useImageLoaded = (ref: RefObject<HTMLElement>): boolean => {
-  const [loaded, setLoaded] = useState(false);
-
-  useLayoutEffect(() => {
-    if (!ref.current) {
-      setLoaded(true);
-      return;
-    }
-
-    const images = Array.from(ref.current.querySelectorAll('img'));
-
-    // If there are no images, we are "loaded" immediately.
-    if (images.length === 0) {
-      setLoaded(true);
-      return;
-    }
-
-    let loadedCount = 0;
-    const handleImageLoad = () => {
-      loadedCount++;
-      if (loadedCount === images.length) {
-        setLoaded(true);
-      }
-    };
-
-    images.forEach((image) => {
-      if (image.complete) {
-        handleImageLoad();
-      } else {
-        image.addEventListener('load', handleImageLoad);
-        image.addEventListener('error', handleImageLoad);
-      }
-    });
-
-    return () => {
-      images.forEach((image) => {
-        image.removeEventListener('load', handleImageLoad);
-        image.removeEventListener('error', handleImageLoad);
-      });
-    };
-  }, [ref.current]);
-
-  return loaded;
-};
-// Components.tsx
 
 export function IsolatedComponentWrapper({
   stateKey,

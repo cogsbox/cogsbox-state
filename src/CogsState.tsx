@@ -1367,6 +1367,8 @@ function handleCut(
   const oldValue = getShadowValue(stateKey, path);
   removeShadowArrayElement(stateKey, path);
   markAsDirty(stateKey, parentArrayPath, { bubble: true });
+  const parentArrayKey = [stateKey, ...parentArrayPath].join('.');
+  notifyPathSubscribers(parentArrayKey, { type: 'REMOVE' });
   return { type: 'cut', oldValue: oldValue, parentPath: parentArrayPath };
 }
 

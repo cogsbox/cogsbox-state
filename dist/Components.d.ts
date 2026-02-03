@@ -15,8 +15,13 @@ export declare function ListItemWrapper({ stateKey, itemComponentId, itemPath, l
     itemPath: string[];
     localIndex: number;
     arraySetter: any;
-    rebuildStateShape: any;
-    renderFn: any;
+    rebuildStateShape: (options: {
+        currentState: any;
+        path: string[];
+        componentId: string;
+        meta?: any;
+    }) => any;
+    renderFn: (setter: any, index: number, arraySetter: any) => React.ReactNode;
 }): import("react/jsx-runtime").JSX.Element | null;
 export declare function FormElementWrapper({ stateKey, path, rebuildStateShape, renderFn, formOpts, setState, }: {
     stateKey: string;
