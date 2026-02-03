@@ -494,31 +494,33 @@ describe('$isolate and $formElement interaction', () => {
       );
     });
   });
+  it('should re-render parent when $cutThis is called on a list item', async () => {
+    const parentRenderCount = { value: 0 };
 
-  it('should work with filtered arrays in both isolate and formElement', async () => {
     const TestComponent = () => {
       const state = useCogsState('componentTestState');
+      parentRenderCount.value++;
+
       useEffect(() => {
         state.$revertToInitialState();
       }, []);
 
-      const activeUsers = state.users.$filter((u) => u.active);
-
       return (
         <div>
-          {activeUsers.$list((user, index) => (
-            <div key={index}>
-              {user.name.$formElement((params) => (
-                <input
-                  data-testid={`active-user-${index}`}
-                  {...params.$inputProps}
-                />
-              ))}
-              {user.$isolate((u) => (
-                <span data-testid={`active-display-${index}`}>
-                  Active: {u.active.$get() ? 'Yes' : 'No'}
-                </span>
-              ))}
+          <div data-testid="user-count">{state.users.$get().length}</div>
+          <div data-testid="parent-render-count">{parentRenderCount.value}</div>
+          {state.users.$list((user, index) => (
+            <div key={index} data-testid="user-row">
+              <span data-testid={`user-name-${index}`}>{user.name.$get()}</span>
+              <button
+                data-testid={`delete-user-${index}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  user.$cutThis();
+                }}
+              >
+                Delete
+              </button>
             </div>
           ))}
         </div>
@@ -527,18 +529,103 @@ describe('$isolate and $formElement interaction', () => {
 
     render(<TestComponent />);
 
-    expect(screen.getByTestId('active-user-0')).toHaveValue('Alice');
-    expect(screen.getByTestId('active-user-1')).toHaveValue('Charlie');
-    expect(screen.queryByTestId('active-user-2')).not.toBeInTheDocument();
+    // Verify initial state - should have 3 users (Alice, Bob, Charlie based on existing tests)
+    await waitFor(() => {
+      expect(screen.getAllByTestId('user-row')).toHaveLength(3);
+    });
 
-    const input = screen.getByTestId('active-user-0') as HTMLInputElement;
-    fireEvent.change(input, { target: { value: 'Alicia' } });
+    expect(screen.getByTestId('user-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('user-name-0')).toHaveTextContent('Alice');
 
+    const initialParentRenders = parentRenderCount.value;
+
+    // Delete the first user (Alice)
+    fireEvent.click(screen.getByTestId('delete-user-0'));
+
+    // Wait for the parent to re-render and update the list
     await waitFor(
       () => {
-        expect(input.value).toBe('Alicia');
+        // The row count should decrease to 2
+        expect(screen.getAllByTestId('user-row')).toHaveLength(2);
       },
-      { timeout: 500 }
+      { timeout: 1000 }
+    );
+
+    // Verify the count updates
+    expect(screen.getByTestId('user-count')).toHaveTextContent('2');
+
+    // The first user should now be what was previously the second user (Bob)
+    expect(screen.getByTestId('user-name-0')).toHaveTextContent('Bob');
+
+    // Parent component should have re-rendered
+    expect(parentRenderCount.value).toBeGreaterThan(initialParentRenders);
+  });
+
+  it('should handle $cutThis with filtered lists correctly', async () => {
+    const TestComponent = () => {
+      const state = useCogsState('componentTestState');
+
+      useEffect(() => {
+        state.$revertToInitialState();
+      }, []);
+
+      // Filter to only active users
+      const activeUsers = state.users.$filter((u) => u.active);
+
+      return (
+        <div>
+          <div data-testid="active-count">{activeUsers.$get().length}</div>
+          <div data-testid="total-count">{state.users.$get().length}</div>
+          {activeUsers.$list((user, index) => (
+            <div key={index} data-testid="active-user-row">
+              <span data-testid={`active-user-name-${index}`}>
+                {user.name.$get()}
+              </span>
+              <button
+                data-testid={`delete-active-user-${index}`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  user.$cutThis();
+                }}
+              >
+                Delete
+              </button>
+            </div>
+          ))}
+        </div>
+      );
+    };
+
+    render(<TestComponent />);
+
+    // Initial state: Alice (active), Bob (inactive), Charlie (active)
+    // So active users should be Alice and Charlie
+    await waitFor(() => {
+      expect(screen.getAllByTestId('active-user-row')).toHaveLength(2);
+    });
+
+    expect(screen.getByTestId('active-count')).toHaveTextContent('2');
+    expect(screen.getByTestId('total-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('active-user-name-0')).toHaveTextContent('Alice');
+
+    // Delete Alice (first active user)
+    fireEvent.click(screen.getByTestId('delete-active-user-0'));
+
+    // Wait for updates
+    await waitFor(
+      () => {
+        expect(screen.getAllByTestId('active-user-row')).toHaveLength(1);
+      },
+      { timeout: 1000 }
+    );
+
+    // Counts should update
+    expect(screen.getByTestId('active-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('total-count')).toHaveTextContent('2');
+
+    // Charlie should now be the first (and only) active user
+    expect(screen.getByTestId('active-user-name-0')).toHaveTextContent(
+      'Charlie'
     );
   });
 

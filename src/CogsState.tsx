@@ -1367,8 +1367,6 @@ function handleCut(
   const oldValue = getShadowValue(stateKey, path);
   removeShadowArrayElement(stateKey, path);
   markAsDirty(stateKey, parentArrayPath, { bubble: true });
-  const parentArrayKey = [stateKey, ...parentArrayPath].join('.');
-  notifyPathSubscribers(parentArrayKey, { type: 'REMOVE' });
   return { type: 'cut', oldValue: oldValue, parentPath: parentArrayPath };
 }
 
@@ -2013,6 +2011,38 @@ function createProxyHandler<
       },
 
       get(target: any, prop: string, receiver: any) {
+        // === ADD SYMBOL HANDLERS FIRST (before string checks) ===
+
+        // Handle Symbol.toPrimitive - critical for React DevTools
+        if (prop === (Symbol.toPrimitive as any)) {
+          return (hint: string) => {
+            if (hint === 'number') return NaN;
+            if (hint === 'string') {
+              const pathStr = path.join('.');
+              return `[CogsState: ${pathStr || 'root'}]`;
+            }
+            return null;
+          };
+        }
+
+        // Handle Symbol.toStringTag - used by Object.prototype.toString
+        if (prop === (Symbol.toStringTag as any)) {
+          return 'CogsState';
+        }
+
+        // Handle Symbol.iterator for arrays
+        if (prop === (Symbol.iterator as any)) {
+          const { value } = getScopedData(stateKey, path, meta);
+          if (Array.isArray(value)) {
+            return function* () {
+              for (let i = 0; i < value.length; i++) {
+                yield value[i];
+              }
+            };
+          }
+          return undefined;
+        }
+
         if (prop === 'call' || prop === 'apply' || prop === 'bind') {
           return Reflect.get(target, prop, receiver);
         }
