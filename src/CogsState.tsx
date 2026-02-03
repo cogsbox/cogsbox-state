@@ -81,22 +81,6 @@ type CutFunctionType<T> = (
 
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
 
-export type StreamOptions<T, R = T> = {
-  bufferSize?: number;
-  flushInterval?: number;
-  bufferStrategy?: 'sliding' | 'dropping' | 'accumulate';
-  store?: (buffer: T[]) => R | R[];
-  onFlush?: (buffer: T[]) => void;
-};
-
-export type StreamHandle<T> = {
-  write: (data: T) => void;
-  writeMany: (data: T[]) => void;
-  flush: () => void;
-  close: () => void;
-  pause: () => void;
-  resume: () => void;
-};
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 
 export type UpdateArg<S> = S | ((prevState: S) => S);
@@ -215,10 +199,6 @@ export type ArrayEndType<
 > = {
   (): TShape;
   (newValue: TShape | ((prev: TShape) => TShape)): void;
-
-  $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(
-    options?: StreamOptions<T, R>
-  ) => StreamHandle<T>;
 
   $findWith: <K extends keyof Prettify<InferArrayElement<TShape>>>(
     key: K,
@@ -2444,108 +2424,6 @@ function createProxyHandler<
                 ],
               },
             });
-          };
-        }
-        // In createProxyHandler, inside the get trap where you have other array methods:
-        if (prop === '$stream') {
-          return function <U = InferArrayElement<T>, R = U>(
-            options: StreamOptions<U, R> = {}
-          ): StreamHandle<U> {
-            const {
-              bufferSize = 100,
-              flushInterval = 100,
-              bufferStrategy = 'accumulate',
-              store,
-              onFlush,
-            } = options;
-
-            let buffer: U[] = [];
-            let isPaused = false;
-            let flushTimer: NodeJS.Timeout | null = null;
-
-            const addToBuffer = (item: U) => {
-              if (isPaused) return;
-
-              if (bufferStrategy === 'sliding' && buffer.length >= bufferSize) {
-                buffer.shift();
-              } else if (
-                bufferStrategy === 'dropping' &&
-                buffer.length >= bufferSize
-              ) {
-                return;
-              }
-
-              buffer.push(item);
-
-              if (buffer.length >= bufferSize) {
-                flushBuffer();
-              }
-            };
-
-            const flushBuffer = () => {
-              if (buffer.length === 0) return;
-
-              const toFlush = [...buffer];
-              buffer = [];
-
-              if (store) {
-                const result = store(toFlush);
-                if (result !== undefined) {
-                  const items = Array.isArray(result) ? result : [result];
-                  items.forEach((item) => {
-                    effectiveSetState(item as any, path, {
-                      updateType: 'insert',
-                    });
-                  });
-                }
-              } else {
-                toFlush.forEach((item) => {
-                  effectiveSetState(item as any, path, {
-                    updateType: 'insert',
-                  });
-                });
-              }
-
-              onFlush?.(toFlush);
-            };
-
-            if (flushInterval > 0) {
-              flushTimer = setInterval(flushBuffer, flushInterval);
-            }
-
-            const streamId = uuidv4();
-            const currentMeta = getShadowMetadata(stateKey, path) || {};
-            const streams = currentMeta.streams || new Map();
-            streams.set(streamId, { buffer, flushTimer });
-
-            setShadowMetadata(stateKey, path, {
-              ...currentMeta,
-              streams,
-            });
-
-            return {
-              write: (data: U) => addToBuffer(data),
-              writeMany: (data: U[]) => data.forEach(addToBuffer),
-              flush: () => flushBuffer(),
-              pause: () => {
-                isPaused = true;
-              },
-              resume: () => {
-                isPaused = false;
-                if (buffer.length > 0) flushBuffer();
-              },
-              close: () => {
-                flushBuffer();
-                if (flushTimer) clearInterval(flushTimer);
-
-                const meta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-                if (meta?.streams) {
-                  meta.streams.delete(streamId);
-                }
-              },
-            };
           };
         }
 

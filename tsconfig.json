@@ -30,6 +30,6 @@
     "inlineSources": true,
     "types": ["node"]
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "../cogsbox-examples/src/vite-env.d.ts"],
   "exclude": ["node_modules", "dist", "examples", "tests", "**/*.test.ts", "**/*.spec.ts"]
 }

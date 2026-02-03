@@ -654,7 +654,6 @@ export function IsolatedComponentWrapper({
   const pathsToSubscribe = useMemo(() => {
     if (dependencies && dependencies.length > 0) {
       return dependencies.map((dep) => {
-        console.log(dep, dep.$_path);
         return [stateKey, ...dep.$_path].join('.');
       });
     }

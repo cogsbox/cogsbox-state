@@ -24,21 +24,6 @@ type CutFunctionType<T> = (index?: number, options?: {
     waitForSync?: boolean;
 }) => StateObject<T>;
 export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
-export type StreamOptions<T, R = T> = {
-    bufferSize?: number;
-    flushInterval?: number;
-    bufferStrategy?: 'sliding' | 'dropping' | 'accumulate';
-    store?: (buffer: T[]) => R | R[];
-    onFlush?: (buffer: T[]) => void;
-};
-export type StreamHandle<T> = {
-    write: (data: T) => void;
-    writeMany: (data: T[]) => void;
-    flush: () => void;
-    close: () => void;
-    pause: () => void;
-    resume: () => void;
-};
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type InsertParams<S> = S | ((prevState: {
@@ -118,7 +103,6 @@ export type ArrayElementState<TElement, TParentArray, TPlugins extends readonly 
 export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]> = {
     (): TShape;
     (newValue: TShape | ((prev: TShape) => TShape)): void;
-    $stream: <T = Prettify<InferArrayElement<TShape>>, R = T>(options?: StreamOptions<T, R>) => StreamHandle<T>;
     $findWith: <K extends keyof Prettify<InferArrayElement<TShape>>>(key: K, value: Prettify<InferArrayElement<TShape>>[K]) => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins> | undefined;
     $index: (index: number) => ArrayElementState<Prettify<InferArrayElement<TShape>>, TShape, TPlugins>;
     $insert: InsertType<Prettify<InferArrayElement<TShape>>>;
