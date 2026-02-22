@@ -3,11 +3,11 @@ import { jsx as H, Fragment as pe } from "react/jsx-runtime";
 import { pluginStore as W } from "./pluginStore.js";
 import { useState as ee, useRef as G, useCallback as Ae, useEffect as q, useLayoutEffect as Me, useMemo as ye, createElement as ue, startTransition as $e } from "react";
 import { transformStateFunc as Ve, isFunction as U, isDeepEqual as Y, isArray as Ee, getDifferences as be } from "./utility.js";
-import { ValidationWrapper as Te, IsolatedComponentWrapper as Pe, FormElementWrapper as Ie, MemoizedCogsItemWrapper as ke } from "./Components.jsx";
+import { ValidationWrapper as Te, IsolatedComponentWrapper as Pe, FormElementWrapper as Ie, MemoizedCogsItemWrapper as ke } from "./Components.js";
 import De from "superjson";
 import { v4 as te } from "uuid";
 import { getGlobalStore as w, updateShadowTypeInfo as fe } from "./store.js";
-import { useCogsConfig as me } from "./CogsStateClient.jsx";
+import { useCogsConfig as me } from "./CogsStateClient.js";
 import { runValidation as Ce } from "./validation.js";
 const {
   getInitialOptions: C,
@@ -1467,4 +1467,4 @@ export {
   vt as createCogsState,
   at as useCogsStateFn
 };
-//# sourceMappingURL=CogsState.jsx.map
+//# sourceMappingURL=CogsState.js.map

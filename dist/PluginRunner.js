@@ -134,4 +134,4 @@ function J({ children: r }) {
 export {
   J as PluginRunner
 };
-//# sourceMappingURL=PluginRunner.jsx.map
+//# sourceMappingURL=PluginRunner.js.map

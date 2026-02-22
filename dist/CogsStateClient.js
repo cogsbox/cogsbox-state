@@ -15,4 +15,4 @@ export {
   r as config,
   u as useCogsConfig
 };
-//# sourceMappingURL=CogsStateClient.jsx.map
+//# sourceMappingURL=CogsStateClient.js.map
