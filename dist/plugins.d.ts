@@ -140,6 +140,15 @@ export declare function createScopedMetadataContext<TPluginMetaData, TFieldMetaD
     setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
     removePluginMetaData: () => void;
 };
+export type ScopedMetadataContext<TFieldMetaData = any> = {
+    getFieldMetaData: () => TFieldMetaData | undefined;
+    setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
+    removeFieldMetaData: () => void;
+};
+export type PluginApiEntry<THookData = any, TFieldMetaData = any> = {
+    hookData: THookData | undefined;
+} & ScopedMetadataContext<TFieldMetaData>;
+export type PluginsApi = Record<string, PluginApiEntry>;
 type ZodObjOutput<T extends z.ZodObject<any>> = {
     [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };

@@ -302,6 +302,21 @@ export function createScopedMetadataContext<TPluginMetaData, TFieldMetaData>(
     removeFieldMetaData: () => globalContext.removeFieldMetaData(path),
   };
 }
+
+// Add this type export - derives from what createScopedMetadataContext returns
+export type ScopedMetadataContext<TFieldMetaData = any> = {
+  getFieldMetaData: () => TFieldMetaData | undefined;
+  setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
+  removeFieldMetaData: () => void;
+};
+
+// Type for a single plugin's API entry in ValidationWrapper
+export type PluginApiEntry<THookData = any, TFieldMetaData = any> = {
+  hookData: THookData | undefined;
+} & ScopedMetadataContext<TFieldMetaData>;
+
+// Type for the entire plugins API object passed to validation render prop
+export type PluginsApi = Record<string, PluginApiEntry>;
 type ZodObjOutput<T extends z.ZodObject<any>> = {
   [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };

@@ -8,6 +8,7 @@ import { pluginStore } from './pluginStore';
 import {
   createMetadataContext,
   createScopedMetadataContext,
+  PluginsApi,
   toDeconstructedMethods,
 } from './plugins';
 import React, {
@@ -83,22 +84,19 @@ export function ValidationWrapper({
         ? 'warning'
         : undefined;
   const { registeredPlugins } = pluginStore.getState();
-  const pluginsApi: any = {};
+  const pluginsApi: PluginsApi = {};
 
   // We iterate over ALL registered plugins in the app.
   registeredPlugins.forEach((plugin) => {
-    // A plugin is considered "active" for this state key if its name
-    // exists as a key in the options (e.g., options.syncPlugin exists).
     if (thisStateOpts && thisStateOpts.hasOwnProperty(plugin.name)) {
       const pluginName = plugin.name;
 
-      // Now we can safely build the API for this active plugin.
       const hookData = pluginStore
         .getState()
-        .getHookResult(stateKey, pluginName);
+        .getHookResult(stateKey!, pluginName);
 
       const scopedMetadata = createScopedMetadataContext(
-        stateKey,
+        stateKey!,
         pluginName,
         path
       );
@@ -107,9 +105,11 @@ export function ValidationWrapper({
         hookData,
         getFieldMetaData: scopedMetadata.getFieldMetaData,
         setFieldMetaData: scopedMetadata.setFieldMetaData,
+        removeFieldMetaData: scopedMetadata.removeFieldMetaData,
       };
     }
   });
+
   return (
     <>
       {thisStateOpts?.formElements?.validation &&
