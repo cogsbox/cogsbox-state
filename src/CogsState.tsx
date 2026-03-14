@@ -721,16 +721,16 @@ export const createCogsState = <
     validation?: ValidationOptionsType;
   }
 ) => {
-  type PluginOptions = {
-    [K in TPlugins[number] as K['name']]?: K extends CogsPlugin<
-      string,
-      infer O,
-      any,
-      any,
-      any
-    >
+  type ExtractPluginOptions<T> = T extends {
+    useHook?: (params: { options: infer O }) => any;
+  }
+    ? O
+    : T extends CogsPlugin<string, infer O, any, any, any>
       ? O
       : never;
+
+  type PluginOptions = {
+    [K in TPlugins[number] as K['name']]?: ExtractPluginOptions<K>;
   };
 
   if (opt?.plugins) {

@@ -321,7 +321,15 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
         syncUpdate?: Partial<UpdateTypeDetail>;
         defaultState?: TransformedStateType<State>[StateKey] | undefined;
         dependencies?: any[];
-    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: NonNullable<P[K_2]> extends {
+    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
+        useHook?: (params: {
+            options: infer O;
+        }) => any;
+    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
+        useHook?: (params: {
+            options: infer O;
+        }) => any;
+    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: NonNullable<P[K_2]> extends {
         __key: "keyed";
         map: infer TMap;
     } ? StateKey extends keyof TMap ? TMap[StateKey] extends infer T_1 ? { [K_3 in keyof T_1]: T_1[K_3]; } : never : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;
