@@ -761,7 +761,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   initializeAndMergeShadowState: (key: string, shadowState: any) => {
     const isArrayState = shadowState?._meta?.arrayKeys !== undefined;
     const storageKey = isArrayState ? `[${key}` : key;
-    console.log('initializeAndMergeShadowState running');
+
     const existingRoot =
       shadowStateStore.get(storageKey) ||
       shadowStateStore.get(key) ||
@@ -1035,7 +1035,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // Direct mutation - no cloning!
     const rootKey = shadowStateStore.has(`[${key}`) ? `[${key}` : key;
     let root = shadowStateStore.get(rootKey);
-    console.log('newMetadata', newMetadata);
+
     if (!root) {
       root = { _meta: newMetadata };
       shadowStateStore.set(rootKey, root);
@@ -1650,7 +1650,7 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
 
   const rootNode =
     shadowStateStore.get(stateKey) || shadowStateStore.get(`[${stateKey}`);
-  console.log('testtestsetsetsetse', rootNode);
+
   if (!rootNode) return elements;
 
   const collectElements = (node: any) => {
@@ -1660,7 +1660,6 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
     if (node._meta?.clientActivityState?.elements) {
       node._meta.clientActivityState.elements.forEach((entry: any) => {
         if (entry.domRef?.current) {
-          console.log('jjjjjjjjjjjjjjjjjjjj', entry);
           elements.push(entry.domRef.current);
         }
       });
@@ -1675,7 +1674,7 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
   };
 
   collectElements(rootNode);
-  console.log('elementselements', elements);
+
   return elements;
 }
 
