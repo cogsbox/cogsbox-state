@@ -1,4 +1,4 @@
-import { CogsPlugin } from './plugins';
+import { KeyedTypes, CogsPlugin } from './plugins';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
 import { ZodType } from 'zod/v4';
@@ -321,13 +321,10 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
         syncUpdate?: Partial<UpdateTypeDetail>;
         defaultState?: TransformedStateType<State>[StateKey] | undefined;
         dependencies?: any[];
-    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }[PName] extends infer P ? P extends {
+    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends CogsPlugin<string, infer O, any, any, any> ? O : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
         __key: "keyed";
         map: infer TMap;
-    } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P extends Record<string, any> ? { [K_2 in keyof P]: P[K_2] extends {
-        __key: "keyed";
-        map: infer TMap_1;
-    } ? StateKey extends keyof TMap_1 ? TMap_1[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;
+    } ? StateKey extends keyof TMap ? TMap[StateKey] : never : P[K_2] extends KeyedTypes<infer TMap_1 extends Record<string, any>> ? StateKey extends keyof TMap_1 ? TMap_1[StateKey] : never : P[K_2]; } : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;
     setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: CreateStateOptionsType<TransformedStateType<State>[StateKey], TPlugins> & Omit<OptionsType<TransformedStateType<State>[StateKey]>, keyof CreateStateOptionsType>) => void;
     setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
 };

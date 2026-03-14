@@ -13,7 +13,7 @@ type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 export type KeyedTypes<TMap extends Record<string, any>> = {
   __key: 'keyed';
-  map: { [K in keyof TMap]: TMap[K] };
+  map: TMap;
 };
 
 export const keyedSchema = <TMap extends Record<string, any>>() =>

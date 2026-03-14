@@ -1,6 +1,6 @@
 'use client';
 import { pluginStore } from './pluginStore';
-import { FormWrapperParams, type CogsPlugin } from './plugins';
+import { FormWrapperParams, KeyedTypes, type CogsPlugin } from './plugins';
 import {
   createElement,
   startTransition,
@@ -798,22 +798,19 @@ export const createCogsState = <
     options?: Prettify<
       OptionsType<(typeof statePart)[StateKey], never> & {
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
-          ? P extends { __key: 'keyed'; map: infer TMap }
-            ? StateKey extends keyof TMap
-              ? TMap[StateKey]
-              : never
-            : P extends Record<string, any>
-              ? {
-                  [K in keyof P]: P[K] extends {
-                    __key: 'keyed';
-                    map: infer TMap;
-                  }
+          ? P extends Record<string, any>
+            ? {
+                [K in keyof P]: P[K] extends { __key: 'keyed'; map: infer TMap }
+                  ? StateKey extends keyof TMap
+                    ? TMap[StateKey]
+                    : never
+                  : P[K] extends KeyedTypes<infer TMap> // ADD THIS CHECK
                     ? StateKey extends keyof TMap
                       ? TMap[StateKey]
                       : never
                     : P[K];
-                }
-              : P
+              }
+            : P
           : never;
       }
     >
