@@ -1,6 +1,6 @@
 'use client';
 import { pluginStore } from './pluginStore';
-import { FormWrapperParams, KeyedTypes, type CogsPlugin } from './plugins';
+import { FormWrapperParams, type CogsPlugin } from './plugins';
 import {
   createElement,
   startTransition,
@@ -804,11 +804,7 @@ export const createCogsState = <
                   ? StateKey extends keyof TMap
                     ? TMap[StateKey]
                     : never
-                  : P[K] extends KeyedTypes<infer TMap> // ADD THIS CHECK
-                    ? StateKey extends keyof TMap
-                      ? TMap[StateKey]
-                      : never
-                    : P[K];
+                  : P[K];
               }
             : P
           : never;

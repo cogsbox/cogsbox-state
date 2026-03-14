@@ -13,7 +13,7 @@ type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
 export type KeyedTypes<TMap extends Record<string, any>> = {
   __key: 'keyed';
-  map: TMap;
+  map: { [K in keyof TMap]: TMap[K] };
 };
 
 export const keyedSchema = <TMap extends Record<string, any>>() =>
@@ -323,10 +323,6 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
       });
     },
     getAllFieldElements: (): HTMLElement[] => {
-      console.log(
-        'getAllFieldElements(stateKey)',
-        getAllFieldElements(stateKey)
-      );
       return getAllFieldElements(stateKey);
     },
 
