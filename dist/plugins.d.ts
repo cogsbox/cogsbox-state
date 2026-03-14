@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { default as React } from 'react';
+import { default as React, RefObject } from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 import { ClientActivityEvent } from './pluginStore';
 
@@ -43,11 +43,17 @@ type ScopedMetadataMethods<TFieldMetaData> = {
     getFieldMetaData: () => TFieldMetaData | undefined;
     setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
     removeFieldMetaData: () => void;
+    getFieldRefs: () => RefObject<any>[];
+    getFieldElements: () => HTMLElement[];
+    setFieldDisabled: (disabled: boolean) => void;
 };
 type GlobalMetadataMethods<TFieldMetaData> = {
     getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
     setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
     removeFieldMetaData: (path: string[]) => void;
+    getFieldRefs: (path: string[]) => RefObject<any>[];
+    getFieldElements: (path: string[]) => HTMLElement[];
+    setFieldDisabled: (path: string[], disabled: boolean) => void;
 };
 export type UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, TStateSlice = any> = DeconstructedCogsMethods<TStateSlice> & GlobalMetadataMethods<TFieldMetaData> & {
     stateKey: string;
@@ -131,11 +137,17 @@ export declare function createMetadataContext<TPluginMetaData, TFieldMetaData>(s
     getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
     setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
     removeFieldMetaData: (path: string[]) => void;
+    getFieldRefs: (path: string[]) => RefObject<any>[];
+    getFieldElements: (path: string[]) => HTMLElement[];
+    setFieldDisabled: (path: string[], disabled: boolean) => void;
 };
 export declare function createScopedMetadataContext<TPluginMetaData, TFieldMetaData>(stateKey: string, pluginName: string, path: string[]): {
     getFieldMetaData: () => TFieldMetaData | undefined;
     setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
     removeFieldMetaData: () => void;
+    getFieldRefs: () => RefObject<any>[];
+    getFieldElements: () => HTMLElement[];
+    setFieldDisabled: (disabled: boolean) => void;
     getPluginMetaData: () => TPluginMetaData | undefined;
     setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
     removePluginMetaData: () => void;

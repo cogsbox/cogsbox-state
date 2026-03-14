@@ -4,6 +4,7 @@ import { createCogsState } from '../src/CogsState';
 import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
 import { pluginStore } from '../src/pluginStore';
+import { getGlobalStore } from '../src/store';
 import React from 'react';
 import z from 'zod';
 
@@ -68,6 +69,7 @@ describe('Plugin Hook to Transform Flow', () => {
     // The initial value was 0, the plugin should transform it to 50 (5 * 10)
     expect(result.current.value.$get()).toBe(50);
   });
+
   it('should re-run hooks on each render but only run transformState on option changes', () => {
     let hookRenderCount = 0;
     let transformCallCount = 0;
@@ -176,5 +178,187 @@ describe('Plugin Hook to Transform Flow', () => {
 
     // Verify the hook data was passed through
     expect(capturedHookData).toEqual({ hookId: 'hook-123' });
+  });
+
+  it('should provide setFieldDisabled to directly disable DOM elements via refs', () => {
+    let capturedSetFieldDisabled:
+      | ((path: string[], disabled: boolean) => void)
+      | null = null;
+    let capturedGetFieldElements: ((path: string[]) => HTMLElement[]) | null =
+      null;
+
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    const testPlugin = createPlugin('disableTestPlugin').useHook((params) => {
+      // Capture the methods for testing
+      capturedSetFieldDisabled = params.setFieldDisabled;
+      capturedGetFieldElements = params.getFieldElements;
+      return {};
+    });
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          disableTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    // Wait for effects
+    act(() => {});
+
+    // Verify the methods were passed to the hook
+    expect(capturedSetFieldDisabled).toBeInstanceOf(Function);
+    expect(capturedGetFieldElements).toBeInstanceOf(Function);
+  });
+
+  it('should disable DOM element when setFieldDisabled is called with a registered ref', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let setFieldDisabledFn:
+      | ((path: string[], disabled: boolean) => void)
+      | null = null;
+
+    const testPlugin = createPlugin('disableTestPlugin').useHook((params) => {
+      setFieldDisabledFn = params.setFieldDisabled;
+      return {};
+    });
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          disableTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    // Create a mock input element and manually register it in shadow metadata
+    const mockInput = document.createElement('input');
+    mockInput.disabled = false;
+
+    const mockRef = { current: mockInput };
+    const path = ['value'];
+    const stateKey = 'counter';
+
+    // Simulate what FormElementWrapper does - register the ref in clientActivityState
+    const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
+    const meta = getShadowMetadata(stateKey, path) || {};
+    meta.clientActivityState = {
+      elements: new Map([
+        [
+          'test-component-id',
+          {
+            domRef: mockRef,
+            elementType: 'input',
+            mountedAt: Date.now(),
+          },
+        ],
+      ]),
+    };
+    setShadowMetadata(stateKey, path, meta);
+
+    // Now call setFieldDisabled
+    act(() => {
+      setFieldDisabledFn!(path, true);
+    });
+
+    // The mock input should now be disabled
+    expect(mockInput.disabled).toBe(true);
+
+    // Re-enable it
+    act(() => {
+      setFieldDisabledFn!(path, false);
+    });
+
+    expect(mockInput.disabled).toBe(false);
+  });
+
+  it('should apply pointer-events fallback for non-form elements', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let setFieldDisabledFn:
+      | ((path: string[], disabled: boolean) => void)
+      | null = null;
+
+    const testPlugin = createPlugin('disableTestPlugin').useHook((params) => {
+      setFieldDisabledFn = params.setFieldDisabled;
+      return {};
+    });
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          disableTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    // Create a div (which doesn't have a native disabled property)
+    const mockDiv = document.createElement('div');
+    const mockRef = { current: mockDiv };
+    const path = ['value'];
+    const stateKey = 'counter';
+
+    const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
+    const meta = getShadowMetadata(stateKey, path) || {};
+    meta.clientActivityState = {
+      elements: new Map([
+        [
+          'test-component-id',
+          {
+            domRef: mockRef,
+            elementType: 'custom',
+            mountedAt: Date.now(),
+          },
+        ],
+      ]),
+    };
+    setShadowMetadata(stateKey, path, meta);
+
+    act(() => {
+      setFieldDisabledFn!(path, true);
+    });
+
+    // Should use pointer-events fallback
+    expect(mockDiv.style.pointerEvents).toBe('none');
+    expect(mockDiv.getAttribute('aria-disabled')).toBe('true');
+
+    act(() => {
+      setFieldDisabledFn!(path, false);
+    });
+
+    expect(mockDiv.style.pointerEvents).toBe('');
+    expect(mockDiv.getAttribute('aria-disabled')).toBe('false');
   });
 });

@@ -3,6 +3,7 @@ import type React from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 import { getGlobalStore } from './store';
 import { ClientActivityEvent } from './pluginStore';
+import { RefObject } from 'react';
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -58,6 +59,9 @@ type ScopedMetadataMethods<TFieldMetaData> = {
   getFieldMetaData: () => TFieldMetaData | undefined;
   setFieldMetaData: (data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: () => void;
+  getFieldRefs: () => RefObject<any>[];
+  getFieldElements: () => HTMLElement[];
+  setFieldDisabled: (disabled: boolean) => void;
 };
 
 // These are the existing global methods that still require a path.
@@ -65,6 +69,9 @@ type GlobalMetadataMethods<TFieldMetaData> = {
   getFieldMetaData: (path: string[]) => TFieldMetaData | undefined;
   setFieldMetaData: (path: string[], data: Partial<TFieldMetaData>) => void;
   removeFieldMetaData: (path: string[]) => void;
+  getFieldRefs: (path: string[]) => RefObject<any>[];
+  getFieldElements: (path: string[]) => HTMLElement[];
+  setFieldDisabled: (path: string[], disabled: boolean) => void;
 };
 // Simplified: All params use the same TFieldMetaData type
 export type UseHookParams<
@@ -276,6 +283,39 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
       getGlobalStore
         .getState()
         .removePluginMetaData(stateKey, path, pluginName),
+    getFieldRefs: (path: string[]): RefObject<any>[] => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return [];
+      const refs: RefObject<any>[] = [];
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        if (entry.domRef?.current) refs.push(entry.domRef);
+      });
+      return refs;
+    },
+
+    getFieldElements: (path: string[]): HTMLElement[] => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return [];
+      const elements: HTMLElement[] = [];
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        if (entry.domRef?.current) elements.push(entry.domRef.current);
+      });
+      return elements;
+    },
+
+    setFieldDisabled: (path: string[], disabled: boolean) => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return;
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        const el = entry.domRef?.current;
+        if (!el) return;
+        if ('disabled' in el) el.disabled = disabled;
+        else {
+          el.style.pointerEvents = disabled ? 'none' : '';
+          el.setAttribute('aria-disabled', String(disabled));
+        }
+      });
+    },
   };
 }
 
@@ -290,19 +330,54 @@ export function createScopedMetadataContext<TPluginMetaData, TFieldMetaData>(
   );
 
   return {
-    // Return the global methods for plugin metadata
     ...globalContext,
-    // Override the field methods with new, path-scoped versions
     getFieldMetaData: (): TFieldMetaData | undefined =>
       globalContext.getFieldMetaData(path),
-
     setFieldMetaData: (data: Partial<TFieldMetaData>) =>
       globalContext.setFieldMetaData(path, data),
-
     removeFieldMetaData: () => globalContext.removeFieldMetaData(path),
+
+    // NEW: Direct access to the DOM refs for this field
+    getFieldRefs: (): RefObject<any>[] => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return [];
+      const refs: RefObject<any>[] = [];
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        if (entry.domRef?.current) {
+          refs.push(entry.domRef);
+        }
+      });
+      return refs;
+    },
+
+    getFieldElements: (): HTMLElement[] => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return [];
+      const elements: HTMLElement[] = [];
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        if (entry.domRef?.current) {
+          elements.push(entry.domRef.current);
+        }
+      });
+      return elements;
+    },
+
+    setFieldDisabled: (disabled: boolean) => {
+      const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+      if (!meta?.clientActivityState?.elements) return;
+      meta.clientActivityState.elements.forEach((entry: any) => {
+        const el = entry.domRef?.current;
+        if (!el) return;
+        if ('disabled' in el) {
+          el.disabled = disabled;
+        } else {
+          el.style.pointerEvents = disabled ? 'none' : '';
+          el.setAttribute('aria-disabled', String(disabled));
+        }
+      });
+    },
   };
 }
-
 // Add this type export - derives from what createScopedMetadataContext returns
 export type ScopedMetadataContext<TFieldMetaData = any> = {
   getFieldMetaData: () => TFieldMetaData | undefined;

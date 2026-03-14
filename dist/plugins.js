@@ -1,88 +1,133 @@
-import { z as l } from "zod";
-import { getGlobalStore as u } from "./store.js";
-const f = () => l.object({
-  __key: l.literal("keyed"),
-  map: l.any()
+import { z as S } from "zod";
+import { getGlobalStore as s } from "./store.js";
+const v = () => S.object({
+  __key: S.literal("keyed"),
+  map: S.any()
 });
-function m(e) {
+function A(a) {
   return {
-    initialiseState: (t) => {
-      e.$update(t);
+    initialiseState: (n) => {
+      a.$update(n);
     },
-    initialiseShadowState: (t) => {
-      e.$initializeAndMergeShadowState(t);
+    initialiseShadowState: (n) => {
+      a.$initializeAndMergeShadowState(n);
     },
-    applyOperation: (t, a) => e.$applyOperation(t, a),
-    addZodErrors: (t) => e.$addZodValidation(t),
-    getState: () => e.$get(),
-    setOptions: (t) => {
-      e.$setOptions(t);
+    applyOperation: (n, e) => a.$applyOperation(n, e),
+    addZodErrors: (n) => a.$addZodValidation(n),
+    getState: () => a.$get(),
+    setOptions: (n) => {
+      a.$setOptions(n);
     }
   };
 }
-function S(e, t) {
+function m(a, n) {
   return {
-    getPluginMetaData: () => u.getState().getPluginMetaDataMap(e, [])?.get(t),
-    setPluginMetaData: (a) => u.getState().setPluginMetaData(e, [], t, a),
-    removePluginMetaData: () => u.getState().removePluginMetaData(e, [], t),
-    getFieldMetaData: (a) => u.getState().getPluginMetaDataMap(e, a)?.get(t),
-    setFieldMetaData: (a, i) => u.getState().setPluginMetaData(e, a, t, i),
-    removeFieldMetaData: (a) => u.getState().removePluginMetaData(e, a, t)
+    getPluginMetaData: () => s.getState().getPluginMetaDataMap(a, [])?.get(n),
+    setPluginMetaData: (e) => s.getState().setPluginMetaData(a, [], n, e),
+    removePluginMetaData: () => s.getState().removePluginMetaData(a, [], n),
+    getFieldMetaData: (e) => s.getState().getPluginMetaDataMap(a, e)?.get(n),
+    setFieldMetaData: (e, o) => s.getState().setPluginMetaData(a, e, n, o),
+    removeFieldMetaData: (e) => s.getState().removePluginMetaData(a, e, n),
+    getFieldRefs: (e) => {
+      const o = s.getState().getShadowMetadata(a, e);
+      if (!o?.clientActivityState?.elements) return [];
+      const t = [];
+      return o.clientActivityState.elements.forEach((r) => {
+        r.domRef?.current && t.push(r.domRef);
+      }), t;
+    },
+    getFieldElements: (e) => {
+      const o = s.getState().getShadowMetadata(a, e);
+      if (!o?.clientActivityState?.elements) return [];
+      const t = [];
+      return o.clientActivityState.elements.forEach((r) => {
+        r.domRef?.current && t.push(r.domRef.current);
+      }), t;
+    },
+    setFieldDisabled: (e, o) => {
+      const t = s.getState().getShadowMetadata(a, e);
+      t?.clientActivityState?.elements && t.clientActivityState.elements.forEach((r) => {
+        const i = r.domRef?.current;
+        i && ("disabled" in i ? i.disabled = o : (i.style.pointerEvents = o ? "none" : "", i.setAttribute("aria-disabled", String(o))));
+      });
+    }
   };
 }
-function O(e, t, a) {
-  const i = S(
-    e,
-    t
+function h(a, n, e) {
+  const o = m(
+    a,
+    n
   );
   return {
-    // Return the global methods for plugin metadata
-    ...i,
-    // Override the field methods with new, path-scoped versions
-    getFieldMetaData: () => i.getFieldMetaData(a),
-    setFieldMetaData: (n) => i.setFieldMetaData(a, n),
-    removeFieldMetaData: () => i.removeFieldMetaData(a)
+    ...o,
+    getFieldMetaData: () => o.getFieldMetaData(e),
+    setFieldMetaData: (t) => o.setFieldMetaData(e, t),
+    removeFieldMetaData: () => o.removeFieldMetaData(e),
+    // NEW: Direct access to the DOM refs for this field
+    getFieldRefs: () => {
+      const t = s.getState().getShadowMetadata(a, e);
+      if (!t?.clientActivityState?.elements) return [];
+      const r = [];
+      return t.clientActivityState.elements.forEach((i) => {
+        i.domRef?.current && r.push(i.domRef);
+      }), r;
+    },
+    getFieldElements: () => {
+      const t = s.getState().getShadowMetadata(a, e);
+      if (!t?.clientActivityState?.elements) return [];
+      const r = [];
+      return t.clientActivityState.elements.forEach((i) => {
+        i.domRef?.current && r.push(i.domRef.current);
+      }), r;
+    },
+    setFieldDisabled: (t) => {
+      const r = s.getState().getShadowMetadata(a, e);
+      r?.clientActivityState?.elements && r.clientActivityState.elements.forEach((i) => {
+        const c = i.domRef?.current;
+        c && ("disabled" in c ? c.disabled = t : (c.style.pointerEvents = t ? "none" : "", c.setAttribute("aria-disabled", String(t))));
+      });
+    }
   };
 }
-function b(e) {
-  function t(a) {
-    const i = (o, r, g, c) => ({
-      name: a,
-      useHook: o,
-      transformState: r,
-      onUpdate: g,
-      onFormUpdate: c
+function b(a) {
+  function n(e) {
+    const o = (i, c, l, d) => ({
+      name: e,
+      useHook: i,
+      transformState: c,
+      onUpdate: l,
+      onFormUpdate: d
     });
-    function n(o, r, g, c) {
-      const D = i(
-        o,
-        r,
-        g,
-        c
-      ), s = {};
-      return r || (s.transformState = (M) => n(o, M, g, c)), g || (s.onUpdate = (M) => n(o, r, M, c)), c || (s.onFormUpdate = (M) => n(
-        o,
-        r,
-        g,
-        M
-      )), Object.assign(D, s);
+    function t(i, c, l, d) {
+      const f = o(
+        i,
+        c,
+        l,
+        d
+      ), g = {};
+      return c || (g.transformState = (u) => t(i, u, l, d)), l || (g.onUpdate = (u) => t(i, c, u, d)), d || (g.onFormUpdate = (u) => t(
+        i,
+        c,
+        l,
+        u
+      )), Object.assign(f, g);
     }
     return Object.assign(
-      n(),
+      t(),
       {
-        useHook(o) {
-          return n(o);
+        useHook(i) {
+          return t(i);
         }
       }
     );
   }
-  return { createPlugin: t };
+  return { createPlugin: n };
 }
 export {
-  S as createMetadataContext,
+  m as createMetadataContext,
   b as createPluginContext,
-  O as createScopedMetadataContext,
-  f as keyedSchema,
-  m as toDeconstructedMethods
+  h as createScopedMetadataContext,
+  v as keyedSchema,
+  A as toDeconstructedMethods
 };
 //# sourceMappingURL=plugins.js.map

@@ -8,7 +8,6 @@ import {
 } from './plugins';
 import type { CogsPlugin } from './plugins';
 import type { StateObject, UpdateTypeDetail } from './CogsState';
-import { ClientActivityState, FormEventType } from './store';
 
 const { setHookResult, removeHookResult } = pluginStore.getState();
 
@@ -118,7 +117,7 @@ const PluginInstance = React.memo(
             options,
             hookData: hookDataRef.current,
             ...deconstructed,
-            ...scopedMetadata, // <-- Use the new scoped context
+            ...scopedMetadata,
           });
         }
       };
