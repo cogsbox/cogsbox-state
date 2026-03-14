@@ -1585,3 +1585,69 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }),
   getSyncInfo: (key) => get().syncInfoStore.get(key) || null,
 }));
+
+export function getAllFieldElements(stateKey: string): HTMLElement[] {
+  const elements: HTMLElement[] = [];
+
+  const rootNode =
+    shadowStateStore.get(stateKey) || shadowStateStore.get(`[${stateKey}`);
+  if (!rootNode) return elements;
+
+  const collectElements = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+
+    // Check this node for elements
+    if (node._meta?.clientActivityState?.elements) {
+      node._meta.clientActivityState.elements.forEach((entry: any) => {
+        if (entry.domRef?.current) {
+          elements.push(entry.domRef.current);
+        }
+      });
+    }
+
+    // Recurse into children
+    for (const key in node) {
+      if (key !== '_meta') {
+        collectElements(node[key]);
+      }
+    }
+  };
+
+  collectElements(rootNode);
+  return elements;
+}
+
+export function setAllFieldsDisabled(
+  stateKey: string,
+  disabled: boolean
+): void {
+  const rootNode =
+    shadowStateStore.get(stateKey) || shadowStateStore.get(`[${stateKey}`);
+  if (!rootNode) return;
+
+  const disableElements = (node: any) => {
+    if (!node || typeof node !== 'object') return;
+
+    if (node._meta?.clientActivityState?.elements) {
+      node._meta.clientActivityState.elements.forEach((entry: any) => {
+        const el = entry.domRef?.current;
+        if (!el) return;
+
+        if ('disabled' in el) {
+          (el as HTMLInputElement).disabled = disabled;
+        } else {
+          el.style.pointerEvents = disabled ? 'none' : '';
+          el.setAttribute('aria-disabled', String(disabled));
+        }
+      });
+    }
+
+    for (const key in node) {
+      if (key !== '_meta') {
+        disableElements(node[key]);
+      }
+    }
+  };
+
+  disableElements(rootNode);
+}

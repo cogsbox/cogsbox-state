@@ -1,42 +1,44 @@
 import { $cogsSignal as r, addStateOptions as o, createCogsState as a, useCogsStateFn as n } from "./CogsState.js";
-import { CogsStateClient as d, config as g, useCogsConfig as i } from "./CogsStateClient.js";
-import { debounce as f, deepMerge as p, deleteNestedProperty as u, getArrayLengthDifferences as S, getArrayLengthDifferencesArray as l, getDifferences as x, getDifferencesArray as C, isArray as m, isDeepEqual as y, isFunction as h, isObject as D, transformStateFunc as A, updateNestedProperty as b } from "./utility.js";
-import { useCogsTrpcValidationLink as P } from "./TRPCValidationLink.js";
-import { buildShadowNode as F, generateId as L, getGlobalStore as N, shadowStateStore as k, updateShadowTypeInfo as I } from "./store.js";
-import { createMetadataContext as T, createPluginContext as j, createScopedMetadataContext as q, keyedSchema as E, toDeconstructedMethods as G } from "./plugins.js";
-import { PluginRunner as V } from "./PluginRunner.js";
+import { CogsStateClient as d, config as i, useCogsConfig as g } from "./CogsStateClient.js";
+import { debounce as f, deepMerge as l, deleteNestedProperty as p, getArrayLengthDifferences as u, getArrayLengthDifferencesArray as S, getDifferences as m, getDifferencesArray as x, isArray as C, isDeepEqual as y, isFunction as h, isObject as A, transformStateFunc as D, updateNestedProperty as b } from "./utility.js";
+import { useCogsTrpcValidationLink as M } from "./TRPCValidationLink.js";
+import { buildShadowNode as w, generateId as L, getAllFieldElements as N, getGlobalStore as k, setAllFieldsDisabled as E, shadowStateStore as I, updateShadowTypeInfo as O } from "./store.js";
+import { createMetadataContext as j, createPluginContext as q, createScopedMetadataContext as G, keyedSchema as R, toDeconstructedMethods as V } from "./plugins.js";
+import { PluginRunner as v } from "./PluginRunner.js";
 export {
   r as $cogsSignal,
   d as CogsStateClient,
-  V as PluginRunner,
+  v as PluginRunner,
   o as addStateOptions,
-  F as buildShadowNode,
-  g as config,
+  w as buildShadowNode,
+  i as config,
   a as createCogsState,
-  T as createMetadataContext,
-  j as createPluginContext,
-  q as createScopedMetadataContext,
+  j as createMetadataContext,
+  q as createPluginContext,
+  G as createScopedMetadataContext,
   f as debounce,
-  p as deepMerge,
-  u as deleteNestedProperty,
+  l as deepMerge,
+  p as deleteNestedProperty,
   L as generateId,
-  S as getArrayLengthDifferences,
-  l as getArrayLengthDifferencesArray,
-  x as getDifferences,
-  C as getDifferencesArray,
-  N as getGlobalStore,
-  m as isArray,
+  N as getAllFieldElements,
+  u as getArrayLengthDifferences,
+  S as getArrayLengthDifferencesArray,
+  m as getDifferences,
+  x as getDifferencesArray,
+  k as getGlobalStore,
+  C as isArray,
   y as isDeepEqual,
   h as isFunction,
-  D as isObject,
-  E as keyedSchema,
-  k as shadowStateStore,
-  G as toDeconstructedMethods,
-  A as transformStateFunc,
+  A as isObject,
+  R as keyedSchema,
+  E as setAllFieldsDisabled,
+  I as shadowStateStore,
+  V as toDeconstructedMethods,
+  D as transformStateFunc,
   b as updateNestedProperty,
-  I as updateShadowTypeInfo,
-  i as useCogsConfig,
+  O as updateShadowTypeInfo,
+  g as useCogsConfig,
   n as useCogsStateFn,
-  P as useCogsTrpcValidationLink
+  M as useCogsTrpcValidationLink
 };
 //# sourceMappingURL=index.js.map

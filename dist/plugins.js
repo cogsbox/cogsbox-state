@@ -1,10 +1,10 @@
 import { z as S } from "zod";
-import { getGlobalStore as s } from "./store.js";
-const v = () => S.object({
+import { getGlobalStore as c, setAllFieldsDisabled as m, getAllFieldElements as M } from "./store.js";
+const F = () => S.object({
   __key: S.literal("keyed"),
   map: S.any()
 });
-function A(a) {
+function b(a) {
   return {
     initialiseState: (n) => {
       a.$update(n);
@@ -12,7 +12,7 @@ function A(a) {
     initialiseShadowState: (n) => {
       a.$initializeAndMergeShadowState(n);
     },
-    applyOperation: (n, e) => a.$applyOperation(n, e),
+    applyOperation: (n, t) => a.$applyOperation(n, t),
     addZodErrors: (n) => a.$addZodValidation(n),
     getState: () => a.$get(),
     setOptions: (n) => {
@@ -20,103 +20,105 @@ function A(a) {
     }
   };
 }
-function m(a, n) {
+function D(a, n) {
   return {
-    getPluginMetaData: () => s.getState().getPluginMetaDataMap(a, [])?.get(n),
-    setPluginMetaData: (e) => s.getState().setPluginMetaData(a, [], n, e),
-    removePluginMetaData: () => s.getState().removePluginMetaData(a, [], n),
-    getFieldMetaData: (e) => s.getState().getPluginMetaDataMap(a, e)?.get(n),
-    setFieldMetaData: (e, o) => s.getState().setPluginMetaData(a, e, n, o),
-    removeFieldMetaData: (e) => s.getState().removePluginMetaData(a, e, n),
-    getFieldRefs: (e) => {
-      const o = s.getState().getShadowMetadata(a, e);
+    getPluginMetaData: () => c.getState().getPluginMetaDataMap(a, [])?.get(n),
+    setPluginMetaData: (t) => c.getState().setPluginMetaData(a, [], n, t),
+    removePluginMetaData: () => c.getState().removePluginMetaData(a, [], n),
+    getFieldMetaData: (t) => c.getState().getPluginMetaDataMap(a, t)?.get(n),
+    setFieldMetaData: (t, o) => c.getState().setPluginMetaData(a, t, n, o),
+    removeFieldMetaData: (t) => c.getState().removePluginMetaData(a, t, n),
+    getFieldRefs: (t) => {
+      const o = c.getState().getShadowMetadata(a, t);
       if (!o?.clientActivityState?.elements) return [];
-      const t = [];
+      const e = [];
       return o.clientActivityState.elements.forEach((r) => {
-        r.domRef?.current && t.push(r.domRef);
-      }), t;
+        r.domRef?.current && e.push(r.domRef);
+      }), e;
     },
-    getFieldElements: (e) => {
-      const o = s.getState().getShadowMetadata(a, e);
+    getFieldElements: (t) => {
+      const o = c.getState().getShadowMetadata(a, t);
       if (!o?.clientActivityState?.elements) return [];
-      const t = [];
+      const e = [];
       return o.clientActivityState.elements.forEach((r) => {
-        r.domRef?.current && t.push(r.domRef.current);
-      }), t;
+        r.domRef?.current && e.push(r.domRef.current);
+      }), e;
     },
-    setFieldDisabled: (e, o) => {
-      const t = s.getState().getShadowMetadata(a, e);
-      t?.clientActivityState?.elements && t.clientActivityState.elements.forEach((r) => {
+    setFieldDisabled: (t, o) => {
+      const e = c.getState().getShadowMetadata(a, t);
+      e?.clientActivityState?.elements && e.clientActivityState.elements.forEach((r) => {
         const i = r.domRef?.current;
         i && ("disabled" in i ? i.disabled = o : (i.style.pointerEvents = o ? "none" : "", i.setAttribute("aria-disabled", String(o))));
       });
-    }
+    },
+    getAllFieldElements: () => M(a),
+    setAllFieldsDisabled: (t) => m(a, t)
   };
 }
-function h(a, n, e) {
-  const o = m(
+function h(a, n, t) {
+  const o = D(
     a,
     n
   );
   return {
     ...o,
-    getFieldMetaData: () => o.getFieldMetaData(e),
-    setFieldMetaData: (t) => o.setFieldMetaData(e, t),
-    removeFieldMetaData: () => o.removeFieldMetaData(e),
+    getFieldMetaData: () => o.getFieldMetaData(t),
+    setFieldMetaData: (e) => o.setFieldMetaData(t, e),
+    removeFieldMetaData: () => o.removeFieldMetaData(t),
     // NEW: Direct access to the DOM refs for this field
     getFieldRefs: () => {
-      const t = s.getState().getShadowMetadata(a, e);
-      if (!t?.clientActivityState?.elements) return [];
+      const e = c.getState().getShadowMetadata(a, t);
+      if (!e?.clientActivityState?.elements) return [];
       const r = [];
-      return t.clientActivityState.elements.forEach((i) => {
+      return e.clientActivityState.elements.forEach((i) => {
         i.domRef?.current && r.push(i.domRef);
       }), r;
     },
     getFieldElements: () => {
-      const t = s.getState().getShadowMetadata(a, e);
-      if (!t?.clientActivityState?.elements) return [];
+      const e = c.getState().getShadowMetadata(a, t);
+      if (!e?.clientActivityState?.elements) return [];
       const r = [];
-      return t.clientActivityState.elements.forEach((i) => {
+      return e.clientActivityState.elements.forEach((i) => {
         i.domRef?.current && r.push(i.domRef.current);
       }), r;
     },
-    setFieldDisabled: (t) => {
-      const r = s.getState().getShadowMetadata(a, e);
+    setFieldDisabled: (e) => {
+      const r = c.getState().getShadowMetadata(a, t);
       r?.clientActivityState?.elements && r.clientActivityState.elements.forEach((i) => {
-        const c = i.domRef?.current;
-        c && ("disabled" in c ? c.disabled = t : (c.style.pointerEvents = t ? "none" : "", c.setAttribute("aria-disabled", String(t))));
+        const l = i.domRef?.current;
+        l && ("disabled" in l ? l.disabled = e : (l.style.pointerEvents = e ? "none" : "", l.setAttribute("aria-disabled", String(e))));
       });
     }
   };
 }
-function b(a) {
-  function n(e) {
-    const o = (i, c, l, d) => ({
-      name: e,
+function E(a) {
+  function n(t) {
+    const o = (i, l, s, d) => ({
+      name: t,
       useHook: i,
-      transformState: c,
-      onUpdate: l,
+      transformState: l,
+      onUpdate: s,
       onFormUpdate: d
     });
-    function t(i, c, l, d) {
+    function e(i, l, s, d) {
       const f = o(
         i,
-        c,
         l,
+        s,
         d
       ), g = {};
-      return c || (g.transformState = (u) => t(i, u, l, d)), l || (g.onUpdate = (u) => t(i, c, u, d)), d || (g.onFormUpdate = (u) => t(
+      return l || (g.transformState = (u) => e(i, u, s, d)), s || (g.onUpdate = (u) => e(i, l, u, d)), d || (g.onFormUpdate = (u) => e(
         i,
-        c,
         l,
+        s,
         u
       )), Object.assign(f, g);
     }
     return Object.assign(
-      t(),
+      e(),
       {
         useHook(i) {
-          return t(i);
+          return e(i);
         }
       }
     );
@@ -124,10 +126,10 @@ function b(a) {
   return { createPlugin: n };
 }
 export {
-  m as createMetadataContext,
-  b as createPluginContext,
+  D as createMetadataContext,
+  E as createPluginContext,
   h as createScopedMetadataContext,
-  v as keyedSchema,
-  A as toDeconstructedMethods
+  F as keyedSchema,
+  b as toDeconstructedMethods
 };
 //# sourceMappingURL=plugins.js.map

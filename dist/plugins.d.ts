@@ -54,6 +54,8 @@ type GlobalMetadataMethods<TFieldMetaData> = {
     getFieldRefs: (path: string[]) => RefObject<any>[];
     getFieldElements: (path: string[]) => HTMLElement[];
     setFieldDisabled: (path: string[], disabled: boolean) => void;
+    getAllFieldElements: () => HTMLElement[];
+    setAllFieldsDisabled: (disabled: boolean) => void;
 };
 export type UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, TStateSlice = any> = DeconstructedCogsMethods<TStateSlice> & GlobalMetadataMethods<TFieldMetaData> & {
     stateKey: string;
@@ -140,6 +142,8 @@ export declare function createMetadataContext<TPluginMetaData, TFieldMetaData>(s
     getFieldRefs: (path: string[]) => RefObject<any>[];
     getFieldElements: (path: string[]) => HTMLElement[];
     setFieldDisabled: (path: string[], disabled: boolean) => void;
+    getAllFieldElements: () => HTMLElement[];
+    setAllFieldsDisabled: (disabled: boolean) => void;
 };
 export declare function createScopedMetadataContext<TPluginMetaData, TFieldMetaData>(stateKey: string, pluginName: string, path: string[]): {
     getFieldMetaData: () => TFieldMetaData | undefined;
@@ -151,6 +155,8 @@ export declare function createScopedMetadataContext<TPluginMetaData, TFieldMetaD
     getPluginMetaData: () => TPluginMetaData | undefined;
     setPluginMetaData: (data: Partial<TPluginMetaData>) => void;
     removePluginMetaData: () => void;
+    getAllFieldElements: () => HTMLElement[];
+    setAllFieldsDisabled: (disabled: boolean) => void;
 };
 export type ScopedMetadataContext<TFieldMetaData = any> = {
     getFieldMetaData: () => TFieldMetaData | undefined;

@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import type React from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
-import { getGlobalStore } from './store';
+import {
+  getGlobalStore,
+  getAllFieldElements,
+  setAllFieldsDisabled,
+} from './store';
 import { ClientActivityEvent } from './pluginStore';
 import { RefObject } from 'react';
 
@@ -72,6 +76,8 @@ type GlobalMetadataMethods<TFieldMetaData> = {
   getFieldRefs: (path: string[]) => RefObject<any>[];
   getFieldElements: (path: string[]) => HTMLElement[];
   setFieldDisabled: (path: string[], disabled: boolean) => void;
+  getAllFieldElements: () => HTMLElement[];
+  setAllFieldsDisabled: (disabled: boolean) => void;
 };
 // Simplified: All params use the same TFieldMetaData type
 export type UseHookParams<
@@ -316,6 +322,10 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
         }
       });
     },
+    getAllFieldElements: (): HTMLElement[] => getAllFieldElements(stateKey),
+
+    setAllFieldsDisabled: (disabled: boolean): void =>
+      setAllFieldsDisabled(stateKey, disabled),
   };
 }
 

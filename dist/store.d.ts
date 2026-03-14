@@ -195,5 +195,7 @@ export declare function updateShadowTypeInfo(stateKey: string, rootSchema: any, 
 export declare const shadowStateStore: Map<string, ShadowNode>;
 export declare function generateId(stateKey: string): string;
 export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
+export declare function getAllFieldElements(stateKey: string): HTMLElement[];
+export declare function setAllFieldsDisabled(stateKey: string, disabled: boolean): void;
 export {};
 //# sourceMappingURL=store.d.ts.map
