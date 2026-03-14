@@ -271,6 +271,7 @@ export function FormElementWrapper({
 
   useEffect(() => {
     const { getShadowMetadata, setShadowMetadata } = getGlobalStore.getState();
+    console.log('FormElementWrapper effect running for:', stateKey, path);
 
     // Initialize clientActivityState if needed
     const currentMeta = getShadowMetadata(stateKey, path) || {};
@@ -302,7 +303,7 @@ export function FormElementWrapper({
       inputType: formElementRef.current?.type,
       mountedAt: Date.now(),
     });
-
+    console.log('currentMeta', currentMeta);
     setShadowMetadata(stateKey, path, currentMeta);
 
     // Subscribe to path updates

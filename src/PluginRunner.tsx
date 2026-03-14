@@ -176,6 +176,7 @@ export function PluginRunner({ children }: { children: React.ReactNode }) {
   // this component will re-render to update the list of PluginInstances.
   useEffect(() => {
     const unsubscribe = pluginStore.subscribe(forceUpdate);
+
     return unsubscribe;
   }, []);
 

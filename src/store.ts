@@ -761,7 +761,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   initializeAndMergeShadowState: (key: string, shadowState: any) => {
     const isArrayState = shadowState?._meta?.arrayKeys !== undefined;
     const storageKey = isArrayState ? `[${key}` : key;
-
+    console.log('initializeAndMergeShadowState running');
     const existingRoot =
       shadowStateStore.get(storageKey) ||
       shadowStateStore.get(key) ||
@@ -816,9 +816,22 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
           newMeta.validation = existingMeta.validation;
         }
 
-        // 3. Preserve component registrations, which only exist on the live target state.
+        // 3. Preserve component registrations
         if (existingMeta.components) {
           newMeta.components = existingMeta.components;
+        }
+
+        // 4. Preserve clientActivityState (DOM ref registrations)
+        if (
+          existingMeta.clientActivityState &&
+          !sourceMeta.clientActivityState
+        ) {
+          newMeta.clientActivityState = existingMeta.clientActivityState;
+        }
+
+        // 5. Preserve pluginMetaData
+        if (existingMeta.pluginMetaData && !sourceMeta.pluginMetaData) {
+          newMeta.pluginMetaData = existingMeta.pluginMetaData;
         }
 
         target._meta = newMeta;
@@ -906,6 +919,33 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       shadowStateStore.get(key) || shadowStateStore.get(`[${key}`);
     let preservedMetadata: Partial<ShadowMetadata> = {};
 
+    // NEW: Collect runtime metadata (clientActivityState, pluginMetaData) from ALL nodes
+    const preservedRuntimeMeta = new Map<
+      string,
+      {
+        clientActivityState?: ClientActivityState;
+        pluginMetaData?: Map<string, Record<string, any>>;
+      }
+    >();
+
+    if (existingRoot) {
+      const collectRuntimeMeta = (node: any, pathSegments: string[]) => {
+        if (!node || typeof node !== 'object') return;
+        if (node._meta?.clientActivityState || node._meta?.pluginMetaData) {
+          preservedRuntimeMeta.set(pathSegments.join('\x00'), {
+            clientActivityState: node._meta.clientActivityState,
+            pluginMetaData: node._meta.pluginMetaData,
+          });
+        }
+        for (const k in node) {
+          if (k !== '_meta') {
+            collectRuntimeMeta(node[k], [...pathSegments, k]);
+          }
+        }
+      };
+      collectRuntimeMeta(existingRoot, []);
+    }
+
     if (existingRoot?._meta) {
       const {
         components,
@@ -924,7 +964,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     shadowStateStore.delete(key);
     shadowStateStore.delete(`[${key}`);
 
-    // Get all available schemas for this state
     const options = get().getInitialOptions(key);
     const syncSchemas = get().getInitialOptions('__syncSchemas');
 
@@ -938,11 +977,30 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       },
     };
 
-    // Build with context so type info is stored
     const newRoot = buildShadowNode(key, initialState, context);
 
     if (!newRoot._meta) newRoot._meta = {};
     Object.assign(newRoot._meta, preservedMetadata);
+
+    // NEW: Restore runtime metadata to matching nodes in rebuilt tree
+    const restoreRuntimeMeta = (node: any, pathSegments: string[]) => {
+      if (!node || typeof node !== 'object') return;
+      const pathKey = pathSegments.join('\x00');
+      const saved = preservedRuntimeMeta.get(pathKey);
+      if (saved) {
+        if (!node._meta) node._meta = {};
+        if (saved.clientActivityState)
+          node._meta.clientActivityState = saved.clientActivityState;
+        if (saved.pluginMetaData)
+          node._meta.pluginMetaData = saved.pluginMetaData;
+      }
+      for (const k in node) {
+        if (k !== '_meta') {
+          restoreRuntimeMeta(node[k], [...pathSegments, k]);
+        }
+      }
+    };
+    restoreRuntimeMeta(newRoot, []);
 
     const storageKey = Array.isArray(initialState) ? `[${key}` : key;
     shadowStateStore.set(storageKey, newRoot);
@@ -977,7 +1035,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // Direct mutation - no cloning!
     const rootKey = shadowStateStore.has(`[${key}`) ? `[${key}` : key;
     let root = shadowStateStore.get(rootKey);
-
+    console.log('newMetadata', newMetadata);
     if (!root) {
       root = { _meta: newMetadata };
       shadowStateStore.set(rootKey, root);
@@ -1354,6 +1412,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     const rootMeta = get().getShadowMetadata(stateKey, []) || {};
     const components = new Map(rootMeta.components);
     components.set(fullComponentId, registration);
+
     get().setShadowMetadata(stateKey, [], { components });
   },
 
@@ -1591,6 +1650,7 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
 
   const rootNode =
     shadowStateStore.get(stateKey) || shadowStateStore.get(`[${stateKey}`);
+  console.log('testtestsetsetsetse', rootNode);
   if (!rootNode) return elements;
 
   const collectElements = (node: any) => {
@@ -1600,6 +1660,7 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
     if (node._meta?.clientActivityState?.elements) {
       node._meta.clientActivityState.elements.forEach((entry: any) => {
         if (entry.domRef?.current) {
+          console.log('jjjjjjjjjjjjjjjjjjjj', entry);
           elements.push(entry.domRef.current);
         }
       });
@@ -1614,6 +1675,7 @@ export function getAllFieldElements(stateKey: string): HTMLElement[] {
   };
 
   collectElements(rootNode);
+  console.log('elementselements', elements);
   return elements;
 }
 

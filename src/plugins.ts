@@ -322,7 +322,13 @@ export function createMetadataContext<TPluginMetaData, TFieldMetaData>(
         }
       });
     },
-    getAllFieldElements: (): HTMLElement[] => getAllFieldElements(stateKey),
+    getAllFieldElements: (): HTMLElement[] => {
+      console.log(
+        'getAllFieldElements(stateKey)',
+        getAllFieldElements(stateKey)
+      );
+      return getAllFieldElements(stateKey);
+    },
 
     setAllFieldsDisabled: (disabled: boolean): void =>
       setAllFieldsDisabled(stateKey, disabled),

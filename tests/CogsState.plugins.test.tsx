@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, render } from '@testing-library/react';
 import { createCogsState } from '../src/CogsState';
 import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
 import { pluginStore } from '../src/pluginStore';
-import { getGlobalStore } from '../src/store';
-import React from 'react';
+import { getGlobalStore, shadowStateStore } from '../src/store';
+
 import z from 'zod';
 
 describe('Plugin Hook to Transform Flow', () => {
@@ -20,6 +20,7 @@ describe('Plugin Hook to Transform Flow', () => {
     pluginStore.getState().stateHandlers.clear();
     // Clear update subscribers to prevent tests from interfering
     pluginStore.getState().updateSubscribers.clear();
+    shadowStateStore.clear();
   });
 
   it('should pass hook data to transformState', () => {
@@ -360,5 +361,542 @@ describe('Plugin Hook to Transform Flow', () => {
 
     expect(mockDiv.style.pointerEvents).toBe('');
     expect(mockDiv.getAttribute('aria-disabled')).toBe('false');
+  });
+  it('should get all field elements across multiple paths with getAllFieldElements', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let getAllFieldElementsFn: (() => HTMLElement[]) | null = null;
+
+    const testPlugin = createPlugin('getAllElementsTestPlugin').useHook(
+      (params) => {
+        getAllFieldElementsFn = params.getAllFieldElements;
+        return {};
+      }
+    );
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          getAllElementsTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    // Create multiple mock elements at different paths
+    const mockInput1 = document.createElement('input');
+    const mockInput2 = document.createElement('input');
+    const mockDiv = document.createElement('div');
+
+    const stateKey = 'counter';
+
+    const { setShadowMetadata } = getGlobalStore.getState();
+
+    // Register elements at different paths
+    setShadowMetadata(stateKey, ['value'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-1',
+            {
+              domRef: { current: mockInput1 },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    setShadowMetadata(stateKey, ['other', 'nested'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-2',
+            {
+              domRef: { current: mockInput2 },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-3',
+            {
+              domRef: { current: mockDiv },
+              elementType: 'div',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    // Get all elements
+    let allElements: HTMLElement[] = [];
+    act(() => {
+      allElements = getAllFieldElementsFn!();
+    });
+
+    // Should return all 3 elements
+    expect(allElements).toHaveLength(3);
+    expect(allElements).toContain(mockInput1);
+    expect(allElements).toContain(mockInput2);
+    expect(allElements).toContain(mockDiv);
+  });
+
+  it('should return empty array when no elements are registered', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let getAllFieldElementsFn: (() => HTMLElement[]) | null = null;
+
+    const testPlugin = createPlugin('emptyElementsTestPlugin').useHook(
+      (params) => {
+        getAllFieldElementsFn = params.getAllFieldElements;
+        return {};
+      }
+    );
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          emptyElementsTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    let allElements: HTMLElement[] = [];
+    act(() => {
+      allElements = getAllFieldElementsFn!();
+    });
+
+    expect(allElements).toHaveLength(0);
+    expect(allElements).toEqual([]);
+  });
+
+  it('should disable all fields with setAllFieldsDisabled', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let setAllFieldsDisabledFn: ((disabled: boolean) => void) | null = null;
+
+    const testPlugin = createPlugin('disableAllTestPlugin').useHook(
+      (params) => {
+        setAllFieldsDisabledFn = params.setAllFieldsDisabled;
+        return {};
+      }
+    );
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          disableAllTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    // Create multiple mock elements at different paths
+    const mockInput1 = document.createElement('input');
+    const mockInput2 = document.createElement('input');
+    const mockDiv = document.createElement('div');
+    mockInput1.disabled = false;
+    mockInput2.disabled = false;
+
+    const stateKey = 'counter';
+
+    const { setShadowMetadata } = getGlobalStore.getState();
+
+    // Register elements at different paths
+    setShadowMetadata(stateKey, ['value'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-1',
+            {
+              domRef: { current: mockInput1 },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    setShadowMetadata(stateKey, ['other'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-2',
+            {
+              domRef: { current: mockInput2 },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-3',
+            {
+              domRef: { current: mockDiv },
+              elementType: 'div',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    // Disable all fields
+    act(() => {
+      setAllFieldsDisabledFn!(true);
+    });
+
+    // All form elements should be disabled
+    expect(mockInput1.disabled).toBe(true);
+    expect(mockInput2.disabled).toBe(true);
+    // Div should have pointer-events none
+    expect(mockDiv.style.pointerEvents).toBe('none');
+    expect(mockDiv.getAttribute('aria-disabled')).toBe('true');
+
+    // Re-enable all fields
+    act(() => {
+      setAllFieldsDisabledFn!(false);
+    });
+
+    expect(mockInput1.disabled).toBe(false);
+    expect(mockInput2.disabled).toBe(false);
+    expect(mockDiv.style.pointerEvents).toBe('');
+    expect(mockDiv.getAttribute('aria-disabled')).toBe('false');
+  });
+
+  it('should handle mixed form and non-form elements when disabling all fields', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let setAllFieldsDisabledFn: ((disabled: boolean) => void) | null = null;
+
+    const testPlugin = createPlugin('mixedElementsTestPlugin').useHook(
+      (params) => {
+        setAllFieldsDisabledFn = params.setAllFieldsDisabled;
+        return {};
+      }
+    );
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          mixedElementsTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    // Create various element types
+    const mockInput = document.createElement('input');
+    const mockButton = document.createElement('button');
+    const mockSelect = document.createElement('select');
+    const mockTextarea = document.createElement('textarea');
+    const mockSpan = document.createElement('span');
+
+    mockInput.disabled = false;
+    mockButton.disabled = false;
+    mockSelect.disabled = false;
+    mockTextarea.disabled = false;
+
+    const stateKey = 'counter';
+    const { setShadowMetadata } = getGlobalStore.getState();
+
+    setShadowMetadata(stateKey, ['field1'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-1',
+            {
+              domRef: { current: mockInput },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-2',
+            {
+              domRef: { current: mockButton },
+              elementType: 'button',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    setShadowMetadata(stateKey, ['field2'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-3',
+            {
+              domRef: { current: mockSelect },
+              elementType: 'select',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-4',
+            {
+              domRef: { current: mockTextarea },
+              elementType: 'textarea',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-5',
+            {
+              domRef: { current: mockSpan },
+              elementType: 'span',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    // Disable all
+    act(() => {
+      setAllFieldsDisabledFn!(true);
+    });
+
+    // Native form elements should use disabled property
+    expect(mockInput.disabled).toBe(true);
+    expect(mockButton.disabled).toBe(true);
+    expect(mockSelect.disabled).toBe(true);
+    expect(mockTextarea.disabled).toBe(true);
+
+    // Non-form element should use pointer-events fallback
+    expect(mockSpan.style.pointerEvents).toBe('none');
+    expect(mockSpan.getAttribute('aria-disabled')).toBe('true');
+  });
+
+  it('should handle null refs gracefully in getAllFieldElements', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let getAllFieldElementsFn: (() => HTMLElement[]) | null = null;
+
+    const testPlugin = createPlugin('nullRefTestPlugin').useHook((params) => {
+      getAllFieldElementsFn = params.getAllFieldElements;
+      return {};
+    });
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          nullRefTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    const mockInput = document.createElement('input');
+    const stateKey = 'counter';
+    const { setShadowMetadata } = getGlobalStore.getState();
+
+    // Mix of valid and null refs
+    setShadowMetadata(stateKey, ['value'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-1',
+            {
+              domRef: { current: mockInput },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-2',
+            {
+              domRef: { current: null },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-3',
+            { domRef: null, elementType: 'input', mountedAt: Date.now() },
+          ],
+        ]),
+      },
+    });
+
+    let allElements: HTMLElement[] = [];
+    act(() => {
+      allElements = getAllFieldElementsFn!();
+    });
+
+    // Should only return the valid element
+    expect(allElements).toHaveLength(1);
+    expect(allElements).toContain(mockInput);
+  });
+
+  it('should handle null refs gracefully in setAllFieldsDisabled', () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let setAllFieldsDisabledFn: ((disabled: boolean) => void) | null = null;
+
+    const testPlugin = createPlugin('nullRefDisableTestPlugin').useHook(
+      (params) => {
+        setAllFieldsDisabledFn = params.setAllFieldsDisabled;
+        return {};
+      }
+    );
+
+    const { useCogsState } = createCogsState(initialState, {
+      plugins: [testPlugin],
+    });
+
+    renderHook(
+      () => {
+        return useCogsState('counter', {
+          nullRefDisableTestPlugin: {},
+        });
+      },
+      {
+        wrapper: ({ children }) => <PluginRunner>{children}</PluginRunner>,
+      }
+    );
+
+    act(() => {});
+
+    const mockInput = document.createElement('input');
+    mockInput.disabled = false;
+
+    const stateKey = 'counter';
+    const { setShadowMetadata } = getGlobalStore.getState();
+
+    // Mix of valid and null refs
+    setShadowMetadata(stateKey, ['value'], {
+      clientActivityState: {
+        elements: new Map([
+          [
+            'comp-1',
+            {
+              domRef: { current: mockInput },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+          [
+            'comp-2',
+            {
+              domRef: { current: null },
+              elementType: 'input',
+              mountedAt: Date.now(),
+            },
+          ],
+        ]),
+      },
+    });
+
+    // Should not throw when encountering null refs
+    expect(() => {
+      act(() => {
+        setAllFieldsDisabledFn!(true);
+      });
+    }).not.toThrow();
+
+    // Valid element should still be disabled
+    expect(mockInput.disabled).toBe(true);
+  });
+  it('should get all field elements after FormElementWrapper mounts', async () => {
+    const { createPlugin } = createPluginContext({
+      options: z.object({}),
+    });
+
+    let capturedGetAllFieldElements: (() => HTMLElement[]) | null = null;
+
+    const testPlugin = createPlugin('testPlugin').useHook((params) => {
+      capturedGetAllFieldElements = params.getAllFieldElements;
+      return {};
+    });
+
+    const { useCogsState } = createCogsState(
+      { test: { name: '' } },
+      { plugins: [testPlugin] }
+    );
+
+    function TestComponent() {
+      const state = useCogsState('test', { testPlugin: {} });
+      return (
+        <div>
+          {state.name.$formElement((f) => (
+            <input data-testid="name-input" {...f.$inputProps} />
+          ))}
+        </div>
+      );
+    }
+
+    render(
+      <PluginRunner>
+        <TestComponent />
+      </PluginRunner>
+    );
+
+    // Wait for ALL effects to complete - FormElementWrapper's useEffect needs to run
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+
+    // The function queries live state, so it should see the registered element now
+    const elements = capturedGetAllFieldElements!();
+    expect(elements).toHaveLength(1);
   });
 });

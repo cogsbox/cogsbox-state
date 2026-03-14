@@ -1,5 +1,5 @@
 import { z as S } from "zod";
-import { getGlobalStore as c, setAllFieldsDisabled as m, getAllFieldElements as M } from "./store.js";
+import { getGlobalStore as c, setAllFieldsDisabled as M, getAllFieldElements as m } from "./store.js";
 const F = () => S.object({
   __key: S.literal("keyed"),
   map: S.any()
@@ -32,27 +32,30 @@ function D(a, n) {
       const o = c.getState().getShadowMetadata(a, t);
       if (!o?.clientActivityState?.elements) return [];
       const e = [];
-      return o.clientActivityState.elements.forEach((r) => {
-        r.domRef?.current && e.push(r.domRef);
+      return o.clientActivityState.elements.forEach((l) => {
+        l.domRef?.current && e.push(l.domRef);
       }), e;
     },
     getFieldElements: (t) => {
       const o = c.getState().getShadowMetadata(a, t);
       if (!o?.clientActivityState?.elements) return [];
       const e = [];
-      return o.clientActivityState.elements.forEach((r) => {
-        r.domRef?.current && e.push(r.domRef.current);
+      return o.clientActivityState.elements.forEach((l) => {
+        l.domRef?.current && e.push(l.domRef.current);
       }), e;
     },
     setFieldDisabled: (t, o) => {
       const e = c.getState().getShadowMetadata(a, t);
-      e?.clientActivityState?.elements && e.clientActivityState.elements.forEach((r) => {
-        const i = r.domRef?.current;
+      e?.clientActivityState?.elements && e.clientActivityState.elements.forEach((l) => {
+        const i = l.domRef?.current;
         i && ("disabled" in i ? i.disabled = o : (i.style.pointerEvents = o ? "none" : "", i.setAttribute("aria-disabled", String(o))));
       });
     },
-    getAllFieldElements: () => M(a),
-    setAllFieldsDisabled: (t) => m(a, t)
+    getAllFieldElements: () => (console.log(
+      "getAllFieldElements(stateKey)",
+      m(a)
+    ), m(a)),
+    setAllFieldsDisabled: (t) => M(a, t)
   };
 }
 function h(a, n, t) {
@@ -69,50 +72,50 @@ function h(a, n, t) {
     getFieldRefs: () => {
       const e = c.getState().getShadowMetadata(a, t);
       if (!e?.clientActivityState?.elements) return [];
-      const r = [];
+      const l = [];
       return e.clientActivityState.elements.forEach((i) => {
-        i.domRef?.current && r.push(i.domRef);
-      }), r;
+        i.domRef?.current && l.push(i.domRef);
+      }), l;
     },
     getFieldElements: () => {
       const e = c.getState().getShadowMetadata(a, t);
       if (!e?.clientActivityState?.elements) return [];
-      const r = [];
+      const l = [];
       return e.clientActivityState.elements.forEach((i) => {
-        i.domRef?.current && r.push(i.domRef.current);
-      }), r;
+        i.domRef?.current && l.push(i.domRef.current);
+      }), l;
     },
     setFieldDisabled: (e) => {
-      const r = c.getState().getShadowMetadata(a, t);
-      r?.clientActivityState?.elements && r.clientActivityState.elements.forEach((i) => {
-        const l = i.domRef?.current;
-        l && ("disabled" in l ? l.disabled = e : (l.style.pointerEvents = e ? "none" : "", l.setAttribute("aria-disabled", String(e))));
+      const l = c.getState().getShadowMetadata(a, t);
+      l?.clientActivityState?.elements && l.clientActivityState.elements.forEach((i) => {
+        const r = i.domRef?.current;
+        r && ("disabled" in r ? r.disabled = e : (r.style.pointerEvents = e ? "none" : "", r.setAttribute("aria-disabled", String(e))));
       });
     }
   };
 }
 function E(a) {
   function n(t) {
-    const o = (i, l, s, d) => ({
+    const o = (i, r, s, d) => ({
       name: t,
       useHook: i,
-      transformState: l,
+      transformState: r,
       onUpdate: s,
       onFormUpdate: d
     });
-    function e(i, l, s, d) {
+    function e(i, r, s, d) {
       const f = o(
         i,
-        l,
+        r,
         s,
         d
-      ), g = {};
-      return l || (g.transformState = (u) => e(i, u, s, d)), s || (g.onUpdate = (u) => e(i, l, u, d)), d || (g.onFormUpdate = (u) => e(
+      ), u = {};
+      return r || (u.transformState = (g) => e(i, g, s, d)), s || (u.onUpdate = (g) => e(i, r, g, d)), d || (u.onFormUpdate = (g) => e(
         i,
-        l,
+        r,
         s,
-        u
-      )), Object.assign(f, g);
+        g
+      )), Object.assign(f, u);
     }
     return Object.assign(
       e(),
