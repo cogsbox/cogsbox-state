@@ -799,16 +799,36 @@ export const createCogsState = <
       OptionsType<(typeof statePart)[StateKey], never> & {
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
           ? P extends Record<string, any>
-            ? {
-                [K in keyof P]: NonNullable<P[K]> extends {
-                  __key: 'keyed';
-                  map: infer TMap;
+            ? Prettify<
+                {
+                  [K in keyof P as NonNullable<P[K]> extends {
+                    __key: 'keyed';
+                    map: any;
+                  }
+                    ? never
+                    : K]: P[K];
+                } & {
+                  [K in keyof P as NonNullable<P[K]> extends {
+                    __key: 'keyed';
+                    map: infer TMap;
+                  }
+                    ? StateKey extends keyof TMap
+                      ? TMap[StateKey] extends undefined
+                        ? never
+                        : keyof TMap[StateKey] extends never
+                          ? never
+                          : K
+                      : never
+                    : never]: NonNullable<P[K]> extends {
+                    __key: 'keyed';
+                    map: infer TMap;
+                  }
+                    ? StateKey extends keyof TMap
+                      ? TMap[StateKey]
+                      : never
+                    : never;
                 }
-                  ? StateKey extends keyof TMap
-                    ? Prettify<TMap[StateKey]>
-                    : never
-                  : P[K];
-              }
+              >
             : P
           : never;
       }
