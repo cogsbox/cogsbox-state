@@ -1,6 +1,6 @@
 {
   "name": "cogsbox-state",
-  "version": "1.0.1-canary.18",
+  "version": "0.5.476-canary.18",
   "description": "React state management library with form controls and server sync",
   "type": "module",
   "main": "./dist/index.js",
