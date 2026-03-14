@@ -798,15 +798,24 @@ export const createCogsState = <
     options?: Prettify<
       OptionsType<(typeof statePart)[StateKey], never> & {
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
-          ? P extends Record<string, any>
-            ? {
-                [K in keyof P]: P[K] extends { __key: 'keyed'; map: infer TMap }
-                  ? StateKey extends keyof TMap
-                    ? TMap[StateKey]
-                    : never
-                  : P[K];
-              }
-            : P
+          ? // NEW: Check if entire plugin options is keyed
+            P extends { __key: 'keyed'; map: infer TMap }
+            ? StateKey extends keyof TMap
+              ? TMap[StateKey]
+              : never
+            : // EXISTING: field-level keyed check
+              P extends Record<string, any>
+              ? {
+                  [K in keyof P]: P[K] extends {
+                    __key: 'keyed';
+                    map: infer TMap;
+                  }
+                    ? StateKey extends keyof TMap
+                      ? TMap[StateKey]
+                      : never
+                    : P[K];
+                }
+              : P
           : never;
       }
     >
