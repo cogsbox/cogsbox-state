@@ -802,7 +802,7 @@ export const createCogsState = <
             ? {
                 [K in keyof P]: P[K] extends { __key: 'keyed'; map: infer TMap }
                   ? StateKey extends keyof TMap
-                    ? TMap[StateKey]
+                    ? Prettify<TMap[StateKey]>
                     : never
                   : P[K];
               }

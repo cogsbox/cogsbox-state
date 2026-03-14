@@ -8,9 +8,7 @@ type Prettify<T> = {
 } & {};
 export type KeyedTypes<TMap extends Record<string, any>> = {
     __key: 'keyed';
-    map: {
-        [K in keyof TMap]: TMap[K];
-    };
+    map: TMap;
 };
 export declare const keyedSchema: <TMap extends Record<string, any>>() => z.ZodType<KeyedTypes<TMap>>;
 type InferZodObject<T extends Record<string, z.ZodTypeAny>> = {
