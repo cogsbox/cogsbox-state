@@ -800,7 +800,10 @@ export const createCogsState = <
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
           ? P extends Record<string, any>
             ? {
-                [K in keyof P]: P[K] extends { __key: 'keyed'; map: infer TMap }
+                [K in keyof P]: NonNullable<P[K]> extends {
+                  __key: 'keyed';
+                  map: infer TMap;
+                }
                   ? StateKey extends keyof TMap
                     ? Prettify<TMap[StateKey]>
                     : never
