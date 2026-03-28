@@ -810,7 +810,7 @@ export const createCogsState = <
                     map: any;
                   }
                     ? never
-                    : K]: P[K];
+                    : K]?: P[K];
                 } & {
                   // 2. Resolve keyed properties and squash the 4x intersection
                   [K in keyof P as NonNullable<P[K]> extends {

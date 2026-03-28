@@ -332,7 +332,7 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
     } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? { [K_3 in keyof P as NonNullable<P[K_3]> extends {
         __key: "keyed";
         map: any;
-    } ? never : K_3]: P[K_3]; } & { [K_4 in keyof P as NonNullable<P[K_4]> extends {
+    } ? never : K_3]?: P[K_3] | undefined; } & { [K_4 in keyof P as NonNullable<P[K_4]> extends {
         __key: "keyed";
         map: any;
     } ? StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_4]>["map"][StateKey] extends never ? never : K_4 : never : never]: (NonNullable<P[K_4]> extends {
