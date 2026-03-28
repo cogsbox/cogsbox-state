@@ -792,23 +792,48 @@ export const createCogsState = <
     [K in keyof T]: T[K];
   } & {};
   type StateKeys = keyof typeof statePart;
-  type ExtractPerKey<T> =
-    T extends CogsPlugin<string, any, any, any, any, infer PK> ? PK : {};
 
-  type PluginPerKey = {
-    [K in TPlugins[number] as K['name']]: ExtractPerKey<K>;
-  };
+  // Extract the keyed map ONCE per plugin, outside any mapped type
+  type ExtractKeyedMap<P, K extends keyof P> =
+    NonNullable<P[K]> extends { __key: 'keyed'; map: infer TMap }
+      ? TMap
+      : never;
+
+  // Resolve a single plugin's options for a specific StateKey
+  type ResolvePluginOptionsForKey<P, SK extends string> =
+    P extends Record<string, any>
+      ? Prettify<
+          // Non-keyed properties: pass through
+          {
+            [K in keyof P as NonNullable<P[K]> extends {
+              __key: 'keyed';
+              map: any;
+            }
+              ? never
+              : K]?: P[K];
+          } & // Keyed properties: resolve using the helper (single infer)
+          {
+            [K in keyof P as NonNullable<P[K]> extends {
+              __key: 'keyed';
+              map: any;
+            }
+              ? SK extends keyof ExtractKeyedMap<P, K>
+                ? keyof ExtractKeyedMap<P, K>[SK] extends never
+                  ? never
+                  : K
+                : never
+              : never]: ExtractKeyedMap<P, K>[SK & keyof ExtractKeyedMap<P, K>];
+          }
+        >
+      : P;
+
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
     options?: Prettify<
       OptionsType<(typeof statePart)[StateKey], never> & {
-        [PName in keyof PluginOptions]?: Prettify<
-          NonNullable<PluginOptions[PName]> &
-            (PName extends keyof PluginPerKey
-              ? StateKey extends keyof PluginPerKey[PName]
-                ? PluginPerKey[PName][StateKey]
-                : {}
-              : {})
+        [PName in keyof PluginOptions]?: ResolvePluginOptionsForKey<
+          PluginOptions[PName],
+          StateKey & string
         >;
       }
     >
