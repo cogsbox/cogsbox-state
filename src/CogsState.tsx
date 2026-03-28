@@ -722,10 +722,10 @@ export const createCogsState = <
   }
 ) => {
   type ExtractPluginOptions<T> = T extends {
-    useHook?: (params: { options: infer O }) => any;
+    useHook?: (params: { options: infer O }) => any; // infers O here
   }
     ? O
-    : T extends CogsPlugin<string, infer O, any, any, any>
+    : T extends CogsPlugin<string, infer O, any, any, any> // AND here
       ? O
       : never;
 
@@ -792,45 +792,24 @@ export const createCogsState = <
     [K in keyof T]: T[K];
   } & {};
   type StateKeys = keyof typeof statePart;
+  type ExtractPerKey<T> =
+    T extends CogsPlugin<string, any, any, any, any, infer PK> ? PK : {};
 
+  type PluginPerKey = {
+    [K in TPlugins[number] as K['name']]: ExtractPerKey<K>;
+  };
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
     options?: Prettify<
       OptionsType<(typeof statePart)[StateKey], never> & {
-        [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
-          ? P extends Record<string, any>
-            ? Prettify<
-                {
-                  [K in keyof P as NonNullable<P[K]> extends {
-                    __key: 'keyed';
-                    map: any;
-                  }
-                    ? never
-                    : K]?: P[K];
-                } & {
-                  [K in keyof P as NonNullable<P[K]> extends {
-                    __key: 'keyed';
-                    map: infer TMap;
-                  }
-                    ? StateKey extends keyof TMap
-                      ? TMap[StateKey] extends undefined
-                        ? never
-                        : keyof TMap[StateKey] extends never
-                          ? never
-                          : K
-                      : never
-                    : never]: NonNullable<P[K]> extends {
-                    __key: 'keyed';
-                    map: infer TMap;
-                  }
-                    ? StateKey extends keyof TMap
-                      ? TMap[StateKey]
-                      : never
-                    : never;
-                }
-              >
-            : P
-          : never;
+        [PName in keyof PluginOptions]?: Prettify<
+          NonNullable<PluginOptions[PName]> &
+            (PName extends keyof PluginPerKey
+              ? StateKey extends keyof PluginPerKey[PName]
+                ? PluginPerKey[PName][StateKey]
+                : {}
+              : {})
+        >;
       }
     >
   ) => {
