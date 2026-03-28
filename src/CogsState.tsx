@@ -793,48 +793,48 @@ export const createCogsState = <
   } & {};
   type StateKeys = keyof typeof statePart;
 
-  // Extract the keyed map ONCE per plugin, outside any mapped type
-  type ExtractKeyedMap<P, K extends keyof P> =
-    NonNullable<P[K]> extends { __key: 'keyed'; map: infer TMap }
-      ? TMap
-      : never;
-
-  // Resolve a single plugin's options for a specific StateKey
-  type ResolvePluginOptionsForKey<P, SK extends string> =
-    P extends Record<string, any>
-      ? Prettify<
-          // Non-keyed properties: pass through
-          {
-            [K in keyof P as NonNullable<P[K]> extends {
-              __key: 'keyed';
-              map: any;
-            }
-              ? never
-              : K]?: P[K];
-          } & // Keyed properties: resolve using the helper (single infer)
-          {
-            [K in keyof P as NonNullable<P[K]> extends {
-              __key: 'keyed';
-              map: any;
-            }
-              ? SK extends keyof ExtractKeyedMap<P, K>
-                ? keyof ExtractKeyedMap<P, K>[SK] extends never
-                  ? never
-                  : K
-                : never
-              : never]: ExtractKeyedMap<P, K>[SK & keyof ExtractKeyedMap<P, K>];
-          }
-        >
-      : P;
+  // This utility takes an intersection like A & A & A & A and squashes it into a single clean object
+  type CleanIntersection<T> = T extends object ? { [K in keyof T]: T[K] } : T;
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
     options?: Prettify<
       OptionsType<(typeof statePart)[StateKey], never> & {
-        [PName in keyof PluginOptions]?: ResolvePluginOptionsForKey<
-          PluginOptions[PName],
-          StateKey & string
-        >;
+        [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
+          ? P extends Record<string, any>
+            ? Prettify<
+                {
+                  // 1. Pass through standard properties (like stateRoom) untouched so they keep optionality
+                  [K in keyof P as NonNullable<P[K]> extends {
+                    __key: 'keyed';
+                    map: any;
+                  }
+                    ? never
+                    : K]: P[K];
+                } & {
+                  // 2. Resolve keyed properties and squash the 4x intersection
+                  [K in keyof P as NonNullable<P[K]> extends {
+                    __key: 'keyed';
+                    map: any;
+                  }
+                    ? StateKey extends keyof NonNullable<P[K]>['map']
+                      ? NonNullable<P[K]>['map'][StateKey] extends undefined
+                        ? never
+                        : keyof NonNullable<P[K]>['map'][StateKey] extends never
+                          ? never
+                          : K
+                      : never
+                    : never]: CleanIntersection<
+                    NonNullable<P[K]> extends { __key: 'keyed'; map: any }
+                      ? StateKey extends keyof NonNullable<P[K]>['map']
+                        ? NonNullable<P[K]>['map'][StateKey]
+                        : never
+                      : never
+                  >;
+                }
+              >
+            : P
+          : never;
       }
     >
   ) => {
