@@ -793,8 +793,15 @@ export const createCogsState = <
   } & {};
   type StateKeys = keyof typeof statePart;
 
-  // This utility takes an intersection like A & A & A & A and squashes it into a single clean object
+  // Flattens A & B & C into a single clean object
   type CleanIntersection<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+
+  // Helper to find which keys are "keyed" (like queryParams)
+  type KeyedKeys<P> = {
+    [K in keyof P]-?: NonNullable<P[K]> extends { __key: 'keyed'; map: any }
+      ? K
+      : never;
+  }[keyof P];
 
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
@@ -803,35 +810,24 @@ export const createCogsState = <
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
           ? P extends Record<string, any>
             ? Prettify<
-                {
-                  // 1. Pass through standard properties (like stateRoom) untouched so they keep optionality
-                  [K in keyof P as NonNullable<P[K]> extends {
-                    __key: 'keyed';
-                    map: any;
-                  }
-                    ? never
-                    : K]?: P[K];
-                } & {
-                  // 2. Resolve keyed properties and squash the 4x intersection
-                  [K in keyof P as NonNullable<P[K]> extends {
-                    __key: 'keyed';
-                    map: any;
-                  }
-                    ? StateKey extends keyof NonNullable<P[K]>['map']
+                // 1. NON-KEYED: Pick preserves optionality natively! (stateRoom?: string)
+                Pick<P, Exclude<keyof P, KeyedKeys<P>>> &
+                  // 2. KEYED: Resolve the map for this specific stateKey and clean it
+                  {
+                    [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
+                      P[K]
+                    >['map']
                       ? NonNullable<P[K]>['map'][StateKey] extends undefined
                         ? never
                         : keyof NonNullable<P[K]>['map'][StateKey] extends never
                           ? never
                           : K
-                      : never
-                    : never]: CleanIntersection<
-                    NonNullable<P[K]> extends { __key: 'keyed'; map: any }
-                      ? StateKey extends keyof NonNullable<P[K]>['map']
+                      : never]: CleanIntersection<
+                      StateKey extends keyof NonNullable<P[K]>['map']
                         ? NonNullable<P[K]>['map'][StateKey]
                         : never
-                      : never
-                  >;
-                }
+                    >;
+                  }
               >
             : P
           : never;
