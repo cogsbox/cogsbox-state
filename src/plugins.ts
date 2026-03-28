@@ -206,10 +206,9 @@ export type CogsPlugin<
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
-  TPerKeyOptions extends Record<string, Record<string, any>> = {},
 > = {
   name: TName;
-  _perKeyOptions?: TPerKeyOptions; // phantom
+
   useHook?: (
     params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
   ) => THookReturn;
@@ -405,18 +404,17 @@ export type PluginApiEntry<THookData = any, TFieldMetaData = any> = {
 
 // Type for the entire plugins API object passed to validation render prop
 export type PluginsApi = Record<string, PluginApiEntry>;
-type OutputOf<T extends z.ZodTypeAny> = Prettify<z.output<T>>;
+type ZodObjOutput<T extends z.ZodObject<any>> = {
+  [K in keyof T['shape']]: z.output<T['shape'][K]>;
+};
+type OutputOf<T extends z.ZodTypeAny> =
+  T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
+
 export function createPluginContext<
   O extends z.ZodTypeAny,
   PM extends z.ZodTypeAny | undefined = undefined,
   FM extends z.ZodTypeAny | undefined = undefined,
-  TPerKeyOptions extends Record<string, Record<string, any>> = {},
->(schemas: {
-  options: O;
-  pluginMetaData?: PM;
-  fieldMetaData?: FM;
-  perKeyOptions?: TPerKeyOptions;
-}) {
+>(schemas: { options: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
   // Crucial: compute from the generic params, not from an object-indexed optional type
   type Options = OutputOf<O>;
   type PluginMetaData = PM extends z.ZodTypeAny ? OutputOf<PM> : unknown;
