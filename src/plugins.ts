@@ -11,16 +11,9 @@ import { RefObject } from 'react';
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
-export type KeyedTypes<TMap extends Record<string, any>> = {
-  __key: 'keyed';
-  map: TMap;
-};
-
-export const keyedSchema = <TMap extends Record<string, any>>() =>
-  z.object({
-    __key: z.literal('keyed'),
-    map: z.any(),
-  }) as z.ZodType<KeyedTypes<TMap>>;
+export const perKeyOptions = <
+  T extends Record<string, Record<string, any>>,
+>(): T => ({}) as T;
 
 // Helpers: turn a zod object shape into its inferred value shape
 type InferZodObject<T extends Record<string, z.ZodTypeAny>> = {
@@ -206,9 +199,10 @@ export type CogsPlugin<
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
+  TPerKey extends Record<string, Record<string, any>> = {},
 > = {
   name: TName;
-
+  _perKey?: TPerKey;
   useHook?: (
     params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
   ) => THookReturn;
@@ -409,11 +403,16 @@ export function createPluginContext<
   O extends z.ZodTypeAny,
   PM extends z.ZodTypeAny | undefined = undefined,
   FM extends z.ZodTypeAny | undefined = undefined,
->(schemas: { options: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
-  // Crucial: compute from the generic params, not from an object-indexed optional type
-  type Options = OutputOf<O>;
-  type PluginMetaData = PM extends z.ZodTypeAny ? OutputOf<PM> : unknown;
-  type FieldMetaData = FM extends z.ZodTypeAny ? OutputOf<FM> : unknown;
+  TPerKey extends Record<string, Record<string, any>> = {},
+>(schemas: {
+  options: O;
+  pluginMetaData?: PM;
+  fieldMetaData?: FM;
+  perKeyOptions?: TPerKey; // Type-only, inferred from perKeyOptions<>()
+}) {
+  type Options = Prettify<z.output<O>>;
+  type PluginMetaData = PM extends z.ZodTypeAny ? z.output<PM> : unknown;
+  type FieldMetaData = FM extends z.ZodTypeAny ? z.output<FM> : unknown;
 
   function createPlugin<TName extends string>(name: TName) {
     type TransformFn<THookReturn> = (
@@ -443,8 +442,16 @@ export function createPluginContext<
       >
     ) => void;
 
+    // TPerKey threaded through here:
     type Plugin<THookReturn> = Prettify<
-      CogsPlugin<TName, Options, THookReturn, PluginMetaData, FieldMetaData>
+      CogsPlugin<
+        TName,
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData,
+        TPerKey
+      >
     >;
 
     const createPluginObject = <THookReturn = never>(
