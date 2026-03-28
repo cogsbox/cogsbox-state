@@ -1,11 +1,4 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  useRef,
-  useReducer,
-  useSyncExternalStore,
-} from 'react';
+import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
 import { ClientActivityEvent, pluginStore } from './pluginStore';
 import { isDeepEqual } from './utility';
 import {
@@ -109,6 +102,7 @@ const PluginInstance = React.memo(
 
       const handleUpdate = (update: UpdateTypeDetail) => {
         if (update.stateKey === stateKey) {
+          // Create a new, SCOPED context for this specific path
           const scopedMetadata = createScopedMetadataContext(
             stateKey,
             plugin.name,
@@ -137,8 +131,11 @@ const PluginInstance = React.memo(
     useEffect(() => {
       if (!plugin.onFormUpdate) return;
 
-      const handleFormUpdate = (event: ClientActivityEvent) => {
+      const handleFormUpdate = (
+        event: ClientActivityEvent // Use the proper type
+      ) => {
         if (event.stateKey === stateKey) {
+          // Create a new, SCOPED context for this specific path
           const scopedMetadata = createScopedMetadataContext(
             stateKey,
             plugin.name,
@@ -153,7 +150,7 @@ const PluginInstance = React.memo(
             options,
             hookData: hookDataRef.current,
             ...deconstructed,
-            ...scopedMetadata,
+            ...scopedMetadata, // <-- Use the new scoped context
           });
         }
       };
@@ -167,104 +164,57 @@ const PluginInstance = React.memo(
     return null;
   }
 );
-
-/**
- * Serializes the current plugin configuration into a stable snapshot string.
- * This is used by useSyncExternalStore to detect when the set of active
- * plugin instances changes.
- */
-function getPluginSnapshot(): string {
-  const { pluginOptions, stateHandlers, registeredPlugins } =
-    pluginStore.getState();
-
-  const entries: string[] = [];
-
-  pluginOptions.forEach((pluginMap, stateKey) => {
-    if (!stateHandlers.has(stateKey)) return;
-    pluginMap.forEach((options, pluginName) => {
-      if (registeredPlugins.some((p) => p.name === pluginName)) {
-        entries.push(`${stateKey}:${pluginName}`);
-      }
-    });
-  });
-
-  return entries.sort().join('|');
-}
-
-/**
- * Builds the list of plugin instance descriptors from the store.
- */
-function getPluginInstances(): Array<{
-  key: string;
-  stateKey: string;
-  plugin: CogsPlugin<any, any, any, any, any>;
-  options: any;
-  stateHandler: StateObject<any>;
-}> {
-  const { pluginOptions, stateHandlers, registeredPlugins } =
-    pluginStore.getState();
-
-  const instances: Array<{
-    key: string;
-    stateKey: string;
-    plugin: CogsPlugin<any, any, any, any, any>;
-    options: any;
-    stateHandler: StateObject<any>;
-  }> = [];
-
-  pluginOptions.forEach((pluginMap, stateKey) => {
-    const stateHandler = stateHandlers.get(stateKey);
-    if (!stateHandler) return;
-
-    pluginMap.forEach((options, pluginName) => {
-      const plugin = registeredPlugins.find((p) => p.name === pluginName);
-      if (!plugin) return;
-
-      instances.push({
-        key: `${stateKey}:${pluginName}`,
-        stateKey,
-        plugin,
-        options,
-        stateHandler,
-      });
-    });
-  });
-
-  return instances;
-}
-
 /**
  * The main orchestrator component. It reads from the central pluginStore
  * and renders a `PluginInstance` controller for each active plugin.
- *
- * Uses useSyncExternalStore for reliable, tear-free reads from the
- * zustand store, ensuring React always sees a consistent snapshot.
  */
 export function PluginRunner({ children }: { children: React.ReactNode }) {
-  // Use useSyncExternalStore for reliable subscription to the plugin store.
-  // The snapshot string changes whenever the set of active plugins changes,
-  // which triggers a re-render.
-  const snapshot = useSyncExternalStore(
-    pluginStore.subscribe,
-    getPluginSnapshot,
-    getPluginSnapshot // SSR fallback
-  );
+  // A simple way to force a re-render when the store changes.
+  const [, forceUpdate] = useReducer((c) => c + 1, 0);
 
-  // Derive the actual instances to render. This is memoized on the snapshot
-  // string so we only rebuild when the plugin set actually changes.
-  const instances = useMemo(() => getPluginInstances(), [snapshot]);
+  // Subscribe to the store. When plugins or their options are added/removed,
+  // this component will re-render to update the list of PluginInstances.
+  useEffect(() => {
+    const unsubscribe = pluginStore.subscribe(forceUpdate);
+
+    return unsubscribe;
+  }, []);
+
+  const { pluginOptions, stateHandlers, registeredPlugins } =
+    pluginStore.getState();
 
   return (
     <>
-      {instances.map((instance) => (
-        <PluginInstance
-          key={instance.key}
-          stateKey={instance.stateKey}
-          plugin={instance.plugin}
-          options={instance.options}
-          stateHandler={instance.stateHandler}
-        />
-      ))}
+      {/*
+        This declarative mapping is the core of the solution.
+        React will now manage adding and removing `PluginInstance` components
+        as the application state changes, ensuring hooks are handled safely.
+      */}
+      {Array.from(pluginOptions.entries()).map(([stateKey, pluginMap]) => {
+        const stateHandler = stateHandlers.get(stateKey);
+        if (!stateHandler) {
+          return null; // Don't render a runner if the state handler isn't ready.
+        }
+
+        return Array.from(pluginMap.entries()).map(([pluginName, options]) => {
+          const plugin = registeredPlugins.find((p) => p.name === pluginName);
+          if (!plugin) {
+            return null; // Don't render if the plugin is not in the registered list.
+          }
+
+          // Render a dedicated, memoized controller for this specific plugin configuration.
+          return (
+            <PluginInstance
+              key={`${stateKey}:${pluginName}`}
+              stateKey={stateKey}
+              plugin={plugin}
+              options={options}
+              stateHandler={stateHandler}
+            />
+          );
+        });
+      })}
+
       {children}
     </>
   );
