@@ -404,12 +404,7 @@ export type PluginApiEntry<THookData = any, TFieldMetaData = any> = {
 
 // Type for the entire plugins API object passed to validation render prop
 export type PluginsApi = Record<string, PluginApiEntry>;
-type ZodObjOutput<T extends z.ZodObject<any>> = {
-  [K in keyof T['shape']]: z.output<T['shape'][K]>;
-};
-type OutputOf<T extends z.ZodTypeAny> =
-  T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
-
+type OutputOf<T extends z.ZodTypeAny> = Prettify<z.output<T>>;
 export function createPluginContext<
   O extends z.ZodTypeAny,
   PM extends z.ZodTypeAny | undefined = undefined,

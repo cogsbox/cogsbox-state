@@ -806,7 +806,7 @@ export const createCogsState = <
                     map: any;
                   }
                     ? never
-                    : K]: P[K];
+                    : K]?: P[K];
                 } & {
                   [K in keyof P as NonNullable<P[K]> extends {
                     __key: 'keyed';
