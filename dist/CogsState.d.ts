@@ -329,10 +329,10 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
         useHook?: (params: {
             options: infer O;
         }) => any;
-    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? Pick<P, Exclude<keyof P, { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
+    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? Partial<Pick<P, Exclude<keyof P, { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
         __key: "keyed";
         map: any;
-    } ? K_3 : never; }[keyof P]>> & { [K_4 in { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
+    } ? K_3 : never; }[keyof P]>>> & { [K_4 in { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
         __key: "keyed";
         map: any;
     } ? K_3 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_4]>["map"][StateKey] extends never ? never : K_4 : never]: (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) extends infer T_2 ? T_2 extends (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) ? T_2 extends object ? { [K_5 in keyof T_2]: T_2[K_5]; } : T_2 : never : never; } extends infer T_1 ? { [K_2 in keyof T_1]: T_1[K_2]; } : never : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;

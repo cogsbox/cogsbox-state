@@ -793,7 +793,7 @@ export const createCogsState = <
   } & {};
   type StateKeys = keyof typeof statePart;
 
-  // Flattens A & B & C into a single clean object
+  // Flattens the 4x spam into a single clean object
   type CleanIntersection<T> = T extends object ? { [K in keyof T]: T[K] } : T;
 
   // Helper to find which keys are "keyed" (like queryParams)
@@ -810,9 +810,9 @@ export const createCogsState = <
         [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
           ? P extends Record<string, any>
             ? Prettify<
-                // 1. NON-KEYED: Pick preserves optionality natively! (stateRoom?: string)
-                Pick<P, Exclude<keyof P, KeyedKeys<P>>> &
-                  // 2. KEYED: Resolve the map for this specific stateKey and clean it
+                // 1. NON-KEYED: Partial physically forces stateRoom to be optional
+                Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> &
+                  // 2. KEYED: Resolves queryParams and squashes the 4x intersection
                   {
                     [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
                       P[K]
