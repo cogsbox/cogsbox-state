@@ -126,9 +126,9 @@ export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsP
 export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     (): T;
     (newValue: T | ((prev: T) => T)): void;
-} & (NonNullable<T> extends any[] ? ArrayEndType<T, TPlugins> : NonNullable<T> extends Record<string, unknown> | object ? {
+} & ([NonNullable<T>] extends [any[]] ? ArrayEndType<T, TPlugins> : [NonNullable<T>] extends [Record<string, unknown> | object] ? {
     [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
-} : EndType<T, TPlugins>) & // primitives just get EndType
+} : {}) & // Fallback to {} since we intersect EndType below anyway
 EndType<T, TPlugins> & {
     $toggle: NonNullable<T> extends boolean ? () => void : never;
     $validate: () => {

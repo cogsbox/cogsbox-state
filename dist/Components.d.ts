@@ -8,15 +8,7 @@ export type ValidationWrapperProps = {
     children: React.ReactNode;
 };
 export declare function ValidationWrapper({ formOpts, path, stateKey, children, }: ValidationWrapperProps): import("react/jsx-runtime").JSX.Element;
-export declare const MemoizedCogsItemWrapper: React.NamedExoticComponent<{
-    stateKey: string;
-    itemComponentId: string;
-    itemPath: string[];
-    localIndex: number;
-    arraySetter: any;
-    rebuildStateShape: any;
-    renderFn: any;
-}>;
+export declare const MemoizedCogsItemWrapper: React.MemoExoticComponent<typeof ListItemWrapper>;
 export declare function ListItemWrapper({ stateKey, itemComponentId, itemPath, localIndex, arraySetter, rebuildStateShape, renderFn, }: {
     stateKey: string;
     itemComponentId: string;

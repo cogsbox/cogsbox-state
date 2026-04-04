@@ -194,7 +194,7 @@ export declare function buildShadowNode(stateKey: string, value: any, context?: 
 export declare function updateShadowTypeInfo(stateKey: string, rootSchema: any, source: 'zod4' | 'zod3'): void;
 export declare const shadowStateStore: Map<string, ShadowNode>;
 export declare function generateId(stateKey: string): string;
-export declare const getGlobalStore: any;
+export declare const getGlobalStore: import('zustand').UseBoundStore<import('zustand').StoreApi<CogsGlobalState>>;
 export declare function getAllFieldElements(stateKey: string): HTMLElement[];
 export declare function setAllFieldsDisabled(stateKey: string, disabled: boolean): void;
 export {};

@@ -304,15 +304,14 @@ export type StateObject<
 > = {
   (): T;
   (newValue: T | ((prev: T) => T)): void;
-} & (NonNullable<T> extends any[]
+} & ([NonNullable<T>] extends [any[]] // <-- Wrap in brackets
   ? ArrayEndType<T, TPlugins>
-  : NonNullable<T> extends Record<string, unknown> | object
+  : [NonNullable<T>] extends [Record<string, unknown> | object] // <-- Wrap in brackets
     ? {
         [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
       }
-    : EndType<T, TPlugins>) & // primitives just get EndType
+    : {}) & // Fallback to {} since we intersect EndType below anyway
   EndType<T, TPlugins> & {
-    // NO third param = no $cutThis
     $toggle: NonNullable<T> extends boolean ? () => void : never;
     $validate: () => { success: boolean; data?: T; error?: any };
     $_componentId: string | null;
@@ -1235,7 +1234,7 @@ function getComponentNotifications(
       const pathMeta = getShadowMetadata(stateKey, currentPath);
 
       if (pathMeta?.pathComponents) {
-        pathMeta.pathComponents.forEach((componentId: string) => {
+        pathMeta.pathComponents.forEach((componentId) => {
           const component = rootMeta.components?.get(componentId);
           if (component) {
             componentsToNotify.add(component);
