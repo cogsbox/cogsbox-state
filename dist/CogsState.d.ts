@@ -23,7 +23,7 @@ export type StateKeys = string;
 type CutFunctionType<T> = (index?: number, options?: {
     waitForSync?: boolean;
 }) => StateObject<T>;
-export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
+export type InferArrayElement<T> = NonNullable<T> extends (infer U)[] ? U : never;
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 export type UpdateArg<S> = S | ((prevState: S) => S);
 export type InsertParams<S> = S | ((prevState: {
@@ -126,11 +126,11 @@ export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsP
 export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []> = {
     (): T;
     (newValue: T | ((prev: T) => T)): void;
-} & (T extends any[] ? ArrayEndType<T, TPlugins> : T extends Record<string, unknown> | object ? {
-    [K in keyof T]-?: StateObject<T[K], TPlugins>;
+} & (NonNullable<T> extends any[] ? ArrayEndType<T, TPlugins> : NonNullable<T> extends Record<string, unknown> | object ? {
+    [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
 } : EndType<T, TPlugins>) & // primitives just get EndType
 EndType<T, TPlugins> & {
-    $toggle: T extends boolean ? () => void : never;
+    $toggle: NonNullable<T> extends boolean ? () => void : never;
     $validate: () => {
         success: boolean;
         data?: T;
@@ -140,7 +140,7 @@ EndType<T, TPlugins> & {
     $getComponents: () => ComponentsType;
     $_initialState: T;
     $updateInitialState: (newState: T | null) => {
-        fetchId: (field: keyof T) => string | number;
+        fetchId: (field: keyof NonNullable<T>) => string | number;
     };
     $initializeAndMergeShadowState: (newState: any | null) => void;
     $_isLoading: boolean;

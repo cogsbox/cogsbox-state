@@ -79,7 +79,8 @@ type CutFunctionType<T> = (
   options?: { waitForSync?: boolean }
 ) => StateObject<T>;
 
-export type InferArrayElement<T> = T extends (infer U)[] ? U : never;
+export type InferArrayElement<T> =
+  NonNullable<T> extends (infer U)[] ? U : never;
 
 export type FormControl<T> = (obj: FormElementParams<T>) => JSX.Element;
 
@@ -303,20 +304,22 @@ export type StateObject<
 > = {
   (): T;
   (newValue: T | ((prev: T) => T)): void;
-} & (T extends any[]
+} & (NonNullable<T> extends any[]
   ? ArrayEndType<T, TPlugins>
-  : T extends Record<string, unknown> | object
-    ? { [K in keyof T]-?: StateObject<T[K], TPlugins> }
+  : NonNullable<T> extends Record<string, unknown> | object
+    ? {
+        [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
+      }
     : EndType<T, TPlugins>) & // primitives just get EndType
   EndType<T, TPlugins> & {
     // NO third param = no $cutThis
-    $toggle: T extends boolean ? () => void : never;
+    $toggle: NonNullable<T> extends boolean ? () => void : never;
     $validate: () => { success: boolean; data?: T; error?: any };
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
     $_initialState: T;
     $updateInitialState: (newState: T | null) => {
-      fetchId: (field: keyof T) => string | number;
+      fetchId: (field: keyof NonNullable<T>) => string | number;
     };
     $initializeAndMergeShadowState: (newState: any | null) => void;
     $_isLoading: boolean;
@@ -333,7 +336,6 @@ export type StateObject<
     ) => void;
     $getLocalStorage: (key: string) => LocalStorageData<T> | null;
   };
-
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 
 type EffectiveSetStateArg<
