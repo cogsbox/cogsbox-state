@@ -4,7 +4,7 @@
     "rootDir": "src",
     "target": "ES2020",
     "module": "ESNext",
-    "moduleResolution": "node",
+
     "jsx": "react-jsx",
     "allowJs": true,
     "esModuleInterop": true,
