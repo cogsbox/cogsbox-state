@@ -1,6 +1,10 @@
 'use client';
 import { pluginStore } from './pluginStore';
-import { FormWrapperParams, type CogsPlugin } from './plugins';
+import {
+  FormWrapperParams,
+  type ChainMethodCallables,
+  type CogsPlugin,
+} from './plugins';
 import {
   createElement,
   startTransition,
@@ -334,8 +338,22 @@ export type StateObject<
       }) => void
     ) => void;
     $getLocalStorage: (key: string) => LocalStorageData<T> | null;
-  };
+  } & PluginChainMethodCallables<TPlugins>;
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
+
+type UnionToIntersection<T> = (
+  T extends any ? (arg: T) => void : never
+) extends (arg: infer I) => void
+  ? I
+  : never;
+
+type PluginChainMethodCallables<
+  TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
+> = UnionToIntersection<
+  TPlugins[number] extends CogsPlugin<any, any, any, any, any, infer TMethods>
+    ? ChainMethodCallables<TMethods>
+    : {}
+>;
 
 type EffectiveSetStateArg<
   T,
@@ -1983,6 +2001,61 @@ function getScopedData(stateKey: string, path: string[], meta?: MetaData) {
   };
 }
 
+function pathMatchesPattern(path: string[], pattern?: string[]) {
+  if (!pattern) return true;
+  if (path.length !== pattern.length) return false;
+
+  return pattern.every((segment, index) => {
+    return segment === '*' || segment === path[index];
+  });
+}
+
+function valueMatchesChainTarget(value: any, target: string) {
+  if (target === 'any') return true;
+  if (target === 'array') return Array.isArray(value);
+  if (target === 'boolean') return typeof value === 'boolean';
+  if (target === 'object') {
+    return value !== null && typeof value === 'object' && !Array.isArray(value);
+  }
+  if (target === 'primitive') {
+    return (
+      value === null || (typeof value !== 'object' && !Array.isArray(value))
+    );
+  }
+  return false;
+}
+
+function getFieldRefsForPath(stateKey: string, path: string[]) {
+  const meta = getGlobalStore.getState().getShadowMetadata(stateKey, path);
+  if (!meta?.clientActivityState?.elements) return [];
+  const refs: RefObject<any>[] = [];
+  meta.clientActivityState.elements.forEach((entry: any) => {
+    if (entry.domRef?.current) refs.push(entry.domRef);
+  });
+  return refs;
+}
+
+function getFieldElementsForPath(stateKey: string, path: string[]) {
+  const refs = getFieldRefsForPath(stateKey, path);
+  return refs.map((ref) => ref.current).filter(Boolean);
+}
+
+function setFieldDisabledForPath(
+  stateKey: string,
+  path: string[],
+  disabled: boolean
+) {
+  getFieldElementsForPath(stateKey, path).forEach((el: any) => {
+    if ('disabled' in el) {
+      el.disabled = disabled;
+      return;
+    }
+
+    el.style.pointerEvents = disabled ? 'none' : '';
+    el.setAttribute('aria-disabled', String(disabled));
+  });
+}
+
 function createProxyHandler<
   T,
   const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
@@ -2079,6 +2152,91 @@ function createProxyHandler<
         }
 
         if (typeof prop === 'string' && !prop.startsWith('$')) {
+          const { value } = getScopedData(stateKey, path, meta);
+          const hasStateChild =
+            value !== null &&
+            typeof value === 'object' &&
+            !Array.isArray(value) &&
+            Object.prototype.hasOwnProperty.call(value, prop);
+
+          if (hasStateChild) {
+            const nextPath = [...path, prop];
+            return rebuildStateShape({
+              path: nextPath,
+              componentId: componentId!,
+              meta,
+            });
+          }
+
+          const registeredPlugins = pluginStore.getState().registeredPlugins;
+          for (const plugin of registeredPlugins) {
+            const chainMethod = (plugin.chainMethods as any)?.[prop];
+            if (!chainMethod) continue;
+            if (!pathMatchesPattern(path, chainMethod.pathPattern)) continue;
+            if (!valueMatchesChainTarget(value, chainMethod.target)) continue;
+
+            return (...args: any[]) => {
+              const store = pluginStore.getState();
+              const options = store.pluginOptions
+                .get(stateKey)
+                ?.get(plugin.name);
+              const hookData = store.getHookResult(stateKey, plugin.name);
+
+              return chainMethod.handler(
+                {
+                  stateKey,
+                  path,
+                  pluginName: plugin.name,
+                  options,
+                  hookData,
+                  $get: () => getScopedData(stateKey, path, meta).value,
+                  $update: (payload: any) => {
+                    effectiveSetState(payload, path, {
+                      updateType: 'update',
+                    });
+
+                    return {
+                      synced: () => {
+                        const shadowMeta = getGlobalStore
+                          .getState()
+                          .getShadowMetadata(stateKey, path);
+
+                        setShadowMetadata(stateKey, path, {
+                          ...shadowMeta,
+                          isDirty: false,
+                          stateSource: 'server',
+                          lastServerSync: Date.now(),
+                        });
+                      },
+                    };
+                  },
+                  $applyOperation: (
+                    operation: UpdateTypeDetail,
+                    metaData?: Record<string, any>
+                  ) => {
+                    effectiveSetState(operation.newValue, operation.path, {
+                      updateType: operation.updateType,
+                      itemId: operation.itemId,
+                      metaData,
+                    });
+                  },
+                  getFieldMetaData: () =>
+                    getPluginMetaDataMap(stateKey, path)?.get(plugin.name),
+                  setFieldMetaData: (data: Record<string, any>) =>
+                    setPluginMetaData(stateKey, path, plugin.name, data),
+                  removeFieldMetaData: () =>
+                    removePluginMetaData(stateKey, path, plugin.name),
+                  getFieldRefs: () => getFieldRefsForPath(stateKey, path),
+                  getFieldElements: () =>
+                    getFieldElementsForPath(stateKey, path),
+                  setFieldDisabled: (disabled: boolean) =>
+                    setFieldDisabledForPath(stateKey, path, disabled),
+                },
+                ...args
+              );
+            };
+          }
+
           const nextPath = [...path, prop];
           return rebuildStateShape({
             path: nextPath,

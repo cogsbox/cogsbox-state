@@ -11,6 +11,58 @@ import { RefObject } from 'react';
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
+export type ChainMethodTarget =
+  | 'any'
+  | 'array'
+  | 'object'
+  | 'primitive'
+  | 'boolean';
+
+export type ChainMethodContext<TOptions = any, THookReturn = any> = {
+  stateKey: string;
+  path: string[];
+  pluginName: string;
+  options: TOptions | undefined;
+  hookData?: THookReturn;
+  $get: () => any;
+  $update: (payload: any) => { synced: () => void };
+  $applyOperation: (operation: any, metaData?: Record<string, any>) => void;
+  getFieldMetaData: () => any;
+  setFieldMetaData: (data: Record<string, any>) => void;
+  removeFieldMetaData: () => void;
+  getFieldRefs: () => RefObject<any>[];
+  getFieldElements: () => HTMLElement[];
+  setFieldDisabled: (disabled: boolean) => void;
+};
+
+export type ChainMethodHandler = (
+  ctx: ChainMethodContext<any, any>,
+  ...args: any[]
+) => any;
+
+export type ChainMethodDefinition<
+  THandler extends ChainMethodHandler = ChainMethodHandler,
+> = {
+  target: ChainMethodTarget;
+  pathPattern?: string[];
+  handler: THandler;
+};
+
+export type ChainMethodDefinitions = Record<string, ChainMethodDefinition<any>>;
+
+type ChainMethodCallable<THandler> = THandler extends (
+  ctx: any,
+  ...args: infer TArgs
+) => infer TReturn
+  ? (...args: TArgs) => TReturn
+  : never;
+
+export type ChainMethodCallables<TMethods> = {
+  [K in keyof TMethods]: TMethods[K] extends ChainMethodDefinition<infer TFn>
+    ? ChainMethodCallable<TFn>
+    : never;
+};
+
 export type KeyedTypes<TMap extends Record<string, any>> = {
   __key: 'keyed';
   map: TMap;
@@ -206,6 +258,7 @@ export type CogsPlugin<
   THookReturn,
   TPluginMetaData,
   TFieldMetaData,
+  TChainMethods extends ChainMethodDefinitions = {},
 > = {
   name: TName;
 
@@ -252,6 +305,8 @@ export type CogsPlugin<
       any
     >
   ) => React.ReactNode;
+
+  chainMethods?: TChainMethods;
 };
 
 // Metadata helpers
@@ -410,6 +465,81 @@ type ZodObjOutput<T extends z.ZodObject<any>> = {
 type OutputOf<T extends z.ZodTypeAny> =
   T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
 
+type MethodFactory = <THandler extends ChainMethodHandler>(
+  handler: THandler
+) => ChainMethodDefinition<THandler>;
+
+type PathMethodFactory = MethodFactory & {
+  array: MethodFactory;
+  object: MethodFactory;
+  primitive: MethodFactory;
+  boolean: MethodFactory;
+  field: MethodFactory;
+};
+
+type MethodsBuilderParams = {
+  path: (selector: (state: any) => any) => PathMethodFactory;
+  array: MethodFactory;
+  object: MethodFactory;
+  primitive: MethodFactory;
+  boolean: MethodFactory;
+  field: MethodFactory;
+};
+
+const createMethodDefinition =
+  (target: ChainMethodTarget, pathPattern?: string[]): MethodFactory =>
+  (handler) => ({
+    target,
+    pathPattern,
+    handler,
+  });
+
+const createPathRecorder = () => {
+  const path: string[] = [];
+
+  const recorder = new Proxy(
+    {},
+    {
+      get(_target, prop) {
+        if (typeof prop !== 'string') return recorder;
+        if (prop === 'then') return undefined;
+        path.push(prop === '$' ? '*' : prop);
+        return recorder;
+      },
+    }
+  );
+
+  return { recorder, path };
+};
+
+const createMethodsBuilderParams = (): MethodsBuilderParams => {
+  const path = (selector: (state: any) => any): PathMethodFactory => {
+    const { recorder, path: pathPattern } = createPathRecorder();
+    selector(recorder);
+
+    const base = createMethodDefinition(
+      'any',
+      pathPattern
+    ) as PathMethodFactory;
+    base.array = createMethodDefinition('array', pathPattern);
+    base.object = createMethodDefinition('object', pathPattern);
+    base.primitive = createMethodDefinition('primitive', pathPattern);
+    base.boolean = createMethodDefinition('boolean', pathPattern);
+    base.field = createMethodDefinition('any', pathPattern);
+
+    return base;
+  };
+
+  return {
+    path,
+    array: createMethodDefinition('array'),
+    object: createMethodDefinition('object'),
+    primitive: createMethodDefinition('primitive'),
+    boolean: createMethodDefinition('boolean'),
+    field: createMethodDefinition('any'),
+  };
+};
+
 export function createPluginContext<
   O extends z.ZodTypeAny,
   PM extends z.ZodTypeAny | undefined = undefined,
@@ -448,34 +578,51 @@ export function createPluginContext<
       >
     ) => void;
 
-    type Plugin<THookReturn> = Prettify<
-      CogsPlugin<TName, Options, THookReturn, PluginMetaData, FieldMetaData>
+    type Plugin<
+      THookReturn,
+      TChainMethods extends ChainMethodDefinitions = {},
+    > = Prettify<
+      CogsPlugin<
+        TName,
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData,
+        TChainMethods
+      >
     >;
 
-    const createPluginObject = <THookReturn = never>(
+    const createPluginObject = <
+      THookReturn = never,
+      TChainMethods extends ChainMethodDefinitions = {},
+    >(
       hookFn?: (
         params: UseHookParams<Options, PluginMetaData, FieldMetaData>
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>
-    ): Plugin<THookReturn> => {
+      formUpdateHandler?: FormUpdateFn<THookReturn>,
+      chainMethods?: TChainMethods
+    ): Plugin<THookReturn, TChainMethods> => {
       return {
         name,
         useHook: hookFn as any,
         transformState: transformFn as any,
         onUpdate: updateHandler as any,
         onFormUpdate: formUpdateHandler as any,
+        chainMethods,
       };
     };
 
     type BuildRet<
       THookReturn,
+      TChainMethods extends ChainMethodDefinitions,
       HasTransform extends boolean,
       HasUpdate extends boolean,
       HasFormUpdate extends boolean,
+      HasMethods extends boolean,
       HasWrapper extends boolean,
-    > = Plugin<THookReturn> &
+    > = Plugin<THookReturn, TChainMethods> &
       (HasTransform extends true
         ? {}
         : {
@@ -483,9 +630,11 @@ export function createPluginContext<
               fn: TransformFn<THookReturn>
             ): BuildRet<
               THookReturn,
+              TChainMethods,
               true,
               HasUpdate,
               HasFormUpdate,
+              HasMethods,
               HasWrapper
             >;
           }) &
@@ -496,9 +645,11 @@ export function createPluginContext<
               fn: UpdateFn<THookReturn>
             ): BuildRet<
               THookReturn,
+              TChainMethods,
               HasTransform,
               true,
               HasFormUpdate,
+              HasMethods,
               HasWrapper
             >;
           }) &
@@ -507,14 +658,39 @@ export function createPluginContext<
         : {
             onFormUpdate(
               fn: FormUpdateFn<THookReturn>
-            ): BuildRet<THookReturn, HasTransform, HasUpdate, true, HasWrapper>;
+            ): BuildRet<
+              THookReturn,
+              TChainMethods,
+              HasTransform,
+              HasUpdate,
+              true,
+              HasMethods,
+              HasWrapper
+            >;
+          }) &
+      (HasMethods extends true
+        ? {}
+        : {
+            methods<TNextMethods extends ChainMethodDefinitions>(
+              fn: (helpers: MethodsBuilderParams) => TNextMethods
+            ): BuildRet<
+              THookReturn,
+              TNextMethods,
+              HasTransform,
+              HasUpdate,
+              HasFormUpdate,
+              true,
+              HasWrapper
+            >;
           });
 
     function createBuilder<
       THookReturn = never,
+      TChainMethods extends ChainMethodDefinitions = {},
       HasTransform extends boolean = false,
       HasUpdate extends boolean = false,
       HasFormUpdate extends boolean = false,
+      HasMethods extends boolean = false,
       HasWrapper extends boolean = false,
     >(
       hookFn?: (
@@ -522,27 +698,33 @@ export function createPluginContext<
       ) => THookReturn,
       transformFn?: TransformFn<THookReturn>,
       updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>
+      formUpdateHandler?: FormUpdateFn<THookReturn>,
+      chainMethods?: TChainMethods
     ): BuildRet<
       THookReturn,
+      TChainMethods,
       HasTransform,
       HasUpdate,
       HasFormUpdate,
+      HasMethods,
       HasWrapper
     > {
-      const plugin = createPluginObject<THookReturn>(
+      const plugin = createPluginObject<THookReturn, TChainMethods>(
         hookFn,
         transformFn,
         updateHandler,
-        formUpdateHandler
+        formUpdateHandler,
+        chainMethods
       );
 
       const methods = {} as Partial<
         BuildRet<
           THookReturn,
+          TChainMethods,
           HasTransform,
           HasUpdate,
           HasFormUpdate,
+          HasMethods,
           HasWrapper
         >
       >;
@@ -551,58 +733,97 @@ export function createPluginContext<
         (methods as any).transformState = (fn: TransformFn<THookReturn>) =>
           createBuilder<
             THookReturn,
+            TChainMethods,
             true,
             HasUpdate,
             HasFormUpdate,
+            HasMethods,
             HasWrapper
-          >(hookFn, fn, updateHandler, formUpdateHandler);
+          >(hookFn, fn, updateHandler, formUpdateHandler, chainMethods);
       }
       if (!updateHandler) {
         (methods as any).onUpdate = (fn: UpdateFn<THookReturn>) =>
           createBuilder<
             THookReturn,
+            TChainMethods,
             HasTransform,
             true,
             HasFormUpdate,
+            HasMethods,
             HasWrapper
-          >(hookFn, transformFn, fn, formUpdateHandler);
+          >(hookFn, transformFn, fn, formUpdateHandler, chainMethods);
       }
       if (!formUpdateHandler) {
         (methods as any).onFormUpdate = (fn: FormUpdateFn<THookReturn>) =>
-          createBuilder<THookReturn, HasTransform, HasUpdate, true, HasWrapper>(
+          createBuilder<
+            THookReturn,
+            TChainMethods,
+            HasTransform,
+            HasUpdate,
+            true,
+            HasMethods,
+            HasWrapper
+          >(hookFn, transformFn, updateHandler, fn, chainMethods);
+      }
+      if (!chainMethods) {
+        (methods as any).methods = <
+          TNextMethods extends ChainMethodDefinitions,
+        >(
+          fn: (helpers: MethodsBuilderParams) => TNextMethods
+        ) =>
+          createBuilder<
+            THookReturn,
+            TNextMethods,
+            HasTransform,
+            HasUpdate,
+            HasFormUpdate,
+            true,
+            HasWrapper
+          >(
             hookFn,
             transformFn,
             updateHandler,
-            fn
+            formUpdateHandler,
+            fn(createMethodsBuilderParams())
           );
       }
 
       return Object.assign(plugin, methods) as BuildRet<
         THookReturn,
+        TChainMethods,
         HasTransform,
         HasUpdate,
         HasFormUpdate,
+        HasMethods,
         HasWrapper
       >;
     }
 
     const start = Object.assign(
-      createBuilder<never, false, false, false, false>(),
+      createBuilder<never, {}, false, false, false, false, false>(),
       {
         useHook<THookReturn>(
           hookFn: (
             params: UseHookParams<Options, PluginMetaData, FieldMetaData>
           ) => THookReturn
         ) {
-          return createBuilder<THookReturn, false, false, false, false>(hookFn);
+          return createBuilder<
+            THookReturn,
+            {},
+            false,
+            false,
+            false,
+            false,
+            false
+          >(hookFn);
         },
       }
-    ) as BuildRet<never, false, false, false, false> & {
+    ) as BuildRet<never, {}, false, false, false, false, false> & {
       useHook<THookReturn>(
         hookFn: (
           params: UseHookParams<Options, PluginMetaData, FieldMetaData>
         ) => THookReturn
-      ): BuildRet<THookReturn, false, false, false, false>;
+      ): BuildRet<THookReturn, {}, false, false, false, false, false>;
     };
 
     return start;

@@ -289,6 +289,98 @@ todos.$clearSelected();
 const isSelected = todos.$index(0).isSelected;
 ```
 
+## Plugin Chain Methods
+
+Plugins can add custom methods to the state builder chain with `.methods(...)`.
+This is useful for reusable behaviours such as uploads, persistence, analytics,
+or domain-specific state actions.
+
+```typescript
+import { createCogsState, createPluginContext } from 'cogsbox-state';
+import { z } from 'zod';
+
+const { createPlugin } = createPluginContext({
+  options: z.object({
+    bucketPrefix: z.string().optional(),
+  }),
+});
+
+const s3Plugin = createPlugin('s3').methods(({ path, array }) => ({
+  sendToS3: path((state) => state.users.$.profile.image)(
+    async (ctx, bucket: string) => {
+      return upload(ctx.$get(), bucket);
+    }
+  ),
+
+  sendManyToS3: array(async (ctx, bucket: string) => {
+    return uploadMany(ctx.$get(), bucket);
+  }),
+
+  sendGalleryToS3: path((state) => state.galleries.$.images).array(
+    async (ctx, bucket: string) => {
+      return uploadMany(ctx.$get(), bucket, ctx.options?.bucketPrefix);
+    }
+  ),
+}));
+
+const { useCogsState } = createCogsState(initialState, {
+  plugins: [s3Plugin],
+});
+```
+
+Use the plugin by passing its options to `useCogsState`:
+
+```typescript
+const assets = useCogsState('assets', {
+  s3: { bucketPrefix: 'uploads' },
+});
+
+await assets.users.$index(0).profile.image.sendToS3('avatars');
+await assets.galleries.$index(0).images.sendGalleryToS3('gallery');
+await assets.looseImages.sendManyToS3('images');
+```
+
+### Method Targets
+
+Method helpers decide where a method can run:
+
+- `field(fn)` - any state node
+- `array(fn)` - arrays only
+- `object(fn)` - plain objects only
+- `primitive(fn)` - strings, numbers, booleans, `null`, etc.
+- `boolean(fn)` - booleans only
+- `path(selector)(fn)` - only a matching path
+- `path(selector).array(fn)` - matching path and array value
+
+The `path` helper receives a path-recorder proxy. The `$` segment means "one
+path segment", which naturally matches array item ids internally:
+
+```typescript
+path((state) => state.users.$.profile.image);
+```
+
+matches calls like:
+
+```typescript
+assets.users.$index(0).profile.image.sendToS3('avatars');
+```
+
+The first handler argument is a scoped plugin context. The remaining handler
+arguments become the chain method arguments, and the return type is preserved:
+
+```typescript
+const imagePlugin = createPlugin('images').methods(({ field }) => ({
+  resize: field((ctx, width: number, height: number) => {
+    return resizeImage(ctx.$get(), width, height);
+  }),
+}));
+
+// typed as resize(width: number, height: number): ReturnType<typeof resizeImage>
+state.avatar.resize(200, 200);
+```
+
+If a real state field has the same name as a plugin method, the state field wins.
+
 <!-- ### Virtualization for Large Lists
 
 For performance with large datasets:

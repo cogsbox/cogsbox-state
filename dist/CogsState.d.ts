@@ -1,4 +1,4 @@
-import { CogsPlugin } from './plugins';
+import { ChainMethodCallables, CogsPlugin } from './plugins';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
 import { ZodType } from 'zod/v4';
@@ -153,8 +153,10 @@ EndType<T, TPlugins> & {
         update: UpdateTypeDetail;
     }) => void) => void;
     $getLocalStorage: (key: string) => LocalStorageData<T> | null;
-};
+} & PluginChainMethodCallables<TPlugins>;
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
+type UnionToIntersection<T> = (T extends any ? (arg: T) => void : never) extends (arg: infer I) => void ? I : never;
+type PluginChainMethodCallables<TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]> = UnionToIntersection<TPlugins[number] extends CogsPlugin<any, any, any, any, any, infer TMethods> ? ChainMethodCallables<TMethods> : {}>;
 export type UpdateTypeDetail = {
     timeStamp: number;
     stateKey: string;

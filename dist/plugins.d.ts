@@ -6,6 +6,36 @@ import { ClientActivityEvent } from './pluginStore';
 type Prettify<T> = {
     [K in keyof T]: T[K];
 } & {};
+export type ChainMethodTarget = 'any' | 'array' | 'object' | 'primitive' | 'boolean';
+export type ChainMethodContext<TOptions = any, THookReturn = any> = {
+    stateKey: string;
+    path: string[];
+    pluginName: string;
+    options: TOptions | undefined;
+    hookData?: THookReturn;
+    $get: () => any;
+    $update: (payload: any) => {
+        synced: () => void;
+    };
+    $applyOperation: (operation: any, metaData?: Record<string, any>) => void;
+    getFieldMetaData: () => any;
+    setFieldMetaData: (data: Record<string, any>) => void;
+    removeFieldMetaData: () => void;
+    getFieldRefs: () => RefObject<any>[];
+    getFieldElements: () => HTMLElement[];
+    setFieldDisabled: (disabled: boolean) => void;
+};
+export type ChainMethodHandler = (ctx: ChainMethodContext<any, any>, ...args: any[]) => any;
+export type ChainMethodDefinition<THandler extends ChainMethodHandler = ChainMethodHandler> = {
+    target: ChainMethodTarget;
+    pathPattern?: string[];
+    handler: THandler;
+};
+export type ChainMethodDefinitions = Record<string, ChainMethodDefinition<any>>;
+type ChainMethodCallable<THandler> = THandler extends (ctx: any, ...args: infer TArgs) => infer TReturn ? (...args: TArgs) => TReturn : never;
+export type ChainMethodCallables<TMethods> = {
+    [K in keyof TMethods]: TMethods[K] extends ChainMethodDefinition<infer TFn> ? ChainMethodCallable<TFn> : never;
+};
 export type KeyedTypes<TMap extends Record<string, any>> = {
     __key: 'keyed';
     map: TMap;
@@ -122,13 +152,14 @@ export type FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMeta
     removePluginMetaData: () => void;
     pluginName: string;
 };
-export type CogsPlugin<TName extends string, TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = {
+export type CogsPlugin<TName extends string, TOptions, THookReturn, TPluginMetaData, TFieldMetaData, TChainMethods extends ChainMethodDefinitions = {}> = {
     name: TName;
     useHook?: (params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>) => THookReturn;
     transformState?: (params: TransformStateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
     onUpdate?: (params: OnUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
     onFormUpdate?: (params: OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
     formWrapper?: (params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => React.ReactNode;
+    chainMethods?: TChainMethods;
 };
 export declare function createMetadataContext<TPluginMetaData, TFieldMetaData>(stateKey: string, pluginName: string): {
     getPluginMetaData: () => TPluginMetaData | undefined;
@@ -169,6 +200,22 @@ type ZodObjOutput<T extends z.ZodObject<any>> = {
     [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };
 type OutputOf<T extends z.ZodTypeAny> = T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
+type MethodFactory = <THandler extends ChainMethodHandler>(handler: THandler) => ChainMethodDefinition<THandler>;
+type PathMethodFactory = MethodFactory & {
+    array: MethodFactory;
+    object: MethodFactory;
+    primitive: MethodFactory;
+    boolean: MethodFactory;
+    field: MethodFactory;
+};
+type MethodsBuilderParams = {
+    path: (selector: (state: any) => any) => PathMethodFactory;
+    array: MethodFactory;
+    object: MethodFactory;
+    primitive: MethodFactory;
+    boolean: MethodFactory;
+    field: MethodFactory;
+};
 export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z.ZodTypeAny | undefined = undefined, FM extends z.ZodTypeAny | undefined = undefined>(schemas: {
     options: O;
     pluginMetaData?: PM;
@@ -181,6 +228,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+        chainMethods?: {} | undefined;
     } & {
         transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
             name: TName;
@@ -189,6 +237,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
             onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+            chainMethods?: {} | undefined;
         } & {
             onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                 name: TName;
@@ -197,6 +246,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -205,6 +255,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         } & {
@@ -215,6 +296,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -223,6 +305,87 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        } & {
+            methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         };
@@ -234,6 +397,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
             onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+            chainMethods?: {} | undefined;
         } & {
             transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                 name: TName;
@@ -242,6 +406,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -250,6 +415,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         } & {
@@ -260,6 +456,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -268,6 +465,87 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        } & {
+            methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         };
@@ -279,6 +557,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
             onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+            chainMethods?: {} | undefined;
         } & {
             transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                 name: TName;
@@ -287,6 +566,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -295,6 +575,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         } & {
@@ -305,6 +616,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -313,6 +625,247 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        } & {
+            methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        };
+    } & {
+        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+            name: TName;
+            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+            transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+            chainMethods?: TNextMethods | undefined;
+        } & {
+            transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        } & {
+            onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            };
+        } & {
+            onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
+                };
+            } & {
+                onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => never) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, never, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    };
                 };
             };
         };
@@ -324,6 +877,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
             onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
             formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+            chainMethods?: {} | undefined;
         } & {
             transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                 name: TName;
@@ -332,6 +886,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -340,6 +895,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -348,6 +904,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             } & {
@@ -358,6 +945,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -366,6 +954,87 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             };
@@ -377,6 +1046,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -385,6 +1055,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -393,6 +1064,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             } & {
@@ -403,6 +1105,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -411,6 +1114,87 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             };
@@ -422,6 +1206,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                 onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                 formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: {} | undefined;
             } & {
                 transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                     name: TName;
@@ -430,6 +1215,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -438,6 +1224,37 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             } & {
@@ -448,6 +1265,7 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                     onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                     formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: {} | undefined;
                 } & {
                     transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
                         name: TName;
@@ -456,6 +1274,247 @@ export declare function createPluginContext<O extends z.ZodTypeAny, PM extends z
                         onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
                         formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: {} | undefined;
+                    } & {
+                        methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            } & {
+                methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            };
+        } & {
+            methods<TNextMethods extends ChainMethodDefinitions>(fn: (helpers: MethodsBuilderParams) => TNextMethods): {
+                name: TName;
+                useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                chainMethods?: TNextMethods | undefined;
+            } & {
+                transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            } & {
+                onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                };
+            } & {
+                onFormUpdate(fn: (params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                    name: TName;
+                    useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                    transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                    formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                    chainMethods?: TNextMethods | undefined;
+                } & {
+                    transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
+                    };
+                } & {
+                    onUpdate(fn: (params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                        name: TName;
+                        useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                        transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                        formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                        chainMethods?: TNextMethods | undefined;
+                    } & {
+                        transformState(fn: (params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void): {
+                            name: TName;
+                            useHook?: ((params: UseHookParams<OutputOf<O>, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => THookReturn) | undefined;
+                            transformState?: ((params: TransformStateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onUpdate?: ((params: OnUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            onFormUpdate?: ((params: OnFormUpdateParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => void) | undefined;
+                            formWrapper?: ((params: FormWrapperParams<OutputOf<O>, THookReturn, PM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<PM> : unknown, FM extends z.ZodType<unknown, unknown, z.core.$ZodTypeInternals<unknown, unknown>> ? OutputOf<FM> : unknown, any>) => React.ReactNode) | undefined;
+                            chainMethods?: TNextMethods | undefined;
+                        };
                     };
                 };
             };
