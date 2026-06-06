@@ -1071,6 +1071,25 @@ describe('CogsState - Core Helper Methods & Edge Cases', () => {
     expect(basicSetter.counter.$get()).toBe(1000);
   });
 
+  it('should update initial state when localStorage is unavailable', () => {
+    const originalWindow = globalThis.window;
+    vi.stubGlobal('window', {
+      ...(originalWindow as any),
+      localStorage: undefined,
+    });
+    vi.stubGlobal('localStorage', undefined);
+
+    try {
+      const newInitialState = { ...getBasicInitialState(), counter: 2000 };
+      expect(() =>
+        basicSetter.$updateInitialState(newInitialState)
+      ).not.toThrow();
+      expect(basicSetter.counter.$get()).toBe(2000);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('should find an object in an array using key-value with findWith', () => {
     // Use the correct API method: findWith
     const bookProxy = advancedSetter.products.$findWith('price', 20);

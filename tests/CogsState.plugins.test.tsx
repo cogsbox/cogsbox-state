@@ -1030,4 +1030,34 @@ describe('Plugin Hook to Transform Flow', () => {
 
     expect(result.current.image.sendToS3.$get()).toBe('real-field');
   });
+
+  it('should allow plugins with no options schema', () => {
+    const { createPlugin } = createPluginContext();
+
+    const noOptionsPlugin = createPlugin('noOptionsPlugin').methods(
+      ({ object }) => ({
+        initialise: object((ctx, value: Record<string, any>) => {
+          ctx.$update(value);
+          return ctx.$get();
+        }),
+      })
+    );
+
+    const { useCogsState } = createCogsState(
+      {
+        draftUser: {},
+      },
+      { plugins: [noOptionsPlugin] }
+    );
+
+    const { result } = renderHook(() => useCogsState('draftUser'));
+
+    expect(
+      result.current.initialise({
+        name: 'Ada',
+      })
+    ).toEqual({
+      name: 'Ada',
+    });
+  });
 });

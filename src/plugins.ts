@@ -541,12 +541,12 @@ const createMethodsBuilderParams = (): MethodsBuilderParams => {
 };
 
 export function createPluginContext<
-  O extends z.ZodTypeAny,
+  O extends z.ZodTypeAny | undefined = undefined,
   PM extends z.ZodTypeAny | undefined = undefined,
   FM extends z.ZodTypeAny | undefined = undefined,
->(schemas: { options: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
+>(schemas?: { options?: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
   // Crucial: compute from the generic params, not from an object-indexed optional type
-  type Options = OutputOf<O>;
+  type Options = O extends z.ZodTypeAny ? OutputOf<O> : undefined;
   type PluginMetaData = PM extends z.ZodTypeAny ? OutputOf<PM> : unknown;
   type FieldMetaData = FM extends z.ZodTypeAny ? OutputOf<FM> : unknown;
 

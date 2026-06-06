@@ -1026,6 +1026,18 @@ const loadFromLocalStorage = (localStorageKey: string) => {
     return null;
   }
 };
+
+const removeFromLocalStorage = (localStorageKey?: string) => {
+  if (!localStorageKey) return;
+
+  try {
+    if (typeof window !== 'undefined' && window.localStorage) {
+      window.localStorage.removeItem(localStorageKey);
+    }
+  } catch (error) {
+    console.error('Error removing from localStorage:', error);
+  }
+};
 const loadAndApplyLocalStorage = (stateKey: string, options: any) => {
   const currentState = getShadowValue(stateKey, []);
   const { sessionId } = useCogsConfig();
@@ -2353,8 +2365,11 @@ function createProxyHandler<
             const localKey = isFunction(initalOptionsGet?.localStorage?.key)
               ? initalOptionsGet.localStorage.key(initialState)
               : initalOptionsGet?.localStorage?.key;
-            const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-            if (storageKey) localStorage.removeItem(storageKey);
+            const storageKey =
+              sessionId && localKey
+                ? `${sessionId}-${stateKey}-${localKey}`
+                : undefined;
+            removeFromLocalStorage(storageKey);
           };
         }
 
@@ -3505,10 +3520,11 @@ function createProxyHandler<
       const localKey = isFunction(initalOptionsGet?.localStorage?.key)
         ? initalOptionsGet?.localStorage?.key(revertState)
         : initalOptionsGet?.localStorage?.key;
-      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-      if (storageKey) {
-        localStorage.removeItem(storageKey);
-      }
+      const storageKey =
+        sessionId && localKey
+          ? `${sessionId}-${stateKey}-${localKey}`
+          : undefined;
+      removeFromLocalStorage(storageKey);
 
       notifyComponents(stateKey);
 
@@ -3532,11 +3548,11 @@ function createProxyHandler<
         ? initalOptionsGet?.localStorage?.key(initialState)
         : initalOptionsGet?.localStorage?.key;
 
-      const storageKey = `${sessionId}-${stateKey}-${localKey}`;
-
-      if (localStorage.getItem(storageKey)) {
-        localStorage.removeItem(storageKey);
-      }
+      const storageKey =
+        sessionId && localKey
+          ? `${sessionId}-${stateKey}-${localKey}`
+          : undefined;
+      removeFromLocalStorage(storageKey);
       startTransition(() => {
         updateInitialStateGlobal(stateKey, newState);
         initializeShadowState(stateKey, newState);
