@@ -1,291 +1,273 @@
-# Plugin Interface
+# Plugins — How To Guide
 
-Plugins let you hook into cogsbox-state's lifecycle without modifying the library. The state layer stays schema-agnostic — a plugin bridges the gap between cogsbox-state and a schema library like `cogsbox-shape`.
+Plugins let you extend cogsbox-state without changing the core library. Use them when you want reusable behaviour — validation, uploads, default state, field wrappers, analytics — that plugs into the state lifecycle.
 
-## Plugin Type
+This guide shows how to build and wire up plugins. For chain method helpers (`path`, `array`, etc.), see the **Plugin Chain Methods** section in [README.md](./README.md).
 
-```ts
-type CogsPlugin<
-  TName extends string,
-  TOptions,
-  THookReturn,
-  TPluginMetaData,
-  TFieldMetaData,
-  TChainMethods extends ChainMethodDefinitions = {},
-> = {
-  name: TName;
+---
 
-  initialState?: () => Record<string, unknown>;
+## 1. Create a plugin
 
-  useHook?: (
-    params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData>
-  ) => THookReturn;
-
-  transformState?: (
-    params: TransformStateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData>
-  ) => void;
-
-  onUpdate?: (
-    params: OnUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData>
-  ) => void;
-
-  onFormUpdate?: (
-    params: OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData>
-  ) => void;
-
-  formWrapper?: (
-    params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData>
-  ) => React.ReactNode;
-
-  chainMethods?: TChainMethods;
-};
-```
-
-## Registration
-
-Plugins are registered at `createCogsState()` time via the `plugins` option. When a plugin defines `initialState`, its keys are merged into the state shape — the user's `initialState` arg wins on conflicts:
+Use `createPluginContext` and chain the hooks you need:
 
 ```ts
-const counterPlugin = {
-  name: 'counter',
-  initialState: () => ({ count: 0 }),
-};
+import { createPluginContext } from 'cogsbox-state';
+import { z } from 'zod';
 
-// statePart has { count: 0 } from the plugin
-const { useCogsState } = createCogsState({}, {
-  plugins: [counterPlugin],
+const { createPlugin } = createPluginContext({
+  options: z.object({
+    multiplier: z.number(),
+  }),
 });
 
-// user-provided keys override plugin keys
-const { useCogsState } = createCogsState({ count: 100 }, {
-  plugins: [counterPlugin],
-}); // count starts at 100
+export const scalePlugin = createPlugin('scale')
+  .useHook((params) => {
+    return { factor: params.options.multiplier * 10 };
+  })
+  .transformState((params) => {
+    if (params.isInitialTransform && params.hookData) {
+      params.initialiseState({ value: params.hookData.factor });
+    }
+  });
 ```
 
+You can chain any of these (in any order, each once):
+
+| Method | Use when… |
+|--------|-----------|
+| `.initialState()` | The plugin should contribute default state keys |
+| `.useHook()` | You need a React hook (fetch data, subscriptions, etc.) |
+| `.transformState()` | Options change and you need to reshape state |
+| `.onUpdate()` | You want to react to every state write |
+| `.onFormUpdate()` | You want to react to focus/blur/input on form fields |
+| `.formWrapper()` | You want to wrap rendered form elements |
+| `.methods()` | You want custom chain methods on state nodes |
+
+Options and metadata schemas are optional — skip them for plugins that don't need config.
+
+---
+
+## 2. Register the plugin
+
+Pass plugins when you create state:
+
 ```ts
-const { useCogsState, setCogsOptionsByKey } = createCogsState(initialState, {
-  plugins: [myPlugin],
+const { useCogsState } = createCogsState(initialState, {
+  plugins: [scalePlugin],
 });
 ```
 
-Plugin options are passed per-state-key through `useCogsState()` or `setCogsOptionsByKey()`. The key is the plugin's `name`:
+### Contributing default state
+
+If your plugin defines `.initialState()`, its keys are merged in at setup time. **Your `initialState` argument always wins** on conflicts:
 
 ```ts
-setCogsOptionsByKey("tradingRulesForm", {
-  myPlugin: {
-    schema: mySchema,
-    refineInfo: myRefineInfo,
-  },
-});
+const counterPlugin = createPlugin('counter').initialState(() => ({
+  count: 0,
+}));
+
+// Plugin provides `count`
+createCogsState({}, { plugins: [counterPlugin] });
+
+// User override wins — count starts at 100
+createCogsState({ count: 100 }, { plugins: [counterPlugin] });
 ```
 
-Or per-hook:
+Plugin-only keys (like `filter` below) are still added even when you pass partial state:
 
 ```ts
-const state = useCogsState("tradingRulesForm", {
-  myPlugin: { schema: mySchema },
-});
-```
-
-The `PluginRunner` component (rendered inside `CogsStateProvider`) creates a dedicated `PluginInstance` for each `(stateKey, plugin)` pair. Each instance receives its own scoped options.
-
-## Hooks
-
-### `initialState`
-
-Returns state keys and values contributed by the plugin. Called at `createCogsState()` time, before any other lifecycle hook. The returned object is shallow-merged into the initial state (user keys win on conflict). Keys from `initialState` are available to all later hooks (`useHook`, `transformState`, etc.):
-
-```ts
-initialState: () => ({
-  todos: [],
+const taskPlugin = createPlugin('tasks').initialState(() => ({
+  tasks: [] as Todo[],
   filter: 'all',
-}),
+}));
+
+createCogsState({ theme: 'dark' }, { plugins: [taskPlugin] });
+// → { theme: 'dark', tasks: [], filter: 'all' }
 ```
 
-### `useHook`
+---
 
-A React hook, runs once per `(stateKey, pluginName)` pair. Returns `THookReturn` which is stored in the plugin store and available to other hooks.
+## 3. Pass plugin options
+
+Options are keyed by the plugin's `name`. Pass them from `useCogsState` or `setCogsOptionsByKey`:
 
 ```ts
-useHook: (params) => {
-  const [data, setData] = useState(null);
-  useEffect(() => {
-    // setup
-    return () => cleanup;
-  }, []);
-  return data; // THookReturn
-},
+const counter = useCogsState('counter', {
+  scale: { multiplier: 5 },
+});
 ```
 
-Available in the params object:
-
-- `stateKey` — current state key
-- `options` — plugin options for this state key
-- `pluginName`
-- `isInitialMount` — true on first render
-- `initialiseState(data)` — replace state value
-- `initialiseShadowState(data)` — merge into shadow state
-- `applyOperation(patch, meta?)` — apply a raw operation
-- `addZodErrors(errors)` — push validation errors to specific paths
-- `getState()` — read current shadow state
-- `setOptions(opts)` — set options for this state key
-- `getPluginMetaData()`, `setPluginMetaData(data)`, `removePluginMetaData()` — plugin-level metadata
-- `getFieldMetaData(path)`, `setFieldMetaData(path, data)`, `removeFieldMetaData(path)` — per-field metadata
-- `getFieldRefs(path)`, `getFieldElements(path)` — DOM refs/elements at a path
-- `setFieldDisabled(path, disabled)` — disable/enable fields
-- `getAllFieldElements()`, `setAllFieldsDisabled(disabled)`
-
-### `transformState`
-
-Runs when plugin options change. Good for initializing or transforming state based on schema config.
+Or set them later:
 
 ```ts
-transformState: (params) => {
-  const state = params.getState();
-  // transform state
-  params.initialiseShadowState(transformed);
-},
+setCogsOptionsByKey('counter', {
+  scale: { multiplier: 5 },
+});
 ```
 
-### `onUpdate`
+---
 
-Fires on every state update (setter calls, inserts, cuts). Receives the `UpdateTypeDetail` describing what changed.
+## 4. Wrap your app with `PluginRunner`
 
-```ts
-onUpdate: (params) => {
-  // params.update — { path, newValue, oldValue, updateType, timeStamp }
-  // params.path — the update path
-  // params.getState() — full current state
-  // params.addZodErrors(errors) — push validation errors
-},
-```
+Plugins that use `.useHook()` need `PluginRunner` so hooks actually run:
 
-The `onUpdate` hook receives a scoped metadata context (field-level) for the specific path being updated — `getFieldMetaData()`, `setFieldMetaData()`, etc. operate on the update's path without needing to pass it.
+```tsx
+import { PluginRunner } from 'cogsbox-state';
 
-### `onFormUpdate`
-
-Fires on form activity events: focus, blur, input, select, hover, scroll, cursor move. This is the primary hook for real-time validation.
-
-```ts
-onFormUpdate: (params) => {
-  // params.event.activityType — "focus" | "blur" | "input" | "select" | "hover_enter" | "hover_exit" | "scroll" | "cursor_move"
-  // params.event.path — the field path
-  // params.event.timestamp
-  // params.event.details — varies by activityType
-  // params.getState() — full current state
-  // params.addZodErrors(errors) — push validation errors
-},
-```
-
-Activity-type-specific details:
-
-```ts
-{ activityType: "focus", details: { cursorPosition?: number } }
-{ activityType: "blur", details: { duration: number } }
-{ activityType: "input", details: { value, inputLength?, isComposing?, isPasting?, keystrokeCount? } }
-{ activityType: "select", details: { selectionStart, selectionEnd, selectedText? } }
-{ activityType: "hover_enter", details: { cursorPosition? } }
-{ activityType: "hover_exit", details: { duration: number } }
-{ activityType: "scroll", details: { scrollTop, scrollLeft } }
-{ activityType: "cursor_move", details: { cursorPosition } }
-```
-
-Like `onUpdate`, this receives the scoped metadata context for the event's path.
-
-### `formWrapper`
-
-Wraps form element rendering. This is an alternative to the `formElements.validation` option for plugin-specific field wrappers.
-
-```ts
-formWrapper: (params) => {
+function App() {
   return (
-    <div className="plugin-wrapped">
-      {params.element}
-    </div>
+    <PluginRunner>
+      <MyForm />
+    </PluginRunner>
   );
-},
+}
 ```
 
-The `formWrapper` can also be set dynamically via `setCogsOptionsByKey`:
+Each `(stateKey, plugin)` pair gets its own instance inside the runner.
+
+---
+
+## 5. Common recipes
+
+### React side-effects with `useHook`
+
+Run setup/teardown once per state key. Return anything you want available in later hooks:
 
 ```ts
-setCogsOptionsByKey("tradingRulesForm", {
+createPlugin('analytics')
+  .useHook(() => {
+    const client = createAnalyticsClient();
+    useEffect(() => () => client.flush(), []);
+    return { client };
+  })
+  .onUpdate((params) => {
+    params.hookData?.client.track('state-change', params.update);
+  });
+```
+
+### Transform state when options change
+
+`transformState` runs when plugin options change (and once on mount). Use `isInitialTransform` to distinguish first run:
+
+```ts
+createPlugin('seed')
+  .transformState((params) => {
+    if (params.isInitialTransform) {
+      params.initialiseState({ items: params.options.defaultItems });
+    }
+  });
+```
+
+Inside any hook you also get state helpers: `getState()`, `initialiseState()`, `initialiseShadowState()`, `applyOperation()`, `addZodErrors()`, and DOM helpers like `setFieldDisabled()`.
+
+### React to state updates
+
+```ts
+createPlugin('logger')
+  .onUpdate((params) => {
+    console.log(params.update.path, params.update.oldValue, '→', params.update.newValue);
+  });
+```
+
+### Validate on blur
+
+`onFormUpdate` receives form activity events. Blur is the usual trigger for field validation:
+
+```ts
+createPlugin('validator')
+  .onFormUpdate((params) => {
+    if (params.event.activityType !== 'blur') return;
+
+    const result = mySchema.safeParse(params.getState());
+    if (!result.success) {
+      params.addZodErrors(
+        result.error.issues.map((i) => ({
+          path: i.path.map(String),
+          message: i.message,
+          code: i.code,
+        }))
+      );
+    }
+  });
+```
+
+### Cross-field validation (shape-style)
+
+When one field's error depends on others, validate the full state but only surface errors for the blurred field and its related fields:
+
+```ts
+createPlugin('shapeValidator')
+  .onFormUpdate((params) => {
+    if (params.event.activityType !== 'blur') return;
+
+    const path = params.event.path;
+    const fieldName = path[path.length - 1];
+    const { schema, fieldToGroup, groups } = params.options;
+
+    const affectedGroups = fieldToGroup[fieldName] ?? [];
+    const relatedFields = new Set<string>();
+    for (const g of affectedGroups) {
+      for (const dep of groups[g].deps) relatedFields.add(dep);
+    }
+
+    const result = schema.safeParse(params.getState());
+    if (!result.success) {
+      const errors = result.error.issues
+        .filter((i) => {
+          const issueField = String(i.path[0]);
+          return issueField === fieldName || relatedFields.has(issueField);
+        })
+        .map((i) => ({
+          path: i.path.map(String),
+          message: i.message,
+          code: i.code,
+        }));
+
+      if (errors.length) params.addZodErrors(errors);
+    }
+  });
+```
+
+The core library doesn't know about schemas — it just forwards the event and applies whatever errors you return.
+
+### Wrap form fields
+
+Use `.formWrapper()` on the plugin, or set it dynamically via options:
+
+```ts
+// On the plugin
+createPlugin('highlight').formWrapper((params) => (
+  <div className="highlighted-field">{params.element}</div>
+));
+
+// Or dynamically
+setCogsOptionsByKey('myForm', {
   formElements: {
-    myPlugin: (params) => <CustomWrapper>{params.element}</CustomWrapper>,
+    highlight: (params) => <div className="highlighted-field">{params.element}</div>,
   },
 });
 ```
 
-### `chainMethods`
+### Add chain methods
 
-Adds custom methods to state objects via proxy. Each method definition targets a value type (`"any"`, `"array"`, `"object"`, `"primitive"`, `"boolean"`) and optionally a path pattern.
-
-```ts
-chainMethods: {
-  $myMethod: {
-    target: "array",
-    handler: (ctx, ...args) => {
-      // ctx.$get() — current value at path
-      // ctx.$update(payload) — update value
-      // ctx.getFieldRefs() — DOM refs at path
-      return someResult;
-    },
-  },
-},
-```
-
-## Validation Flow (Shape Plugin Pattern)
-
-A schema-aware plugin like `cogsbox-shape` would use `onFormUpdate` for per-field validation with cross-field awareness:
+Use `.methods()` to attach actions to state nodes. See [README.md](./README.md#plugin-chain-methods) for the full `path` / `array` / `object` API.
 
 ```ts
-onFormUpdate: (params) => {
-  if (params.event.activityType !== "blur") return;
+const s3Plugin = createPlugin('s3')
+  .methods(({ array }) => ({
+    uploadAll: array(async (ctx, bucket: string) => {
+      await uploadMany(ctx.$get(), bucket);
+    }),
+  }));
 
-  const path = params.event.path;
-  const fullState = params.getState();
-  const schema = params.options.schema;           // full Zod schema with superRefine
-  const fieldToGroup = params.options.fieldToGroup; // refineInfo.fieldToGroup
-  const groups = params.options.groups;           // refineInfo.groups
-
-  // 1. Find which refinement groups touch this field
-  const fieldName = path[path.length - 1];
-  const affectedGroups = fieldToGroup[fieldName] || [];
-
-  // 2. Collect all related fields across those groups
-  const relatedFields = new Set<string>();
-  for (const g of affectedGroups) {
-    for (const dep of groups[g].deps) {
-      relatedFields.add(dep);
-    }
-  }
-
-  // 3. Validate full state against full schema (hits superRefine)
-  const result = schema.safeParse(fullState);
-  if (!result.success) {
-    const errors = result.error.issues
-      .filter(i => {
-        const issueField = i.path[0];
-        return issueField === fieldName || relatedFields.has(issueField);
-      })
-      .map(i => ({
-        path: i.path.map(String),
-        message: i.message,
-        code: i.code,
-      }));
-
-    if (errors.length > 0) {
-      params.addZodErrors(errors);
-    }
-  }
-},
+// Real state fields win over plugin methods with the same name
 ```
 
-The state library never needs to know about schemas, `refineInfo`, or dependency tracking. It just routes the blur event to the plugin and lets the plugin return path-mapped errors.
+---
 
-## `createPluginContext()` Builder
+## 6. Typed options (optional)
 
-`createPluginContext` provides a typed builder for creating plugins with Zod-validated options and metadata:
+If your plugin takes config, define a Zod schema in `createPluginContext`:
 
 ```ts
 const { createPlugin } = createPluginContext({
@@ -293,13 +275,23 @@ const { createPlugin } = createPluginContext({
     schema: z.custom<ZodType>(),
     refineInfo: z.custom<RefineInfo>(),
   }),
-  pluginMetaData: z.object({ /* ... */ }),
-  fieldMetaData: z.object({ /* ... */ }),
+  pluginMetaData: z.object({ lastValidatedAt: z.number().optional() }),
+  fieldMetaData: z.object({ touched: z.boolean().optional() }),
 });
-
-const myPlugin = createPlugin("shapeValidator")
-  .useHook((params) => { /* ... */ })
-  .onFormUpdate((params) => { /* ... */ });
 ```
 
-The builder chains `.useHook()`, `.transformState()`, `.onUpdate()`, `.onFormUpdate()`, and `.methods()` to construct the plugin object with full type inference.
+`params.options`, metadata getters/setters, and the builder chain are all typed from these schemas.
+
+---
+
+## Quick reference — when to use what
+
+| Goal | Hook |
+|------|------|
+| Default state keys | `.initialState()` |
+| Fetch/subscribe in React | `.useHook()` |
+| Reshape state when config changes | `.transformState()` |
+| Log/sync on every write | `.onUpdate()` |
+| Validate on blur/input | `.onFormUpdate()` |
+| Custom field UI | `.formWrapper()` or `formElements` option |
+| Custom actions on state (`state.items.upload()`) | `.methods()` |

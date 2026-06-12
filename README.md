@@ -291,6 +291,8 @@ const isSelected = todos.$index(0).isSelected;
 
 ## Plugin Chain Methods
 
+For a full plugin how-to (registration, hooks, validation, etc.) see [PLUGINS.md](./PLUGINS.md).
+
 Plugins can add custom methods to the state builder chain with `.methods(...)`.
 This is useful for reusable behaviours such as uploads, persistence, analytics,
 or domain-specific state actions.
