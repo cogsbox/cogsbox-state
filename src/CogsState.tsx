@@ -180,6 +180,7 @@ export type EndType<
     selectText: () => void;
   };
   $removeStorage: () => void;
+  $setRaw: (value: T) => void;
   $sync: () => void;
   $validationWrapper: ({
     children,
@@ -736,8 +737,35 @@ export const createCogsState = <
     pluginStore.getState().setRegisteredPlugins(opt.plugins as any);
   }
 
+  type UnionToIntersection<U> = (
+    U extends any ? (k: U) => void : never
+  ) extends (k: infer I) => void
+    ? I
+    : never;
+
+  type FullState = State &
+    UnionToIntersection<
+      {
+        [K in keyof TPlugins]: TPlugins[K] extends {
+          initialState: () => infer S;
+        }
+          ? S
+          : {};
+      }[number]
+    >;
+
+  const pluginState: Record<string, unknown> = {};
+  if (opt?.plugins) {
+    for (const plugin of opt.plugins) {
+      if (typeof plugin.initialState === 'function') {
+        Object.assign(pluginState, plugin.initialState());
+      }
+    }
+  }
+  const mergedInitialState = { ...pluginState, ...initialState } as FullState;
+
   const [statePart, initialOptionsPart] =
-    transformStateFunc<State>(initialState);
+    transformStateFunc<FullState>(mergedInitialState);
 
   Object.keys(statePart).forEach((key) => {
     let mergedOptions: any = {};
@@ -832,7 +860,7 @@ export const createCogsState = <
     const thiState =
       getShadowValue(stateKey as string, []) || statePart[stateKey as string];
 
-    const updater = useCogsStateFn<(typeof statePart)[StateKey], TPlugins>(
+    const updater = useCogsStateFn<(typeof statePart)[StateKey]>(
       thiState,
       {
         stateKey: stateKey as string,
@@ -865,7 +893,7 @@ export const createCogsState = <
       };
     }, [stateKey, updater]);
 
-    return updater;
+    return updater as StateObject<(typeof statePart)[StateKey]>;
   };
 
   function setCogsOptionsByKey<StateKey extends StateKeys>(
@@ -1518,7 +1546,7 @@ function createEffectiveSetState<T>(
 
 export function useCogsStateFn<
   TStateObject extends unknown,
-  const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[],
+  const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = [],
 >(
   stateObject: TStateObject,
   {
@@ -2053,6 +2081,11 @@ function createProxyHandler<
     componentId: string;
     meta?: MetaData;
   }): any {
+    const rawMeta = getShadowMetadata(stateKey, path);
+    if (rawMeta?.isRaw) {
+      return getShadowValue(stateKey, path);
+    }
+
     const derivationSignature = meta
       ? JSON.stringify(meta.arrayViews || meta.transforms)
       : '';
@@ -2335,6 +2368,13 @@ function createProxyHandler<
                 ? `${sessionId}-${stateKey}-${localKey}`
                 : undefined;
             removeFromLocalStorage(storageKey);
+          };
+        }
+        if (prop === '$setRaw') {
+          return (value: any) => {
+            const currentMeta = getShadowMetadata(stateKey, path) || {};
+            setShadowMetadata(stateKey, path, { ...currentMeta, isRaw: true });
+            effectiveSetState(value, path, { updateType: 'update' });
           };
         }
 

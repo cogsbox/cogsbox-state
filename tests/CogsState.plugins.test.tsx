@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { renderHook, act, render } from '@testing-library/react';
+import '@testing-library/jest-dom';
+import { renderHook, act, render, screen } from '@testing-library/react';
 import { createCogsState } from '../src/CogsState';
 import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
@@ -1059,5 +1060,64 @@ describe('Plugin Hook to Transform Flow', () => {
     ).toEqual({
       name: 'Ada',
     });
+  });
+
+  it('should contribute initialState keys from plugin when user passes {}', () => {
+    const taskManagerPlugin = {
+      name: 'taskManager' as const,
+      initialState: () => ({
+        tasks: [] as Array<{ id: number; title: string; done: boolean }>,
+        filter: 'all' as string,
+      }),
+    };
+
+    const { useCogsState } = createCogsState(
+      {},
+      {
+        plugins: [taskManagerPlugin],
+      }
+    );
+
+    const TestComponent = () => {
+      const tasks = useCogsState('tasks');
+      return <div data-testid="tasks">{tasks.$get().length}</div>;
+    };
+
+    render(<TestComponent />);
+    expect(screen.getByTestId('tasks')).toHaveTextContent('0');
+  });
+
+  it('should allow user initialState to override plugin initialState', () => {
+    const formPlugin = {
+      name: 'formPrefs' as const,
+      initialState: () => ({
+        theme: 'dark',
+        fontSize: 14,
+      }),
+    };
+
+    const { useCogsState } = createCogsState(
+      {
+        theme: 'light',
+      },
+      {
+        plugins: [formPlugin],
+      }
+    );
+
+    const TestComponent = () => {
+      const theme = useCogsState('theme'); //const theme: StateObject<string, []>
+      const fontSize = useCogsState('fontSize');
+      return (
+        <div>
+          <span data-testid="theme">{theme.$get()}</span>
+          <span data-testid="fontSize">{fontSize.$get()}</span>
+        </div>
+      );
+    };
+
+    render(<TestComponent />);
+    expect(screen.getByTestId('theme')).toHaveTextContent('light');
+    expect(screen.getByTestId('fontSize')).toHaveTextContent('14');
   });
 });

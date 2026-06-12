@@ -92,6 +92,7 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
         selectText: () => void;
     };
     $removeStorage: () => void;
+    $setRaw: (value: T) => void;
     $sync: () => void;
     $validationWrapper: ({ children, hideMessage, }: {
         children: React.ReactNode;
@@ -271,13 +272,21 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
     formElements?: FormsElementsType<State, TPlugins>;
     validation?: ValidationOptionsType;
 }) => {
-    useCogsState: <StateKey extends keyof State>(stateKey: StateKey, options?: CreateStateOptionsType<unknown, []> & {
+    useCogsState: <StateKey extends keyof State | keyof (({ [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] extends infer T ? T extends { [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] ? T extends any ? (k: T) => void : never : never : never) extends (k: infer I) => void ? I : never)>(stateKey: StateKey, options?: CreateStateOptionsType<unknown, []> & {
         log?: boolean;
         componentId?: string;
         syncOptions?: SyncOptionsType<never> | undefined;
         serverState?: {
             id?: string | number;
-            data?: State[StateKey] | undefined;
+            data?: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] extends infer T_3 ? T_3 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] ? T_3 extends any ? (k: T_3) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey] | undefined;
             status?: "pending" | "error" | "success" | "loading";
             timestamp?: number;
             merge?: boolean | {
@@ -286,7 +295,11 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
             };
         } | undefined;
         sync?: {
-            action: (state: State[StateKey]) => Promise<{
+            action: (state: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] extends infer T_4 ? T_4 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]) => Promise<{
                 success: boolean;
                 data?: any;
                 error?: any;
@@ -302,30 +315,62 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
             update: UpdateTypeDetail;
         }) => void;
         localStorage?: {
-            key: string | ((state: State[StateKey]) => string);
-            onChange?: ((state: State[StateKey]) => void) | undefined;
+            key: string | ((state: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] extends infer T_4 ? T_4 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]) => string);
+            onChange?: ((state: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] extends infer T_4 ? T_4 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+                initialState: () => infer S;
+            } ? S : {}; }[number] ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]) => void) | undefined;
         } | undefined;
-        reactiveDeps?: ((state: State[StateKey]) => any[] | true) | undefined;
+        reactiveDeps?: ((state: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+            initialState: () => infer S;
+        } ? S : {}; }[number] extends infer T_4 ? T_4 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+            initialState: () => infer S;
+        } ? S : {}; }[number] ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]) => any[] | true) | undefined;
         reactiveType?: ReactivityType;
         syncUpdate?: Partial<UpdateTypeDetail>;
-        defaultState?: State[StateKey] | undefined;
+        defaultState?: (State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+            initialState: () => infer S;
+        } ? S : {}; }[number] extends infer T_4 ? T_4 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+            initialState: () => infer S;
+        } ? S : {}; }[number] ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey] | undefined;
         dependencies?: any[];
-    } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
+    } & { [PName in keyof { [K_2 in TPlugins[number] as K_2["name"]]?: (K_2 extends {
         useHook?: (params: {
             options: infer O;
         }) => any;
-    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }]?: ({ [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
+    } ? O : K_2 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }]?: ({ [K_2 in TPlugins[number] as K_2["name"]]?: (K_2 extends {
         useHook?: (params: {
             options: infer O;
         }) => any;
-    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? Partial<Pick<P, Exclude<keyof P, { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
+    } ? O : K_2 extends CogsPlugin<string, infer O_1, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? Partial<Pick<P, Exclude<keyof P, { [K_4 in keyof P]-?: NonNullable<P[K_4]> extends {
         __key: "keyed";
         map: any;
-    } ? K_3 : never; }[keyof P]>>> & { [K_4 in { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
+    } ? K_4 : never; }[keyof P]>>> & { [K_5 in { [K_4 in keyof P]-?: NonNullable<P[K_4]> extends {
         __key: "keyed";
         map: any;
-    } ? K_3 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_4]>["map"][StateKey] extends never ? never : K_4 : never]: (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) extends infer T_2 ? T_2 extends (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) ? T_2 extends object ? { [K_5 in keyof T_2]: T_2[K_5]; } : T_2 : never : never; } extends infer T_1 ? { [K_2 in keyof T_1]: T_1[K_2]; } : never : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<State[StateKey], TPlugins>;
-    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: CreateStateOptionsType<State[StateKey], TPlugins> & Omit<OptionsType<State[StateKey]>, keyof CreateStateOptionsType>) => void;
+    } ? K_4 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_5]>["map"] ? NonNullable<P[K_5]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_5]>["map"][StateKey] extends never ? never : K_5 : never]: (StateKey extends keyof NonNullable<P[K_5]>["map"] ? NonNullable<P[K_5]>["map"][StateKey] : never) extends infer T_6 ? T_6 extends (StateKey extends keyof NonNullable<P[K_5]>["map"] ? NonNullable<P[K_5]>["map"][StateKey] : never) ? T_6 extends object ? { [K_6 in keyof T_6]: T_6[K_6]; } : T_6 : never : never; } extends infer T_5 ? { [K_3 in keyof T_5]: T_5[K_3]; } : never : P : never) | undefined; } extends infer T_2 ? { [K_1 in keyof T_2]: T_2[K_1]; } : never) => StateObject<(State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] extends infer T_5 ? T_5 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] ? T_5 extends any ? (k: T_5) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]>;
+    setCogsOptionsByKey: <StateKey extends keyof State | keyof (({ [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] extends infer T ? T extends { [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] ? T extends any ? (k: T) => void : never : never : never) extends (k: infer I) => void ? I : never)>(stateKey: StateKey, options: CreateStateOptionsType<(State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] extends infer T_1 ? T_1 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] ? T_1 extends any ? (k: T_1) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey], TPlugins> & Omit<OptionsType<(State & (({ [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] extends infer T_2 ? T_2 extends { [K in keyof TPlugins]: TPlugins[K] extends {
+        initialState: () => infer S;
+    } ? S : {}; }[number] ? T_2 extends any ? (k: T_2) => void : never : never : never) extends (k: infer I) => void ? I : never))[StateKey]>, keyof CreateStateOptionsType>) => void;
     setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
 };
 type LocalStorageData<T> = {
@@ -335,7 +380,7 @@ type LocalStorageData<T> = {
     baseServerState?: T;
     stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[]>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any>[] = []>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, serverState, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;

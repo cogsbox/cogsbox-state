@@ -88,6 +88,7 @@ export type ShadowMetadata = {
     stateSource?: 'default' | 'server' | 'localStorage';
     lastServerSync?: number;
     isDirty?: boolean;
+    isRaw?: boolean;
     baseServerState?: any;
     arrayKeys?: string[];
     fields?: Record<string, any>;

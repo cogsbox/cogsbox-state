@@ -15,6 +15,8 @@ type CogsPlugin<
 > = {
   name: TName;
 
+  initialState?: () => Record<string, unknown>;
+
   useHook?: (
     params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData>
   ) => THookReturn;
@@ -41,7 +43,24 @@ type CogsPlugin<
 
 ## Registration
 
-Plugins are registered at `createCogsState()` time via the `plugins` option:
+Plugins are registered at `createCogsState()` time via the `plugins` option. When a plugin defines `initialState`, its keys are merged into the state shape — the user's `initialState` arg wins on conflicts:
+
+```ts
+const counterPlugin = {
+  name: 'counter',
+  initialState: () => ({ count: 0 }),
+};
+
+// statePart has { count: 0 } from the plugin
+const { useCogsState } = createCogsState({}, {
+  plugins: [counterPlugin],
+});
+
+// user-provided keys override plugin keys
+const { useCogsState } = createCogsState({ count: 100 }, {
+  plugins: [counterPlugin],
+}); // count starts at 100
+```
 
 ```ts
 const { useCogsState, setCogsOptionsByKey } = createCogsState(initialState, {
@@ -71,6 +90,17 @@ const state = useCogsState("tradingRulesForm", {
 The `PluginRunner` component (rendered inside `CogsStateProvider`) creates a dedicated `PluginInstance` for each `(stateKey, plugin)` pair. Each instance receives its own scoped options.
 
 ## Hooks
+
+### `initialState`
+
+Returns state keys and values contributed by the plugin. Called at `createCogsState()` time, before any other lifecycle hook. The returned object is shallow-merged into the initial state (user keys win on conflict). Keys from `initialState` are available to all later hooks (`useHook`, `transformState`, etc.):
+
+```ts
+initialState: () => ({
+  todos: [],
+  filter: 'all',
+}),
+```
 
 ### `useHook`
 

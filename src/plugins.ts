@@ -262,6 +262,8 @@ export type CogsPlugin<
 > = {
   name: TName;
 
+  initialState?: () => Record<string, unknown>;
+
   useHook?: (
     params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
   ) => THookReturn;
