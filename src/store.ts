@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import type { RefObject } from 'react';
 
 import type {
   OptionsType,
@@ -79,7 +80,7 @@ export type ClientActivityState = {
     string,
     {
       // componentId -> element info
-      domRef: React.RefObject<HTMLElement>;
+      domRef: RefObject<HTMLElement>;
       elementType:
         | 'input'
         | 'textarea'

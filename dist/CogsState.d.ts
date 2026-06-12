@@ -1,4 +1,5 @@
 import { ChainMethodCallables, CogsPlugin } from './plugins';
+import { ChangeEvent, FocusEvent, JSX, ReactNode, RefObject } from 'react';
 import { GenericObject } from './utility.js';
 import { ValidationError, ValidationSeverity, ValidationStatus, ComponentsType } from './store.js';
 import { ZodType } from 'zod/v4';
@@ -13,10 +14,10 @@ export type SyncInfo = {
 };
 export type FormElementParams<T> = StateObject<T> & {
     $inputProps: {
-        ref?: React.RefObject<any>;
+        ref?: RefObject<any>;
         value?: T extends boolean ? never : T;
-        onChange?: (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
-        onBlur?: (event: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+        onChange?: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
+        onBlur?: (event: FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     };
 };
 export type StateKeys = string;
@@ -68,8 +69,8 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $_path: string[];
     $_stateKey: string;
     $isolate: {
-        (renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode): JSX.Element;
-        (dependencies: any[], renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode): JSX.Element;
+        (renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
+        (dependencies: any[], renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
     };
     $formElement: (control: FormControl<T>, opts?: PerPathFormOptsType<T, TPlugins>) => JSX.Element;
     $get: () => T;
@@ -95,7 +96,7 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $setRaw: (value: T) => void;
     $sync: () => void;
     $validationWrapper: ({ children, hideMessage, }: {
-        children: React.ReactNode;
+        children: ReactNode;
         hideMessage?: boolean;
     }) => JSX.Element;
     $lastSynced?: SyncInfo;
@@ -242,7 +243,7 @@ type ScopedPluginApi<THookReturn, TFieldMetaData> = {
 };
 export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []> = {
     validation?: (options: {
-        children: React.ReactNode;
+        children: ReactNode;
         status: ValidationStatus;
         severity: ValidationSeverity;
         hasErrors: boolean;
@@ -254,13 +255,13 @@ export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, 
         plugins: {
             [P in TPlugins[number] as P['name']]: P extends CogsPlugin<any, any, infer THookReturn, any, infer TFieldMetaData> ? ScopedPluginApi<THookReturn, TFieldMetaData> : never;
         };
-    }) => React.ReactNode;
+    }) => ReactNode;
     syncRender?: (options: {
-        children: React.ReactNode;
+        children: ReactNode;
         time: number;
         data?: TState;
         key?: string;
-    }) => React.ReactNode;
+    }) => ReactNode;
 };
 export type PluginData = {
     plugin: CogsPlugin<any, any, any, any, any, any, any>;

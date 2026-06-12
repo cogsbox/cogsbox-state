@@ -1,3 +1,4 @@
+import { RefObject } from 'react';
 import { OptionsType, ReactivityType, SyncInfo, UpdateTypeDetail } from './CogsState.js';
 
 export type FreshValuesObject = {
@@ -50,7 +51,7 @@ export type SchemaTypeInfo = {
 };
 export type ClientActivityState = {
     elements: Map<string, {
-        domRef: React.RefObject<HTMLElement>;
+        domRef: RefObject<HTMLElement>;
         elementType: 'input' | 'textarea' | 'select' | 'checkbox' | 'radio' | 'range' | 'file' | 'custom';
         inputType?: string;
         mountedAt: number;

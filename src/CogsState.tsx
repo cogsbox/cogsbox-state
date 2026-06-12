@@ -15,6 +15,10 @@ import {
   useRef,
   useState,
   type CSSProperties,
+  type ChangeEvent,
+  type FocusEvent,
+  type JSX,
+  type MutableRefObject,
   type ReactNode,
   type RefObject,
 } from 'react';
@@ -61,15 +65,15 @@ export type SyncInfo = {
 
 export type FormElementParams<T> = StateObject<T> & {
   $inputProps: {
-    ref?: React.RefObject<any>;
+    ref?: RefObject<any>;
     value?: T extends boolean ? never : T;
     onChange?: (
-      event: React.ChangeEvent<
+      event: ChangeEvent<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >
     ) => void;
     onBlur?: (
-      event: React.FocusEvent<
+      event: FocusEvent<
         HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
       >
     ) => void;
@@ -165,11 +169,11 @@ export type EndType<
   $_stateKey: string;
   $isolate: {
     (
-      renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
+      renderFn: (state: StateObject<T, TPlugins>) => ReactNode
     ): JSX.Element;
     (
       dependencies: any[],
-      renderFn: (state: StateObject<T, TPlugins>) => React.ReactNode
+      renderFn: (state: StateObject<T, TPlugins>) => ReactNode
     ): JSX.Element;
   };
   $formElement: (
@@ -202,7 +206,7 @@ export type EndType<
     children,
     hideMessage,
   }: {
-    children: React.ReactNode;
+    children: ReactNode;
     hideMessage?: boolean;
   }) => JSX.Element;
   $lastSynced?: SyncInfo;
@@ -542,7 +546,7 @@ export type FormsElementsType<
 > = {
   // These optional, built-in wrappers are unchanged.
   validation?: (options: {
-    children: React.ReactNode;
+    children: ReactNode;
     status: ValidationStatus;
     severity: ValidationSeverity;
     hasErrors: boolean;
@@ -564,13 +568,13 @@ export type FormsElementsType<
           ScopedPluginApi<THookReturn, TFieldMetaData>
         : never;
     };
-  }) => React.ReactNode;
+  }) => ReactNode;
   syncRender?: (options: {
-    children: React.ReactNode;
+    children: ReactNode;
     time: number;
     data?: TState;
     key?: string;
-  }) => React.ReactNode;
+  }) => ReactNode;
 };
 const {
   getInitialOptions,
@@ -1630,7 +1634,7 @@ function flushQueue() {
 function createEffectiveSetState<T>(
   thisKey: string,
   sessionId: string | undefined,
-  latestInitialOptionsRef: React.MutableRefObject<OptionsType<T> | null>
+  latestInitialOptionsRef: MutableRefObject<OptionsType<T> | null>
 ): EffectiveSetState<T> {
   return (newStateOrFunction, path, updateObj) => {
     executeUpdate(thisKey, path, newStateOrFunction, updateObj);
@@ -3556,7 +3560,7 @@ function createProxyHandler<
             children,
             hideMessage,
           }: {
-            children: React.ReactNode;
+            children: ReactNode;
             hideMessage?: boolean;
           }) => (
             <ValidationWrapper
@@ -3618,8 +3622,8 @@ function createProxyHandler<
         if (prop === '$isolate') {
           // We accept (renderFn) OR (deps, renderFn)
           return (
-            arg1: any[] | ((state: any) => React.ReactNode),
-            arg2?: (state: any) => React.ReactNode
+            arg1: any[] | ((state: any) => ReactNode),
+            arg2?: (state: any) => ReactNode
           ) => {
             // Check if the first argument is the dependency array
             const hasDependencies = Array.isArray(arg1);
