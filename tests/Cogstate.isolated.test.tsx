@@ -40,7 +40,6 @@ const { useCogsState } = createCogsState({
           { value: 20, label: 'Item B' },
         ],
       },
-    },
   },
 });
 
