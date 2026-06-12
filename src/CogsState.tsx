@@ -758,8 +758,138 @@ export type PluginData = {
 
 ////////////////////////////////
 
+type AnyCogsPlugin = CogsPlugin<string, any, any, any, any, any, any>;
+
+type ExtractPluginOptions<T> = T extends {
+  useHook?: (params: { options: infer O }) => any;
+}
+  ? O
+  : T extends CogsPlugin<string, infer O, any, any, any, any, any>
+    ? O
+    : never;
+
+type PluginOptionsMap<TPlugins extends readonly AnyCogsPlugin[]> = {
+  [K in TPlugins[number] as K['name']]?: ExtractPluginOptions<K>;
+};
+
+type ExtractPluginState<T> = T extends {
+  initialState?: () => infer S;
+}
+  ? S extends object
+    ? S
+    : {}
+  : T extends CogsPlugin<string, any, any, any, any, any, infer S>
+    ? S extends object
+      ? S
+      : {}
+    : {};
+
+type PluginStates<TPlugins extends readonly AnyCogsPlugin[]> =
+  UnionToIntersection<ExtractPluginState<TPlugins[number]>> extends infer S
+    ? S extends object
+      ? S
+      : {}
+    : {};
+
+type KnownKeys<T> =
+  string extends keyof T
+    ? never
+    : number extends keyof T
+      ? never
+      : symbol extends keyof T
+        ? never
+        : keyof T;
+
+type MergeInitialState<
+  State extends object,
+  PluginState extends object,
+> = Prettify<
+  State & {
+    [K in keyof PluginState as K extends KnownKeys<State>
+      ? never
+      : K]: PluginState[K];
+  }
+>;
+
+type CogsFullState<
+  State extends object,
+  TPlugins extends readonly AnyCogsPlugin[],
+> = MergeInitialState<State, PluginStates<TPlugins>>;
+
+type CleanIntersection<T> = T extends object ? { [K in keyof T]: T[K] } : T;
+
+type KeyedKeys<P> = {
+  [K in keyof P]-?: NonNullable<P[K]> extends { __key: 'keyed'; map: any }
+    ? K
+    : never;
+}[keyof P];
+
+type PluginOptionsForState<
+  PluginOptions,
+  StateKey extends PropertyKey,
+> = {
+  [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
+    ? P extends Record<string, any>
+      ? Prettify<
+          Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
+            [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
+              P[K]
+            >['map']
+              ? NonNullable<P[K]>['map'][StateKey] extends undefined
+                ? never
+                : keyof NonNullable<P[K]>['map'][StateKey] extends never
+                  ? never
+                  : K
+              : never]: CleanIntersection<
+              StateKey extends keyof NonNullable<P[K]>['map']
+                ? NonNullable<P[K]>['map'][StateKey]
+                : never
+            >;
+          }
+        >
+      : P
+    : never;
+};
+
+type UseCogsStateOptions<
+  StateSlice,
+  PluginOptions,
+  StateKey extends PropertyKey,
+> = Prettify<
+  OptionsType<StateSlice, never> & PluginOptionsForState<PluginOptions, StateKey>
+>;
+
+type CreateCogsStateReturn<
+  State extends object,
+  TPlugins extends readonly AnyCogsPlugin[],
+> = {
+  useCogsState: <StateKey extends keyof CogsFullState<State, TPlugins>>(
+    stateKey: StateKey,
+    options?: UseCogsStateOptions<
+      CogsFullState<State, TPlugins>[StateKey],
+      PluginOptionsMap<TPlugins>,
+      StateKey
+    >
+  ) => StateObject<CogsFullState<State, TPlugins>[StateKey]>;
+  setCogsOptionsByKey: <StateKey extends keyof CogsFullState<State, TPlugins>>(
+    stateKey: StateKey,
+    options: CreateStateOptionsType<
+      CogsFullState<State, TPlugins>[StateKey],
+      TPlugins
+    > &
+      Omit<
+        OptionsType<CogsFullState<State, TPlugins>[StateKey]>,
+        keyof CreateStateOptionsType
+      >
+  ) => void;
+  setCogsOptions: (
+    globalOptions: CreateStateOptionsType<unknown, TPlugins> &
+      Omit<OptionsType<unknown>, keyof CreateStateOptionsType>
+  ) => void;
+};
+
 export const createCogsState = <
-  State extends Record<string, unknown>,
+  State extends object,
   const TPlugins extends readonly CogsPlugin<
     string,
     any,
@@ -776,18 +906,8 @@ export const createCogsState = <
     formElements?: FormsElementsType<State, TPlugins>;
     validation?: ValidationOptionsType;
   }
-) => {
-  type ExtractPluginOptions<T> = T extends {
-    useHook?: (params: { options: infer O }) => any; // infers O here
-  }
-    ? O
-    : T extends CogsPlugin<string, infer O, any, any, any, any, any> // AND here
-      ? O
-      : never;
-
-  type PluginOptions = {
-    [K in TPlugins[number] as K['name']]?: ExtractPluginOptions<K>;
-  };
+) : CreateCogsStateReturn<State, TPlugins> => {
+  type PluginOptions = PluginOptionsMap<TPlugins>;
 
   if (opt?.plugins) {
     pluginStore.getState().setRegisteredPlugins(opt.plugins as any);
@@ -798,39 +918,7 @@ export const createCogsState = <
     ? I
     : never;
 
-  // Extract plugin initial state from the CogsPlugin generic (7th param) first,
-  // falling back to structural inference from initialState() return type.
-  type ExtractPluginState<T> = T extends CogsPlugin<
-    string,
-    any,
-    any,
-    any,
-    any,
-    any,
-    infer S
-  >
-    ? S extends Record<string, unknown>
-      ? S
-      : {}
-    : T extends {
-          initialState?: () => infer S;
-        }
-      ? S extends Record<string, unknown>
-        ? S
-        : {}
-      : {};
-
-  // Extract the merged plugin states into a helper type
-  type PluginStates = UnionToIntersection<ExtractPluginState<TPlugins[number]>>;
-
-  // User keys win over plugin keys — omit overlapping plugin keys before merging.
-  type FullState = Prettify<
-    State & {
-      [K in keyof PluginStates as K extends keyof State
-        ? never
-        : K]: PluginStates[K];
-    }
-  >;
+  type FullState = CogsFullState<State, TPlugins>;
   const pluginState: Record<string, unknown> = {};
   if (opt?.plugins) {
     for (const plugin of opt.plugins) {
@@ -876,7 +964,7 @@ export const createCogsState = <
   });
 
   Object.keys(statePart).forEach((key) => {
-    initializeShadowState(key, statePart[key]);
+    initializeShadowState(key, (statePart as Record<string, unknown>)[key]);
   });
   type StateKeys = keyof FullState;
 
@@ -932,7 +1020,8 @@ export const createCogsState = <
     optionsRef.current = currentOptions;
 
     const thiState =
-      getShadowValue(stateKey as string, []) || statePart[stateKey as string];
+      getShadowValue(stateKey as string, []) ||
+      (statePart as Record<string, unknown>)[stateKey as string];
 
     const updater = useCogsStateFn<StateSlice<StateKey>>(thiState, {
       stateKey: stateKey as string,
@@ -1021,7 +1110,7 @@ export const createCogsState = <
     useCogsState,
     setCogsOptionsByKey,
     setCogsOptions,
-  };
+  } as CreateCogsStateReturn<State, TPlugins>;
 };
 
 const saveToLocalStorage = <T,>(

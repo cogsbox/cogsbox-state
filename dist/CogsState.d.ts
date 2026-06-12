@@ -267,77 +267,49 @@ export type PluginData = {
     options: any;
     hookData?: any;
 };
-export declare const createCogsState: <State extends Record<string, unknown>, const TPlugins extends readonly CogsPlugin<string, any, any, any, any, any, any>[] = []>(initialState: State, opt?: {
+type AnyCogsPlugin = CogsPlugin<string, any, any, any, any, any, any>;
+type ExtractPluginOptions<T> = T extends {
+    useHook?: (params: {
+        options: infer O;
+    }) => any;
+} ? O : T extends CogsPlugin<string, infer O, any, any, any, any, any> ? O : never;
+type PluginOptionsMap<TPlugins extends readonly AnyCogsPlugin[]> = {
+    [K in TPlugins[number] as K['name']]?: ExtractPluginOptions<K>;
+};
+type ExtractPluginState<T> = T extends {
+    initialState?: () => infer S;
+} ? S extends object ? S : {} : T extends CogsPlugin<string, any, any, any, any, any, infer S> ? S extends object ? S : {} : {};
+type PluginStates<TPlugins extends readonly AnyCogsPlugin[]> = UnionToIntersection<ExtractPluginState<TPlugins[number]>> extends infer S ? S extends object ? S : {} : {};
+type KnownKeys<T> = string extends keyof T ? never : number extends keyof T ? never : symbol extends keyof T ? never : keyof T;
+type MergeInitialState<State extends object, PluginState extends object> = Prettify<State & {
+    [K in keyof PluginState as K extends KnownKeys<State> ? never : K]: PluginState[K];
+}>;
+type CogsFullState<State extends object, TPlugins extends readonly AnyCogsPlugin[]> = MergeInitialState<State, PluginStates<TPlugins>>;
+type CleanIntersection<T> = T extends object ? {
+    [K in keyof T]: T[K];
+} : T;
+type KeyedKeys<P> = {
+    [K in keyof P]-?: NonNullable<P[K]> extends {
+        __key: 'keyed';
+        map: any;
+    } ? K : never;
+}[keyof P];
+type PluginOptionsForState<PluginOptions, StateKey extends PropertyKey> = {
+    [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P ? P extends Record<string, any> ? Prettify<Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
+        [K in KeyedKeys<P> as StateKey extends keyof NonNullable<P[K]>['map'] ? NonNullable<P[K]>['map'][StateKey] extends undefined ? never : keyof NonNullable<P[K]>['map'][StateKey] extends never ? never : K : never]: CleanIntersection<StateKey extends keyof NonNullable<P[K]>['map'] ? NonNullable<P[K]>['map'][StateKey] : never>;
+    }> : P : never;
+};
+type UseCogsStateOptions<StateSlice, PluginOptions, StateKey extends PropertyKey> = Prettify<OptionsType<StateSlice, never> & PluginOptionsForState<PluginOptions, StateKey>>;
+type CreateCogsStateReturn<State extends object, TPlugins extends readonly AnyCogsPlugin[]> = {
+    useCogsState: <StateKey extends keyof CogsFullState<State, TPlugins>>(stateKey: StateKey, options?: UseCogsStateOptions<CogsFullState<State, TPlugins>[StateKey], PluginOptionsMap<TPlugins>, StateKey>) => StateObject<CogsFullState<State, TPlugins>[StateKey]>;
+    setCogsOptionsByKey: <StateKey extends keyof CogsFullState<State, TPlugins>>(stateKey: StateKey, options: CreateStateOptionsType<CogsFullState<State, TPlugins>[StateKey], TPlugins> & Omit<OptionsType<CogsFullState<State, TPlugins>[StateKey]>, keyof CreateStateOptionsType>) => void;
+    setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
+};
+export declare const createCogsState: <State extends object, const TPlugins extends readonly CogsPlugin<string, any, any, any, any, any, any>[] = []>(initialState: State, opt?: {
     plugins?: TPlugins;
     formElements?: FormsElementsType<State, TPlugins>;
     validation?: ValidationOptionsType;
-}) => {
-    useCogsState: <StateKey extends keyof Prettify<State & { [K in keyof (((TPlugins[number] extends infer T ? T extends TPlugins[number] ? T extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_1 ? T_1 extends (TPlugins[number] extends infer T_2 ? T_2 extends TPlugins[number] ? T_2 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_2 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_1 extends any ? (k: T_1) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_3 ? T_3 extends TPlugins[number] ? T_3 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_3 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_4 ? T_4 extends (TPlugins[number] extends infer T_5 ? T_5 extends TPlugins[number] ? T_5 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_5 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>>(stateKey: StateKey, options?: Prettify<OptionsType<Prettify<State & { [K in keyof (((TPlugins[number] extends infer T_3 ? T_3 extends TPlugins[number] ? T_3 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_3 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_4 ? T_4 extends (TPlugins[number] extends infer T_5 ? T_5 extends TPlugins[number] ? T_5 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_5 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_6 ? T_6 extends TPlugins[number] ? T_6 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_6 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_7 ? T_7 extends (TPlugins[number] extends infer T_8 ? T_8 extends TPlugins[number] ? T_8 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_8 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_7 extends any ? (k: T_7) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>[StateKey], never> & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
-        useHook?: (params: {
-            options: infer O;
-        }) => any;
-    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any, any, any> ? O_1 : never) | undefined; }]?: { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
-        useHook?: (params: {
-            options: infer O;
-        }) => any;
-    } ? O : K_1 extends CogsPlugin<string, infer O_1, any, any, any, any, any> ? O_1 : never) | undefined; }[PName] extends infer P ? P extends Record<string, any> ? Prettify<Partial<Pick<P, Exclude<keyof P, { [K_2 in keyof P]-?: NonNullable<P[K_2]> extends {
-        __key: "keyed";
-        map: any;
-    } ? K_2 : never; }[keyof P]>>> & { [K_3 in { [K_2 in keyof P]-?: NonNullable<P[K_2]> extends {
-        __key: "keyed";
-        map: any;
-    } ? K_2 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_3]>["map"] ? NonNullable<P[K_3]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_3]>["map"][StateKey] extends never ? never : K_3 : never]: (StateKey extends keyof NonNullable<P[K_3]>["map"] ? NonNullable<P[K_3]>["map"][StateKey] : never) extends infer T_6 ? T_6 extends (StateKey extends keyof NonNullable<P[K_3]>["map"] ? NonNullable<P[K_3]>["map"][StateKey] : never) ? T_6 extends object ? { [K_4 in keyof T_6]: T_6[K_4]; } : T_6 : never : never; }> : P : never; }>) => StateObject<Prettify<State & { [K in keyof (((TPlugins[number] extends infer T_6 ? T_6 extends TPlugins[number] ? T_6 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_6 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_7 ? T_7 extends (TPlugins[number] extends infer T_8 ? T_8 extends TPlugins[number] ? T_8 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_8 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_7 extends any ? (k: T_7) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_9 ? T_9 extends TPlugins[number] ? T_9 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_9 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_10 ? T_10 extends (TPlugins[number] extends infer T_11 ? T_11 extends TPlugins[number] ? T_11 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_11 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_10 extends any ? (k: T_10) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>[StateKey]>;
-    setCogsOptionsByKey: <StateKey extends keyof Prettify<State & { [K in keyof (((TPlugins[number] extends infer T ? T extends TPlugins[number] ? T extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_1 ? T_1 extends (TPlugins[number] extends infer T_2 ? T_2 extends TPlugins[number] ? T_2 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_2 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_1 extends any ? (k: T_1) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_3 ? T_3 extends TPlugins[number] ? T_3 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_3 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_4 ? T_4 extends (TPlugins[number] extends infer T_5 ? T_5 extends TPlugins[number] ? T_5 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_5 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>>(stateKey: StateKey, options: CreateStateOptionsType<Prettify<State & { [K in keyof (((TPlugins[number] extends infer T_3 ? T_3 extends TPlugins[number] ? T_3 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_3 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_4 ? T_4 extends (TPlugins[number] extends infer T_5 ? T_5 extends TPlugins[number] ? T_5 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_5 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_4 extends any ? (k: T_4) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_6 ? T_6 extends TPlugins[number] ? T_6 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_6 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_7 ? T_7 extends (TPlugins[number] extends infer T_8 ? T_8 extends TPlugins[number] ? T_8 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_8 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_7 extends any ? (k: T_7) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>[StateKey], TPlugins> & Omit<OptionsType<Prettify<State & { [K in keyof (((TPlugins[number] extends infer T_6 ? T_6 extends TPlugins[number] ? T_6 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_6 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_7 ? T_7 extends (TPlugins[number] extends infer T_8 ? T_8 extends TPlugins[number] ? T_8 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_8 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_7 extends any ? (k: T_7) => void : never : never : never) extends (k: infer I) => void ? I : never) as K extends keyof State ? never : K]: (((TPlugins[number] extends infer T_9 ? T_9 extends TPlugins[number] ? T_9 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_9 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) extends infer T_10 ? T_10 extends (TPlugins[number] extends infer T_11 ? T_11 extends TPlugins[number] ? T_11 extends CogsPlugin<string, any, any, any, any, any, infer S extends Record<string, unknown>> ? S extends Record<string, unknown> ? S : {} : T_11 extends {
-        initialState?: () => infer S_1;
-    } ? S_1 extends Record<string, unknown> ? S_1 : {} : {} : never : never) ? T_10 extends any ? (k: T_10) => void : never : never : never) extends (k: infer I) => void ? I : never)[K]; }>[StateKey]>, keyof CreateStateOptionsType>) => void;
-    setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
-};
+}) => CreateCogsStateReturn<State, TPlugins>;
 type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
