@@ -259,10 +259,11 @@ export type CogsPlugin<
   TPluginMetaData,
   TFieldMetaData,
   TChainMethods extends ChainMethodDefinitions = {},
+  TInitialState extends Record<string, unknown> = {},
 > = {
   name: TName;
 
-  initialState?: () => Record<string, unknown>;
+  initialState?: () => TInitialState;
 
   useHook?: (
     params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
@@ -541,150 +542,406 @@ const createMethodsBuilderParams = (): MethodsBuilderParams => {
     field: createMethodDefinition('any'),
   };
 };
+// --- EXTRACTED BUILDER TYPES (Solves TS7056 Serialization Error) ---
+
+export type PluginTransformFn<
+  TOptions,
+  THookReturn,
+  TPluginMetaData,
+  TFieldMetaData,
+> = (
+  params: TransformStateParams<
+    TOptions,
+    THookReturn,
+    TPluginMetaData,
+    TFieldMetaData,
+    any
+  >
+) => void;
+
+export type PluginUpdateFn<
+  TOptions,
+  THookReturn,
+  TPluginMetaData,
+  TFieldMetaData,
+> = (
+  params: OnUpdateParams<
+    TOptions,
+    THookReturn,
+    TPluginMetaData,
+    TFieldMetaData,
+    any
+  >
+) => void;
+
+export type PluginFormUpdateFn<
+  TOptions,
+  THookReturn,
+  TPluginMetaData,
+  TFieldMetaData,
+> = (
+  params: OnFormUpdateParams<
+    TOptions,
+    THookReturn,
+    TPluginMetaData,
+    TFieldMetaData,
+    any
+  >
+) => void;
+
+export type PluginFormWrapperFn<
+  TOptions,
+  THookReturn,
+  TPluginMetaData,
+  TFieldMetaData,
+> = (
+  params: FormWrapperParams<
+    TOptions,
+    THookReturn,
+    TPluginMetaData,
+    TFieldMetaData,
+    any
+  >
+) => React.ReactNode;
+
+export type CogsPluginBuilder<
+  TName extends string,
+  TOptions,
+  TPluginMetaData,
+  TFieldMetaData,
+  THookReturn,
+  TChainMethods extends ChainMethodDefinitions,
+  HasTransform extends boolean,
+  HasUpdate extends boolean,
+  HasFormUpdate extends boolean,
+  HasMethods extends boolean,
+  HasWrapper extends boolean,
+  HasInitialState extends boolean,
+  TInitialState extends Record<string, unknown> = {},
+> = Prettify<
+  CogsPlugin<
+    TName,
+    TOptions,
+    THookReturn,
+    TPluginMetaData,
+    TFieldMetaData,
+    TChainMethods,
+    TInitialState
+  >
+> &
+  (HasTransform extends true
+    ? {}
+    : {
+        transformState(
+          fn: PluginTransformFn<
+            TOptions,
+            THookReturn,
+            TPluginMetaData,
+            TFieldMetaData
+          >
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TChainMethods,
+          true,
+          HasUpdate,
+          HasFormUpdate,
+          HasMethods,
+          HasWrapper,
+          HasInitialState,
+          TInitialState
+        >;
+      }) &
+  (HasUpdate extends true
+    ? {}
+    : {
+        onUpdate(
+          fn: PluginUpdateFn<
+            TOptions,
+            THookReturn,
+            TPluginMetaData,
+            TFieldMetaData
+          >
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TChainMethods,
+          HasTransform,
+          true,
+          HasFormUpdate,
+          HasMethods,
+          HasWrapper,
+          HasInitialState,
+          TInitialState
+        >;
+      }) &
+  (HasFormUpdate extends true
+    ? {}
+    : {
+        onFormUpdate(
+          fn: PluginFormUpdateFn<
+            TOptions,
+            THookReturn,
+            TPluginMetaData,
+            TFieldMetaData
+          >
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TChainMethods,
+          HasTransform,
+          HasUpdate,
+          true,
+          HasMethods,
+          HasWrapper,
+          HasInitialState,
+          TInitialState
+        >;
+      }) &
+  (HasMethods extends true
+    ? {}
+    : {
+        methods<TNextMethods extends ChainMethodDefinitions>(
+          fn: (helpers: MethodsBuilderParams) => TNextMethods
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TNextMethods,
+          HasTransform,
+          HasUpdate,
+          HasFormUpdate,
+          true,
+          HasWrapper,
+          HasInitialState,
+          TInitialState
+        >;
+      }) &
+  (HasWrapper extends true
+    ? {}
+    : {
+        formWrapper(
+          fn: PluginFormWrapperFn<
+            TOptions,
+            THookReturn,
+            TPluginMetaData,
+            TFieldMetaData
+          >
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TChainMethods,
+          HasTransform,
+          HasUpdate,
+          HasFormUpdate,
+          HasMethods,
+          true,
+          HasInitialState,
+          TInitialState
+        >;
+      }) &
+  (HasInitialState extends true
+    ? {}
+    : {
+        initialState<TNewState extends Record<string, unknown>>(
+          fn: () => TNewState
+        ): CogsPluginBuilder<
+          TName,
+          TOptions,
+          TPluginMetaData,
+          TFieldMetaData,
+          THookReturn,
+          TChainMethods,
+          HasTransform,
+          HasUpdate,
+          HasFormUpdate,
+          HasMethods,
+          HasWrapper,
+          true,
+          TNewState
+        >;
+      });
+
+export type CreatePluginStart<
+  TName extends string,
+  TOptions,
+  TPluginMetaData,
+  TFieldMetaData,
+> = CogsPluginBuilder<
+  TName,
+  TOptions,
+  TPluginMetaData,
+  TFieldMetaData,
+  never,
+  {},
+  false,
+  false,
+  false,
+  false,
+  false,
+  false,
+  {}
+> & {
+  useHook<THookReturn>(
+    hookFn: (
+      params: UseHookParams<TOptions, TPluginMetaData, TFieldMetaData, any>
+    ) => THookReturn
+  ): CogsPluginBuilder<
+    TName,
+    TOptions,
+    TPluginMetaData,
+    TFieldMetaData,
+    THookReturn,
+    {},
+    false,
+    false,
+    false,
+    false,
+    false,
+    false,
+    {}
+  >;
+  initialState<TNewState extends Record<string, unknown>>(
+    fn: () => TNewState
+  ): CogsPluginBuilder<
+    TName,
+    TOptions,
+    TPluginMetaData,
+    TFieldMetaData,
+    never,
+    {},
+    false,
+    false,
+    false,
+    false,
+    false,
+    true,
+    TNewState
+  >;
+};
+
+// --- UPDATED EXPLICIT CONTEXT ---
 
 export function createPluginContext<
   O extends z.ZodTypeAny | undefined = undefined,
   PM extends z.ZodTypeAny | undefined = undefined,
   FM extends z.ZodTypeAny | undefined = undefined,
->(schemas?: { options?: O; pluginMetaData?: PM; fieldMetaData?: FM }) {
-  // Crucial: compute from the generic params, not from an object-indexed optional type
+>(schemas?: {
+  options?: O;
+  pluginMetaData?: PM;
+  fieldMetaData?: FM;
+}): {
+  // EXPLICIT RETURN ANNOTATION STOPS TS FROM SERIALIZING
+  createPlugin: <TName extends string>(
+    name: TName
+  ) => CreatePluginStart<
+    TName,
+    O extends z.ZodTypeAny ? OutputOf<O> : undefined,
+    PM extends z.ZodTypeAny ? OutputOf<PM> : unknown,
+    FM extends z.ZodTypeAny ? OutputOf<FM> : unknown
+  >;
+} {
   type Options = O extends z.ZodTypeAny ? OutputOf<O> : undefined;
   type PluginMetaData = PM extends z.ZodTypeAny ? OutputOf<PM> : unknown;
   type FieldMetaData = FM extends z.ZodTypeAny ? OutputOf<FM> : unknown;
 
   function createPlugin<TName extends string>(name: TName) {
-    type TransformFn<THookReturn> = (
-      params: TransformStateParams<
-        Options,
-        THookReturn,
-        PluginMetaData,
-        FieldMetaData
-      >
-    ) => void;
-
-    type UpdateFn<THookReturn> = (
-      params: OnUpdateParams<
-        Options,
-        THookReturn,
-        PluginMetaData,
-        FieldMetaData
-      >
-    ) => void;
-
-    type FormUpdateFn<THookReturn> = (
-      params: OnFormUpdateParams<
-        Options,
-        THookReturn,
-        PluginMetaData,
-        FieldMetaData
-      >
-    ) => void;
-
-    type Plugin<
+    type Builder<
       THookReturn,
+      TChainMethods extends ChainMethodDefinitions,
+      HT extends boolean,
+      HU extends boolean,
+      HFU extends boolean,
+      HM extends boolean,
+      HW extends boolean,
+      HI extends boolean,
+      TInitialState extends Record<string, unknown> = {},
+    > = CogsPluginBuilder<
+      TName,
+      Options,
+      PluginMetaData,
+      FieldMetaData,
+      THookReturn,
+      TChainMethods,
+      HT,
+      HU,
+      HFU,
+      HM,
+      HW,
+      HI,
+      TInitialState
+    >;
+
+    const createPluginObject = <
+      THookReturn = never,
       TChainMethods extends ChainMethodDefinitions = {},
-    > = Prettify<
+      TInitialState extends Record<string, unknown> = {},
+    >(
+      hookFn?: (
+        params: UseHookParams<Options, PluginMetaData, FieldMetaData, any>
+      ) => THookReturn,
+      transformFn?: PluginTransformFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      updateHandler?: PluginUpdateFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      formUpdateHandler?: PluginFormUpdateFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      chainMethods?: TChainMethods,
+      initialStateFn?: () => TInitialState,
+      wrapperFn?: PluginFormWrapperFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >
+    ): Prettify<
       CogsPlugin<
         TName,
         Options,
         THookReturn,
         PluginMetaData,
         FieldMetaData,
-        TChainMethods
+        TChainMethods,
+        TInitialState
       >
-    >;
-
-    const createPluginObject = <
-      THookReturn = never,
-      TChainMethods extends ChainMethodDefinitions = {},
-    >(
-      hookFn?: (
-        params: UseHookParams<Options, PluginMetaData, FieldMetaData>
-      ) => THookReturn,
-      transformFn?: TransformFn<THookReturn>,
-      updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>,
-      chainMethods?: TChainMethods
-    ): Plugin<THookReturn, TChainMethods> => {
+    > => {
       return {
         name,
+        initialState: initialStateFn,
         useHook: hookFn as any,
         transformState: transformFn as any,
         onUpdate: updateHandler as any,
         onFormUpdate: formUpdateHandler as any,
+        formWrapper: wrapperFn as any,
         chainMethods,
       };
     };
-
-    type BuildRet<
-      THookReturn,
-      TChainMethods extends ChainMethodDefinitions,
-      HasTransform extends boolean,
-      HasUpdate extends boolean,
-      HasFormUpdate extends boolean,
-      HasMethods extends boolean,
-      HasWrapper extends boolean,
-    > = Plugin<THookReturn, TChainMethods> &
-      (HasTransform extends true
-        ? {}
-        : {
-            transformState(
-              fn: TransformFn<THookReturn>
-            ): BuildRet<
-              THookReturn,
-              TChainMethods,
-              true,
-              HasUpdate,
-              HasFormUpdate,
-              HasMethods,
-              HasWrapper
-            >;
-          }) &
-      (HasUpdate extends true
-        ? {}
-        : {
-            onUpdate(
-              fn: UpdateFn<THookReturn>
-            ): BuildRet<
-              THookReturn,
-              TChainMethods,
-              HasTransform,
-              true,
-              HasFormUpdate,
-              HasMethods,
-              HasWrapper
-            >;
-          }) &
-      (HasFormUpdate extends true
-        ? {}
-        : {
-            onFormUpdate(
-              fn: FormUpdateFn<THookReturn>
-            ): BuildRet<
-              THookReturn,
-              TChainMethods,
-              HasTransform,
-              HasUpdate,
-              true,
-              HasMethods,
-              HasWrapper
-            >;
-          }) &
-      (HasMethods extends true
-        ? {}
-        : {
-            methods<TNextMethods extends ChainMethodDefinitions>(
-              fn: (helpers: MethodsBuilderParams) => TNextMethods
-            ): BuildRet<
-              THookReturn,
-              TNextMethods,
-              HasTransform,
-              HasUpdate,
-              HasFormUpdate,
-              true,
-              HasWrapper
-            >;
-          });
 
     function createBuilder<
       THookReturn = never,
@@ -694,45 +951,82 @@ export function createPluginContext<
       HasFormUpdate extends boolean = false,
       HasMethods extends boolean = false,
       HasWrapper extends boolean = false,
+      HasInitialState extends boolean = false,
+      TInitialState extends Record<string, unknown> = {},
     >(
       hookFn?: (
-        params: UseHookParams<Options, PluginMetaData, FieldMetaData>
+        params: UseHookParams<Options, PluginMetaData, FieldMetaData, any>
       ) => THookReturn,
-      transformFn?: TransformFn<THookReturn>,
-      updateHandler?: UpdateFn<THookReturn>,
-      formUpdateHandler?: FormUpdateFn<THookReturn>,
-      chainMethods?: TChainMethods
-    ): BuildRet<
+      transformFn?: PluginTransformFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      updateHandler?: PluginUpdateFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      formUpdateHandler?: PluginFormUpdateFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >,
+      chainMethods?: TChainMethods,
+      initialStateFn?: () => TInitialState,
+      wrapperFn?: PluginFormWrapperFn<
+        Options,
+        THookReturn,
+        PluginMetaData,
+        FieldMetaData
+      >
+    ): Builder<
       THookReturn,
       TChainMethods,
       HasTransform,
       HasUpdate,
       HasFormUpdate,
       HasMethods,
-      HasWrapper
+      HasWrapper,
+      HasInitialState,
+      TInitialState
     > {
-      const plugin = createPluginObject<THookReturn, TChainMethods>(
+      const plugin = createPluginObject<THookReturn, TChainMethods, TInitialState>(
         hookFn,
         transformFn,
         updateHandler,
         formUpdateHandler,
-        chainMethods
+        chainMethods,
+        initialStateFn,
+        wrapperFn
       );
 
       const methods = {} as Partial<
-        BuildRet<
+        Builder<
           THookReturn,
           TChainMethods,
           HasTransform,
           HasUpdate,
           HasFormUpdate,
           HasMethods,
-          HasWrapper
+          HasWrapper,
+          HasInitialState,
+          TInitialState
         >
       >;
 
       if (!transformFn) {
-        (methods as any).transformState = (fn: TransformFn<THookReturn>) =>
+        (methods as any).transformState = (
+          fn: PluginTransformFn<
+            Options,
+            THookReturn,
+            PluginMetaData,
+            FieldMetaData
+          >
+        ) =>
           createBuilder<
             THookReturn,
             TChainMethods,
@@ -740,11 +1034,28 @@ export function createPluginContext<
             HasUpdate,
             HasFormUpdate,
             HasMethods,
-            HasWrapper
-          >(hookFn, fn, updateHandler, formUpdateHandler, chainMethods);
+            HasWrapper,
+            HasInitialState,
+            TInitialState
+          >(
+            hookFn,
+            fn,
+            updateHandler,
+            formUpdateHandler,
+            chainMethods,
+            initialStateFn,
+            wrapperFn
+          );
       }
       if (!updateHandler) {
-        (methods as any).onUpdate = (fn: UpdateFn<THookReturn>) =>
+        (methods as any).onUpdate = (
+          fn: PluginUpdateFn<
+            Options,
+            THookReturn,
+            PluginMetaData,
+            FieldMetaData
+          >
+        ) =>
           createBuilder<
             THookReturn,
             TChainMethods,
@@ -752,11 +1063,28 @@ export function createPluginContext<
             true,
             HasFormUpdate,
             HasMethods,
-            HasWrapper
-          >(hookFn, transformFn, fn, formUpdateHandler, chainMethods);
+            HasWrapper,
+            HasInitialState,
+            TInitialState
+          >(
+            hookFn,
+            transformFn,
+            fn,
+            formUpdateHandler,
+            chainMethods,
+            initialStateFn,
+            wrapperFn
+          );
       }
       if (!formUpdateHandler) {
-        (methods as any).onFormUpdate = (fn: FormUpdateFn<THookReturn>) =>
+        (methods as any).onFormUpdate = (
+          fn: PluginFormUpdateFn<
+            Options,
+            THookReturn,
+            PluginMetaData,
+            FieldMetaData
+          >
+        ) =>
           createBuilder<
             THookReturn,
             TChainMethods,
@@ -764,8 +1092,18 @@ export function createPluginContext<
             HasUpdate,
             true,
             HasMethods,
-            HasWrapper
-          >(hookFn, transformFn, updateHandler, fn, chainMethods);
+            HasWrapper,
+            HasInitialState,
+            TInitialState
+          >(
+            hookFn,
+            transformFn,
+            updateHandler,
+            fn,
+            chainMethods,
+            initialStateFn,
+            wrapperFn
+          );
       }
       if (!chainMethods) {
         (methods as any).methods = <
@@ -780,33 +1118,90 @@ export function createPluginContext<
             HasUpdate,
             HasFormUpdate,
             true,
-            HasWrapper
+            HasWrapper,
+            HasInitialState,
+            TInitialState
           >(
             hookFn,
             transformFn,
             updateHandler,
             formUpdateHandler,
-            fn(createMethodsBuilderParams())
+            fn(createMethodsBuilderParams()),
+            initialStateFn,
+            wrapperFn
+          );
+      }
+      if (!initialStateFn) {
+        (methods as any).initialState = <TNewState extends Record<string, unknown>>(fn: () => TNewState) =>
+          createBuilder<
+            THookReturn,
+            TChainMethods,
+            HasTransform,
+            HasUpdate,
+            HasFormUpdate,
+            HasMethods,
+            HasWrapper,
+            true,
+            TNewState
+          >(
+            hookFn,
+            transformFn,
+            updateHandler,
+            formUpdateHandler,
+            chainMethods,
+            fn,
+            wrapperFn
+          );
+      }
+      if (!wrapperFn) {
+        (methods as any).formWrapper = (
+          fn: PluginFormWrapperFn<
+            Options,
+            THookReturn,
+            PluginMetaData,
+            FieldMetaData
+          >
+        ) =>
+          createBuilder<
+            THookReturn,
+            TChainMethods,
+            HasTransform,
+            HasUpdate,
+            HasFormUpdate,
+            HasMethods,
+            true,
+            HasInitialState,
+            TInitialState
+          >(
+            hookFn,
+            transformFn,
+            updateHandler,
+            formUpdateHandler,
+            chainMethods,
+            initialStateFn,
+            fn
           );
       }
 
-      return Object.assign(plugin, methods) as BuildRet<
+      return Object.assign(plugin, methods) as Builder<
         THookReturn,
         TChainMethods,
         HasTransform,
         HasUpdate,
         HasFormUpdate,
         HasMethods,
-        HasWrapper
+        HasWrapper,
+        HasInitialState,
+        TInitialState
       >;
     }
 
     const start = Object.assign(
-      createBuilder<never, {}, false, false, false, false, false>(),
+      createBuilder<never, {}, false, false, false, false, false, false, {}>(),
       {
         useHook<THookReturn>(
           hookFn: (
-            params: UseHookParams<Options, PluginMetaData, FieldMetaData>
+            params: UseHookParams<Options, PluginMetaData, FieldMetaData, any>
           ) => THookReturn
         ) {
           return createBuilder<
@@ -816,17 +1211,26 @@ export function createPluginContext<
             false,
             false,
             false,
-            false
+            false,
+            false,
+            {}
           >(hookFn);
         },
+        initialState<TNewState extends Record<string, unknown>>(fn: () => TNewState) {
+          return createBuilder<
+            never,
+            {},
+            false,
+            false,
+            false,
+            false,
+            false,
+            true,
+            TNewState
+          >(undefined, undefined, undefined, undefined, undefined, fn);
+        },
       }
-    ) as BuildRet<never, {}, false, false, false, false, false> & {
-      useHook<THookReturn>(
-        hookFn: (
-          params: UseHookParams<Options, PluginMetaData, FieldMetaData>
-        ) => THookReturn
-      ): BuildRet<THookReturn, {}, false, false, false, false, false>;
-    };
+    ) as CreatePluginStart<TName, Options, PluginMetaData, FieldMetaData>;
 
     return start;
   }

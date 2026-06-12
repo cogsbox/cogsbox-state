@@ -19,7 +19,7 @@ const PluginInstance = React.memo(
     stateHandler,
   }: {
     stateKey: string;
-    plugin: CogsPlugin<any, any, any, any, any>;
+    plugin: CogsPlugin<any, any, any, any, any, any, any>;
     options: any;
     stateHandler: StateObject<any>;
   }) => {

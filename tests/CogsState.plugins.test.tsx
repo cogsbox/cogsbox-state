@@ -1063,13 +1063,12 @@ describe('Plugin Hook to Transform Flow', () => {
   });
 
   it('should contribute initialState keys from plugin when user passes {}', () => {
-    const taskManagerPlugin = {
-      name: 'taskManager' as const,
-      initialState: () => ({
-        tasks: [] as Array<{ id: number; title: string; done: boolean }>,
-        filter: 'all' as string,
-      }),
-    };
+    const { createPlugin } = createPluginContext();
+
+    const taskManagerPlugin = createPlugin('taskManager').initialState(() => ({
+      tasks: [] as Array<{ id: number; title: string; done: boolean }>,
+      filter: 'all' as string,
+    }));
 
     const { useCogsState } = createCogsState(
       {},
@@ -1080,6 +1079,11 @@ describe('Plugin Hook to Transform Flow', () => {
 
     const TestComponent = () => {
       const tasks = useCogsState('tasks');
+      /*const tasks: StateObject<{
+    id: number;
+    title: string;
+    done: boolean;
+}[], []>*/
       return <div data-testid="tasks">{tasks.$get().length}</div>;
     };
 
@@ -1088,13 +1092,12 @@ describe('Plugin Hook to Transform Flow', () => {
   });
 
   it('should allow user initialState to override plugin initialState', () => {
-    const formPlugin = {
-      name: 'formPrefs' as const,
-      initialState: () => ({
-        theme: 'dark',
-        fontSize: 14,
-      }),
-    };
+    const { createPlugin } = createPluginContext();
+
+    const formPlugin = createPlugin('formPrefs').initialState(() => ({
+      theme: 'dark',
+      fontSize: 14,
+    }));
 
     const { useCogsState } = createCogsState(
       {
