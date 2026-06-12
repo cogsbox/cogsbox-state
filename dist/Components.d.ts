@@ -1,11 +1,11 @@
 import { FormElementParams, FormOptsType } from './CogsState';
-import { default as React } from 'react';
+import { default as React, ReactNode } from 'react';
 
 export type ValidationWrapperProps = {
     formOpts?: FormOptsType;
     path: string[];
     stateKey: string;
-    children: React.ReactNode;
+    children: ReactNode;
 };
 export declare function ValidationWrapper({ formOpts, path, stateKey, children, }: ValidationWrapperProps): import("react/jsx-runtime").JSX.Element;
 export declare const MemoizedCogsItemWrapper: React.MemoExoticComponent<typeof ListItemWrapper>;
@@ -26,7 +26,7 @@ export declare function FormElementWrapper({ stateKey, path, rebuildStateShape, 
         componentId: string;
         meta?: any;
     }) => any;
-    renderFn: (params: FormElementParams<any>) => React.ReactNode;
+    renderFn: (params: FormElementParams<any>) => ReactNode;
     formOpts?: FormOptsType;
     setState: any;
 }): import("react/jsx-runtime").JSX.Element;

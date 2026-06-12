@@ -828,31 +828,42 @@ type KeyedKeys<P> = {
     : never;
 }[keyof P];
 
+type PluginOptionEntry<
+  P,
+  StateKey extends PropertyKey,
+> = P extends undefined
+  ? never
+  : P extends Record<string, any>
+    ? Prettify<
+        Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
+          [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
+            P[K]
+          >['map']
+            ? NonNullable<P[K]>['map'][StateKey] extends undefined
+              ? never
+              : keyof NonNullable<P[K]>['map'][StateKey] extends never
+                ? never
+                : K
+            : never]: CleanIntersection<
+            StateKey extends keyof NonNullable<P[K]>['map']
+              ? NonNullable<P[K]>['map'][StateKey]
+              : never
+          >;
+        }
+      >
+    : P extends object
+      ? Partial<P> extends P
+        ? Partial<P>
+        : P
+      : P;
+
 type PluginOptionsForState<
   PluginOptions,
   StateKey extends PropertyKey,
 > = {
-  [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
-    ? P extends Record<string, any>
-      ? Prettify<
-          Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
-            [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
-              P[K]
-            >['map']
-              ? NonNullable<P[K]>['map'][StateKey] extends undefined
-                ? never
-                : keyof NonNullable<P[K]>['map'][StateKey] extends never
-                  ? never
-                  : K
-              : never]: CleanIntersection<
-              StateKey extends keyof NonNullable<P[K]>['map']
-                ? NonNullable<P[K]>['map'][StateKey]
-                : never
-            >;
-          }
-        >
-      : P
-    : never;
+  [PName in keyof PluginOptions as PluginOptions[PName] extends undefined
+    ? never
+    : PName]?: PluginOptionEntry<PluginOptions[PName], StateKey>;
 };
 
 type UseCogsStateOptions<
@@ -987,29 +998,8 @@ export const createCogsState = <
   const useCogsState = <StateKey extends StateKeys>(
     stateKey: StateKey,
     options?: Prettify<
-      OptionsType<StateSlice<StateKey>, never> & {
-        [PName in keyof PluginOptions]?: PluginOptions[PName] extends infer P
-          ? P extends Record<string, any>
-            ? Prettify<
-                Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
-                  [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
-                    P[K]
-                  >['map']
-                    ? NonNullable<P[K]>['map'][StateKey] extends undefined
-                      ? never
-                      : keyof NonNullable<P[K]>['map'][StateKey] extends never
-                        ? never
-                        : K
-                    : never]: CleanIntersection<
-                    StateKey extends keyof NonNullable<P[K]>['map']
-                      ? NonNullable<P[K]>['map'][StateKey]
-                      : never
-                  >;
-                }
-              >
-            : P
-          : never;
-      }
+      OptionsType<StateSlice<StateKey>, never> &
+        PluginOptionsForState<PluginOptions, StateKey>
     >
   ): StateObject<StateSlice<StateKey>> => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
@@ -1050,10 +1040,10 @@ export const createCogsState = <
     useEffect(() => {
       pluginStore
         .getState()
-        .stateHandlers.set(stateKey as string, updater as any);
+        .registerStateHandler(stateKey as string, updater as any);
 
       return () => {
-        pluginStore.getState().stateHandlers.delete(stateKey as string);
+        pluginStore.getState().unregisterStateHandler(stateKey as string);
       };
     }, [stateKey, updater]);
 
@@ -1737,7 +1727,7 @@ export function useCogsStateFn<
     defaultState?: TStateObject;
     syncOptions?: SyncOptionsType<any>;
   } & OptionsType<TStateObject> = {}
-) {
+): StateObject<TStateObject, TPlugins> {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
   const { sessionId } = useCogsConfig();
   let noStateKey = stateKey ? false : true;

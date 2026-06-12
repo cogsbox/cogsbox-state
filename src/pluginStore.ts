@@ -39,6 +39,7 @@ export type ClientActivityEvent = {
 type PluginRegistryStore = {
   stateHandlers: Map<string, StateObject<any>>; // stateKey -> handler
   registerStateHandler: (stateKey: string, handler: StateObject<any>) => void;
+  unregisterStateHandler: (stateKey: string) => void;
   registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
   setRegisteredPlugins: (
     plugins: readonly CogsPlugin<any, any, any, any, any>[]
@@ -78,7 +79,12 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
     set((state) => {
       const newMap = new Map(state.stateHandlers);
       newMap.set(stateKey, handler);
-      console.log('addign handler', stateKey, handler);
+      return { stateHandlers: newMap };
+    }),
+  unregisterStateHandler: (stateKey) =>
+    set((state) => {
+      const newMap = new Map(state.stateHandlers);
+      newMap.delete(stateKey);
       return { stateHandlers: newMap };
     }),
   registeredPlugins: [],

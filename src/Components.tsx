@@ -20,6 +20,7 @@ import React, {
   useRef,
   useState,
   useMemo,
+  type ReactNode,
 } from 'react';
 import { getGlobalStore, ValidationError, ValidationSeverity } from './store';
 import { useInView } from 'react-intersection-observer';
@@ -46,7 +47,7 @@ export type ValidationWrapperProps = {
   formOpts?: FormOptsType;
   path: string[];
   stateKey: string;
-  children: React.ReactNode;
+  children: ReactNode;
 };
 
 export function ValidationWrapper({
@@ -241,7 +242,7 @@ export function FormElementWrapper({
     componentId: string;
     meta?: any;
   }) => any;
-  renderFn: (params: FormElementParams<any>) => React.ReactNode;
+  renderFn: (params: FormElementParams<any>) => ReactNode;
   formOpts?: FormOptsType;
   setState: any;
 }) {
@@ -626,7 +627,7 @@ export function IsolatedComponentWrapper({
 }
 // 1. Define the MINIMAL props needed.
 type PluginWrapperProps = {
-  children: React.ReactNode;
+  children: ReactNode;
   stateKey: string;
   path: string[];
   pluginName: string;

@@ -1,24 +1,28 @@
 import { create as l } from "zustand";
 const b = l((u, o) => ({
   stateHandlers: /* @__PURE__ */ new Map(),
-  registerStateHandler: (e, s) => u((n) => {
-    const t = new Map(n.stateHandlers);
-    return t.set(e, s), console.log("addign handler", e, s), { stateHandlers: t };
+  registerStateHandler: (e, s) => u((t) => {
+    const r = new Map(t.stateHandlers);
+    return r.set(e, s), { stateHandlers: r };
+  }),
+  unregisterStateHandler: (e) => u((s) => {
+    const t = new Map(s.stateHandlers);
+    return t.delete(e), { stateHandlers: t };
   }),
   registeredPlugins: [],
   pluginOptions: /* @__PURE__ */ new Map(),
   setRegisteredPlugins: (e) => u({ registeredPlugins: e }),
-  setPluginOptionsForState: (e, s) => u((n) => {
-    const t = new Map(n.pluginOptions), r = /* @__PURE__ */ new Map();
-    return Object.entries(s).forEach(([i, p]) => {
-      n.registeredPlugins.some((a) => a.name === i) && r.set(i, p);
-    }), r.size > 0 && t.set(e, r), { pluginOptions: t };
+  setPluginOptionsForState: (e, s) => u((t) => {
+    const r = new Map(t.pluginOptions), n = /* @__PURE__ */ new Map();
+    return Object.entries(s).forEach(([i, a]) => {
+      t.registeredPlugins.some((p) => p.name === i) && n.set(i, a);
+    }), n.size > 0 && r.set(e, n), { pluginOptions: r };
   }),
   getPluginConfigsForState: (e) => {
-    const s = o(), n = s.pluginOptions.get(e);
-    return n ? s.registeredPlugins.map((t) => {
-      const r = n.get(t.name);
-      return r !== void 0 ? { plugin: t, options: r } : null;
+    const s = o(), t = s.pluginOptions.get(e);
+    return t ? s.registeredPlugins.map((r) => {
+      const n = t.get(r.name);
+      return n !== void 0 ? { plugin: r, options: n } : null;
     }).filter(Boolean) : [];
   },
   updateSubscribers: /* @__PURE__ */ new Set(),
@@ -36,14 +40,14 @@ const b = l((u, o) => ({
     o().formUpdateSubscribers.forEach((s) => s(e));
   },
   hookResults: /* @__PURE__ */ new Map(),
-  setHookResult: (e, s, n) => u((t) => {
-    const r = new Map(t.hookResults), i = new Map(r.get(e) ?? /* @__PURE__ */ new Map());
-    return n === void 0 ? i.delete(s) : i.set(s, n), i.size > 0 ? r.set(e, i) : r.delete(e), { hookResults: r };
+  setHookResult: (e, s, t) => u((r) => {
+    const n = new Map(r.hookResults), i = new Map(n.get(e) ?? /* @__PURE__ */ new Map());
+    return t === void 0 ? i.delete(s) : i.set(s, t), i.size > 0 ? n.set(e, i) : n.delete(e), { hookResults: n };
   }),
   getHookResult: (e, s) => o().hookResults.get(e)?.get(s),
-  removeHookResult: (e, s) => u((n) => {
-    const t = new Map(n.hookResults), r = new Map(t.get(e) ?? /* @__PURE__ */ new Map());
-    return r.delete(s), r.size > 0 ? t.set(e, r) : t.delete(e), { hookResults: t };
+  removeHookResult: (e, s) => u((t) => {
+    const r = new Map(t.hookResults), n = new Map(r.get(e) ?? /* @__PURE__ */ new Map());
+    return n.delete(s), n.size > 0 ? r.set(e, n) : r.delete(e), { hookResults: r };
   })
 }));
 export {

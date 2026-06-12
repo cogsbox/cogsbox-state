@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type React from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 import {
   getGlobalStore,
@@ -7,7 +7,6 @@ import {
   setAllFieldsDisabled,
 } from './store';
 import { ClientActivityEvent } from './pluginStore';
-import { RefObject } from 'react';
 
 type Prettify<T> = { [K in keyof T]: T[K] } & {};
 
@@ -228,7 +227,7 @@ export type FormWrapperParams<
   TFieldMetaData,
   TStateSlice = any,
 > = ScopedMetadataMethods<TFieldMetaData> & {
-  element: React.ReactNode;
+  element: ReactNode;
   path: string[];
   stateKey: string;
   options: TOptions;
@@ -307,7 +306,7 @@ export type CogsPlugin<
       TFieldMetaData,
       any
     >
-  ) => React.ReactNode;
+  ) => ReactNode;
 
   chainMethods?: TChainMethods;
 };
@@ -602,7 +601,7 @@ export type PluginFormWrapperFn<
     TFieldMetaData,
     any
   >
-) => React.ReactNode;
+) => ReactNode;
 
 export type CogsPluginBuilder<
   TName extends string,

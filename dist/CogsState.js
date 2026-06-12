@@ -133,8 +133,8 @@ const $t = (e, n) => {
     });
     return x(() => {
       d && R.getState().setPluginOptionsForState(a, d);
-    }, [a, d]), x(() => (R.getState().stateHandlers.set(a, C), () => {
-      R.getState().stateHandlers.delete(a);
+    }, [a, d]), x(() => (R.getState().registerStateHandler(a, C), () => {
+      R.getState().unregisterStateHandler(a);
     }), [a, C]), C;
   };
   function y(a, d) {

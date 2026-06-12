@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, type ReactNode } from "react";
 type ConfigType = { sessionId?: string };
 export const config: ConfigType = {
   sessionId: undefined,
@@ -14,7 +14,7 @@ export function CogsStateClient({
   children,
   sessionId,
 }: {
-  children: React.ReactNode;
+  children: ReactNode;
   sessionId?: string;
 }) {
   return (

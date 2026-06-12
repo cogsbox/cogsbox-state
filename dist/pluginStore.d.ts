@@ -57,6 +57,7 @@ export type ClientActivityEvent = {
 type PluginRegistryStore = {
     stateHandlers: Map<string, StateObject<any>>;
     registerStateHandler: (stateKey: string, handler: StateObject<any>) => void;
+    unregisterStateHandler: (stateKey: string) => void;
     registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
     setRegisteredPlugins: (plugins: readonly CogsPlugin<any, any, any, any, any>[]) => void;
     pluginOptions: Map<string, Map<string, any>>;

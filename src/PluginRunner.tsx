@@ -1,4 +1,11 @@
-import React, { useEffect, useMemo, useState, useRef, useReducer } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useSyncExternalStore,
+  type ReactNode,
+} from 'react';
 import { ClientActivityEvent, pluginStore } from './pluginStore';
 import { isDeepEqual } from './utility';
 import {
@@ -168,52 +175,42 @@ const PluginInstance = React.memo(
  * The main orchestrator component. It reads from the central pluginStore
  * and renders a `PluginInstance` controller for each active plugin.
  */
-export function PluginRunner({ children }: { children: React.ReactNode }) {
-  // A simple way to force a re-render when the store changes.
-  const [, forceUpdate] = useReducer((c) => c + 1, 0);
-
-  // Subscribe to the store. When plugins or their options are added/removed,
-  // this component will re-render to update the list of PluginInstances.
-  useEffect(() => {
-    const unsubscribe = pluginStore.subscribe(forceUpdate);
-
-    return unsubscribe;
-  }, []);
-
+export function PluginRunner({ children }: { children: ReactNode }) {
   const { pluginOptions, stateHandlers, registeredPlugins } =
-    pluginStore.getState();
+    useSyncExternalStore(
+      pluginStore.subscribe,
+      () => pluginStore.getState(),
+      () => pluginStore.getState()
+    );
+
+  const pluginNeedsRunner = (
+    plugin: CogsPlugin<any, any, any, any, any, any, any>
+  ) =>
+    !!(
+      plugin.useHook ||
+      plugin.transformState ||
+      plugin.onUpdate ||
+      plugin.onFormUpdate
+    );
 
   return (
     <>
-      {/*
-        This declarative mapping is the core of the solution.
-        React will now manage adding and removing `PluginInstance` components
-        as the application state changes, ensuring hooks are handled safely.
-      */}
-      {Array.from(pluginOptions.entries()).map(([stateKey, pluginMap]) => {
-        const stateHandler = stateHandlers.get(stateKey);
-        if (!stateHandler) {
-          return null; // Don't render a runner if the state handler isn't ready.
-        }
+      {Array.from(stateHandlers.entries()).flatMap(([stateKey, stateHandler]) =>
+        registeredPlugins.filter(pluginNeedsRunner).map((plugin) => {
+          const options =
+            pluginOptions.get(stateKey)?.get(plugin.name) ?? {};
 
-        return Array.from(pluginMap.entries()).map(([pluginName, options]) => {
-          const plugin = registeredPlugins.find((p) => p.name === pluginName);
-          if (!plugin) {
-            return null; // Don't render if the plugin is not in the registered list.
-          }
-
-          // Render a dedicated, memoized controller for this specific plugin configuration.
           return (
             <PluginInstance
-              key={`${stateKey}:${pluginName}`}
+              key={`${stateKey}:${plugin.name}`}
               stateKey={stateKey}
               plugin={plugin}
               options={options}
               stateHandler={stateHandler}
             />
           );
-        });
-      })}
+        })
+      )}
 
       {children}
     </>

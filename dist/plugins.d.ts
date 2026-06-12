@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { default as React, RefObject } from 'react';
+import { ReactNode, RefObject } from 'react';
 import { StateObject, UpdateTypeDetail } from './CogsState';
 import { ClientActivityEvent } from './pluginStore';
 
@@ -132,7 +132,7 @@ export type OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMet
     pluginName: string;
 };
 export type FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, TStateSlice = any> = ScopedMetadataMethods<TFieldMetaData> & {
-    element: React.ReactNode;
+    element: ReactNode;
     path: string[];
     stateKey: string;
     options: TOptions;
@@ -159,7 +159,7 @@ export type CogsPlugin<TName extends string, TOptions, THookReturn, TPluginMetaD
     transformState?: (params: TransformStateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
     onUpdate?: (params: OnUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
     onFormUpdate?: (params: OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
-    formWrapper?: (params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => React.ReactNode;
+    formWrapper?: (params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => ReactNode;
     chainMethods?: TChainMethods;
 };
 export declare function createMetadataContext<TPluginMetaData, TFieldMetaData>(stateKey: string, pluginName: string): {
@@ -220,7 +220,7 @@ type MethodsBuilderParams = {
 export type PluginTransformFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = (params: TransformStateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
 export type PluginUpdateFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = (params: OnUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
 export type PluginFormUpdateFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = (params: OnFormUpdateParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => void;
-export type PluginFormWrapperFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = (params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => React.ReactNode;
+export type PluginFormWrapperFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData> = (params: FormWrapperParams<TOptions, THookReturn, TPluginMetaData, TFieldMetaData, any>) => ReactNode;
 export type CogsPluginBuilder<TName extends string, TOptions, TPluginMetaData, TFieldMetaData, THookReturn, TChainMethods extends ChainMethodDefinitions, HasTransform extends boolean, HasUpdate extends boolean, HasFormUpdate extends boolean, HasMethods extends boolean, HasWrapper extends boolean, HasInitialState extends boolean, TInitialState extends Record<string, unknown> = {}> = Prettify<CogsPlugin<TName, TOptions, THookReturn, TPluginMetaData, TFieldMetaData, TChainMethods, TInitialState>> & (HasTransform extends true ? {} : {
     transformState(fn: PluginTransformFn<TOptions, THookReturn, TPluginMetaData, TFieldMetaData>): CogsPluginBuilder<TName, TOptions, TPluginMetaData, TFieldMetaData, THookReturn, TChainMethods, true, HasUpdate, HasFormUpdate, HasMethods, HasWrapper, HasInitialState, TInitialState>;
 }) & (HasUpdate extends true ? {} : {
