@@ -1,5 +1,6 @@
 import React, {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useState,
   useRef,
@@ -75,7 +76,7 @@ const PluginInstance = React.memo(
     const lastProcessedOptionsRef = useRef<any>();
     const [isInitialTransform, setIsInitialTransform] = useState(true);
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (plugin.transformState) {
         if (!isDeepEqual(options, lastProcessedOptionsRef.current)) {
           plugin.transformState({

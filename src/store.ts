@@ -316,16 +316,25 @@ function getTypeFromZodSchema(
 
     const typeIdentifier = def.typeName || def.type || current._type;
 
-    // --- START: THE CRITICAL FIX FOR ZodUnion ---
     if (typeIdentifier === 'ZodUnion' || typeIdentifier === 'union') {
       if (def.options && def.options.length > 0) {
-        current = def.options[0]; // Proceed by analyzing the FIRST option of the union
-        continue; // Restart the loop with the new schema
+        const preferredOption = def.options.find((option: any) => {
+          const optionDef = option?.def || option?._def;
+          const optionType =
+            optionDef?.typeName || optionDef?.type || option?._type;
+          return (
+            optionType !== 'ZodNull' &&
+            optionType !== 'null' &&
+            optionType !== 'ZodUndefined' &&
+            optionType !== 'undefined'
+          );
+        });
+        current = preferredOption ?? def.options[0];
+        continue;
       } else {
-        break; // Union with no options, cannot determine type
+        break;
       }
     }
-    // --- END: THE CRITICAL FIX ---
 
     if (typeIdentifier === 'ZodOptional' || typeIdentifier === 'optional') {
       isOptional = true;
@@ -684,9 +693,10 @@ function getSchemaAtPath(schema: any, path: string[]): any {
     const typeIdentifier = def?.typeName || def?.type || containerSchema._type;
 
     if (typeIdentifier === 'ZodObject' || typeIdentifier === 'object') {
-      // VITAL FIX: Check for `shape` inside `def` first, then on the schema itself.
+      const rawShape =
+        def?.shape ?? containerSchema.shape ?? containerSchema._shape;
       const shape =
-        def?.shape || containerSchema.shape || containerSchema._shape;
+        typeof rawShape === 'function' ? rawShape() : rawShape;
       currentSchema = shape?.[segment];
     } else if (typeIdentifier === 'ZodArray' || typeIdentifier === 'array') {
       // For arrays, the next schema is always the element's schema.
@@ -1006,6 +1016,13 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
     const storageKey = Array.isArray(initialState) ? `[${key}` : key;
     shadowStateStore.set(storageKey, newRoot);
+
+    const latestOptions = get().getInitialOptions(key);
+    if (latestOptions?.validation?.zodSchemaV4) {
+      updateShadowTypeInfo(key, latestOptions.validation.zodSchemaV4, 'zod4');
+    } else if (latestOptions?.validation?.zodSchemaV3) {
+      updateShadowTypeInfo(key, latestOptions.validation.zodSchemaV3, 'zod3');
+    }
   },
   getShadowNode: (key: string, path: string[]): ShadowNode | undefined => {
     let current: any =

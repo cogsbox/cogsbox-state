@@ -1,5 +1,5 @@
 import { create as N } from "zustand";
-function v(f, o = "zod4") {
+function A(f, o = "zod4") {
   if (!f) return null;
   let t = f, e = !1, n = !1, a, s = !1;
   for (let l = 0; l < 20; l++) {
@@ -8,7 +8,10 @@ function v(f, o = "zod4") {
     const y = d.typeName || d.type || t._type;
     if (y === "ZodUnion" || y === "union")
       if (d.options && d.options.length > 0) {
-        t = d.options[0];
+        t = d.options.find((c) => {
+          const h = c?.def || c?._def, m = h?.typeName || h?.type || c?._type;
+          return m !== "ZodNull" && m !== "null" && m !== "ZodUndefined" && m !== "undefined";
+        }) ?? d.options[0];
         continue;
       } else
         break;
@@ -20,10 +23,10 @@ function v(f, o = "zod4") {
       s = !0, a = typeof d.defaultValue == "function" ? d.defaultValue() : d.defaultValue;
     else if (y !== "ZodEffects" && y !== "effects")
       break;
-    const h = d.innerType || d.schema || t._inner;
-    if (!h || h === t)
+    const b = d.innerType || d.schema || t._inner;
+    if (!b || b === t)
       break;
-    t = h;
+    t = b;
   }
   const i = t, r = i?.def || i?._def, u = r?.typeName || r?.type || i?._type;
   return u === "ZodNumber" || u === "number" ? {
@@ -70,7 +73,7 @@ function v(f, o = "zod4") {
     optional: n
   } : null;
 }
-function A(f) {
+function O(f) {
   if (f === null)
     return {
       type: "unknown",
@@ -90,64 +93,64 @@ function A(f) {
   const o = typeof f;
   return o === "number" ? { type: "number", schema: null, source: "runtime", default: f } : o === "string" ? { type: "string", schema: null, source: "runtime", default: f } : o === "boolean" ? { type: "boolean", schema: null, source: "runtime", default: f } : Array.isArray(f) ? { type: "array", schema: null, source: "runtime", default: [] } : f instanceof Date ? { type: "date", schema: null, source: "runtime", default: f } : o === "object" ? { type: "object", schema: null, source: "runtime", default: {} } : { type: "unknown", schema: null, source: "runtime", default: f };
 }
-function _(f, o, t) {
+function g(f, o, t) {
   if (o == null || typeof o != "object") {
     const e = { _meta: { value: o } };
-    return e._meta.typeInfo = I(o, t), e;
+    return e._meta.typeInfo = v(o, t), e;
   }
   if (Array.isArray(o)) {
     const e = { _meta: { arrayKeys: [] } };
-    return e._meta.typeInfo = I(o, t), o.forEach((n, a) => {
-      const s = w(), i = t ? {
+    return e._meta.typeInfo = v(o, t), o.forEach((n, a) => {
+      const s = I(), i = t ? {
         ...t,
         path: [...t.path, a.toString()]
       } : void 0;
-      e[s] = _(f, n, i), e._meta.arrayKeys.push(s);
+      e[s] = g(f, n, i), e._meta.arrayKeys.push(s);
     }), e;
   }
   if (o.constructor === Object) {
     const e = { _meta: {} };
-    e._meta.typeInfo = I(o, t);
+    e._meta.typeInfo = v(o, t);
     for (const n in o)
       if (Object.prototype.hasOwnProperty.call(o, n)) {
         const a = t ? {
           ...t,
           path: [...t.path, n]
         } : void 0;
-        e[n] = _(f, o[n], a);
+        e[n] = g(f, o[n], a);
       }
     return e;
   }
   return {
     _meta: {
       value: o,
-      typeInfo: A(o)
+      typeInfo: O(o)
     }
   };
 }
-function I(f, o) {
+function v(f, o) {
   if (o) {
     let t = null;
     if (o.schemas.zodV4) {
       const e = o.path.length === 0 ? o.schemas.zodV4 : E(o.schemas.zodV4, o.path);
-      e && (t = v(e, "zod4"));
+      e && (t = A(e, "zod4"));
     }
     if (!t && o.schemas.zodV3) {
       const e = o.path.length === 0 ? o.schemas.zodV3 : E(o.schemas.zodV3, o.path);
-      e && (t = v(e, "zod3"));
+      e && (t = A(e, "zod3"));
     }
-    if (!t && o.schemas.sync?.[o.stateKey] && (t = A(f), t.source = "sync"), t) return t;
+    if (!t && o.schemas.sync?.[o.stateKey] && (t = O(f), t.source = "sync"), t) return t;
   }
-  return A(f);
+  return O(f);
 }
-function j(f, o, t) {
-  const e = b.get(f) || b.get(`[${f}`);
+function w(f, o, t) {
+  const e = S.get(f) || S.get(`[${f}`);
   if (!e) return;
   function n(a, s) {
     if (!a || typeof a != "object") return;
     const i = E(o, s);
     if (i) {
-      const r = v(i, t);
+      const r = A(i, t);
       r && (a._meta || (a._meta = {}), a._meta.typeInfo = {
         ...r,
         schema: i
@@ -161,7 +164,7 @@ function j(f, o, t) {
   }
   n(e, []);
 }
-function K(f) {
+function z(f) {
   let o = f;
   for (; o; ) {
     const t = o.def || o._def, e = t?.typeName || t?.type || o._type;
@@ -177,12 +180,13 @@ function E(f, o) {
   if (o.length === 0) return f;
   let t = f;
   for (const e of o) {
-    const n = K(t);
+    const n = z(t);
     if (!n) return null;
     const a = n.def || n._def, s = a?.typeName || a?.type || n._type;
-    if (s === "ZodObject" || s === "object")
-      t = (a?.shape || n.shape || n._shape)?.[e];
-    else if (s === "ZodArray" || s === "array")
+    if (s === "ZodObject" || s === "object") {
+      const i = a?.shape ?? n.shape ?? n._shape;
+      t = (typeof i == "function" ? i() : i)?.[e];
+    } else if (s === "ZodArray" || s === "array")
       t = n.element || a?.type;
     else
       return null;
@@ -191,11 +195,11 @@ function E(f, o) {
   }
   return t;
 }
-const b = /* @__PURE__ */ new Map();
-let z = 0;
+const S = /* @__PURE__ */ new Map();
+let K = 0;
 const V = Date.now().toString(36);
-function w(f) {
-  return `id:local_${V}_${(z++).toString(36)}`;
+function I(f) {
+  return `id:local_${V}_${(K++).toString(36)}`;
 }
 const C = N((f, o) => ({
   getPluginMetaDataMap: (t, e) => o().getShadowMetadata(t, e)?.pluginMetaData,
@@ -219,75 +223,75 @@ const C = N((f, o) => ({
   },
   // Replace your entire `initializeAndMergeShadowState` function with this one.
   initializeAndMergeShadowState: (t, e) => {
-    const a = e?._meta?.arrayKeys !== void 0 ? `[${t}` : t, s = b.get(a) || b.get(t) || b.get(`[${t}`);
+    const a = e?._meta?.arrayKeys !== void 0 ? `[${t}` : t, s = S.get(a) || S.get(t) || S.get(`[${t}`);
     let i = {};
     if (s?._meta) {
       const {
         components: d,
         features: y,
-        lastServerSync: h,
+        lastServerSync: b,
         stateSource: p,
         baseServerState: c,
-        pathComponents: m,
-        signals: S,
-        validation: g
+        pathComponents: h,
+        signals: m,
+        validation: _
       } = s._meta;
-      d && (i.components = d), y && (i.features = y), h && (i.lastServerSync = h), p && (i.stateSource = p), c && (i.baseServerState = c), m && (i.pathComponents = m), S && (i.signals = S), g && (i.validation = g);
+      d && (i.components = d), y && (i.features = y), b && (i.lastServerSync = b), p && (i.stateSource = p), c && (i.baseServerState = c), h && (i.pathComponents = h), m && (i.signals = m), _ && (i.validation = _);
     }
     function r(d, y) {
       if (y._meta || d._meta) {
-        const c = d._meta || {}, m = y._meta || {}, S = { ...c, ...m };
-        c.typeInfo?.schema && !m.typeInfo?.schema && (S.typeInfo = c.typeInfo), c.validation && !m.validation && (S.validation = c.validation), c.components && (S.components = c.components), c.clientActivityState && !m.clientActivityState && (S.clientActivityState = c.clientActivityState), c.pluginMetaData && !m.pluginMetaData && (S.pluginMetaData = c.pluginMetaData), d._meta = S;
+        const c = d._meta || {}, h = y._meta || {}, m = { ...c, ...h };
+        c.typeInfo?.schema && !h.typeInfo?.schema && (m.typeInfo = c.typeInfo), c.validation && !h.validation && (m.validation = c.validation), c.components && (m.components = c.components), c.clientActivityState && !h.clientActivityState && (m.clientActivityState = c.clientActivityState), c.pluginMetaData && !h.pluginMetaData && (m.pluginMetaData = c.pluginMetaData), d._meta = m;
       }
       if (y._meta?.hasOwnProperty("value")) {
         for (const c in d)
           c !== "_meta" && delete d[c];
         return;
       }
-      const h = new Set(
+      const b = new Set(
         Object.keys(y).filter((c) => c !== "_meta")
       ), p = new Set(
         Object.keys(d).filter((c) => c !== "_meta")
       );
       for (const c of p)
-        h.has(c) || delete d[c];
-      for (const c of h) {
-        const m = y[c], S = d[c];
-        S && typeof S == "object" && m && typeof m == "object" ? r(S, m) : d[c] = m;
+        b.has(c) || delete d[c];
+      for (const c of b) {
+        const h = y[c], m = d[c];
+        m && typeof m == "object" && h && typeof h == "object" ? r(m, h) : d[c] = h;
       }
     }
-    s ? (r(s, e), s._meta || (s._meta = {}), Object.assign(s._meta, i), b.set(a, s)) : (i && Object.keys(i).length > 0 && (e._meta || (e._meta = {}), Object.assign(e._meta, i)), b.set(a, e));
+    s ? (r(s, e), s._meta || (s._meta = {}), Object.assign(s._meta, i), S.set(a, s)) : (i && Object.keys(i).length > 0 && (e._meta || (e._meta = {}), Object.assign(e._meta, i)), S.set(a, e));
     const u = o().getInitialOptions(t);
-    (u?.validation?.zodSchemaV4 || u?.validation?.zodSchemaV3) && (u.validation?.zodSchemaV4 ? j(t, u.validation.zodSchemaV4, "zod4") : u.validation?.zodSchemaV3 && j(t, u.validation.zodSchemaV3, "zod3")), a === t ? b.delete(`[${t}`) : b.delete(t);
+    (u?.validation?.zodSchemaV4 || u?.validation?.zodSchemaV3) && (u.validation?.zodSchemaV4 ? w(t, u.validation.zodSchemaV4, "zod4") : u.validation?.zodSchemaV3 && w(t, u.validation.zodSchemaV3, "zod3")), a === t ? S.delete(`[${t}`) : S.delete(t);
   },
   initializeShadowState: (t, e) => {
-    const n = b.get(t) || b.get(`[${t}`);
+    const n = S.get(t) || S.get(`[${t}`);
     let a = {};
     const s = /* @__PURE__ */ new Map();
     if (n) {
-      const h = (p, c) => {
-        if (!(!p || typeof p != "object")) {
-          (p._meta?.clientActivityState || p._meta?.pluginMetaData) && s.set(c.join("\0"), {
-            clientActivityState: p._meta.clientActivityState,
-            pluginMetaData: p._meta.pluginMetaData
+      const p = (c, h) => {
+        if (!(!c || typeof c != "object")) {
+          (c._meta?.clientActivityState || c._meta?.pluginMetaData) && s.set(h.join("\0"), {
+            clientActivityState: c._meta.clientActivityState,
+            pluginMetaData: c._meta.pluginMetaData
           });
-          for (const m in p)
-            m !== "_meta" && h(p[m], [...c, m]);
+          for (const m in c)
+            m !== "_meta" && p(c[m], [...h, m]);
         }
       };
-      h(n, []);
+      p(n, []);
     }
     if (n?._meta) {
       const {
-        components: h,
-        features: p,
-        lastServerSync: c,
+        components: p,
+        features: c,
+        lastServerSync: h,
         stateSource: m,
-        baseServerState: S
+        baseServerState: _
       } = n._meta;
-      h && (a.components = h), p && (a.features = p), c && (a.lastServerSync = c), m && (a.stateSource = m), S && (a.baseServerState = S);
+      p && (a.components = p), c && (a.features = c), h && (a.lastServerSync = h), m && (a.stateSource = m), _ && (a.baseServerState = _);
     }
-    b.delete(t), b.delete(`[${t}`);
+    S.delete(t), S.delete(`[${t}`);
     const i = o().getInitialOptions(t), r = o().getInitialOptions("__syncSchemas"), u = {
       stateKey: t,
       path: [],
@@ -296,21 +300,23 @@ const C = N((f, o) => ({
         zodV4: i?.validation?.zodSchemaV4,
         zodV3: i?.validation?.zodSchemaV3
       }
-    }, l = _(t, e, u);
+    }, l = g(t, e, u);
     l._meta || (l._meta = {}), Object.assign(l._meta, a);
-    const d = (h, p) => {
-      if (!h || typeof h != "object") return;
-      const c = p.join("\0"), m = s.get(c);
-      m && (h._meta || (h._meta = {}), m.clientActivityState && (h._meta.clientActivityState = m.clientActivityState), m.pluginMetaData && (h._meta.pluginMetaData = m.pluginMetaData));
-      for (const S in h)
-        S !== "_meta" && d(h[S], [...p, S]);
+    const d = (p, c) => {
+      if (!p || typeof p != "object") return;
+      const h = c.join("\0"), m = s.get(h);
+      m && (p._meta || (p._meta = {}), m.clientActivityState && (p._meta.clientActivityState = m.clientActivityState), m.pluginMetaData && (p._meta.pluginMetaData = m.pluginMetaData));
+      for (const _ in p)
+        _ !== "_meta" && d(p[_], [...c, _]);
     };
     d(l, []);
     const y = Array.isArray(e) ? `[${t}` : t;
-    b.set(y, l);
+    S.set(y, l);
+    const b = o().getInitialOptions(t);
+    b?.validation?.zodSchemaV4 ? w(t, b.validation.zodSchemaV4, "zod4") : b?.validation?.zodSchemaV3 && w(t, b.validation.zodSchemaV3, "zod3");
   },
   getShadowNode: (t, e) => {
-    let n = b.get(t) || b.get(`[${t}`);
+    let n = S.get(t) || S.get(`[${t}`);
     if (n) {
       if (e.length === 0) return n;
       for (const a of e)
@@ -320,10 +326,10 @@ const C = N((f, o) => ({
   },
   getShadowMetadata: (t, e) => o().getShadowNode(t, e)?._meta,
   setShadowMetadata: (t, e, n) => {
-    const a = b.has(`[${t}`) ? `[${t}` : t;
-    let s = b.get(a);
+    const a = S.has(`[${t}`) ? `[${t}` : t;
+    let s = S.get(a);
     if (!s) {
-      s = { _meta: n }, b.set(a, s);
+      s = { _meta: n }, S.set(a, s);
       return;
     }
     let i = s;
@@ -345,25 +351,25 @@ const C = N((f, o) => ({
         continue;
       }
       if (r._meta?.arrayKeys) {
-        const h = n || r._meta.arrayKeys, p = [];
+        const b = n || r._meta.arrayKeys, p = [];
         u[l] = p;
-        for (let c = h.length - 1; c >= 0; c--) {
-          const m = h[c];
-          r[m] && i.push([r[m], p, c]);
+        for (let c = b.length - 1; c >= 0; c--) {
+          const h = b[c];
+          r[h] && i.push([r[h], p, c]);
         }
         continue;
       }
       const d = {};
       u[l] = d;
       const y = Object.keys(r);
-      for (const h of y)
-        h !== "_meta" && i.push([r[h], d, h]);
+      for (const b of y)
+        b !== "_meta" && i.push([r[b], d, b]);
     }
     return s.final;
   },
   updateShadowAtPath: (t, e, n) => {
-    const a = b.has(`[${t}`) ? `[${t}` : t;
-    let s = b.get(a);
+    const a = S.has(`[${t}`) ? `[${t}` : t;
+    let s = S.get(a);
     if (!s) return;
     let i = s;
     for (let l = 0; l < e.length - 1; l++)
@@ -379,40 +385,40 @@ const C = N((f, o) => ({
       }
       if (Array.isArray(d)) {
         l._meta || (l._meta = {}), l._meta.arrayKeys || (l._meta.arrayKeys = []);
-        const p = l._meta.arrayKeys, c = d, m = [];
-        for (let S = 0; S < c.length; S++) {
-          const g = c[S];
-          if (S < p.length) {
-            const M = p[S];
-            u(l[M], g, [
+        const p = l._meta.arrayKeys, c = d, h = [];
+        for (let m = 0; m < c.length; m++) {
+          const _ = c[m];
+          if (m < p.length) {
+            const M = p[m];
+            u(l[M], _, [
               ...y,
               M
-            ]), m.push(M);
+            ]), h.push(M);
           } else {
-            const M = w(), O = o().getInitialOptions(t), D = {
+            const M = I(), D = o().getInitialOptions(t), j = {
               stateKey: t,
               path: [...y, "0"],
               // Use '0' for array element schema lookup
               schemas: {
-                zodV4: O?.validation?.zodSchemaV4,
-                zodV3: O?.validation?.zodSchemaV3
+                zodV4: D?.validation?.zodSchemaV4,
+                zodV3: D?.validation?.zodSchemaV3
               }
             };
-            l[M] = _(
+            l[M] = g(
               t,
-              g,
-              D
-            ), m.push(M);
+              _,
+              j
+            ), h.push(M);
           }
         }
-        p.length > c.length && p.slice(c.length).forEach((g) => {
-          delete l[g];
-        }), l._meta.arrayKeys = m;
+        p.length > c.length && p.slice(c.length).forEach((_) => {
+          delete l[_];
+        }), l._meta.arrayKeys = h;
         return;
       }
-      const h = new Set(Object.keys(d));
+      const b = new Set(Object.keys(d));
       l._meta?.hasOwnProperty("value") && delete l._meta.value;
-      for (const p of h) {
+      for (const p of b) {
         const c = d[p];
         if (l[p])
           u(l[p], c, [
@@ -420,28 +426,28 @@ const C = N((f, o) => ({
             p
           ]);
         else {
-          const m = o().getInitialOptions(t), S = {
+          const h = o().getInitialOptions(t), m = {
             stateKey: t,
             path: [...y, p],
             schemas: {
-              zodV4: m?.validation?.zodSchemaV4,
-              zodV3: m?.validation?.zodSchemaV3
+              zodV4: h?.validation?.zodSchemaV4,
+              zodV3: h?.validation?.zodSchemaV3
             }
           };
-          l[p] = _(t, c, S);
+          l[p] = g(t, c, m);
         }
       }
       for (const p in l)
-        p === "_meta" || !Object.prototype.hasOwnProperty.call(l, p) || h.has(p) || delete l[p];
+        p === "_meta" || !Object.prototype.hasOwnProperty.call(l, p) || b.has(p) || delete l[p];
     }
-    r ? u(r, n, e) : i[e[e.length - 1]] = _(t, n), o().notifyPathSubscribers([t, ...e].join("."), {
+    r ? u(r, n, e) : i[e[e.length - 1]] = g(t, n), o().notifyPathSubscribers([t, ...e].join("."), {
       type: "UPDATE",
       newValue: n
     });
   },
   addItemsToArrayNode: (t, e, n) => {
-    const a = b.has(`[${t}`) ? `[${t}` : t;
-    let s = b.get(a);
+    const a = S.has(`[${t}`) ? `[${t}` : t;
+    let s = S.get(a);
     if (!s) {
       console.error("Root not found for state key:", t);
       return;
@@ -457,8 +463,8 @@ const C = N((f, o) => ({
       throw new Error(
         `Array not found at path: ${[t, ...e].join(".")}`
       );
-    const r = s || `${w()}`;
-    i[r] = _(t, n);
+    const r = s || `${I()}`;
+    i[r] = g(t, n);
     const u = i._meta.arrayKeys, l = a !== void 0 && a >= 0 && a <= u.length ? a : u.length;
     l >= u.length ? u.push(r) : u.splice(l, 0, r);
     const d = [t, ...e].join(".");
@@ -481,8 +487,8 @@ const C = N((f, o) => ({
     }
     const i = [];
     n.forEach((d) => {
-      const y = `${w()}`;
-      i.push(y), s[y] = _(t, d);
+      const y = `${I()}`;
+      i.push(y), s[y] = g(t, d);
     });
     const r = s._meta.arrayKeys, u = a !== void 0 && a >= 0 && a <= r.length ? a : r.length;
     u >= r.length ? r.push(...i) : r.splice(u, 0, ...i);
@@ -656,7 +662,7 @@ const C = N((f, o) => ({
   getSyncInfo: (t) => o().syncInfoStore.get(t) || null
 }));
 function P(f) {
-  const o = [], t = b.get(f) || b.get(`[${f}`);
+  const o = [], t = S.get(f) || S.get(`[${f}`);
   if (!t) return o;
   const e = (n) => {
     if (!(!n || typeof n != "object")) {
@@ -670,7 +676,7 @@ function P(f) {
   return e(t), o;
 }
 function R(f, o) {
-  const t = b.get(f) || b.get(`[${f}`);
+  const t = S.get(f) || S.get(`[${f}`);
   if (!t) return;
   const e = (n) => {
     if (!(!n || typeof n != "object")) {
@@ -685,12 +691,12 @@ function R(f, o) {
   e(t);
 }
 export {
-  _ as buildShadowNode,
-  w as generateId,
+  g as buildShadowNode,
+  I as generateId,
   P as getAllFieldElements,
   C as getGlobalStore,
   R as setAllFieldsDisabled,
-  b as shadowStateStore,
-  j as updateShadowTypeInfo
+  S as shadowStateStore,
+  w as updateShadowTypeInfo
 };
 //# sourceMappingURL=store.js.map

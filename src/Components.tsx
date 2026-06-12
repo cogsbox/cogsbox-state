@@ -336,21 +336,28 @@ export function FormElementWrapper({
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
+      const liveTypeInfo =
+        getGlobalStore.getState().getShadowNode(stateKey, path)?._meta
+          ?.typeInfo ?? typeInfo;
+
       // Type conversion logic (keep existing)
-      if (typeInfo) {
-        if (typeInfo.type === 'number' && typeof newValue === 'string') {
+      if (liveTypeInfo) {
+        if (liveTypeInfo.type === 'number' && typeof newValue === 'string') {
           newValue =
             newValue === ''
-              ? typeInfo.nullable
+              ? liveTypeInfo.nullable
                 ? null
-                : (typeInfo.default ?? 0)
+                : (liveTypeInfo.default ?? 0)
               : Number(newValue);
         } else if (
-          typeInfo.type === 'boolean' &&
+          liveTypeInfo.type === 'boolean' &&
           typeof newValue === 'string'
         ) {
           newValue = newValue === 'true' || newValue === '1';
-        } else if (typeInfo.type === 'date' && typeof newValue === 'string') {
+        } else if (
+          liveTypeInfo.type === 'date' &&
+          typeof newValue === 'string'
+        ) {
           newValue = new Date(newValue);
         }
       } else {

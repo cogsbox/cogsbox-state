@@ -6,7 +6,7 @@ import { createCogsState } from '../src/CogsState';
 import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
 import { pluginStore } from '../src/pluginStore';
-import { shadowStateStore } from '../src/store';
+import { getGlobalStore, shadowStateStore } from '../src/store';
 import { z } from 'zod';
 
 vi.mock('../src/CogsStateClient.js', () => ({
@@ -497,6 +497,108 @@ describe('Plugin onFormUpdate validation', () => {
 
     await waitFor(() => {
       expect(blurCount).toBe(1);
+    });
+  });
+
+  it('should coerce nested nullable number inputs when plugin wires schema via transformState setOptions', async () => {
+    const tradingRulesSchema = z.object({
+      rules: z.object({
+        positionSizeRangeMin: z.number().nullable(),
+        positionSizeRangeMax: z.number().nullable(),
+      }),
+    });
+
+    type ShapeSchemaBoxEntry = {
+      generateDefaults: () => unknown;
+      schemas: { client: z.ZodTypeAny };
+    };
+
+    const journalSchemaBox: Record<string, ShapeSchemaBoxEntry> = {
+      tradingRulesForm: {
+        generateDefaults: () => ({
+          rules: {
+            positionSizeRangeMin: null,
+            positionSizeRangeMax: null,
+          },
+        }),
+        schemas: { client: tradingRulesSchema },
+      },
+    };
+
+    const { createPlugin } = createPluginContext({
+      options: z.object({ logs: z.boolean().optional() }),
+    });
+
+    const shapePlugin = createPlugin('shape')
+      .initialState(() => ({
+        tradingRulesForm: journalSchemaBox.tradingRulesForm.generateDefaults(),
+      }))
+      .transformState((params) => {
+        const entry = journalSchemaBox[params.stateKey];
+        if (!entry) return;
+        params.setOptions({
+          validation: {
+            zodSchemaV4: entry.schemas.client,
+            onBlur: 'error',
+          },
+        });
+      });
+
+    const { useCogsState } = createCogsState({}, { plugins: [shapePlugin] });
+
+    function TestComponent() {
+      const form = useCogsState('tradingRulesForm');
+
+      return (
+        <div>
+          {form.rules.positionSizeRangeMin.$formElement((params) => (
+            <input
+              type="number"
+              data-testid="min-input"
+              {...params.$inputProps}
+              value={params.$inputProps.value ?? ''}
+            />
+          ))}
+          <span data-testid="min-value">
+            {String(form.rules.positionSizeRangeMin.$get())}
+          </span>
+          <span data-testid="min-type">
+            {typeof form.rules.positionSizeRangeMin.$get()}
+          </span>
+        </div>
+      );
+    }
+
+    render(
+      <PluginRunner>
+        <TestComponent />
+      </PluginRunner>
+    );
+
+    await waitFor(() => {
+      expect(
+        getGlobalStore.getState().getInitialOptions('tradingRulesForm')
+          ?.validation?.zodSchemaV4
+      ).toBeTruthy();
+      const node = getGlobalStore
+        .getState()
+        .getShadowNode('tradingRulesForm', ['rules', 'positionSizeRangeMin']);
+      expect(node?._meta?.typeInfo?.type).toBe('number');
+    });
+
+    const input = screen.getByTestId('min-input');
+    fireEvent.change(input, { target: { value: '12' } });
+
+    await waitFor(() => {
+      expect(screen.getByTestId('min-value')).toHaveTextContent('12');
+      expect(screen.getByTestId('min-type')).toHaveTextContent('number');
+    });
+
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('min-type')).toHaveTextContent('number');
+      expect(screen.getByTestId('min-value')).toHaveTextContent('12');
     });
   });
 

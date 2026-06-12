@@ -721,33 +721,19 @@ function setOptions<StateKey, Opt>({
   if (needToAdd) {
     setInitialStateOptions(stateKey as string, mergedOptions);
 
-    // NEW: Update type info if validation schema was added
-    const hadSchema =
-      initialOptions?.validation?.zodSchemaV4 ||
-      initialOptions?.validation?.zodSchemaV3;
-    const hasNewSchemaV4 =
-      mergedOptions.validation?.zodSchemaV4 &&
-      !initialOptions?.validation?.zodSchemaV4;
-    const hasNewSchemaV3 =
-      mergedOptions.validation?.zodSchemaV3 &&
-      !initialOptions?.validation?.zodSchemaV3;
+    const schemaV4 = mergedOptions.validation?.zodSchemaV4;
+    const schemaV3 = mergedOptions.validation?.zodSchemaV3;
+    const schemaChanged =
+      schemaV4 !== initialOptions?.validation?.zodSchemaV4 ||
+      schemaV3 !== initialOptions?.validation?.zodSchemaV3;
 
-    if (!hadSchema && (hasNewSchemaV4 || hasNewSchemaV3)) {
-      if (hasNewSchemaV4) {
-        updateShadowTypeInfo(
-          stateKey as string,
-          mergedOptions.validation.zodSchemaV4,
-          'zod4'
-        );
-      } else if (hasNewSchemaV3) {
-        updateShadowTypeInfo(
-          stateKey as string,
-          mergedOptions.validation.zodSchemaV3,
-          'zod3'
-        );
+    if (schemaChanged && (schemaV4 || schemaV3)) {
+      if (schemaV4) {
+        updateShadowTypeInfo(stateKey as string, schemaV4, 'zod4');
+      } else if (schemaV3) {
+        updateShadowTypeInfo(stateKey as string, schemaV3, 'zod3');
       }
 
-      // Notify components to re-render with updated validation
       notifyComponents(stateKey as string);
     }
   }
@@ -1030,14 +1016,15 @@ export const createCogsState = <
       serverState: options?.serverState,
     });
 
-    useEffect(() => {
+    useLayoutEffect(() => {
       if (options) {
         pluginStore
           .getState()
           .setPluginOptionsForState(stateKey as string, options);
       }
     }, [stateKey, options]);
-    useEffect(() => {
+
+    useLayoutEffect(() => {
       pluginStore
         .getState()
         .registerStateHandler(stateKey as string, updater as any);
@@ -1046,6 +1033,15 @@ export const createCogsState = <
         pluginStore.getState().unregisterStateHandler(stateKey as string);
       };
     }, [stateKey, updater]);
+
+    useLayoutEffect(() => {
+      const validation = getInitialOptions(stateKey as string)?.validation;
+      if (validation?.zodSchemaV4) {
+        updateShadowTypeInfo(stateKey as string, validation.zodSchemaV4, 'zod4');
+      } else if (validation?.zodSchemaV3) {
+        updateShadowTypeInfo(stateKey as string, validation.zodSchemaV3, 'zod3');
+      }
+    });
 
     return updater as StateObject<StateSlice<StateKey>>;
   };
@@ -1927,6 +1923,14 @@ export function useCogsStateFn<
 
     const { value: resolvedState, source, timestamp } = resolveInitialState();
     initializeShadowState(thisKey, resolvedState);
+
+    const validation = getInitialOptions(thisKey as string)?.validation;
+    if (validation?.zodSchemaV4) {
+      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV4, 'zod4');
+    } else if (validation?.zodSchemaV3) {
+      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV3, 'zod3');
+    }
+
     setShadowMetadata(thisKey, [], {
       stateSource: source,
       lastServerSync: source === 'server' ? timestamp : undefined,
