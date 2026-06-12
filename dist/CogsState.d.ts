@@ -261,19 +261,6 @@ export type FormsElementsType<TState, TPlugins extends readonly CogsPlugin<any, 
         key?: string;
     }) => React.ReactNode;
 };
-export type CogsInitialState<T> = {
-    initialState: T;
-} | CreateStateOptionsType<T>;
-export type TransformedStateType<T> = {
-    [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
-};
-export declare function addStateOptions<T>(initialState: T, options: CreateStateOptionsType<T>): {
-    initialState: T;
-    _addStateOptions: boolean;
-    formElements?: FormsElementsType<T, []> | undefined;
-    validation?: ValidationOptionsType;
-    plugins?: [] | undefined;
-};
 export type PluginData = {
     plugin: CogsPlugin<any, any, any, any, any>;
     options: any;
@@ -290,7 +277,7 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
         syncOptions?: SyncOptionsType<never> | undefined;
         serverState?: {
             id?: string | number;
-            data?: TransformedStateType<State>[StateKey] | undefined;
+            data?: State[StateKey] | undefined;
             status?: "pending" | "error" | "success" | "loading";
             timestamp?: number;
             merge?: boolean | {
@@ -299,7 +286,7 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
             };
         } | undefined;
         sync?: {
-            action: (state: TransformedStateType<State>[StateKey]) => Promise<{
+            action: (state: State[StateKey]) => Promise<{
                 success: boolean;
                 data?: any;
                 error?: any;
@@ -315,13 +302,13 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
             update: UpdateTypeDetail;
         }) => void;
         localStorage?: {
-            key: string | ((state: TransformedStateType<State>[StateKey]) => string);
-            onChange?: ((state: TransformedStateType<State>[StateKey]) => void) | undefined;
+            key: string | ((state: State[StateKey]) => string);
+            onChange?: ((state: State[StateKey]) => void) | undefined;
         } | undefined;
-        reactiveDeps?: ((state: TransformedStateType<State>[StateKey]) => any[] | true) | undefined;
+        reactiveDeps?: ((state: State[StateKey]) => any[] | true) | undefined;
         reactiveType?: ReactivityType;
         syncUpdate?: Partial<UpdateTypeDetail>;
-        defaultState?: TransformedStateType<State>[StateKey] | undefined;
+        defaultState?: State[StateKey] | undefined;
         dependencies?: any[];
     } & { [PName in keyof { [K_1 in TPlugins[number] as K_1["name"]]?: (K_1 extends {
         useHook?: (params: {
@@ -337,8 +324,8 @@ export declare const createCogsState: <State extends Record<string, unknown>, co
     } ? K_3 : never; }[keyof P]>>> & { [K_4 in { [K_3 in keyof P]-?: NonNullable<P[K_3]> extends {
         __key: "keyed";
         map: any;
-    } ? K_3 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_4]>["map"][StateKey] extends never ? never : K_4 : never]: (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) extends infer T_2 ? T_2 extends (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) ? T_2 extends object ? { [K_5 in keyof T_2]: T_2[K_5]; } : T_2 : never : never; } extends infer T_1 ? { [K_2 in keyof T_1]: T_1[K_2]; } : never : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<TransformedStateType<State>[StateKey], TPlugins>;
-    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: CreateStateOptionsType<TransformedStateType<State>[StateKey], TPlugins> & Omit<OptionsType<TransformedStateType<State>[StateKey]>, keyof CreateStateOptionsType>) => void;
+    } ? K_3 : never; }[keyof P] as StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] extends undefined ? never : keyof NonNullable<P[K_4]>["map"][StateKey] extends never ? never : K_4 : never]: (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) extends infer T_2 ? T_2 extends (StateKey extends keyof NonNullable<P[K_4]>["map"] ? NonNullable<P[K_4]>["map"][StateKey] : never) ? T_2 extends object ? { [K_5 in keyof T_2]: T_2[K_5]; } : T_2 : never : never; } extends infer T_1 ? { [K_2 in keyof T_1]: T_1[K_2]; } : never : P : never) | undefined; } extends infer T ? { [K in keyof T]: T[K]; } : never) => StateObject<State[StateKey], TPlugins>;
+    setCogsOptionsByKey: <StateKey extends keyof State>(stateKey: StateKey, options: CreateStateOptionsType<State[StateKey], TPlugins> & Omit<OptionsType<State[StateKey]>, keyof CreateStateOptionsType>) => void;
     setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
 };
 type LocalStorageData<T> = {

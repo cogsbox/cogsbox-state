@@ -1,51 +1,51 @@
-const u = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, $ = (e) => typeof e == "function", y = (e) => Array.isArray(e), d = (e, n, i = {}, r = []) => {
+const u = (e) => e && typeof e == "object" && !Array.isArray(e) && e !== null, $ = (e) => typeof e == "function", a = (e) => Array.isArray(e), g = (e, n, i = {}, r = []) => {
   if (u(e) && u(n)) {
-    const t = Object.keys(e), l = Object.keys(n);
-    if (t.length !== l.length)
+    const l = Object.keys(e), t = Object.keys(n);
+    if (l.length !== t.length)
       return !1;
-    for (let s of t) {
-      const o = e[s], f = n[s];
-      if (!(s in e) || !(s in n))
+    for (let o of l) {
+      const s = e[o], f = n[o];
+      if (!(o in e) || !(o in n))
         return !1;
-      const c = [...r, s];
-      if (!d(o, f, i, c))
+      const c = [...r, o];
+      if (!g(s, f, i, c))
         return !1;
     }
     return !0;
-  } else if (y(e) && y(n)) {
+  } else if (a(e) && a(n)) {
     if (e.length !== n.length)
       return !1;
-    for (let t = 0; t < e.length; t++)
-      if (!d(e[t], n[t], i, [
+    for (let l = 0; l < e.length; l++)
+      if (!g(e[l], n[l], i, [
         ...r,
-        t.toString()
+        l.toString()
       ]))
         return !1;
     return !0;
   } else
     return e === n || Number.isNaN(e) && Number.isNaN(n);
 };
-function g(e, n, i) {
+function d(e, n, i) {
   if (!e || e.length === 0) return i;
-  const r = e[0], t = e.slice(1);
+  const r = e[0], l = e.slice(1);
   if (Array.isArray(n)) {
-    const l = Number(r);
-    if (!isNaN(l) && l >= 0 && l < n.length)
+    const t = Number(r);
+    if (!isNaN(t) && t >= 0 && t < n.length)
       return [
-        ...n.slice(0, l),
-        g(t, n[l], i),
-        ...n.slice(l + 1)
+        ...n.slice(0, t),
+        d(l, n[t], i),
+        ...n.slice(t + 1)
       ];
     throw console.log("errorstate", n, e), new Error(
-      `Invalid array index "${l}" in path "${e.join(".")}".`
+      `Invalid array index "${t}" in path "${e.join(".")}".`
     );
   } else if (typeof n == "object" && n !== null) {
     if (r && r in n)
       return {
         ...n,
-        [r]: g(t, n[r], i)
+        [r]: d(l, n[r], i)
       };
-    throw console.log("Invalid property", r, t, e), new Error(
+    throw console.log("Invalid property", r, l, e), new Error(
       `Invalid property "${r}" in path "${e.join(".")}".`
     );
   } else
@@ -53,29 +53,29 @@ function g(e, n, i) {
       `Cannot update nested property at path "${e.join(".")}". The path does not exist.`
     );
 }
-function p(e, n) {
+function h(e, n) {
   if (!e || e.length === 0) return n;
   const i = e[0], r = e.slice(1);
   if (Array.isArray(n)) {
-    const t = Number(i);
-    if (!isNaN(t) && t >= 0 && t < n.length)
-      return r.length === 0 ? [...n.slice(0, t), ...n.slice(t + 1)] : [
-        ...n.slice(0, t),
-        p(r, n[t]),
-        ...n.slice(t + 1)
+    const l = Number(i);
+    if (!isNaN(l) && l >= 0 && l < n.length)
+      return r.length === 0 ? [...n.slice(0, l), ...n.slice(l + 1)] : [
+        ...n.slice(0, l),
+        h(r, n[l]),
+        ...n.slice(l + 1)
       ];
     throw new Error(
-      `Invalid array index "${t}" in path "${e.join(".")}".`
+      `Invalid array index "${l}" in path "${e.join(".")}".`
     );
   } else if (typeof n == "object" && n !== null)
     if (r.length === 0) {
-      const { [i]: t, ...l } = n;
-      return l;
+      const { [i]: l, ...t } = n;
+      return t;
     } else {
       if (i in n)
         return {
           ...n,
-          [i]: p(r, n[i])
+          [i]: h(r, n[i])
         };
       throw new Error(
         `Invalid property "${i}" in path "${e.join(".")}".`
@@ -86,7 +86,7 @@ function p(e, n) {
       `Cannot delete nested property at path "${e.join(".")}". The path does not exist.`
     );
 }
-function a(e, n, i = "") {
+function y(e, n, i = "") {
   let r = [];
   if (typeof e == "function" && typeof n == "function")
     return r;
@@ -96,10 +96,10 @@ function a(e, n, i = "") {
     return e !== n ? [i] : r;
   if (Array.isArray(e) && Array.isArray(n)) {
     e.length !== n.length && r.push(`${i}`);
-    const o = Math.min(e.length, n.length);
-    for (let f = 0; f < o; f++)
+    const s = Math.min(e.length, n.length);
+    for (let f = 0; f < s; f++)
       e[f] !== n[f] && (r = r.concat(
-        a(
+        y(
           e[f],
           n[f],
           i ? `${i}.${f}` : `${f}`
@@ -107,16 +107,16 @@ function a(e, n, i = "") {
       ));
     if (e.length !== n.length) {
       const f = e.length > n.length ? e : n;
-      for (let c = o; c < f.length; c++)
+      for (let c = s; c < f.length; c++)
         r.push(i ? `${i}.${c}` : `${c}`);
     }
     return r;
   }
-  const t = Object.keys(e), l = Object.keys(n);
-  return Array.from(/* @__PURE__ */ new Set([...t, ...l])).forEach((o) => {
-    const f = i ? `${i}.${o}` : o;
+  const l = Object.keys(e), t = Object.keys(n);
+  return Array.from(/* @__PURE__ */ new Set([...l, ...t])).forEach((s) => {
+    const f = i ? `${i}.${s}` : s;
     r = r.concat(
-      a(e[o], n[o], f)
+      y(e[s], n[s], f)
     );
   }), r;
 }
@@ -127,67 +127,57 @@ function A(e, n) {
   }), i;
 }
 function w(e, n) {
-  return a(e, n).map(
+  return y(e, n).map(
     (r) => r.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean)
   );
 }
-function h(e, n, i = "") {
+function p(e, n, i = "") {
   let r = [];
   if (e == null || n === null || n === void 0)
     return r;
   if (Array.isArray(e) && Array.isArray(n))
     e.length !== n.length && r.push(i);
   else if (typeof e == "object" && typeof n == "object") {
-    const t = /* @__PURE__ */ new Set([...Object.keys(e), ...Object.keys(n)]);
-    for (const l of t) {
-      const s = i ? `${i}.${l}` : l;
-      (Array.isArray(e[l]) || Array.isArray(n[l])) && (r = r.concat(
-        h(e[l], n[l], s)
+    const l = /* @__PURE__ */ new Set([...Object.keys(e), ...Object.keys(n)]);
+    for (const t of l) {
+      const o = i ? `${i}.${t}` : t;
+      (Array.isArray(e[t]) || Array.isArray(n[t])) && (r = r.concat(
+        p(e[t], n[t], o)
       ));
     }
   }
   return r;
 }
-function m(e, n) {
-  return h(e, n).map(
+function v(e, n) {
+  return p(e, n).map(
     (r) => r.replace(/\[(\w+)\]/g, ".$1").split(".").filter(Boolean)
   );
 }
 function N(e, n) {
   let i = null;
-  const r = (...t) => {
-    i && clearTimeout(i), i = setTimeout(() => e(...t), n);
+  const r = (...l) => {
+    i && clearTimeout(i), i = setTimeout(() => e(...l), n);
   };
   return r.cancel = () => {
     i && (clearTimeout(i), i = null);
   }, r;
 }
-function O(e) {
-  const n = (l) => Object.values(l).some(
-    (s) => s?.hasOwnProperty("initialState")
-  );
-  let i = {};
-  const r = (l) => {
-    const s = {};
-    return Object.entries(l).forEach(([o, f]) => {
-      f?.initialState ? (i = { ...i ?? {}, [o]: f }, s[o] = f.initialState) : s[o] = f;
-    }), s;
-  };
-  return [n(e) ? r(e) : e, i];
+function m(e) {
+  return [e, {}];
 }
 export {
   N as debounce,
   A as deepMerge,
-  p as deleteNestedProperty,
-  h as getArrayLengthDifferences,
-  m as getArrayLengthDifferencesArray,
-  a as getDifferences,
+  h as deleteNestedProperty,
+  p as getArrayLengthDifferences,
+  v as getArrayLengthDifferencesArray,
+  y as getDifferences,
   w as getDifferencesArray,
-  y as isArray,
-  d as isDeepEqual,
+  a as isArray,
+  g as isDeepEqual,
   $ as isFunction,
   u as isObject,
-  O as transformStateFunc,
-  g as updateNestedProperty
+  m as transformStateFunc,
+  d as updateNestedProperty
 };
 //# sourceMappingURL=utility.js.map

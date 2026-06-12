@@ -1,5 +1,3 @@
-import { TransformedStateType } from './CogsState';
-
 export declare const isObject: (item: any) => item is Record<string, any>;
 export type GenericObject = Record<string, any>;
 export declare const isFunction: <TStateObject extends unknown>(arg: any) => arg is (prev: TStateObject) => TStateObject;
@@ -21,6 +19,6 @@ export declare function debounce<F extends (...args: any[]) => any>(func: (...ar
 export type DebouncedFunction<F extends (...args: any[]) => any> = F & {
     cancel: () => void;
 };
-export declare function transformStateFunc<State extends unknown>(initialState: State): [TransformedStateType<State>, GenericObject];
+export declare function transformStateFunc<State extends unknown>(initialState: State): [State, GenericObject];
 export {};
 //# sourceMappingURL=utility.d.ts.map

@@ -22,8 +22,7 @@ vi.mock('react-intersection-observer', () => ({
 // Test state
 const { useCogsState } = createCogsState({
   componentTestState: {
-    initialState: {
-      name: 'John',
+    name: 'John',
       age: 30,
       settings: {
         theme: 'dark',

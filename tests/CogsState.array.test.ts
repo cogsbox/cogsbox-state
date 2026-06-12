@@ -214,10 +214,10 @@ const getOrdersInitialState = (): OrdersTestState => ({
 // Update the createCogsState call to include this new state
 // You'll need to find the existing `createCogsState` call and add the `complexApp` key.
 const { useCogsState } = createCogsState({
-  basicTestState: { initialState: getBasicInitialState() }, // <-- ADDED FOR BASIC TESTS
-  advancedTestState: { initialState: getInitialState() },
-  complexApp: { initialState: getComplexInitialState() },
-  ordersTestState: { initialState: getOrdersInitialState() },
+  basicTestState: getBasicInitialState(),
+  advancedTestState: getInitialState(),
+  complexApp: getComplexInitialState(),
+  ordersTestState: getOrdersInitialState(),
 });
 
 describe('CogsState - Basic Functionality', () => {

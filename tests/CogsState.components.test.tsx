@@ -19,36 +19,34 @@ vi.mock('react-intersection-observer', () => ({
 // Test state with nested arrays - both levels have 'active' property with opposite meanings
 const { useCogsState } = createCogsState({
   testState: {
-    initialState: {
-      categories: [
-        {
-          name: 'Fruits',
-          active: true, // Category is active
-          items: [
-            { name: 'apple', active: false }, // Item is NOT active
-            { name: 'banana', active: true }, // Item IS active
-            { name: 'orange', active: false }, // Item is NOT active
-          ],
-        },
-        {
-          name: 'Vegetables',
-          active: false, // Category is NOT active
-          items: [
-            { name: 'carrot', active: true }, // Item IS active
-            { name: 'lettuce', active: false }, // Item is NOT active
-          ],
-        },
-        {
-          name: 'Dairy',
-          active: true, // Category is active
-          items: [
-            { name: 'milk', active: true }, // Item IS active
-            { name: 'cheese', active: false }, // Item IS active
-            { name: 'yogurt', active: true }, // Item IS active
-          ],
-        },
-      ],
-    },
+    categories: [
+      {
+        name: 'Fruits',
+        active: true,
+        items: [
+          { name: 'apple', active: false },
+          { name: 'banana', active: true },
+          { name: 'orange', active: false },
+        ],
+      },
+      {
+        name: 'Vegetables',
+        active: false,
+        items: [
+          { name: 'carrot', active: true },
+          { name: 'lettuce', active: false },
+        ],
+      },
+      {
+        name: 'Dairy',
+        active: true,
+        items: [
+          { name: 'milk', active: true },
+          { name: 'cheese', active: false },
+          { name: 'yogurt', active: true },
+        ],
+      },
+    ],
   },
 });
 
