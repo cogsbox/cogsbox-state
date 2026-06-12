@@ -1,5 +1,3 @@
-import type { TransformedStateType, CogsInitialState } from './CogsState';
-
 export const isObject = (item: any): item is Record<string, any> => {
   return (
     item && typeof item === 'object' && !Array.isArray(item) && item !== null
@@ -346,35 +344,5 @@ export type DebouncedFunction<F extends (...args: any[]) => any> = F & {
 };
 
 export function transformStateFunc<State extends unknown>(initialState: State) {
-  const isInitialStateType = (state: any): state is CogsInitialState<State> => {
-    return Object.values(state).some((value) =>
-      value?.hasOwnProperty('initialState')
-    );
-  };
-  let initalOptions: GenericObject = {};
-  const transformInitialState = (
-    state: CogsInitialState<State>
-  ): GenericObject | GenericObject[] => {
-    const transformedState: GenericObject | GenericObject[] = {};
-    Object.entries(state).forEach(([key, value]) => {
-      if (value?.initialState) {
-        initalOptions = { ...(initalOptions ?? {}), [key]: value };
-
-        transformedState[key] = value.initialState;
-      } else {
-        transformedState[key] = value;
-      }
-    });
-
-    return transformedState;
-  };
-
-  const transformedInitialState = isInitialStateType(initialState)
-    ? (transformInitialState(initialState) as State)
-    : (initialState as State);
-
-  return [transformedInitialState, initalOptions] as [
-    TransformedStateType<State>,
-    GenericObject,
-  ];
+  return [initialState as State, {}] as [State, GenericObject];
 }

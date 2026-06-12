@@ -523,16 +523,6 @@ export type FormsElementsType<
     key?: string;
   }) => React.ReactNode;
 };
-export type CogsInitialState<T> =
-  | {
-      initialState: T;
-    }
-  | CreateStateOptionsType<T>;
-
-export type TransformedStateType<T> = {
-  [P in keyof T]: T[P] extends CogsInitialState<infer U> ? U : T[P];
-};
-
 const {
   getInitialOptions,
   updateInitialStateGlobal,
@@ -711,16 +701,6 @@ function setOptions<StateKey, Opt>({
 
   return mergedOptions;
 }
-export function addStateOptions<T>(
-  initialState: T,
-  options: CreateStateOptionsType<T>
-) {
-  return {
-    ...options,
-    initialState,
-    _addStateOptions: true,
-  };
-}
 export type PluginData = {
   plugin: CogsPlugin<any, any, any, any, any>;
   options: any;
@@ -759,41 +739,24 @@ export const createCogsState = <
   const [statePart, initialOptionsPart] =
     transformStateFunc<State>(initialState);
 
-  // FIX: Store options INCLUDING validation for each state key
   Object.keys(statePart).forEach((key) => {
-    let existingOptions = initialOptionsPart[key] || {};
-
-    const mergedOptions: any = {
-      ...existingOptions,
-    };
+    let mergedOptions: any = {};
 
     if (opt?.formElements) {
-      mergedOptions.formElements = {
-        ...opt.formElements,
-        ...(existingOptions.formElements || {}),
-      };
+      mergedOptions.formElements = opt.formElements;
     }
 
     mergedOptions.validation = {
       onBlur: 'error',
       ...opt?.validation,
-      ...(existingOptions.validation || {}),
     };
-
-    if (opt?.validation?.key && !existingOptions.validation?.key) {
-      mergedOptions.validation.key = `${opt.validation.key}.${key}`;
-    }
 
     const existingGlobalOptions = getInitialOptions(key);
 
     const finalOptions = existingGlobalOptions
       ? {
           ...existingGlobalOptions,
-          ...mergedOptions,
-          formElements: {
-            ...existingGlobalOptions.formElements,
-            ...mergedOptions.formElements,
-          },
+          formElements: opt?.formElements,
           validation: {
             ...existingGlobalOptions.validation,
             ...mergedOptions.validation,
@@ -801,7 +764,9 @@ export const createCogsState = <
         }
       : mergedOptions;
 
-    setInitialStateOptions(key, finalOptions);
+    if (Object.keys(finalOptions).length > 0) {
+      setInitialStateOptions(key, finalOptions);
+    }
   });
 
   Object.keys(statePart).forEach((key) => {
