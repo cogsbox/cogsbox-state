@@ -119,21 +119,18 @@ const $t = (e, n) => {
       initialOptionsPart: c
     }), V = q(b);
     V.current = b;
-    const v = D(a, []) || f[a], C = ct(
-      v,
-      {
-        stateKey: a,
-        syncUpdate: d?.syncUpdate,
-        componentId: E,
-        localStorage: d?.localStorage,
-        middleware: d?.middleware,
-        reactiveType: d?.reactiveType,
-        reactiveDeps: d?.reactiveDeps,
-        defaultState: d?.defaultState,
-        dependencies: d?.dependencies,
-        serverState: d?.serverState
-      }
-    );
+    const v = D(a, []) || f[a], C = ct(v, {
+      stateKey: a,
+      syncUpdate: d?.syncUpdate,
+      componentId: E,
+      localStorage: d?.localStorage,
+      middleware: d?.middleware,
+      reactiveType: d?.reactiveType,
+      reactiveDeps: d?.reactiveDeps,
+      defaultState: d?.defaultState,
+      dependencies: d?.dependencies,
+      serverState: d?.serverState
+    });
     return x(() => {
       d && R.getState().setPluginOptionsForState(a, d);
     }, [a, d]), x(() => (R.getState().stateHandlers.set(a, C), () => {
