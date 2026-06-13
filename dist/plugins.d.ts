@@ -54,6 +54,7 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
         dontUpdate?: boolean;
     }) => void;
     addZodErrors: (errors: any[]) => void;
+    clearZodErrors: (paths: string[][]) => void;
     getState: () => TStateSlice;
     setOptions: (options: any) => void;
 };
@@ -64,6 +65,7 @@ export declare function toDeconstructedMethods(stateHandler: StateObject<any>): 
         dontUpdate?: boolean;
     }) => void;
     addZodErrors: (errors: any[]) => void;
+    clearZodErrors: (paths: string[][]) => void;
     getState: () => any;
     setOptions: (opts: any) => void;
 };

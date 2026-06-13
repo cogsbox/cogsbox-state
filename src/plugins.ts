@@ -89,6 +89,7 @@ type DeconstructedCogsMethods<TStateSlice = any> = {
   initialiseShadowState: (data: any) => void;
   applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) => void;
   addZodErrors: (errors: any[]) => void;
+  clearZodErrors: (paths: string[][]) => void;
   getState: () => TStateSlice;
   setOptions: (options: any) => void;
 };
@@ -104,6 +105,8 @@ export function toDeconstructedMethods(stateHandler: StateObject<any>) {
     applyOperation: (patch: any, meta?: { dontUpdate?: boolean }) =>
       stateHandler.$applyOperation(patch, meta),
     addZodErrors: (errors: any[]) => stateHandler.$addZodValidation(errors),
+    clearZodErrors: (paths: string[][]) =>
+      stateHandler.$clearZodValidationPaths(paths),
     getState: () => stateHandler.$get(),
     setOptions: (opts: any) => {
       stateHandler.$setOptions(opts);

@@ -620,4 +620,128 @@ describe('Plugin onFormUpdate validation', () => {
     renderHook(() => useCogsState('tradingRulesForm', { shape: { logs: true } }));
     renderHook(() => useCogsState('tradingRulesForm', { shape: {} }));
   });
+
+  it('keeps plugin refine errors after field-level blur validation passes', async () => {
+    const rangeSchema = z
+      .object({
+        min: z.number(),
+        max: z.number(),
+      })
+      .superRefine((row, ctx) => {
+        if (row.min >= row.max) {
+          ctx.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Max must be > min',
+            path: ['max'],
+          });
+        }
+      });
+
+    const { createPlugin } = createPluginContext({
+      options: z.object({
+        schema: z.custom<typeof rangeSchema>(),
+        fieldToGroup: z.record(z.string(), z.array(z.string())),
+        groups: z.record(
+          z.string(),
+          z.object({ deps: z.array(z.string()) })
+        ),
+      }),
+    });
+
+    const shapePlugin = createPlugin('shapeValidator').onFormUpdate((params) => {
+      if (params.event.activityType !== 'blur') return;
+
+      const fieldName = params.event.path.at(-1);
+      if (!fieldName) return;
+
+      const { schema, fieldToGroup, groups } = params.options;
+      const related = new Set<string>([fieldName]);
+      for (const groupName of fieldToGroup[fieldName] ?? []) {
+        for (const dep of groups[groupName]?.deps ?? []) {
+          related.add(dep);
+        }
+      }
+
+      const result = schema.safeParse(params.getState());
+      const relatedPaths = [...related].map((name) => [
+        ...params.event.path.slice(0, -1),
+        name,
+      ]);
+
+      if (result.success) {
+        params.clearZodErrors(relatedPaths);
+        return;
+      }
+
+      const issues = result.error.issues.filter((issue) =>
+        related.has(String(issue.path.at(-1)))
+      );
+      const mapped = issues.map((issue) => ({
+        path: issue.path.map(String),
+        message: issue.message,
+        code: issue.code,
+      }));
+      const active = new Set(mapped.map((e) => e.path.join('\0')));
+      params.clearZodErrors(
+        relatedPaths.filter((p) => !active.has(p.join('\0')))
+      );
+      if (mapped.length > 0) params.addZodErrors(mapped);
+    });
+
+    const { useCogsState } = createCogsState(
+      { rangeForm: { min: 10, max: 1 } },
+      {
+        plugins: [shapePlugin],
+        formElements: {
+          validation: ({ children, hasErrors, message }) => (
+            <div>
+              {children}
+              {hasErrors && message && (
+                <span data-testid="field-validation-message">{message}</span>
+              )}
+            </div>
+          ),
+        },
+        validation: {
+          zodSchemaV4: rangeSchema,
+          onBlur: 'error',
+        },
+      }
+    );
+
+    function TestComponent() {
+      const form = useCogsState('rangeForm', {
+        shapeValidator: {
+          schema: rangeSchema,
+          fieldToGroup: { min: ['range'], max: ['range'] },
+          groups: { range: { deps: ['min', 'max'] } },
+        },
+      });
+
+      return (
+        <div>
+          {form.min.$formElement((params) => (
+            <input data-testid="min-input" {...params.$inputProps} />
+          ))}
+          {form.max.$formElement((params) => (
+            <input data-testid="max-input" {...params.$inputProps} />
+          ))}
+        </div>
+      );
+    }
+
+    render(
+      <PluginRunner>
+        <TestComponent />
+      </PluginRunner>
+    );
+
+    fireEvent.blur(screen.getByTestId('max-input'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('field-validation-message')).toHaveTextContent(
+        'Max must be > min'
+      );
+    });
+  });
 });

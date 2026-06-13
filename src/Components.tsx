@@ -483,10 +483,7 @@ export function FormElementWrapper({
       clearTimeout(debounceTimeoutRef.current);
       debounceTimeoutRef.current = null;
       isCurrentlyDebouncing.current = false;
-      setState(localValue, path, {
-        updateType: 'update',
-        validationTrigger: 'onBlur',
-      });
+      setState(localValue, path, { updateType: 'update' });
     }
 
     // Clear element's current activity
@@ -500,10 +497,26 @@ export function FormElementWrapper({
       meta?.clientActivityState?.elements?.get(componentId)?.currentActivity
         ?.startTime;
 
-    // Notify plugins
+    const validationOptions = getInitialOptions(stateKey)?.validation;
+    if (validationOptions?.onBlur) {
+      runValidation(
+        {
+          stateKey,
+          path,
+          newValue: localValue,
+          updateType: 'update',
+          timeStamp: Date.now(),
+          status: 'new',
+          oldValue: globalStateValue,
+        },
+        'onBlur'
+      );
+    }
+
+    // Refine / plugin validation runs after field validation so it wins on conflict
     notifyFormUpdate({
       stateKey,
-      activityType: 'blur', // Changed from 'type'
+      activityType: 'blur',
       path,
       timestamp: Date.now(),
       duration: focusStartTime ? Date.now() - focusStartTime : undefined,
@@ -511,21 +524,6 @@ export function FormElementWrapper({
         duration: focusStartTime ? Date.now() - focusStartTime : 0,
       },
     });
-
-    // Run validation if configured
-    const validationOptions = getInitialOptions(stateKey)?.validation;
-    if (validationOptions?.onBlur) {
-      const virtualOperation: UpdateTypeDetail = {
-        stateKey,
-        path,
-        newValue: localValue,
-        updateType: 'update',
-        timeStamp: Date.now(),
-        status: 'new',
-        oldValue: globalStateValue,
-      };
-      runValidation(virtualOperation, 'onBlur');
-    }
   }, [localValue, setState, path, stateKey, componentId, globalStateValue]);
 
   const baseState = rebuildStateShape({

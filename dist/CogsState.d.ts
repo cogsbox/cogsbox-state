@@ -62,6 +62,7 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $removePluginMetaData: (key: string) => void;
     $setOptions: (options: OptionsType<T>) => void;
     $addZodValidation: (errors: ValidationError[], source?: 'client' | 'sync_engine' | 'api') => void;
+    $clearZodValidationPaths: (paths: string[][]) => void;
     $clearValidation: (paths?: string[]) => void;
     $applyOperation: (operation: UpdateTypeDetail, metaData?: Record<string, any>) => void;
     $applyJsonPatch: (patches: any[]) => void;

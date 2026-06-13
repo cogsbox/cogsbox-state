@@ -158,6 +158,7 @@ export type EndType<
     errors: ValidationError[],
     source?: 'client' | 'sync_engine' | 'api'
   ) => void;
+  $clearZodValidationPaths: (paths: string[][]) => void;
   $clearValidation: (paths?: string[]) => void;
   $applyOperation: (
     operation: UpdateTypeDetail,
@@ -3393,31 +3394,60 @@ function createProxyHandler<
               zodErrors: any[],
               source: 'client' | 'sync_engine' | 'api'
             ) => {
+              const store = getGlobalStore.getState();
               zodErrors.forEach((error) => {
+                const errorPath = error.path.map(String);
                 const currentMeta =
-                  getGlobalStore
-                    .getState()
-                    .getShadowMetadata(stateKey, error.path) || {};
+                  store.getShadowMetadata(stateKey, errorPath) || {};
 
-                getGlobalStore
-                  .getState()
-                  .setShadowMetadata(stateKey, error.path, {
-                    ...currentMeta,
-                    validation: {
-                      status: 'INVALID',
-                      errors: [
-                        {
-                          source: source || 'client',
-                          message: error.message,
-                          severity: 'error',
-                          code: error.code,
-                        },
-                      ],
-                      lastValidated: Date.now(),
-                      validatedValue: undefined,
-                    },
-                  });
+                store.setShadowMetadata(stateKey, errorPath, {
+                  ...currentMeta,
+                  validation: {
+                    status: 'INVALID',
+                    errors: [
+                      {
+                        source: source || 'client',
+                        message: error.message,
+                        severity: 'error',
+                        code: error.code,
+                      },
+                    ],
+                    lastValidated: Date.now(),
+                    validatedValue: undefined,
+                  },
+                });
+                store.notifyPathSubscribers(
+                  [stateKey, ...errorPath].join('.'),
+                  { type: 'VALIDATION_UPDATE' }
+                );
               });
+              notifyComponents(stateKey);
+            };
+          }
+
+          if (prop === '$clearZodValidationPaths') {
+            return (paths: string[][]) => {
+              const store = getGlobalStore.getState();
+              paths.forEach((targetPath) => {
+                const currentMeta =
+                  store.getShadowMetadata(stateKey, targetPath) || {};
+                if (!currentMeta.validation) return;
+
+                store.setShadowMetadata(stateKey, targetPath, {
+                  ...currentMeta,
+                  validation: {
+                    status: 'NOT_VALIDATED',
+                    errors: [],
+                    lastValidated: Date.now(),
+                    validatedValue: undefined,
+                  },
+                });
+                store.notifyPathSubscribers(
+                  [stateKey, ...targetPath].join('.'),
+                  { type: 'VALIDATION_CLEAR' }
+                );
+              });
+              notifyComponents(stateKey);
             };
           }
 
