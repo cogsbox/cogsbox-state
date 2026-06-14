@@ -962,14 +962,14 @@ describe('Plugin Hook to Transform Flow', () => {
       })
     );
 
-    expect(result.current.looseImages.sendManyToS3('bucket-a')).toBe(
+    expect(result.current.looseImages.$sendManyToS3('bucket-a')).toBe(
       'array:bucket-a'
     );
 
     expect(
       result.current.users
         .$index(0)
-        .profile.image.sendToS3('bucket-b', 'avatars')
+        .profile.image.$sendToS3('bucket-b', 'avatars')
     ).toEqual({
       uploaded: true,
       bucket: 'bucket-b',
@@ -977,7 +977,7 @@ describe('Plugin Hook to Transform Flow', () => {
     });
 
     expect(
-      result.current.galleries.$index(0).images.sendGalleryToS3('bucket-c')
+      result.current.galleries.$index(0).images.$sendGalleryToS3('bucket-c')
     ).toBe('uploads');
 
     expect(calls).toEqual([
@@ -1054,7 +1054,7 @@ describe('Plugin Hook to Transform Flow', () => {
     const { result } = renderHook(() => useCogsState('draftUser'));
 
     expect(
-      result.current.initialise({
+      result.current.$initialise({
         name: 'Ada',
       })
     ).toEqual({

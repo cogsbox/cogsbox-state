@@ -57,7 +57,9 @@ type ChainMethodCallable<THandler> = THandler extends (
   : never;
 
 export type ChainMethodCallables<TMethods> = {
-  [K in keyof TMethods]: TMethods[K] extends ChainMethodDefinition<infer TFn>
+  [K in keyof TMethods as K extends string
+    ? `$${K}`
+    : never]: TMethods[K] extends ChainMethodDefinition<infer TFn>
     ? ChainMethodCallable<TFn>
     : never;
 };
@@ -470,9 +472,14 @@ type ZodObjOutput<T extends z.ZodObject<any>> = {
 type OutputOf<T extends z.ZodTypeAny> =
   T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
 
-type MethodFactory = <THandler extends ChainMethodHandler>(
-  handler: THandler
-) => ChainMethodDefinition<THandler>;
+type MethodFactory = <TArgs extends any[], TReturn>(
+  handler: (
+    ctx: ChainMethodContext<any, any>,
+    ...args: TArgs
+  ) => TReturn
+) => ChainMethodDefinition<
+  (ctx: ChainMethodContext<any, any>, ...args: TArgs) => TReturn
+>;
 
 type PathMethodFactory = MethodFactory & {
   array: MethodFactory;

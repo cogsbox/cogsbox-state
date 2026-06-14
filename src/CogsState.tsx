@@ -914,7 +914,7 @@ type CreateCogsStateReturn<
       PluginOptionsMap<TPlugins>,
       StateKey
     >
-  ) => StateObject<CogsFullState<State, TPlugins>[StateKey]>;
+  ) => StateObject<CogsFullState<State, TPlugins>[StateKey], TPlugins>;
   setCogsOptionsByKey: <StateKey extends keyof CogsFullState<State, TPlugins>>(
     stateKey: StateKey,
     options: CreateStateOptionsType<
@@ -1030,7 +1030,7 @@ export const createCogsState = <
       OptionsType<StateSlice<StateKey>, never> &
         PluginOptionsForState<PluginOptions, StateKey>
     >
-  ): StateObject<StateSlice<StateKey>> => {
+  ): StateObject<StateSlice<StateKey>, TPlugins> => {
     const [componentId] = useState(options?.componentId ?? uuidv4());
 
     const currentOptions = setOptions({
@@ -1086,7 +1086,7 @@ export const createCogsState = <
       }
     });
 
-    return updater as StateObject<StateSlice<StateKey>>;
+    return updater as StateObject<StateSlice<StateKey>, TPlugins>;
   };
 
   function setCogsOptionsByKey<StateKey extends StateKeys>(
@@ -2395,9 +2395,19 @@ function createProxyHandler<
             });
           }
 
+          const nextPath = [...path, prop];
+          return rebuildStateShape({
+            path: nextPath,
+            componentId: componentId!,
+            meta,
+          });
+        }
+        if (typeof prop === 'string' && prop.startsWith('$')) {
+          const methodName = prop.slice(1);
+          const { value } = getScopedData(stateKey, path, meta);
           const registeredPlugins = pluginStore.getState().registeredPlugins;
           for (const plugin of registeredPlugins) {
-            const chainMethod = (plugin.chainMethods as any)?.[prop];
+            const chainMethod = (plugin.chainMethods as any)?.[methodName];
             if (!chainMethod) continue;
             if (!pathMatchesPattern(path, chainMethod.pathPattern)) continue;
             if (!valueMatchesChainTarget(value, chainMethod.target)) continue;
@@ -2463,13 +2473,6 @@ function createProxyHandler<
               );
             };
           }
-
-          const nextPath = [...path, prop];
-          return rebuildStateShape({
-            path: nextPath,
-            componentId: componentId!,
-            meta,
-          });
         }
         if (prop === '$_rebuildStateShape') {
           return rebuildStateShape;

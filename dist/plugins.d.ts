@@ -34,7 +34,7 @@ export type ChainMethodDefinition<THandler extends ChainMethodHandler = ChainMet
 export type ChainMethodDefinitions = Record<string, ChainMethodDefinition<any>>;
 type ChainMethodCallable<THandler> = THandler extends (ctx: any, ...args: infer TArgs) => infer TReturn ? (...args: TArgs) => TReturn : never;
 export type ChainMethodCallables<TMethods> = {
-    [K in keyof TMethods]: TMethods[K] extends ChainMethodDefinition<infer TFn> ? ChainMethodCallable<TFn> : never;
+    [K in keyof TMethods as K extends string ? `$${K}` : never]: TMethods[K] extends ChainMethodDefinition<infer TFn> ? ChainMethodCallable<TFn> : never;
 };
 export type KeyedTypes<TMap extends Record<string, any>> = {
     __key: 'keyed';
@@ -203,7 +203,7 @@ type ZodObjOutput<T extends z.ZodObject<any>> = {
     [K in keyof T['shape']]: z.output<T['shape'][K]>;
 };
 type OutputOf<T extends z.ZodTypeAny> = T extends z.ZodObject<any> ? Prettify<ZodObjOutput<T>> : z.output<T>;
-type MethodFactory = <THandler extends ChainMethodHandler>(handler: THandler) => ChainMethodDefinition<THandler>;
+type MethodFactory = <TArgs extends any[], TReturn>(handler: (ctx: ChainMethodContext<any, any>, ...args: TArgs) => TReturn) => ChainMethodDefinition<(ctx: ChainMethodContext<any, any>, ...args: TArgs) => TReturn>;
 type PathMethodFactory = MethodFactory & {
     array: MethodFactory;
     object: MethodFactory;

@@ -337,9 +337,9 @@ const assets = useCogsState('assets', {
   s3: { bucketPrefix: 'uploads' },
 });
 
-await assets.users.$index(0).profile.image.sendToS3('avatars');
-await assets.galleries.$index(0).images.sendGalleryToS3('gallery');
-await assets.looseImages.sendManyToS3('images');
+await assets.users.$index(0).profile.image.$sendToS3('avatars');
+await assets.galleries.$index(0).images.$sendGalleryToS3('gallery');
+await assets.looseImages.$sendManyToS3('images');
 ```
 
 ### Method Targets
@@ -364,7 +364,7 @@ path((state) => state.users.$.profile.image);
 matches calls like:
 
 ```typescript
-assets.users.$index(0).profile.image.sendToS3('avatars');
+assets.users.$index(0).profile.image.$sendToS3('avatars');
 ```
 
 The first handler argument is a scoped plugin context. The remaining handler

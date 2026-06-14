@@ -342,7 +342,7 @@ type PluginOptionsForState<PluginOptions, StateKey extends PropertyKey> = {
 };
 type UseCogsStateOptions<StateSlice, PluginOptions, StateKey extends PropertyKey> = Prettify<OptionsType<StateSlice, never> & PluginOptionsForState<PluginOptions, StateKey>>;
 type CreateCogsStateReturn<State extends object, TPlugins extends readonly AnyCogsPlugin[]> = {
-    useCogsState: <StateKey extends keyof CogsFullState<State, TPlugins>>(stateKey: StateKey, options?: UseCogsStateOptions<CogsFullState<State, TPlugins>[StateKey], PluginOptionsMap<TPlugins>, StateKey>) => StateObject<CogsFullState<State, TPlugins>[StateKey]>;
+    useCogsState: <StateKey extends keyof CogsFullState<State, TPlugins>>(stateKey: StateKey, options?: UseCogsStateOptions<CogsFullState<State, TPlugins>[StateKey], PluginOptionsMap<TPlugins>, StateKey>) => StateObject<CogsFullState<State, TPlugins>[StateKey], TPlugins>;
     setCogsOptionsByKey: <StateKey extends keyof CogsFullState<State, TPlugins>>(stateKey: StateKey, options: CreateStateOptionsType<CogsFullState<State, TPlugins>[StateKey], TPlugins> & Omit<OptionsType<CogsFullState<State, TPlugins>[StateKey]>, keyof CreateStateOptionsType>) => void;
     setCogsOptions: (globalOptions: CreateStateOptionsType<unknown, TPlugins> & Omit<OptionsType<unknown>, keyof CreateStateOptionsType>) => void;
 };
