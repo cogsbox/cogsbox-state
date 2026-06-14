@@ -1,5 +1,5 @@
 // vitest.config.ts
-import { defineConfig } from "vitest/config";
+import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
@@ -7,6 +7,6 @@ export default defineConfig({
     // `jsdom` is not strictly required if you aren't testing browser-specific APIs
     // but it's a safe default as it emulates things like `localStorage`.
     // You could use 'node' if your library has zero browser dependencies.
-    environment: "jsdom",
+    environment: 'jsdom',
   },
 });

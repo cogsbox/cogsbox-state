@@ -1,7 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import React from 'react';
-import { render, screen, fireEvent, waitFor, renderHook } from '@testing-library/react';
-import '@testing-library/jest-dom';
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  renderHook,
+} from '@testing-library/react';
+import '@testing-library/jest-dom/vitest';
 import { createCogsState } from '../src/CogsState';
 import { createPluginContext } from '../src/plugins';
 import { PluginRunner } from '../src/PluginRunner';
@@ -32,7 +38,9 @@ function createValidatorPlugin() {
   return createPlugin('validator').onFormUpdate((params) => {
     if (params.event.activityType !== 'blur') return;
 
-    const fieldName = params.event.path[params.event.path.length - 1];
+    const fieldName = params.event.path.at(-1);
+    if (!fieldName) return;
+
     const result = params.options.schema.safeParse(params.getState());
 
     if (!result.success) {
@@ -68,7 +76,9 @@ function createShapeStylePlugin() {
   return createPlugin('shapeValidator').onFormUpdate((params) => {
     if (params.event.activityType !== 'blur') return;
 
-    const fieldName = params.event.path[params.event.path.length - 1];
+    const fieldName = params.event.path.at(-1);
+    if (!fieldName) return;
+
     const { schema, fieldToGroup, groups } = params.options;
 
     const affectedGroups = fieldToGroup[fieldName] ?? [];
@@ -352,18 +362,20 @@ describe('Plugin onFormUpdate validation', () => {
       groups: { deps: string[] | null }[];
     };
 
-    type ShapeSchemaBoxEntry = {
-      generateDefaults: () => unknown;
-      schemas: { client: z.ZodTypeAny };
-      refineInfo?: ShapeRefineInfo;
-    };
-
-    type ShapeSchemaBox = Record<string, ShapeSchemaBoxEntry>;
-
     const tradingRulesFormSchema = z.object({
       ruleName: z.string().min(3, 'Rule name must be at least 3 characters'),
       enabled: z.boolean(),
     });
+
+    type TradingRulesForm = z.infer<typeof tradingRulesFormSchema>;
+
+    type ShapeSchemaBoxEntry<TDefaults> = {
+      generateDefaults: () => TDefaults;
+      schemas: { client: z.ZodTypeAny };
+      refineInfo?: ShapeRefineInfo;
+    };
+
+    type ShapeSchemaBox = Record<string, ShapeSchemaBoxEntry<TradingRulesForm>>;
 
     const journalSchemaBox: ShapeSchemaBox = {
       tradingRulesForm: {
@@ -508,12 +520,17 @@ describe('Plugin onFormUpdate validation', () => {
       }),
     });
 
-    type ShapeSchemaBoxEntry = {
-      generateDefaults: () => unknown;
+    type TradingRulesForm = z.infer<typeof tradingRulesSchema>;
+
+    type ShapeSchemaBoxEntry<TDefaults> = {
+      generateDefaults: () => TDefaults;
       schemas: { client: z.ZodTypeAny };
     };
 
-    const journalSchemaBox: Record<string, ShapeSchemaBoxEntry> = {
+    const journalSchemaBox: Record<
+      string,
+      ShapeSchemaBoxEntry<TradingRulesForm>
+    > = {
       tradingRulesForm: {
         generateDefaults: () => ({
           rules: {
@@ -617,7 +634,9 @@ describe('Plugin onFormUpdate validation', () => {
     );
 
     renderHook(() => useCogsState('tradingRulesForm'));
-    renderHook(() => useCogsState('tradingRulesForm', { shape: { logs: true } }));
+    renderHook(() =>
+      useCogsState('tradingRulesForm', { shape: { logs: true } })
+    );
     renderHook(() => useCogsState('tradingRulesForm', { shape: {} }));
   });
 
@@ -641,52 +660,51 @@ describe('Plugin onFormUpdate validation', () => {
       options: z.object({
         schema: z.custom<typeof rangeSchema>(),
         fieldToGroup: z.record(z.string(), z.array(z.string())),
-        groups: z.record(
-          z.string(),
-          z.object({ deps: z.array(z.string()) })
-        ),
+        groups: z.record(z.string(), z.object({ deps: z.array(z.string()) })),
       }),
     });
 
-    const shapePlugin = createPlugin('shapeValidator').onFormUpdate((params) => {
-      if (params.event.activityType !== 'blur') return;
+    const shapePlugin = createPlugin('shapeValidator').onFormUpdate(
+      (params) => {
+        if (params.event.activityType !== 'blur') return;
 
-      const fieldName = params.event.path.at(-1);
-      if (!fieldName) return;
+        const fieldName = params.event.path.at(-1);
+        if (!fieldName) return;
 
-      const { schema, fieldToGroup, groups } = params.options;
-      const related = new Set<string>([fieldName]);
-      for (const groupName of fieldToGroup[fieldName] ?? []) {
-        for (const dep of groups[groupName]?.deps ?? []) {
-          related.add(dep);
+        const { schema, fieldToGroup, groups } = params.options;
+        const related = new Set<string>([fieldName]);
+        for (const groupName of fieldToGroup[fieldName] ?? []) {
+          for (const dep of groups[groupName]?.deps ?? []) {
+            related.add(dep);
+          }
         }
+
+        const result = schema.safeParse(params.getState());
+        const relatedPaths = [...related].map((name) => [
+          ...params.event.path.slice(0, -1),
+          name,
+        ]);
+
+        if (result.success) {
+          params.clearZodErrors(relatedPaths);
+          return;
+        }
+
+        const issues = result.error.issues.filter((issue) =>
+          related.has(String(issue.path.at(-1)))
+        );
+        const mapped = issues.map((issue) => ({
+          path: issue.path.map(String),
+          message: issue.message,
+          code: issue.code,
+        }));
+        const active = new Set(mapped.map((e) => e.path.join('\0')));
+        params.clearZodErrors(
+          relatedPaths.filter((p) => !active.has(p.join('\0')))
+        );
+        if (mapped.length > 0) params.addZodErrors(mapped);
       }
-
-      const result = schema.safeParse(params.getState());
-      const relatedPaths = [...related].map((name) => [
-        ...params.event.path.slice(0, -1),
-        name,
-      ]);
-
-      if (result.success) {
-        params.clearZodErrors(relatedPaths);
-        return;
-      }
-
-      const issues = result.error.issues.filter((issue) =>
-        related.has(String(issue.path.at(-1)))
-      );
-      const mapped = issues.map((issue) => ({
-        path: issue.path.map(String),
-        message: issue.message,
-        code: issue.code,
-      }));
-      const active = new Set(mapped.map((e) => e.path.join('\0')));
-      params.clearZodErrors(
-        relatedPaths.filter((p) => !active.has(p.join('\0')))
-      );
-      if (mapped.length > 0) params.addZodErrors(mapped);
-    });
+    );
 
     const { useCogsState } = createCogsState(
       { rangeForm: { min: 10, max: 1 } },
