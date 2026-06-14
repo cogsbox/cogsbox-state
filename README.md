@@ -543,3 +543,66 @@ function UserForm() {
   );
 }
 ```
+
+### Reading Validation State
+
+Use `$validationErrors()` on an object state node to get validation summaries
+for its immediate child fields.
+
+```typescript
+const userForm = useCogsState('userForm');
+
+const validation = userForm.$validationErrors();
+```
+
+This returns an array of objects. Each item includes the field `path` plus the
+current validation state for that path:
+
+```typescript
+[
+  {
+    path: ['name'],
+    status: 'INVALID',
+    severity: 'error',
+    hasErrors: true,
+    hasWarnings: false,
+    message: 'Name is required',
+    errors: ['Name is required'],
+    warnings: [],
+    allErrors: [
+      {
+        path: ['name'],
+        source: 'client',
+        severity: 'error',
+        message: 'Name is required',
+        code: 'too_small',
+      },
+    ],
+    getData: () => '',
+  },
+]
+```
+
+Pass a type-safe string array to read only specific fields. This is useful for
+multi-stage forms where a stage should not advance while selected fields have
+errors.
+
+```typescript
+const stageValidation = userForm.$validationErrors([
+  'name',
+  'email',
+]);
+
+if (stageValidation.some((field) => field.hasErrors)) {
+  return;
+}
+
+goToNextStage();
+```
+
+The keys must exist on the object state node, so this is checked by TypeScript:
+
+```typescript
+userForm.$validationErrors(['name']); // ok
+userForm.$validationErrors(['missingField']); // type error
+```

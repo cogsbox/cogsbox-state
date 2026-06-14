@@ -243,6 +243,83 @@ describe('Plugin onFormUpdate validation', () => {
     });
   });
 
+  it('should return typed validation summaries for selected object fields', async () => {
+    const { useCogsState } = createCogsState(
+      {
+        userForm: {
+          username: '',
+          email: '',
+          notes: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: z.object({
+            username: z
+              .string()
+              .min(3, 'Username must be at least 3 characters'),
+            email: z.string().email('Invalid email address'),
+            notes: z.string(),
+          }),
+          onBlur: 'error',
+        },
+      }
+    );
+
+    let canLeaveStage = true;
+
+    function TestComponent() {
+      const form = useCogsState('userForm');
+      const stageValidation = form.$validationErrors(['username', 'email']);
+      canLeaveStage = !stageValidation.some((field) => field.hasErrors);
+      const usernameValidation = stageValidation.find(
+        (field) => field.path.at(-1) === 'username'
+      );
+      const emailValidation = stageValidation.find(
+        (field) => field.path.at(-1) === 'email'
+      );
+
+      return (
+        <div>
+          {form.username.$formElement((params) => (
+            <input data-testid="username-input" {...params.$inputProps} />
+          ))}
+          {form.email.$formElement((params) => (
+            <input data-testid="email-input" {...params.$inputProps} />
+          ))}
+          <span data-testid="stage-can-leave">{String(canLeaveStage)}</span>
+          <span data-testid="username-message">
+            {usernameValidation?.message}
+          </span>
+          <span data-testid="username-path">
+            {usernameValidation?.path.join('.')}
+          </span>
+          <span data-testid="email-message">{emailValidation?.message}</span>
+        </div>
+      );
+    }
+
+    render(<TestComponent />);
+
+    expect(screen.getByTestId('stage-can-leave')).toHaveTextContent('true');
+
+    fireEvent.change(screen.getByTestId('username-input'), {
+      target: { value: 'ab' },
+    });
+    fireEvent.blur(screen.getByTestId('username-input'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('stage-can-leave')).toHaveTextContent('false');
+      expect(screen.getByTestId('username-message')).toHaveTextContent(
+        'Username must be at least 3 characters'
+      );
+      expect(screen.getByTestId('username-path')).toHaveTextContent(
+        'username'
+      );
+      expect(screen.getByTestId('email-message')).toHaveTextContent('');
+    });
+  });
+
   it('should surface plugin validation errors in formElements.validation on blur', async () => {
     const validatorPlugin = createValidatorPlugin();
 

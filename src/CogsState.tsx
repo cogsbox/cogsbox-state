@@ -63,6 +63,21 @@ export type SyncInfo = {
   userId: number;
 };
 
+export type ValidationFieldSummary = {
+  status: ValidationStatus;
+  severity: ValidationSeverity;
+  hasErrors: boolean;
+  hasWarnings: boolean;
+  message: string;
+  errors: string[];
+  warnings: string[];
+  allErrors: Array<ValidationError & { path: string[] }>;
+  path: string[];
+  getData: () => unknown;
+};
+
+type ValidationSummaryArray = ValidationFieldSummary[];
+
 export type FormElementParams<T> = StateObject<T> & {
   $inputProps: {
     ref?: RefObject<any>;
@@ -194,6 +209,12 @@ export type EndType<
   $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
   $showValidationErrors: () => string[];
+  $validationErrors: {
+    (): ValidationSummaryArray;
+    <K extends Extract<keyof NonNullable<T>, string>>(
+      keys: readonly K[]
+    ): ValidationSummaryArray;
+  };
   $setValidation: (ctx: string) => void;
   $removeValidation: (ctx: string) => void;
   $isSelected: boolean;
@@ -2636,6 +2657,50 @@ function createProxyHandler<
                 .map((err) => err.message);
             }
             return [];
+          };
+        }
+        if (prop === '$validationErrors') {
+          return (keys?: readonly string[]) => {
+            const store = getGlobalStore.getState();
+            const summarizePath = (targetPath: string[]) => {
+              const validationState =
+                store.getShadowMetadata(stateKey, targetPath)?.validation;
+              const allErrors = (validationState?.errors || []).map((err) => ({
+                ...err,
+                path: targetPath,
+              }));
+              const errors = allErrors.filter((err) => err.severity === 'error');
+              const warnings = allErrors.filter(
+                (err) => err.severity === 'warning'
+              );
+              const severity: ValidationSeverity =
+                errors.length > 0
+                  ? 'error'
+                  : warnings.length > 0
+                    ? 'warning'
+                    : undefined;
+
+              return {
+                status: validationState?.status || 'NOT_VALIDATED',
+                severity,
+                hasErrors: errors.length > 0,
+                hasWarnings: warnings.length > 0,
+                message: errors[0]?.message || warnings[0]?.message || '',
+                errors: errors.map((err) => err.message),
+                warnings: warnings.map((err) => err.message),
+                allErrors,
+                path: targetPath,
+                getData: () => store.getShadowValue(stateKey, targetPath),
+              } satisfies ValidationFieldSummary;
+            };
+
+            const childKeys =
+              keys ??
+              Object.keys(store.getShadowNode(stateKey, path) ?? {}).filter(
+                (key) => key !== '_meta'
+              );
+
+            return childKeys.map((key) => summarizePath([...path, key]));
           };
         }
 

@@ -12,6 +12,21 @@ export type SyncInfo = {
     timeStamp: number;
     userId: number;
 };
+export type ValidationFieldSummary = {
+    status: ValidationStatus;
+    severity: ValidationSeverity;
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    message: string;
+    errors: string[];
+    warnings: string[];
+    allErrors: Array<ValidationError & {
+        path: string[];
+    }>;
+    path: string[];
+    getData: () => unknown;
+};
+type ValidationSummaryArray = ValidationFieldSummary[];
 export type FormElementParams<T> = StateObject<T> & {
     $inputProps: {
         ref?: RefObject<any>;
@@ -87,6 +102,10 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
     $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
     $showValidationErrors: () => string[];
+    $validationErrors: {
+        (): ValidationSummaryArray;
+        <K extends Extract<keyof NonNullable<T>, string>>(keys: readonly K[]): ValidationSummaryArray;
+    };
     $setValidation: (ctx: string) => void;
     $removeValidation: (ctx: string) => void;
     $isSelected: boolean;
