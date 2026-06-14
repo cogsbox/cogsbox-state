@@ -19,6 +19,13 @@ export type FormElementParams<T> = StateObject<T> & {
         onChange?: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
         onBlur?: (event: FocusEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => void;
     };
+    status: ValidationStatus;
+    severity: ValidationSeverity;
+    hasErrors: boolean;
+    hasWarnings: boolean;
+    allErrors: ValidationError[];
+    message: string;
+    getData: () => T;
 };
 export type StateKeys = string;
 type CutFunctionType<T> = (index?: number, options?: {

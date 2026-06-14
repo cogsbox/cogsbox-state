@@ -119,6 +119,130 @@ describe('Plugin onFormUpdate validation', () => {
     shadowStateStore.clear();
   });
 
+  it('should pass expected params to $formElement and formElements.validation', async () => {
+    const formElementSnapshots: Array<{
+      hasErrors: unknown;
+      hasWarnings: unknown;
+      message: unknown;
+      status: unknown;
+      severity: unknown;
+      allErrorsCount: number;
+      data: unknown;
+      validationErrors: string[];
+    }> = [];
+
+    const { useCogsState } = createCogsState(
+      {
+        userForm: {
+          username: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: z.object({
+            username: z
+              .string()
+              .min(3, 'Username must be at least 3 characters'),
+          }),
+          onBlur: 'error',
+        },
+        formElements: {
+          validation: ({
+            children,
+            hasErrors,
+            hasWarnings,
+            message,
+            path,
+          }) => {
+            return (
+              <div
+                data-testid="validation-wrapper"
+                data-has-errors={String(hasErrors)}
+                data-has-warnings={String(hasWarnings)}
+                data-message={message ?? ''}
+                data-path={path.join('.')}
+              >
+                {children}
+              </div>
+            );
+          },
+        },
+      }
+    );
+
+    function TestComponent() {
+      const form = useCogsState('userForm');
+
+      return (
+        <div>
+          {form.username.$formElement((params) => {
+            formElementSnapshots.push({
+              hasErrors: params.hasErrors,
+              hasWarnings: params.hasWarnings,
+              message: params.message,
+              status: params.status,
+              severity: params.severity,
+              allErrorsCount: params.allErrors.length,
+              data: params.getData(),
+              validationErrors: params.$showValidationErrors(),
+            });
+
+            return (
+              <input data-testid="username-input" {...params.$inputProps} />
+            );
+          })}
+        </div>
+      );
+    }
+
+    render(<TestComponent />);
+
+    expect(screen.getByTestId('validation-wrapper')).toHaveAttribute(
+      'data-has-errors',
+      'false'
+    );
+    expect(screen.getByTestId('validation-wrapper')).toHaveAttribute(
+      'data-has-warnings',
+      'false'
+    );
+    expect(formElementSnapshots.at(-1)).toMatchObject({
+      hasErrors: false,
+      hasWarnings: false,
+      message: '',
+      status: 'NOT_VALIDATED',
+      severity: undefined,
+      allErrorsCount: 0,
+      data: '',
+      validationErrors: [],
+    });
+
+    const input = screen.getByTestId('username-input');
+    fireEvent.change(input, { target: { value: 'ab' } });
+    fireEvent.blur(input);
+
+    await waitFor(() => {
+      expect(screen.getByTestId('validation-wrapper')).toHaveAttribute(
+        'data-has-errors',
+        'true'
+      );
+      expect(screen.getByTestId('validation-wrapper')).toHaveAttribute(
+        'data-message',
+        'Username must be at least 3 characters'
+      );
+    });
+
+    expect(formElementSnapshots.at(-1)).toMatchObject({
+      hasErrors: true,
+      hasWarnings: false,
+      message: 'Username must be at least 3 characters',
+      status: 'INVALID',
+      severity: 'error',
+      allErrorsCount: 1,
+      data: 'ab',
+      validationErrors: ['Username must be at least 3 characters'],
+    });
+  });
+
   it('should surface plugin validation errors in formElements.validation on blur', async () => {
     const validatorPlugin = createValidatorPlugin();
 
@@ -390,7 +514,7 @@ describe('Plugin onFormUpdate validation', () => {
 
     const shapePlugin = createPlugin('shape')
       .initialState(() => ({
-        tradingRulesForm: journalSchemaBox.tradingRulesForm.generateDefaults(),
+        tradingRulesForm: journalSchemaBox.tradingRulesForm!.generateDefaults(),
       }))
       .onFormUpdate((params) => {
         const entry = journalSchemaBox[params.stateKey];
@@ -548,7 +672,7 @@ describe('Plugin onFormUpdate validation', () => {
 
     const shapePlugin = createPlugin('shape')
       .initialState(() => ({
-        tradingRulesForm: journalSchemaBox.tradingRulesForm.generateDefaults(),
+        tradingRulesForm: journalSchemaBox.tradingRulesForm!.generateDefaults(),
       }))
       .transformState((params) => {
         const entry = journalSchemaBox[params.stateKey];

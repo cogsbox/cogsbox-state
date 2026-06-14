@@ -531,6 +531,25 @@ export function FormElementWrapper({
     componentId: componentId,
     meta: undefined,
   });
+  const validationState = getShadowMetadata(stateKey, path)?.validation;
+  const validationStatus = validationState?.status || 'NOT_VALIDATED';
+  const allErrors = (validationState?.errors || []).map((err) => ({
+    ...err,
+    path,
+  })) as ValidationError[];
+  const errorMessages = allErrors
+    .filter((err) => err.severity === 'error')
+    .map((err) => err.message);
+  const warningMessages = allErrors
+    .filter((err) => err.severity === 'warning')
+    .map((err) => err.message);
+  const validationMessage = errorMessages[0] || warningMessages[0] || '';
+  const validationSeverity: ValidationSeverity =
+    errorMessages.length > 0
+      ? 'error'
+      : warningMessages.length > 0
+        ? 'warning'
+        : undefined;
 
   const stateWithInputProps = new Proxy(baseState, {
     get(target, prop) {
@@ -545,6 +564,13 @@ export function FormElementWrapper({
           ref: formElementRef,
         };
       }
+      if (prop === 'status') return validationStatus;
+      if (prop === 'severity') return validationSeverity;
+      if (prop === 'hasErrors') return errorMessages.length > 0;
+      if (prop === 'hasWarnings') return warningMessages.length > 0;
+      if (prop === 'allErrors') return allErrors;
+      if (prop === 'message') return validationMessage;
+      if (prop === 'getData') return () => getShadowValue(stateKey, path);
 
       return target[prop];
     },

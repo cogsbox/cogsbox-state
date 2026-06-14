@@ -78,6 +78,13 @@ export type FormElementParams<T> = StateObject<T> & {
       >
     ) => void;
   };
+  status: ValidationStatus;
+  severity: ValidationSeverity;
+  hasErrors: boolean;
+  hasWarnings: boolean;
+  allErrors: ValidationError[];
+  message: string;
+  getData: () => T;
 };
 
 export type StateKeys = string;
