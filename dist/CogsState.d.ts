@@ -160,10 +160,22 @@ export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, a
 } : {}) & // Fallback to {} since we intersect EndType below anyway
 EndType<T, TPlugins> & {
     $toggle: NonNullable<T> extends boolean ? () => void : never;
-    $validate: () => {
-        success: boolean;
-        data?: T;
-        error?: any;
+    $validate: {
+        (): {
+            success: boolean;
+            data?: T;
+            error?: any;
+        };
+        <K extends Extract<keyof NonNullable<T>, string>>(keys: readonly K[]): {
+            success: boolean;
+            results: Array<{
+                key: K;
+                path: string[];
+                success: boolean;
+                data?: unknown;
+                error?: any;
+            }>;
+        };
     };
     $_componentId: string | null;
     $getComponents: () => ComponentsType;

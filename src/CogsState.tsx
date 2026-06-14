@@ -383,7 +383,21 @@ export type StateObject<
     : {}) & // Fallback to {} since we intersect EndType below anyway
   EndType<T, TPlugins> & {
     $toggle: NonNullable<T> extends boolean ? () => void : never;
-    $validate: () => { success: boolean; data?: T; error?: any };
+    $validate: {
+      (): { success: boolean; data?: T; error?: any };
+      <K extends Extract<keyof NonNullable<T>, string>>(
+        keys: readonly K[]
+      ): {
+        success: boolean;
+        results: Array<{
+          key: K;
+          path: string[];
+          success: boolean;
+          data?: unknown;
+          error?: any;
+        }>;
+      };
+    };
     $_componentId: string | null;
     $getComponents: () => ComponentsType;
     $_initialState: T;
@@ -2582,8 +2596,69 @@ function createProxyHandler<
         }
 
         if (prop === '$validate') {
-          return () => {
+          return (keys?: readonly string[]) => {
             const store = getGlobalStore.getState();
+
+            if (keys) {
+              const results = keys.map((key) => {
+                const targetPath = [...path, key];
+                const targetValue = store.getShadowValue(stateKey, targetPath);
+                const currentMeta =
+                  store.getShadowMetadata(stateKey, targetPath) || {};
+                const fieldSchema = currentMeta.typeInfo?.schema;
+
+                if (!fieldSchema) {
+                  return {
+                    key,
+                    path: targetPath,
+                    success: true,
+                    data: targetValue,
+                  };
+                }
+
+                const result = (fieldSchema as any).safeParse(targetValue);
+                const zodErrors =
+                  result.error?.issues || result.error?.errors || [];
+
+                store.setShadowMetadata(stateKey, targetPath, {
+                  ...currentMeta,
+                  validation: {
+                    status: result.success ? 'VALID' : 'INVALID',
+                    errors: result.success
+                      ? []
+                      : [
+                          {
+                            source: 'client',
+                            message:
+                              zodErrors[0]?.message || 'Invalid value',
+                            severity: 'error',
+                            code: zodErrors[0]?.code,
+                          },
+                        ],
+                    lastValidated: Date.now(),
+                    validatedValue: targetValue,
+                  },
+                });
+                store.notifyPathSubscribers([stateKey, ...targetPath].join('.'), {
+                  type: 'VALIDATION_UPDATE',
+                });
+
+                return {
+                  key,
+                  path: targetPath,
+                  success: result.success,
+                  data: result.success ? result.data : undefined,
+                  error: result.success ? undefined : result.error,
+                };
+              });
+
+              notifyComponents(stateKey);
+
+              return {
+                success: results.every((result) => result.success),
+                results,
+              };
+            }
 
             // 1. Get Data & Schema
             const { value } = getScopedData(stateKey, path, meta);

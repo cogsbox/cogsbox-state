@@ -320,6 +320,69 @@ describe('Plugin onFormUpdate validation', () => {
     });
   });
 
+  it('should validate selected child fields with typed $validate args', async () => {
+    const { useCogsState } = createCogsState(
+      {
+        userForm: {
+          username: '',
+          email: '',
+          notes: '',
+        },
+      },
+      {
+        validation: {
+          zodSchemaV4: z.object({
+            username: z
+              .string()
+              .min(3, 'Username must be at least 3 characters'),
+            email: z.string().email('Invalid email address'),
+            notes: z.string(),
+          }),
+          onBlur: 'error',
+        },
+      }
+    );
+
+    function TestComponent() {
+      const form = useCogsState('userForm');
+      const stageValidation = form.$validationErrors(['username', 'email']);
+      const hasStageErrors = stageValidation.some((field) => field.hasErrors);
+
+      return (
+        <div>
+          {form.username.$formElement((params) => (
+            <input data-testid="username-input" {...params.$inputProps} />
+          ))}
+          {form.email.$formElement((params) => (
+            <input data-testid="email-input" {...params.$inputProps} />
+          ))}
+          <button
+            type="button"
+            data-testid="validate-stage"
+            onClick={() => form.$validate(['username', 'email'])}
+          >
+            Validate
+          </button>
+          <span data-testid="has-stage-errors">{String(hasStageErrors)}</span>
+          <span data-testid="stage-error-count">
+            {String(stageValidation.filter((field) => field.hasErrors).length)}
+          </span>
+        </div>
+      );
+    }
+
+    render(<TestComponent />);
+
+    expect(screen.getByTestId('has-stage-errors')).toHaveTextContent('false');
+
+    fireEvent.click(screen.getByTestId('validate-stage'));
+
+    await waitFor(() => {
+      expect(screen.getByTestId('has-stage-errors')).toHaveTextContent('true');
+      expect(screen.getByTestId('stage-error-count')).toHaveTextContent('2');
+    });
+  });
+
   it('should surface plugin validation errors in formElements.validation on blur', async () => {
     const validatorPlugin = createValidatorPlugin();
 
