@@ -57,6 +57,7 @@ import { runValidation } from './validation';
 import { ZodType } from 'zod/v4';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
+type IsAny<T> = 0 extends 1 & T ? true : false;
 
 // Removed: SyncInfo is now owned by Shape Plugin
 
@@ -370,13 +371,18 @@ export type StateObject<
 > = {
   (): T;
   (newValue: T | ((prev: T) => T)): void;
-} & ([NonNullable<T>] extends [any[]] // <-- Wrap in brackets
-  ? ArrayEndType<T, TPlugins>
-  : [NonNullable<T>] extends [Record<string, unknown> | object] // <-- Wrap in brackets
-    ? {
-        [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
-      }
-    : {}) & // Fallback to {} since we intersect EndType below anyway
+} & (IsAny<T> extends true
+  ? {}
+  : [NonNullable<T>] extends [any[]] // <-- Wrap in brackets
+    ? ArrayEndType<T, TPlugins>
+    : [NonNullable<T>] extends [Record<string, unknown> | object] // <-- Wrap in brackets
+      ? {
+          [K in keyof NonNullable<T>]-?: StateObject<
+            NonNullable<T>[K],
+            TPlugins
+          >;
+        }
+      : {}) & // Fallback to {} since we intersect EndType below anyway
   EndType<T, TPlugins> & {
     $toggle: NonNullable<T> extends boolean ? () => void : never;
     $validate: {

@@ -58,8 +58,12 @@ type ChainMethodCallable<THandler> = THandler extends (
   ? (...args: TArgs) => TReturn
   : never;
 
+type LiteralStringKeys<T> = string extends keyof T
+  ? never
+  : Extract<keyof T, string>;
+
 export type ChainMethodCallables<TMethods> = {
-  [K in keyof TMethods as K extends string
+  [K in LiteralStringKeys<TMethods> as K extends string
     ? `$${K}`
     : never]: TMethods[K] extends ChainMethodDefinition<infer TFn>
     ? ChainMethodCallable<TFn>
