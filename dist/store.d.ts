@@ -1,5 +1,5 @@
 import { RefObject } from 'react';
-import { OptionsType, ReactivityType, SyncInfo, UpdateTypeDetail } from './CogsState.js';
+import { OptionsType, ReactivityType, UpdateTypeDetail } from './CogsState.js';
 
 export type FreshValuesObject = {
     pathsToValues?: string[];
@@ -86,19 +86,12 @@ export type ShadowMetadata = {
     value?: any;
     id?: string;
     typeInfo?: SchemaTypeInfo;
-    stateSource?: 'default' | 'server' | 'localStorage';
-    lastServerSync?: number;
-    isDirty?: boolean;
     isRaw?: boolean;
-    baseServerState?: any;
     arrayKeys?: string[];
     fields?: Record<string, any>;
     virtualizer?: {
         itemHeight?: number;
         domRef?: HTMLElement | null;
-    };
-    syncInfo?: {
-        status: string;
     };
     validation?: ValidationState;
     features?: {
@@ -149,9 +142,6 @@ export type CogsGlobalState = {
     registerComponent: (stateKey: string, componentId: string, registration: any) => void;
     unregisterComponent: (stateKey: string, componentId: string) => void;
     addPathComponent: (stateKey: string, dependencyPath: string[], fullComponentId: string) => void;
-    markAsDirty: (key: string, path: string[], options: {
-        bubble: boolean;
-    }) => void;
     pathSubscribers: Map<string, Set<(newValue: any) => void>>;
     subscribeToPath: (path: string, callback: (newValue: any) => void) => () => void;
     notifyPathSubscribers: (updatedPath: string, newValue: any) => void;
@@ -171,17 +161,8 @@ export type CogsGlobalState = {
     updateInitialStateGlobal: (key: string, newState: StateValue) => void;
     getInitialOptions: (key: string) => OptionsType | undefined;
     setInitialStateOptions: (key: string, value: OptionsType) => void;
-    serverStateUpdates: Map<string, {
-        data: any;
-        status: 'loading' | 'success' | 'error';
-        timestamp: number;
-    }>;
-    setServerStateUpdate: (key: string, serverState: any) => void;
     stateLog: Map<string, Map<string, UpdateTypeDetail>>;
-    syncInfoStore: Map<string, SyncInfo>;
     addStateLog: (updates: UpdateTypeDetail[]) => void;
-    setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
-    getSyncInfo: (key: string) => SyncInfo | null;
 };
 type BuildContext = {
     stateKey: string;

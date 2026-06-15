@@ -1059,12 +1059,6 @@ describe('CogsState - Core Helper Methods & Edge Cases', () => {
     advancedSetter.$revertToInitialState();
   });
 
-  it('should get the status of a value (fresh vs. dirty)', () => {
-    expect(basicSetter.counter.$getStatus()).toBe('fresh');
-    basicSetter.counter.$update(5);
-    expect(basicSetter.counter.$getStatus()).toBe('dirty');
-  });
-
   it('should update the entire initial state structure with updateInitialState', () => {
     const newInitialState = { ...getBasicInitialState(), counter: 1000 };
     basicSetter.$updateInitialState(newInitialState);

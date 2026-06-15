@@ -58,10 +58,7 @@ import { ZodType } from 'zod/v4';
 
 export type Prettify<T> = T extends any ? { [K in keyof T]: T[K] } : never;
 
-export type SyncInfo = {
-  timeStamp: number;
-  userId: number;
-};
+// Removed: SyncInfo is now owned by Shape Plugin
 
 export type ValidationFieldSummary = {
   status: ValidationStatus;
@@ -206,8 +203,7 @@ export type EndType<
   $get: () => T;
   $$get: () => T;
   $$derive: <R>(fn: EffectFunction<T, R>) => R;
-  $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-  $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
+  // Removed: $_status and $getStatus are now owned by Shape Plugin
   $showValidationErrors: () => string[];
   $validationErrors: {
     (): ValidationSummaryArray;
@@ -230,7 +226,7 @@ export type EndType<
   };
   $removeStorage: () => void;
   $setRaw: (value: T) => void;
-  $sync: () => void;
+  // Removed: $sync is now owned by Shape Plugin
   $validationWrapper: ({
     children,
     hideMessage,
@@ -238,7 +234,7 @@ export type EndType<
     children: ReactNode;
     hideMessage?: boolean;
   }) => JSX.Element;
-  $lastSynced?: SyncInfo;
+  // Removed: $lastSynced is now owned by Shape Plugin
 };
 
 // Helper type for element returned from array methods
@@ -405,8 +401,6 @@ export type StateObject<
       fetchId: (field: keyof NonNullable<T>) => string | number;
     };
     $initializeAndMergeShadowState: (newState: any | null) => void;
-    $_isLoading: boolean;
-    $_serverState: T;
     $revertToInitialState: (obj?: { validationKey?: string }) => T;
     $middleware: (
       middles: ({
@@ -526,34 +520,6 @@ export type OptionsType<
 > = CreateStateOptionsType & {
   log?: boolean;
   componentId?: string;
-  syncOptions?: SyncOptionsType<TApiParams>;
-
-  serverState?: {
-    id?: string | number;
-    data?: T;
-    status?: 'pending' | 'error' | 'success' | 'loading';
-    timestamp?: number;
-    merge?:
-      | boolean
-      | {
-          strategy: 'append' | 'prepend' | 'diff';
-          key?: string;
-        };
-  };
-
-  sync?: {
-    action: (state: T) => Promise<{
-      success: boolean;
-      data?: any;
-      error?: any;
-      errors?: Array<{
-        path: (string | number)[];
-        message: string;
-      }>;
-    }>;
-    onSuccess?: (data: any) => void;
-    onError?: (error: any) => void;
-  };
   middleware?: ({ update }: { update: UpdateTypeDetail }) => void;
 
   localStorage?: {
@@ -563,7 +529,6 @@ export type OptionsType<
 
   reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType;
-  syncUpdate?: Partial<UpdateTypeDetail>;
 
   defaultState?: T;
 
@@ -632,13 +597,10 @@ const {
   insertManyShadowArrayElements,
   removeShadowArrayElement,
   setInitialStateOptions,
-  setServerStateUpdate,
-  markAsDirty,
   addPathComponent,
   clearSelectedIndexesForState,
   addStateLog,
   clearSelectedIndex,
-  getSyncInfo,
   notifyPathSubscribers,
   getPluginMetaDataMap,
   setPluginMetaData,
@@ -1048,7 +1010,6 @@ export const createCogsState = <
 
     const updater = useCogsStateFn<StateSlice<StateKey>>(thiState, {
       stateKey: stateKey as string,
-      syncUpdate: options?.syncUpdate,
       componentId,
       localStorage: options?.localStorage,
       middleware: options?.middleware,
@@ -1056,7 +1017,6 @@ export const createCogsState = <
       reactiveDeps: options?.reactiveDeps,
       defaultState: options?.defaultState as any,
       dependencies: options?.dependencies,
-      serverState: options?.serverState,
     });
 
     useLayoutEffect(() => {
@@ -1183,8 +1143,6 @@ const saveToLocalStorage = <T,>(
       state,
       lastUpdated: Date.now(),
       lastSyncedWithServer: lastSyncedWithServer ?? existingLastSynced,
-      stateSource: shadowMeta?.stateSource,
-      baseServerState: shadowMeta?.baseServerState,
     };
 
     // Use SuperJSON serialize to get the json part only
@@ -1251,8 +1209,6 @@ type LocalStorageData<T> = {
   state: T;
   lastUpdated: number;
   lastSyncedWithServer?: number;
-  baseServerState?: T; // Keep reference to what server state this is based on
-  stateSource?: 'default' | 'server' | 'localStorage'; // Track origin
 };
 
 const notifyComponents = (thisKey: string) => {
@@ -1278,49 +1234,6 @@ const notifyComponents = (thisKey: string) => {
   });
 };
 
-function markEntireStateAsServerSynced(
-  stateKey: string,
-  path: string[],
-  data: any,
-  timestamp: number
-) {
-  // Mark current path as synced
-  const currentMeta = getShadowMetadata(stateKey, path);
-  setShadowMetadata(stateKey, path, {
-    ...currentMeta,
-    isDirty: false,
-    stateSource: 'server',
-    lastServerSync: timestamp || Date.now(),
-  });
-
-  // If it's an array, mark each item as synced
-  if (Array.isArray(data)) {
-    const arrayMeta = getShadowMetadata(stateKey, path);
-    if (arrayMeta?.arrayKeys) {
-      arrayMeta.arrayKeys.forEach((itemKey, index) => {
-        // Fix: Don't split the itemKey, just use it directly
-        const itemPath = [...path, itemKey];
-        const itemData = data[index];
-        if (itemData !== undefined) {
-          markEntireStateAsServerSynced(
-            stateKey,
-            itemPath,
-            itemData,
-            timestamp
-          );
-        }
-      });
-    }
-  }
-  // If it's an object, mark each field as synced
-  else if (data && typeof data === 'object' && data.constructor === Object) {
-    Object.keys(data).forEach((key) => {
-      const fieldPath = [...path, key];
-      const fieldData = data[key];
-      markEntireStateAsServerSynced(stateKey, fieldPath, fieldData, timestamp);
-    });
-  }
-}
 // 5. Batch queue
 let updateBatchQueue: any[] = [];
 let isFlushScheduled = false;
@@ -1508,11 +1421,7 @@ function handleUpdate(
     return null; // <-- Abort the update
   }
 
-  // ✅ FIX: The new `updateShadowAtPath` handles metadata preservation automatically.
-  // The manual loop has been removed.
   updateShadowAtPath(stateKey, path, newValue);
-
-  markAsDirty(stateKey, path, { bubble: true });
 
   // Return the metadata of the node *after* the update.
   const newShadowMeta = getShadowMetadata(stateKey, path);
@@ -1534,10 +1443,8 @@ function handleInsertMany(
   shadowMeta: any;
   path: string[];
 } {
-  // Use the existing, optimized global store function to perform the state update
   insertManyShadowArrayElements(stateKey, path, payload);
 
-  markAsDirty(stateKey, path, { bubble: true });
   const updatedMeta = getShadowMetadata(stateKey, path);
 
   return {
@@ -1578,10 +1485,6 @@ function handleInsert(
     index,
     itemId
   );
-  //console.timeEnd('insertShadowArrayElement');
-
-  markAsDirty(stateKey, path, { bubble: true });
-
   const updatedMeta = getShadowMetadata(stateKey, path);
 
   let insertAfterId: string | undefined;
@@ -1606,7 +1509,6 @@ function handleCut(
   const parentArrayPath = path.slice(0, -1);
   const oldValue = getShadowValue(stateKey, path);
   removeShadowArrayElement(stateKey, path);
-  markAsDirty(stateKey, parentArrayPath, { bubble: true });
   return { type: 'cut', oldValue: oldValue, parentPath: parentArrayPath };
 }
 
@@ -1759,12 +1661,10 @@ export function useCogsStateFn<
     componentId,
     defaultState,
     dependencies,
-    serverState,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    syncOptions?: SyncOptionsType<any>;
   } & OptionsType<TStateObject> = {}
 ): StateObject<TStateObject, TPlugins> {
   const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
@@ -1783,10 +1683,9 @@ export function useCogsStateFn<
       overrideOptions?: OptionsType<TStateObject>
     ): {
       value: TStateObject;
-      source: 'default' | 'server' | 'localStorage';
+      source: 'default' | 'localStorage';
       timestamp: number;
     } => {
-      // If we pass in options, use them. Otherwise, get from the global store.
       const optionsToUse = overrideOptions
         ? { ...getInitialOptions(thisKey as string), ...overrideOptions }
         : getInitialOptions(thisKey as string);
@@ -1795,19 +1694,7 @@ export function useCogsStateFn<
       const finalDefaultState =
         currentOptions?.defaultState || defaultState || stateObject;
 
-      // 1. Check server state
-      const hasValidServerData =
-        currentOptions?.serverState?.status === 'success' &&
-        currentOptions?.serverState?.data !== undefined;
-
-      if (hasValidServerData) {
-        return {
-          value: currentOptions.serverState!.data! as any,
-          source: 'server',
-          timestamp: currentOptions.serverState!.timestamp || Date.now(),
-        };
-      }
-      // 2. Check localStorage
+      // Check localStorage
       if (currentOptions?.localStorage?.key && sessionId) {
         const localKey = isFunction(currentOptions.localStorage.key)
           ? currentOptions.localStorage.key(finalDefaultState)
@@ -1817,10 +1704,7 @@ export function useCogsStateFn<
           `${sessionId}-${thisKey}-${localKey}`
         );
 
-        if (
-          localData &&
-          localData.lastUpdated > (currentOptions?.serverState?.timestamp || 0)
-        ) {
+        if (localData) {
           return {
             value: localData.state,
             source: 'localStorage',
@@ -1829,7 +1713,7 @@ export function useCogsStateFn<
         }
       }
 
-      // 3. Use default state
+      // Use default state
       return {
         value: finalDefaultState || (stateObject as any),
         source: 'default',
@@ -1839,111 +1723,8 @@ export function useCogsStateFn<
     [thisKey, defaultState, stateObject, sessionId]
   );
 
-  // Effect 1: When this component's serverState prop changes, broadcast it
+  // Removed: Server state effects are now owned by Shape Plugin
   useEffect(() => {
-    if (!serverState) return;
-
-    // Only broadcast if we have valid server data
-    if (serverState.status === 'success' && serverState.data !== undefined) {
-      setServerStateUpdate(thisKey, serverState);
-    }
-  }, [serverState, thisKey]);
-  // Effect 2: Listen for server state updates from ANY component
-  useEffect(() => {
-    const unsubscribe = getGlobalStore
-      .getState()
-      .subscribeToPath(thisKey, (event) => {
-        if (event?.type === 'SERVER_STATE_UPDATE') {
-          const serverStateData = event.serverState;
-
-          if (
-            serverStateData?.status !== 'success' ||
-            serverStateData.data === undefined
-          ) {
-            return; // Ignore if no valid data
-          }
-
-          // Store the server state in options for future reference
-          setAndMergeOptions(thisKey, { serverState: serverStateData });
-
-          const mergeConfig =
-            typeof serverStateData.merge === 'object'
-              ? serverStateData.merge
-              : serverStateData.merge === true
-                ? { strategy: 'append' as const, key: 'id' }
-                : null;
-
-          const currentState = getShadowValue(thisKey, []);
-          const incomingData = serverStateData.data;
-
-          if (
-            mergeConfig &&
-            mergeConfig.strategy === 'append' &&
-            'key' in mergeConfig &&
-            Array.isArray(currentState) &&
-            Array.isArray(incomingData)
-          ) {
-            const keyField = mergeConfig.key;
-            if (!keyField) {
-              console.error(
-                "CogsState: Merge strategy 'append' requires a 'key' field."
-              );
-              return;
-            }
-
-            // Get existing IDs to check for duplicates
-            const existingIds = new Set(
-              currentState.map((item: any) => item[keyField])
-            );
-
-            // Filter out duplicates from incoming data
-            const newUniqueItems = incomingData.filter(
-              (item: any) => !existingIds.has(item[keyField])
-            );
-
-            if (newUniqueItems.length > 0) {
-              // Insert only the new unique items
-              insertManyShadowArrayElements(thisKey, [], newUniqueItems);
-            }
-
-            // Mark the entire merged state as synced
-            const finalState = getShadowValue(thisKey, []);
-            markEntireStateAsServerSynced(
-              thisKey,
-              [],
-              finalState,
-              serverStateData.timestamp || Date.now()
-            );
-          } else {
-            // Replace strategy (default) - completely replace the state
-            initializeShadowState(thisKey, incomingData);
-
-            // Mark as synced from server
-            markEntireStateAsServerSynced(
-              thisKey,
-              [],
-              incomingData,
-              serverStateData.timestamp || Date.now()
-            );
-          }
-
-          // Notify all components subscribed to this state
-          notifyComponents(thisKey);
-        }
-      });
-
-    return unsubscribe;
-  }, [thisKey]);
-  useEffect(() => {
-    const existingMeta = getGlobalStore
-      .getState()
-      .getShadowMetadata(thisKey, []);
-
-    // Skip if already initialized
-    if (existingMeta && existingMeta.stateSource) {
-      return;
-    }
-
     const options = getInitialOptions(thisKey as string);
 
     const features = {
@@ -1951,7 +1732,6 @@ export function useCogsStateFn<
     };
 
     setShadowMetadata(thisKey, [], {
-      ...existingMeta,
       features,
     });
 
@@ -1964,7 +1744,7 @@ export function useCogsStateFn<
       }
     }
 
-    const { value: resolvedState, source, timestamp } = resolveInitialState();
+    const { value: resolvedState } = resolveInitialState();
     initializeShadowState(thisKey, resolvedState);
 
     const validation = getInitialOptions(thisKey as string)?.validation;
@@ -1972,17 +1752,6 @@ export function useCogsStateFn<
       updateShadowTypeInfo(thisKey as string, validation.zodSchemaV4, 'zod4');
     } else if (validation?.zodSchemaV3) {
       updateShadowTypeInfo(thisKey as string, validation.zodSchemaV3, 'zod3');
-    }
-
-    setShadowMetadata(thisKey, [], {
-      stateSource: source,
-      lastServerSync: source === 'server' ? timestamp : undefined,
-      isDirty: source === 'server' ? false : undefined,
-      baseServerState: source === 'server' ? resolvedState : undefined,
-    });
-
-    if (source === 'server' && serverState) {
-      setServerStateUpdate(thisKey, serverState);
     }
 
     notifyComponents(thisKey);
@@ -2089,7 +1858,6 @@ type MetaData = {
     fn: Function;
     path: string[]; // Which array this transform applies to
   }>;
-  serverStateIsUpStream?: boolean;
 };
 
 const applyTransforms = (
@@ -2270,6 +2038,31 @@ function setFieldDisabledForPath(
   });
 }
 
+function pluginMetaDependencyPath(
+  path: string[],
+  pluginName: string,
+  scope = 'default'
+) {
+  return [...path, '$pluginMeta', pluginName, scope];
+}
+
+function notifyPluginMetaDependency(
+  stateKey: string,
+  path: string[],
+  pluginName: string,
+  scope?: string
+) {
+  const rootMeta = getShadowMetadata(stateKey, []);
+  const dependencyMeta = getShadowMetadata(
+    stateKey,
+    pluginMetaDependencyPath(path, pluginName, scope)
+  );
+
+  dependencyMeta?.pathComponents?.forEach((componentId) => {
+    rootMeta?.components?.get(componentId)?.forceUpdate();
+  });
+}
+
 function createProxyHandler<
   T,
   const TPlugins extends readonly CogsPlugin<
@@ -2433,17 +2226,8 @@ function createProxyHandler<
                     });
 
                     return {
-                      synced: () => {
-                        const shadowMeta = getGlobalStore
-                          .getState()
-                          .getShadowMetadata(stateKey, path);
-
-                        setShadowMetadata(stateKey, path, {
-                          ...shadowMeta,
-                          isDirty: false,
-                          stateSource: 'server',
-                          lastServerSync: Date.now(),
-                        });
+                      syned: () => {
+                        // Removed: sync status tracking is now owned by Shape Plugin
                       },
                     };
                   },
@@ -2463,6 +2247,19 @@ function createProxyHandler<
                     setPluginMetaData(stateKey, path, plugin.name, data),
                   removeFieldMetaData: () =>
                     removePluginMetaData(stateKey, path, plugin.name),
+                  watchPluginMeta: (scope?: string) =>
+                    registerComponentDependency(
+                      stateKey,
+                      componentId,
+                      pluginMetaDependencyPath(path, plugin.name, scope)
+                    ),
+                  notifyPluginMeta: (scope?: string) =>
+                    notifyPluginMetaDependency(
+                      stateKey,
+                      path,
+                      plugin.name,
+                      scope
+                    ),
                   getFieldRefs: () => getFieldRefsForPath(stateKey, path),
                   getFieldElements: () =>
                     getFieldElementsForPath(stateKey, path),
@@ -2478,103 +2275,8 @@ function createProxyHandler<
           return rebuildStateShape;
         }
 
-        if (prop === '$sync' && path.length === 0) {
-          return async function () {
-            const options = getGlobalStore
-              .getState()
-              .getInitialOptions(stateKey);
-            const sync = options?.sync;
-
-            if (!sync) {
-              console.error(`No mutation defined for state key "${stateKey}"`);
-              return { success: false, error: `No mutation defined` };
-            }
-
-            const state = getGlobalStore
-              .getState()
-              .getShadowValue(stateKey, []);
-            const validationKey = options?.validation?.key;
-
-            try {
-              const response = await sync.action(state);
-              if (
-                response &&
-                !response.success &&
-                response.errors &&
-                validationKey
-              ) {
-                //  getGlobalStore.getState().removeValidationError(validationKey);
-                // response.errors.forEach((error) => {
-                //   const errorPath = [validationKey, ...error.path].join('.');
-                //   getGlobalStore
-                //     .getState()
-                //     .addValidationError(errorPath, error.message);
-                // });
-                //   notifyComponents(stateKey);
-              }
-
-              if (response?.success) {
-                // Mark as synced and not dirty
-                const shadowMeta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, []);
-                setShadowMetadata(stateKey, [], {
-                  ...shadowMeta,
-                  isDirty: false,
-                  lastServerSync: Date.now(),
-                  stateSource: 'server',
-                  baseServerState: state, // Update base server state
-                });
-
-                if (sync.onSuccess) {
-                  sync.onSuccess(response.data);
-                }
-              } else if (!response?.success && sync.onError)
-                sync.onError(response.error);
-
-              return response;
-            } catch (error) {
-              if (sync.onError) sync.onError(error);
-              return { success: false, error };
-            }
-          };
-        }
-        // Fixed getStatus function in createProxyHandler
-        if (prop === '$_status' || prop === '$getStatus') {
-          const getStatusFunc = () => {
-            // ✅ Use the optimized helper to get all data in one efficient call
-            const { shadowMeta, value } = getScopedData(stateKey, path, meta);
-
-            if (shadowMeta?.isDirty === true) {
-              return 'dirty';
-            }
-
-            if (
-              shadowMeta?.stateSource === 'server' ||
-              shadowMeta?.isDirty === false
-            ) {
-              return 'synced';
-            }
-
-            if (shadowMeta?.stateSource === 'localStorage') {
-              return 'restored';
-            }
-
-            if (shadowMeta?.stateSource === 'default') {
-              return 'fresh';
-            }
-
-            if (value !== undefined) {
-              return 'fresh';
-            }
-
-            // Fallback if no other condition is met.
-            return 'unknown';
-          };
-
-          // This part remains the same
-          return prop === '$_status' ? getStatusFunc() : getStatusFunc;
-        }
+        // Removed: $sync is now owned by Shape Plugin
+        // Removed: $_status and $getStatus are now owned by Shape Plugin
         if (prop === '$removeStorage') {
           return () => {
             const initialState =
@@ -3048,9 +2750,7 @@ function createProxyHandler<
                       e.type === 'INSERT' ||
                       e.type === 'INSERT_MANY' ||
                       e.type === 'REMOVE' ||
-                      e.type === 'CLEAR_SELECTION' ||
-                      (e.type === 'SERVER_STATE_UPDATE' &&
-                        !meta?.serverStateIsUpStream)
+                      e.type === 'CLEAR_SELECTION'
                     ) {
                       forceUpdate({});
                     }
@@ -3387,10 +3087,6 @@ function createProxyHandler<
             $cogsSignal({ _stateKey: stateKey, _path: path, _meta: meta });
         }
 
-        if (prop === '$lastSynced') {
-          const syncKey = `${stateKey}:${path.join('.')}`;
-          return getSyncInfo(syncKey);
-        }
         if (prop == 'getLocalStorage') {
           return (key: string) =>
             loadFromLocalStorage(sessionId + '-' + stateKey + '-' + key);
@@ -3662,8 +3358,6 @@ function createProxyHandler<
                     };
                     store.updateShadowAtPath(stateKey, relativePath, value);
 
-                    store.markAsDirty(stateKey, relativePath, { bubble: true });
-
                     // Bubble up - notify components at this path and all parent paths
                     let currentPath = [...relativePath];
                     while (true) {
@@ -3693,7 +3387,6 @@ function createProxyHandler<
                   case 'remove': {
                     const parentPath = relativePath.slice(0, -1);
                     store.removeShadowArrayElement(stateKey, relativePath);
-                    store.markAsDirty(stateKey, parentPath, { bubble: true });
 
                     // Bubble up from parent path
                     let currentPath = [...parentPath];
@@ -3757,22 +3450,7 @@ function createProxyHandler<
 
             return {
               synced: () => {
-                const shadowMeta = getGlobalStore
-                  .getState()
-                  .getShadowMetadata(stateKey, path);
-
-                setShadowMetadata(stateKey, path, {
-                  ...shadowMeta,
-                  isDirty: false,
-                  stateSource: 'server',
-                  lastServerSync: Date.now(),
-                });
-
-                const fullPath = [stateKey, ...path].join('.');
-                notifyPathSubscribers(fullPath, {
-                  type: 'SYNC_STATUS_CHANGE',
-                  isDirty: false,
-                });
+                // Removed: sync status tracking is now owned by Shape Plugin
               },
             };
           };
@@ -3855,16 +3533,8 @@ function createProxyHandler<
   // ... (rest of the function: rootLevelMethods, returnShape, etc.)
   const rootLevelMethods = {
     $revertToInitialState: (obj?: { validationKey?: string }) => {
-      const shadowMeta = getGlobalStore
-        .getState()
-        .getShadowMetadata(stateKey, []);
-      let revertState;
-
-      if (shadowMeta?.stateSource === 'server' && shadowMeta.baseServerState) {
-        revertState = shadowMeta.baseServerState;
-      } else {
-        revertState = getGlobalStore.getState().initialStateGlobal[stateKey];
-      }
+      const revertState =
+        getGlobalStore.getState().initialStateGlobal[stateKey];
 
       clearSelectedIndexesForState(stateKey);
       initializeShadowState(stateKey, revertState);

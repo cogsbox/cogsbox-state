@@ -8,10 +8,6 @@ import * as z3 from 'zod/v3';
 export type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
-export type SyncInfo = {
-    timeStamp: number;
-    userId: number;
-};
 export type ValidationFieldSummary = {
     status: ValidationStatus;
     severity: ValidationSeverity;
@@ -99,8 +95,6 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $get: () => T;
     $$get: () => T;
     $$derive: <R>(fn: EffectFunction<T, R>) => R;
-    $_status: 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
-    $getStatus: () => 'fresh' | 'dirty' | 'synced' | 'restored' | 'unknown';
     $showValidationErrors: () => string[];
     $validationErrors: {
         (): ValidationSummaryArray;
@@ -121,12 +115,10 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     };
     $removeStorage: () => void;
     $setRaw: (value: T) => void;
-    $sync: () => void;
     $validationWrapper: ({ children, hideMessage, }: {
         children: ReactNode;
         hideMessage?: boolean;
     }) => JSX.Element;
-    $lastSynced?: SyncInfo;
 };
 export type ArrayElementState<TElement, TParentArray, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []> = StateObject<TElement, TPlugins> & ArrayElementExtras<TParentArray>;
 export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[]> = {
@@ -184,8 +176,6 @@ EndType<T, TPlugins> & {
         fetchId: (field: keyof NonNullable<T>) => string | number;
     };
     $initializeAndMergeShadowState: (newState: any | null) => void;
-    $_isLoading: boolean;
-    $_serverState: T;
     $revertToInitialState: (obj?: {
         validationKey?: string;
     }) => T;
@@ -221,15 +211,6 @@ type ValidationOptionsType = {
     onChange?: 'error' | 'warning';
     blockSync?: boolean;
 };
-type SyncOptionsType<TApiParams> = {
-    apiParams: TApiParams;
-    stateKey?: string;
-    stateRoom: number | string | (({ clientId }: {
-        clientId: string;
-    }) => string | null);
-    connect?: boolean;
-    inMemoryState?: boolean;
-};
 export type CreateStateOptionsType<T extends unknown = unknown, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []> = {
     formElements?: FormsElementsType<T, TPlugins>;
     validation?: ValidationOptionsType;
@@ -238,30 +219,6 @@ export type CreateStateOptionsType<T extends unknown = unknown, TPlugins extends
 export type OptionsType<T extends unknown = unknown, TApiParams = never> = CreateStateOptionsType & {
     log?: boolean;
     componentId?: string;
-    syncOptions?: SyncOptionsType<TApiParams>;
-    serverState?: {
-        id?: string | number;
-        data?: T;
-        status?: 'pending' | 'error' | 'success' | 'loading';
-        timestamp?: number;
-        merge?: boolean | {
-            strategy: 'append' | 'prepend' | 'diff';
-            key?: string;
-        };
-    };
-    sync?: {
-        action: (state: T) => Promise<{
-            success: boolean;
-            data?: any;
-            error?: any;
-            errors?: Array<{
-                path: (string | number)[];
-                message: string;
-            }>;
-        }>;
-        onSuccess?: (data: any) => void;
-        onError?: (error: any) => void;
-    };
     middleware?: ({ update }: {
         update: UpdateTypeDetail;
     }) => void;
@@ -271,7 +228,6 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = Creat
     };
     reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType;
-    syncUpdate?: Partial<UpdateTypeDetail>;
     defaultState?: T;
     dependencies?: any[];
 };
@@ -355,14 +311,11 @@ type LocalStorageData<T> = {
     state: T;
     lastUpdated: number;
     lastSyncedWithServer?: number;
-    baseServerState?: T;
-    stateSource?: 'default' | 'server' | 'localStorage';
 };
-export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, serverState, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
-    syncOptions?: SyncOptionsType<any>;
 } & OptionsType<TStateObject>): StateObject<TStateObject, TPlugins>;
 type MetaData = {
     arrayViews?: {
@@ -373,7 +326,6 @@ type MetaData = {
         fn: Function;
         path: string[];
     }>;
-    serverStateIsUpStream?: boolean;
 };
 export declare function $cogsSignal(proxy: {
     _path: string[];

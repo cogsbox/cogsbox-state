@@ -4,7 +4,6 @@ import type { RefObject } from 'react';
 import type {
   OptionsType,
   ReactivityType,
-  SyncInfo,
   UpdateTypeDetail,
 } from './CogsState.js';
 
@@ -134,18 +133,14 @@ export type ShadowMetadata = {
   value?: any;
   id?: string;
   typeInfo?: SchemaTypeInfo;
-  stateSource?: 'default' | 'server' | 'localStorage';
-  lastServerSync?: number;
-  isDirty?: boolean;
   isRaw?: boolean;
-  baseServerState?: any;
   arrayKeys?: string[];
   fields?: Record<string, any>;
   virtualizer?: {
     itemHeight?: number;
     domRef?: HTMLElement | null;
   };
-  syncInfo?: { status: string };
+
   validation?: ValidationState;
   features?: {
     localStorageEnabled: boolean;
@@ -252,12 +247,6 @@ export type CogsGlobalState = {
     dependencyPath: string[],
     fullComponentId: string
   ) => void;
-  markAsDirty: (
-    key: string,
-    path: string[],
-    options: { bubble: boolean }
-  ) => void;
-
   pathSubscribers: Map<string, Set<(newValue: any) => void>>;
   subscribeToPath: (
     path: string,
@@ -278,23 +267,8 @@ export type CogsGlobalState = {
   getInitialOptions: (key: string) => OptionsType | undefined;
   setInitialStateOptions: (key: string, value: OptionsType) => void;
 
-  serverStateUpdates: Map<
-    string,
-    {
-      data: any;
-      status: 'loading' | 'success' | 'error';
-      timestamp: number;
-    }
-  >;
-
-  setServerStateUpdate: (key: string, serverState: any) => void;
-
   stateLog: Map<string, Map<string, UpdateTypeDetail>>;
-  syncInfoStore: Map<string, SyncInfo>;
   addStateLog: (updates: UpdateTypeDetail[]) => void;
-
-  setSyncInfo: (key: string, syncInfo: SyncInfo) => void;
-  getSyncInfo: (key: string) => SyncInfo | null;
 };
 function getTypeFromZodSchema(
   schema: any,
@@ -787,9 +761,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       const {
         components,
         features,
-        lastServerSync,
-        stateSource,
-        baseServerState,
         pathComponents,
         signals,
         validation,
@@ -797,9 +768,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
 
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
-      if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
-      if (stateSource) preservedMetadata.stateSource = stateSource;
-      if (baseServerState) preservedMetadata.baseServerState = baseServerState;
       if (pathComponents) preservedMetadata.pathComponents = pathComponents;
       if (signals) preservedMetadata.signals = signals;
       if (validation) preservedMetadata.validation = validation;
@@ -962,15 +930,9 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
       const {
         components,
         features,
-        lastServerSync,
-        stateSource,
-        baseServerState,
       } = existingRoot._meta;
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
-      if (lastServerSync) preservedMetadata.lastServerSync = lastServerSync;
-      if (stateSource) preservedMetadata.stateSource = stateSource;
-      if (baseServerState) preservedMetadata.baseServerState = baseServerState;
     }
 
     shadowStateStore.delete(key);
@@ -1467,55 +1429,6 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
   },
 
-  markAsDirty: (key, path, options = { bubble: true }) => {
-    // Start at the root node once.
-    let rootNode = get().getShadowNode(key, []);
-    if (!rootNode) return;
-
-    // Navigate to the target node once.
-    let currentNode = rootNode;
-    for (const segment of path) {
-      currentNode = currentNode[segment];
-      if (!currentNode) return; // Path doesn't exist, nothing to mark.
-    }
-
-    // Mark the target node as dirty.
-    if (!currentNode._meta) currentNode._meta = {};
-    currentNode._meta.isDirty = true;
-
-    // If bubbling is disabled, we are done.
-    if (!options.bubble) return;
-
-    // Efficiently bubble up using the path segments.
-    let parentNode = rootNode;
-    for (let i = 0; i < path.length; i++) {
-      // The current node in the loop is the parent of the next one.
-      if (parentNode._meta?.isDirty) {
-        // Optimization: If a parent is already dirty, all of its ancestors are too.
-        // We can stop bubbling immediately.
-        return;
-      }
-      if (!parentNode._meta) parentNode._meta = {};
-      parentNode._meta.isDirty = true;
-      parentNode = parentNode[path[i]!];
-    }
-  },
-
-  // Keep these in Zustand as they need React reactivity
-  serverStateUpdates: new Map(),
-  setServerStateUpdate: (key, serverState) => {
-    set((state) => ({
-      serverStateUpdates: new Map(state.serverStateUpdates).set(
-        key,
-        serverState
-      ),
-    }));
-    get().notifyPathSubscribers(key, {
-      type: 'SERVER_STATE_UPDATE',
-      serverState,
-    });
-  },
-
   pathSubscribers: new Map<string, Set<(newValue: any) => void>>(),
   subscribeToPath: (path, callback) => {
     const subscribers = get().pathSubscribers;
@@ -1654,14 +1567,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }));
   },
 
-  syncInfoStore: new Map<string, SyncInfo>(),
-  setSyncInfo: (key, syncInfo) =>
-    set((state) => {
-      const newMap = new Map(state.syncInfoStore);
-      newMap.set(key, syncInfo);
-      return { syncInfoStore: newMap };
-    }),
-  getSyncInfo: (key) => get().syncInfoStore.get(key) || null,
+  // Removed: syncInfo is now owned by Shape Plugin
 }));
 
 export function getAllFieldElements(stateKey: string): HTMLElement[] {

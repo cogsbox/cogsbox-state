@@ -29,6 +29,8 @@ export type ChainMethodContext<TOptions = any, THookReturn = any> = {
   getFieldMetaData: () => any;
   setFieldMetaData: (data: Record<string, any>) => void;
   removeFieldMetaData: () => void;
+  watchPluginMeta: (scope?: string) => void;
+  notifyPluginMeta: (scope?: string) => void;
   getFieldRefs: () => RefObject<any>[];
   getFieldElements: () => HTMLElement[];
   setFieldDisabled: (disabled: boolean) => void;
