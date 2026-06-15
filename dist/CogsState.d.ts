@@ -8,6 +8,7 @@ import * as z3 from 'zod/v3';
 export type Prettify<T> = T extends any ? {
     [K in keyof T]: T[K];
 } : never;
+type IsAny<T> = 0 extends 1 & T ? true : false;
 export type ValidationFieldSummary = {
     status: ValidationStatus;
     severity: ValidationSeverity;
@@ -147,7 +148,7 @@ export type ArrayEndType<TShape extends unknown, TPlugins extends readonly CogsP
 export type StateObject<T, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []> = {
     (): T;
     (newValue: T | ((prev: T) => T)): void;
-} & ([NonNullable<T>] extends [any[]] ? ArrayEndType<T, TPlugins> : [NonNullable<T>] extends [Record<string, unknown> | object] ? {
+} & (IsAny<T> extends true ? {} : [NonNullable<T>] extends [any[]] ? ArrayEndType<T, TPlugins> : [NonNullable<T>] extends [Record<string, unknown> | object] ? {
     [K in keyof NonNullable<T>]-?: StateObject<NonNullable<T>[K], TPlugins>;
 } : {}) & // Fallback to {} since we intersect EndType below anyway
 EndType<T, TPlugins> & {

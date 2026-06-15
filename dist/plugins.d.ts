@@ -35,8 +35,9 @@ export type ChainMethodDefinition<THandler extends ChainMethodHandler = ChainMet
 };
 export type ChainMethodDefinitions = Record<string, ChainMethodDefinition<any>>;
 type ChainMethodCallable<THandler> = THandler extends (ctx: any, ...args: infer TArgs) => infer TReturn ? (...args: TArgs) => TReturn : never;
+type LiteralStringKeys<T> = string extends keyof T ? never : Extract<keyof T, string>;
 export type ChainMethodCallables<TMethods> = {
-    [K in keyof TMethods as K extends string ? `$${K}` : never]: TMethods[K] extends ChainMethodDefinition<infer TFn> ? ChainMethodCallable<TFn> : never;
+    [K in LiteralStringKeys<TMethods> as K extends string ? `$${K}` : never]: TMethods[K] extends ChainMethodDefinition<infer TFn> ? ChainMethodCallable<TFn> : never;
 };
 export type KeyedTypes<TMap extends Record<string, any>> = {
     __key: 'keyed';
