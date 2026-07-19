@@ -60,4 +60,40 @@ describe('plugin return types', () => {
     // @ts-expect-error plugin chain methods are exposed with a $ prefix
     result.current.sendToS3('bucket');
   });
+
+  it('combines custom methods from multiple plugins', () => {
+    const { createPlugin: createUploadPlugin } = createPluginContext();
+    const { createPlugin: createAuditPlugin } = createPluginContext();
+
+    const uploadPlugin = createUploadPlugin('upload').methods(({ object }) => ({
+      upload: object((_ctx, bucket: string) => ({ bucket })),
+    }));
+    const auditPlugin = createAuditPlugin('audit').methods(({ object }) => ({
+      recordAudit: object((_ctx, eventId: number) => String(eventId)),
+    }));
+    const plugins = [uploadPlugin, auditPlugin];
+
+    const { useCogsState } = createCogsState(
+      { assets: { image: 'avatar.png' } },
+      { plugins }
+    );
+    const { result } = renderHook(() => useCogsState('assets'));
+
+    expectTypeOf(result.current.$upload).parameters.toEqualTypeOf<
+      [bucket: string]
+    >();
+    expectTypeOf(result.current.$upload('images')).toEqualTypeOf<{
+      bucket: string;
+    }>();
+    expectTypeOf(result.current.$recordAudit).parameters.toEqualTypeOf<
+      [eventId: number]
+    >();
+    expectTypeOf(result.current.$recordAudit(42)).toEqualTypeOf<string>();
+
+    // @ts-expect-error upload belongs to the combined plugin method surface
+    // but still requires its own argument type
+    result.current.$upload(42);
+    // @ts-expect-error audit method arguments remain independent of upload
+    result.current.$recordAudit('42');
+  });
 });

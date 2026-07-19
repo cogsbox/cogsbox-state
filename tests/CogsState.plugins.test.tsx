@@ -1003,6 +1003,40 @@ describe('Plugin Hook to Transform Flow', () => {
     ]);
   });
 
+  it('should attach custom methods from multiple plugins', () => {
+    const { createPlugin: createUploadPlugin } = createPluginContext();
+    const { createPlugin: createAuditPlugin } = createPluginContext();
+
+    const uploadPlugin = createUploadPlugin('upload').methods(({ object }) => ({
+      upload: object((ctx, bucket: string) => ({
+        bucket,
+        path: ctx.path,
+      })),
+    }));
+    const auditPlugin = createAuditPlugin('audit').methods(({ object }) => ({
+      recordAudit: object((ctx, eventId: number) => ({
+        eventId,
+        pluginName: ctx.pluginName,
+      })),
+    }));
+    const plugins = [uploadPlugin, auditPlugin];
+
+    const { useCogsState } = createCogsState(
+      { assets: { image: 'avatar.png' } },
+      { plugins }
+    );
+    const { result } = renderHook(() => useCogsState('assets'));
+
+    expect(result.current.$upload('images')).toEqual({
+      bucket: 'images',
+      path: [],
+    });
+    expect(result.current.$recordAudit(42)).toEqual({
+      eventId: 42,
+      pluginName: 'audit',
+    });
+  });
+
   it('should leave real state fields ahead of plugin chain methods', () => {
     const { createPlugin } = createPluginContext({
       options: z.object({}),
