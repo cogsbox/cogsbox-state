@@ -430,10 +430,13 @@ type UnionToIntersection<T> = (
 type PluginChainMethodCallables<
   TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[],
 > = UnionToIntersection<
-  TPlugins[number] extends CogsPlugin<any, any, any, any, any, infer TMethods>
-    ? ChainMethodCallables<TMethods>
-    : {}
+  PluginChainMethodCallable<TPlugins[number]>
 >;
+
+type PluginChainMethodCallable<TPlugin> =
+  TPlugin extends CogsPlugin<any, any, any, any, any, infer TMethods>
+    ? ChainMethodCallables<TMethods>
+    : {};
 
 type EffectiveSetStateArg<
   T,

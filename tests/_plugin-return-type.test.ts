@@ -1,8 +1,13 @@
 import { describe, it } from 'vitest';
 import { expectTypeOf } from 'expect-type';
 import { renderHook } from '@testing-library/react';
+import { z } from 'zod';
 import { createCogsState } from '../src/CogsState';
-import { createPluginContext } from '../src/plugins';
+import {
+  createPluginContext,
+  type ChainMethodDefinition,
+  type CogsPluginBuilder,
+} from '../src/plugins';
 
 describe('plugin return types', () => {
   it('infers StateObject for plugin initialState keys', () => {
@@ -62,38 +67,72 @@ describe('plugin return types', () => {
   });
 
   it('combines custom methods from multiple plugins', () => {
-    const { createPlugin: createUploadPlugin } = createPluginContext();
-    const { createPlugin: createAuditPlugin } = createPluginContext();
+    const { createPlugin: createShapePlugin } = createPluginContext({
+      options: z.object({ logs: z.boolean().optional() }),
+      pluginMetaData: z.object({ cacheKey: z.string().optional() }),
+    });
+    const { createPlugin: createTablePlugin } = createPluginContext({
+      fieldMetaData: z.object({ page: z.number() }),
+    });
 
-    const uploadPlugin = createUploadPlugin('upload').methods(({ object }) => ({
-      upload: object((_ctx, bucket: string) => ({ bucket })),
+    type ShapeMethods = {
+      status: ChainMethodDefinition<
+        (_ctx: unknown, scope: string) => { scope: string; valid: boolean }
+      >;
+    };
+    type EmittedShapePlugin = CogsPluginBuilder<
+      'shape',
+      { logs: boolean | undefined },
+      { cacheKey: string | undefined },
+      unknown,
+      never,
+      ShapeMethods,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      { editor: { name: string } }
+    >;
+
+    const shapePlugin: EmittedShapePlugin = createShapePlugin('shape')
+      .initialState(() => ({ editor: { name: 'Draft' } }))
+      .transformState(() => {})
+      .onFormUpdate(() => {})
+      .onUpdate(() => {})
+      .methods(({ object }) => ({
+        status: object((_ctx, scope: string) => ({ scope, valid: true })),
+      }));
+
+    function table<Row>(_ctx: unknown, rows: Row[]) {
+      return { rows };
+    }
+
+    const tablePlugin = createTablePlugin('table').methods(({ array }) => ({
+      table: array(table),
     }));
-    const auditPlugin = createAuditPlugin('audit').methods(({ object }) => ({
-      recordAudit: object((_ctx, eventId: number) => String(eventId)),
-    }));
-    const plugins = [uploadPlugin, auditPlugin];
+    const plugins = [shapePlugin, tablePlugin];
 
     const { useCogsState } = createCogsState(
-      { assets: { image: 'avatar.png' } },
+      { rows: [{ id: 1 }] },
       { plugins }
     );
-    const { result } = renderHook(() => useCogsState('assets'));
+    const { result } = renderHook(() => useCogsState('editor'));
+    const { result: rowsResult } = renderHook(() => useCogsState('rows'));
 
-    expectTypeOf(result.current.$upload).parameters.toEqualTypeOf<
-      [bucket: string]
+    expectTypeOf(result.current.$status).parameters.toEqualTypeOf<
+      [scope: string]
     >();
-    expectTypeOf(result.current.$upload('images')).toEqualTypeOf<{
-      bucket: string;
+    expectTypeOf(result.current.$status('save')).toEqualTypeOf<{
+      scope: string;
+      valid: boolean;
     }>();
-    expectTypeOf(result.current.$recordAudit).parameters.toEqualTypeOf<
-      [eventId: number]
-    >();
-    expectTypeOf(result.current.$recordAudit(42)).toEqualTypeOf<string>();
+    expectTypeOf(rowsResult.current.$table([{ id: 2 }])).toEqualTypeOf<{
+      rows: unknown[];
+    }>();
 
-    // @ts-expect-error upload belongs to the combined plugin method surface
-    // but still requires its own argument type
-    result.current.$upload(42);
-    // @ts-expect-error audit method arguments remain independent of upload
-    result.current.$recordAudit('42');
+    // @ts-expect-error shape method retains its own argument type
+    result.current.$status(42);
   });
 });

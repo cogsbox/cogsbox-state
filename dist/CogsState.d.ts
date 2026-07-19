@@ -188,7 +188,8 @@ EndType<T, TPlugins> & {
 } & PluginChainMethodCallables<TPlugins>;
 export type CogsUpdate<T extends unknown> = UpdateType<T>;
 type UnionToIntersection<T> = (T extends any ? (arg: T) => void : never) extends (arg: infer I) => void ? I : never;
-type PluginChainMethodCallables<TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[]> = UnionToIntersection<TPlugins[number] extends CogsPlugin<any, any, any, any, any, infer TMethods> ? ChainMethodCallables<TMethods> : {}>;
+type PluginChainMethodCallables<TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[]> = UnionToIntersection<PluginChainMethodCallable<TPlugins[number]>>;
+type PluginChainMethodCallable<TPlugin> = TPlugin extends CogsPlugin<any, any, any, any, any, infer TMethods> ? ChainMethodCallables<TMethods> : {};
 export type UpdateTypeDetail = {
     timeStamp: number;
     stateKey: string;
