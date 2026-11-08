@@ -3,6 +3,8 @@ import {
   StateObject,
   UpdateTypeDetail,
   type FormOptsType,
+  type ReactivityType,
+  type SignalDependency,
 } from './CogsState';
 import { pluginStore } from './pluginStore';
 import {
@@ -331,7 +333,7 @@ export function FormElementWrapper({
         setShadowMetadata(stateKey, path, meta);
       }
     };
-  }, []);
+  }, [stateKey, stateKeyPathKey, componentId]);
 
   const debouncedUpdate = useCallback(
     (newValue: any) => {
@@ -587,7 +589,8 @@ export function FormElementWrapper({
 export function useRegisterComponent(
   stateKey: string,
   componentId: string,
-  forceUpdate: (o: object) => void
+  forceUpdate: (o: object) => void,
+  reactiveType: ReactivityType = 'component'
 ) {
   const fullComponentId = `${stateKey}////${componentId}`;
 
@@ -595,12 +598,12 @@ export function useRegisterComponent(
     registerComponent(stateKey, fullComponentId, {
       forceUpdate: () => forceUpdate({}),
       paths: new Set(),
-      reactiveType: ['component'],
+      reactiveType,
     });
     return () => {
       unregisterComponent(stateKey, fullComponentId);
     };
-  }, [stateKey, fullComponentId]);
+  }, [stateKey, fullComponentId, reactiveType]);
 }
 
 export function IsolatedComponentWrapper({
@@ -612,19 +615,24 @@ export function IsolatedComponentWrapper({
 }: {
   stateKey: string;
   path: string[];
-  dependencies?: any[]; // The explicit list of dependencies
+  dependencies?: readonly SignalDependency<any>[]; // Explicit paths to watch
   rebuildStateShape: (options: any) => any;
   renderFn: (state: any) => React.ReactNode;
 }) {
   const [componentId] = useState(() => uuidv4());
   const [, forceUpdate] = useState({});
 
-  useRegisterComponent(stateKey, componentId, forceUpdate);
+  useRegisterComponent(
+    stateKey,
+    componentId,
+    forceUpdate,
+    dependencies?.length ? 'none' : 'component'
+  );
 
   const pathsToSubscribe = useMemo(() => {
     if (dependencies && dependencies.length > 0) {
       return dependencies.map((dep) => {
-        return [stateKey, ...dep.$_path].join('.');
+        return [dep.$_stateKey, ...dep.$_path].join('.');
       });
     }
 

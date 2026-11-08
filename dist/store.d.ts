@@ -21,10 +21,7 @@ export type ComponentsType = {
     components?: Map<string, {
         forceUpdate: () => void;
         paths: Set<string>;
-        deps?: any[];
-        prevDeps?: any[];
-        depsFunction?: (state: any) => any[] | true;
-        reactiveType: ReactivityType[] | ReactivityType;
+        reactiveType: ReactivityType;
     }>;
 };
 export type ValidationStatus = 'NOT_VALIDATED' | 'VALIDATING' | 'VALID' | 'INVALID';
@@ -102,6 +99,10 @@ export type ShadowMetadata = {
         parentId: string;
         position: number;
         effect?: string;
+        dependencies?: Array<{
+            stateKey: string;
+            path: string[];
+        }>;
     }>;
     transformCaches?: Map<string, {
         validIds: string[];

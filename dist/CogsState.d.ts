@@ -55,7 +55,15 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => {
 };
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
-type EffectFunction<T, R> = (state: T, deps: any[]) => R;
+export type SignalDependency<T = unknown> = {
+    $_path: string[];
+    $_stateKey: string;
+    $get: () => T;
+};
+type SignalDependencyValue<TDependency> = TDependency extends SignalDependency<infer TValue> ? TValue : never;
+type SignalDependencyValues<TDependencies extends readonly SignalDependency<any>[]> = {
+    [K in keyof TDependencies]: SignalDependencyValue<TDependencies[K]>;
+};
 export type PerPathFormOptsType<TState, TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []> = Omit<FormOptsType, 'formElements'> & {
     formElements?: FormsElementsType<TState, TPlugins>;
 };
@@ -90,12 +98,16 @@ export type EndType<T, TPlugins extends readonly CogsPlugin<any, any, any, any, 
     $_stateKey: string;
     $isolate: {
         (renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
-        (dependencies: any[], renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
+        (dependencies: readonly SignalDependency<any>[], renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
     };
     $formElement: (control: FormControl<T>, opts?: PerPathFormOptsType<T, TPlugins>) => JSX.Element;
     $get: () => T;
-    $$get: () => T;
-    $$derive: <R>(fn: EffectFunction<T, R>) => R;
+    $derive: <R>(selector: (state: StateObject<T, TPlugins>) => R) => R;
+    $$get: () => JSX.Element;
+    $$derive: {
+        <R>(selector: (state: T) => R): JSX.Element;
+        <const TDependencies extends readonly SignalDependency<any>[], R>(dependencies: TDependencies, selector: (values: SignalDependencyValues<TDependencies>) => R): JSX.Element;
+    };
     $showValidationErrors: () => string[];
     $validationErrors: {
         (): ValidationSummaryArray;
@@ -203,8 +215,7 @@ export type UpdateTypeDetail = {
     insertAfterId?: string;
     metaData?: Record<string, any>;
 };
-export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
-export type ReactivityType = 'none' | 'component' | 'deps' | 'all' | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
+export type ReactivityType = 'none' | 'component';
 type ValidationOptionsType = {
     key?: string;
     zodSchemaV3?: z3.ZodType<any, any, any>;
@@ -228,10 +239,8 @@ export type OptionsType<T extends unknown = unknown, TApiParams = never> = Creat
         key: string | ((state: T) => string);
         onChange?: (state: T) => void;
     };
-    reactiveDeps?: (state: T) => any[] | true;
     reactiveType?: ReactivityType;
     defaultState?: T;
-    dependencies?: any[];
 };
 type ScopedPluginApi<THookReturn, TFieldMetaData> = {
     hookData: THookReturn;
@@ -314,7 +323,7 @@ type LocalStorageData<T> = {
     lastUpdated: number;
     lastSyncedWithServer?: number;
 };
-export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveDeps, reactiveType, componentId, defaultState, dependencies, }?: {
+export declare function useCogsStateFn<TStateObject extends unknown, const TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[] = []>(stateObject: TStateObject, { stateKey, localStorage, formElements, reactiveType, componentId, defaultState, }?: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
@@ -329,18 +338,19 @@ type MetaData = {
         path: string[];
     }>;
 };
-export declare function $cogsSignal(proxy: {
+type SignalPathDependency = {
+    stateKey: string;
+    path: string[];
+};
+type CogsSignalDescriptor = {
     _path: string[];
     _stateKey: string;
     _effect?: string;
+    _dependencies?: SignalPathDependency[];
     _meta?: MetaData;
-}): import('react').FunctionComponentElement<{
-    proxy: {
-        _path: string[];
-        _stateKey: string;
-        _effect?: string;
-        _meta?: MetaData;
-    };
+};
+export declare function $cogsSignal(proxy: CogsSignalDescriptor): import('react').FunctionComponentElement<{
+    proxy: CogsSignalDescriptor;
 }>;
 export {};
 //# sourceMappingURL=CogsState.d.ts.map

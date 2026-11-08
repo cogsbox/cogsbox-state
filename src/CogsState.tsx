@@ -42,6 +42,7 @@ import { v4 as uuidv4 } from 'uuid';
 
 import {
   getGlobalStore,
+  shadowStateStore,
   updateShadowTypeInfo,
   ValidationError,
   ValidationSeverity,
@@ -121,7 +122,20 @@ export type UpdateType<T> = (payload: UpdateArg<T>) => { synced: () => void };
 export type InsertType<T> = (payload: InsertParams<T>, index?: number) => void;
 export type InsertTypeObj<T> = (payload: InsertParams<T>) => void;
 
-type EffectFunction<T, R> = (state: T, deps: any[]) => R;
+export type SignalDependency<T = unknown> = {
+  $_path: string[];
+  $_stateKey: string;
+  $get: () => T;
+};
+
+type SignalDependencyValue<TDependency> =
+  TDependency extends SignalDependency<infer TValue> ? TValue : never;
+
+type SignalDependencyValues<
+  TDependencies extends readonly SignalDependency<any>[],
+> = {
+  [K in keyof TDependencies]: SignalDependencyValue<TDependencies[K]>;
+};
 export type PerPathFormOptsType<
   TState,
   TPlugins extends readonly CogsPlugin<
@@ -189,11 +203,9 @@ export type EndType<
   $_path: string[];
   $_stateKey: string;
   $isolate: {
+    (renderFn: (state: StateObject<T, TPlugins>) => ReactNode): JSX.Element;
     (
-      renderFn: (state: StateObject<T, TPlugins>) => ReactNode
-    ): JSX.Element;
-    (
-      dependencies: any[],
+      dependencies: readonly SignalDependency<any>[],
       renderFn: (state: StateObject<T, TPlugins>) => ReactNode
     ): JSX.Element;
   };
@@ -202,8 +214,15 @@ export type EndType<
     opts?: PerPathFormOptsType<T, TPlugins>
   ) => JSX.Element;
   $get: () => T;
-  $$get: () => T;
-  $$derive: <R>(fn: EffectFunction<T, R>) => R;
+  $derive: <R>(selector: (state: StateObject<T, TPlugins>) => R) => R;
+  $$get: () => JSX.Element;
+  $$derive: {
+    <R>(selector: (state: T) => R): JSX.Element;
+    <const TDependencies extends readonly SignalDependency<any>[], R>(
+      dependencies: TDependencies,
+      selector: (values: SignalDependencyValues<TDependencies>) => R
+    ): JSX.Element;
+  };
   // Removed: $_status and $getStatus are now owned by Shape Plugin
   $showValidationErrors: () => string[];
   $validationErrors: {
@@ -429,9 +448,7 @@ type UnionToIntersection<T> = (
 
 type PluginChainMethodCallables<
   TPlugins extends readonly CogsPlugin<any, any, any, any, any, any, any>[],
-> = UnionToIntersection<
-  PluginChainMethodCallable<TPlugins[number]>
->;
+> = UnionToIntersection<PluginChainMethodCallable<TPlugins[number]>>;
 
 type PluginChainMethodCallable<TPlugin> =
   TPlugin extends CogsPlugin<any, any, any, any, any, infer TMethods>
@@ -477,13 +494,7 @@ export type UpdateTypeDetail = {
   insertAfterId?: string;
   metaData?: Record<string, any>;
 };
-export type ReactivityUnion = 'none' | 'component' | 'deps' | 'all';
-export type ReactivityType =
-  | 'none'
-  | 'component'
-  | 'deps'
-  | 'all'
-  | Array<Prettify<'none' | 'component' | 'deps' | 'all'>>;
+export type ReactivityType = 'none' | 'component';
 
 // Define the return type of the sync hook locally
 
@@ -536,12 +547,9 @@ export type OptionsType<
     onChange?: (state: T) => void;
   };
 
-  reactiveDeps?: (state: T) => any[] | true;
   reactiveType?: ReactivityType;
 
   defaultState?: T;
-
-  dependencies?: any[];
 };
 type ScopedPluginApi<THookReturn, TFieldMetaData> = {
   hookData: THookReturn;
@@ -607,6 +615,8 @@ const {
   removeShadowArrayElement,
   setInitialStateOptions,
   addPathComponent,
+  registerComponent,
+  unregisterComponent,
   clearSelectedIndexesForState,
   addStateLog,
   clearSelectedIndex,
@@ -795,14 +805,13 @@ type PluginStates<TPlugins extends readonly AnyCogsPlugin[]> =
       : {}
     : {};
 
-type KnownKeys<T> =
-  string extends keyof T
+type KnownKeys<T> = string extends keyof T
+  ? never
+  : number extends keyof T
     ? never
-    : number extends keyof T
+    : symbol extends keyof T
       ? never
-      : symbol extends keyof T
-        ? never
-        : keyof T;
+      : keyof T;
 
 type MergeInitialState<
   State extends object,
@@ -828,17 +837,12 @@ type KeyedKeys<P> = {
     : never;
 }[keyof P];
 
-type PluginOptionEntry<
-  P,
-  StateKey extends PropertyKey,
-> = P extends undefined
+type PluginOptionEntry<P, StateKey extends PropertyKey> = P extends undefined
   ? never
   : P extends Record<string, any>
     ? Prettify<
         Partial<Pick<P, Exclude<keyof P, KeyedKeys<P>>>> & {
-          [K in KeyedKeys<P> as StateKey extends keyof NonNullable<
-            P[K]
-          >['map']
+          [K in KeyedKeys<P> as StateKey extends keyof NonNullable<P[K]>['map']
             ? NonNullable<P[K]>['map'][StateKey] extends undefined
               ? never
               : keyof NonNullable<P[K]>['map'][StateKey] extends never
@@ -857,10 +861,7 @@ type PluginOptionEntry<
         : P
       : P;
 
-type PluginOptionsForState<
-  PluginOptions,
-  StateKey extends PropertyKey,
-> = {
+type PluginOptionsForState<PluginOptions, StateKey extends PropertyKey> = {
   [PName in keyof PluginOptions as PluginOptions[PName] extends undefined
     ? never
     : PName]?: PluginOptionEntry<PluginOptions[PName], StateKey>;
@@ -871,7 +872,8 @@ type UseCogsStateOptions<
   PluginOptions,
   StateKey extends PropertyKey,
 > = Prettify<
-  OptionsType<StateSlice, never> & PluginOptionsForState<PluginOptions, StateKey>
+  OptionsType<StateSlice, never> &
+    PluginOptionsForState<PluginOptions, StateKey>
 >;
 
 type CreateCogsStateReturn<
@@ -921,7 +923,7 @@ export const createCogsState = <
     formElements?: FormsElementsType<State, TPlugins>;
     validation?: ValidationOptionsType;
   }
-) : CreateCogsStateReturn<State, TPlugins> => {
+): CreateCogsStateReturn<State, TPlugins> => {
   type PluginOptions = PluginOptionsMap<TPlugins>;
 
   if (opt?.plugins) {
@@ -1023,35 +1025,38 @@ export const createCogsState = <
       localStorage: options?.localStorage,
       middleware: options?.middleware,
       reactiveType: options?.reactiveType,
-      reactiveDeps: options?.reactiveDeps,
       defaultState: options?.defaultState as any,
-      dependencies: options?.dependencies,
     });
-
-    useLayoutEffect(() => {
-      if (options) {
-        pluginStore
-          .getState()
-          .setPluginOptionsForState(stateKey as string, options);
-      }
-    }, [stateKey, options]);
 
     useLayoutEffect(() => {
       pluginStore
         .getState()
-        .registerStateHandler(stateKey as string, updater as any);
+        .setPluginOptionsForState(
+          stateKey as string,
+          options ?? optionsRef.current
+        );
+    }, [stateKey, options]);
 
-      return () => {
-        pluginStore.getState().unregisterStateHandler(stateKey as string);
-      };
+    useLayoutEffect(() => {
+      return pluginStore
+        .getState()
+        .registerStateHandler(stateKey as string, updater as any);
     }, [stateKey, updater]);
 
     useLayoutEffect(() => {
       const validation = getInitialOptions(stateKey as string)?.validation;
       if (validation?.zodSchemaV4) {
-        updateShadowTypeInfo(stateKey as string, validation.zodSchemaV4, 'zod4');
+        updateShadowTypeInfo(
+          stateKey as string,
+          validation.zodSchemaV4,
+          'zod4'
+        );
       } else if (validation?.zodSchemaV3) {
-        updateShadowTypeInfo(stateKey as string, validation.zodSchemaV3, 'zod3');
+        updateShadowTypeInfo(
+          stateKey as string,
+          validation.zodSchemaV3,
+          'zod3'
+        );
       }
     });
 
@@ -1061,10 +1066,7 @@ export const createCogsState = <
   function setCogsOptionsByKey<StateKey extends StateKeys>(
     stateKey: StateKey,
     options: CreateStateOptionsType<StateSlice<StateKey>, TPlugins> &
-      Omit<
-        OptionsType<StateSlice<StateKey>>,
-        keyof CreateStateOptionsType
-      >
+      Omit<OptionsType<StateSlice<StateKey>>, keyof CreateStateOptionsType>
   ) {
     setOptions({ stateKey, options, initialOptionsPart } as any);
 
@@ -1227,12 +1229,7 @@ const notifyComponents = (thisKey: string) => {
   // Batch component updates
   const updates = new Set<() => void>();
   stateEntry?.components?.forEach((component) => {
-    const reactiveTypes = component
-      ? Array.isArray(component.reactiveType)
-        ? component.reactiveType
-        : [component.reactiveType || 'component']
-      : null;
-    if (!reactiveTypes?.includes('none')) {
+    if (component.reactiveType !== 'none') {
       updates.add(() => component.forceUpdate());
     }
   });
@@ -1260,30 +1257,39 @@ function scheduleFlush() {
 function updateSignals(shadowMeta: any, displayValue: any) {
   if (!shadowMeta?.signals?.length) return;
 
-  shadowMeta.signals.forEach(({ parentId, position, effect }: any) => {
-    const parent = document.querySelector(`[data-parent-id="${parentId}"]`);
-    if (!parent) return;
+  shadowMeta.signals.forEach(
+    ({ parentId, position, effect, dependencies }: any) => {
+      const parent = document.querySelector(`[data-parent-id="${parentId}"]`);
+      if (!parent) return;
 
-    const childNodes = Array.from(parent.childNodes);
-    if (!childNodes[position]) return;
+      const childNodes = Array.from(parent.childNodes);
+      if (!childNodes[position]) return;
 
-    let finalDisplayValue = displayValue;
-    if (effect && displayValue !== null) {
-      try {
-        finalDisplayValue = new Function('state', `return (${effect})(state)`)(
-          displayValue
-        );
-      } catch (err) {
-        console.error('Error evaluating effect function:', err);
+      const effectInput = dependencies?.length
+        ? dependencies.map(({ stateKey, path }: SignalPathDependency) =>
+            getShadowValue(stateKey, path)
+          )
+        : displayValue;
+
+      let finalDisplayValue = effectInput;
+      if (effect && effectInput !== null) {
+        try {
+          finalDisplayValue = new Function(
+            'state',
+            `return (${effect})(state)`
+          )(effectInput);
+        } catch (err) {
+          console.error('Error evaluating effect function:', err);
+        }
       }
-    }
 
-    if (finalDisplayValue !== null && typeof finalDisplayValue === 'object') {
-      finalDisplayValue = JSON.stringify(finalDisplayValue);
-    }
+      if (finalDisplayValue !== null && typeof finalDisplayValue === 'object') {
+        finalDisplayValue = JSON.stringify(finalDisplayValue);
+      }
 
-    childNodes[position].textContent = String(finalDisplayValue ?? '');
-  });
+      childNodes[position].textContent = String(finalDisplayValue ?? '');
+    }
+  );
 }
 
 function getComponentNotifications(
@@ -1312,13 +1318,8 @@ function getComponentNotifications(
         pathMeta.pathComponents.forEach((componentId: string) => {
           const component = rootMeta.components?.get(componentId);
           // NEW: Add component to the set instead of calling forceUpdate()
-          if (component) {
-            const reactiveTypes = Array.isArray(component.reactiveType)
-              ? component.reactiveType
-              : [component.reactiveType || 'component'];
-            if (!reactiveTypes.includes('none')) {
-              componentsToNotify.add(component);
-            }
+          if (component && component.reactiveType !== 'none') {
+            componentsToNotify.add(component);
           }
         });
       }
@@ -1345,13 +1346,8 @@ function getComponentNotifications(
           subPathMeta.pathComponents.forEach((componentId: string) => {
             const component = rootMeta.components?.get(componentId);
             // NEW: Add component to the set
-            if (component) {
-              const reactiveTypes = Array.isArray(component.reactiveType)
-                ? component.reactiveType
-                : [component.reactiveType || 'component'];
-              if (!reactiveTypes.includes('none')) {
-                componentsToNotify.add(component);
-              }
+            if (component && component.reactiveType !== 'none') {
+              componentsToNotify.add(component);
             }
           });
         }
@@ -1385,34 +1381,6 @@ function getComponentNotifications(
     }
     // --- END FIX ---
   }
-
-  // --- PASS 2: Handle 'all' and 'deps' reactivity types ---
-  // Iterate over all components for this stateKey that haven't been notified yet.
-  // rootMeta.components.forEach((component, componentId) => {
-  //   // If we've already added this component, skip it.
-  //   if (componentsToNotify.has(component)) {
-  //     return;
-  //   }
-
-  //   const reactiveTypes = Array.isArray(component.reactiveType)
-  //     ? component.reactiveType
-  //     : [component.reactiveType || 'component'];
-
-  //   if (reactiveTypes.includes('all')) {
-  //     componentsToNotify.add(component);
-  //   } else if (reactiveTypes.includes('deps') && component.depsFunction) {
-  //     const currentState = getShadowValue(stateKey, []);
-  //     const newDeps = component.depsFunction(currentState);
-
-  //     if (
-  //       newDeps === true ||
-  //       (Array.isArray(newDeps) && !isDeepEqual(component.prevDeps, newDeps))
-  //     ) {
-  //       component.prevDeps = newDeps as any; // Update the dependencies for the next check
-  //       componentsToNotify.add(component);
-  //     }
-  //   }
-  // });
 
   return componentsToNotify;
 }
@@ -1522,12 +1490,17 @@ function handleCut(
 }
 
 function flushQueue() {
+  // Release this batch before invoking callbacks, including callbacks that throw
+  // or enqueue another update.
+  const batch = updateBatchQueue;
+  updateBatchQueue = [];
+  isFlushScheduled = false;
   const allComponentsToNotify = new Set<any>();
   const signalUpdates: { shadowMeta: any; displayValue: any }[] = [];
 
   const logsToAdd: UpdateTypeDetail[] = [];
 
-  for (const item of updateBatchQueue) {
+  for (const item of batch) {
     if (item.status && item.updateType) {
       logsToAdd.push(item as UpdateTypeDetail);
       continue;
@@ -1565,11 +1538,6 @@ function flushQueue() {
     component.forceUpdate();
   });
   //console.timeEnd('updateComponents');
-
-  // --- Step 3: CLEANUP ---
-  // Clear the queue for the next batch of updates.
-  updateBatchQueue = [];
-  isFlushScheduled = false;
 }
 function createEffectiveSetState<T>(
   thisKey: string,
@@ -1665,20 +1633,18 @@ export function useCogsStateFn<
     stateKey,
     localStorage,
     formElements,
-    reactiveDeps,
     reactiveType,
     componentId,
     defaultState,
-    dependencies,
   }: {
     stateKey?: string;
     componentId?: string;
     defaultState?: TStateObject;
   } & OptionsType<TStateObject> = {}
 ): StateObject<TStateObject, TPlugins> {
-  const [reactiveForce, forceUpdate] = useState({}); //this is the key to reactivity
+  const [, forceUpdate] = useState({}); //this is the key to reactivity
   const { sessionId } = useCogsConfig();
-  let noStateKey = stateKey ? false : true;
+  const [noStateKey] = useState(!stateKey);
   const [thisKey] = useState(stateKey ?? uuidv4());
   const componentIdRef = useRef(componentId ?? uuidv4());
   const latestInitialOptionsRef = useRef<OptionsType<TStateObject> | null>(
@@ -1764,10 +1730,13 @@ export function useCogsStateFn<
     }
 
     notifyComponents(thisKey);
-  }, [thisKey, ...(dependencies || [])]);
+  }, [thisKey]);
 
   useLayoutEffect(() => {
     if (noStateKey) {
+      if (!(thisKey in getGlobalStore.getState().initialStateGlobal)) {
+        updateInitialStateGlobal(thisKey, stateObject);
+      }
       setAndMergeOptions(thisKey as string, {
         formElements,
         defaultState,
@@ -1778,59 +1747,55 @@ export function useCogsStateFn<
 
     const componentKey = `${thisKey}////${componentIdRef.current}`;
 
-    // Register component in shadow metadata at root level
-    const rootMeta = getShadowMetadata(thisKey, []);
-    const components = rootMeta?.components || new Map();
-
-    components.set(componentKey, {
+    registerComponent(thisKey, componentKey, {
       forceUpdate: () => forceUpdate({}),
-      reactiveType: reactiveType ?? ['component'],
+      reactiveType: reactiveType ?? 'component',
       paths: new Set(),
-      depsFunction: reactiveDeps || undefined,
-      deps: reactiveDeps ? reactiveDeps(getShadowValue(thisKey, [])) : [],
-      prevDeps: reactiveDeps // Initialize prevDeps with the same initial value
-        ? reactiveDeps(getShadowValue(thisKey, []))
-        : [],
     });
 
-    setShadowMetadata(thisKey, [], {
-      ...rootMeta,
-      components,
-    });
     forceUpdate({});
     return () => {
-      const meta = getShadowMetadata(thisKey, []);
-      const component = meta?.components?.get(componentKey);
-
-      // Remove from each path we registered to
-      if (component?.paths) {
-        component.paths.forEach((fullPath) => {
-          // fullPath is like "todos.0.name", need to split and remove stateKey
-          const pathParts = fullPath.split('.');
-          const path = pathParts.slice(1); // Remove stateKey part
-
-          const pathMeta = getGlobalStore
-            .getState()
-            .getShadowMetadata(thisKey, path);
-          if (pathMeta?.pathComponents) {
-            // Optionally clean up empty Sets
-
-            if (pathMeta.pathComponents.size === 0) {
-              delete pathMeta.pathComponents;
-              getGlobalStore
-                .getState()
-                .setShadowMetadata(thisKey, path, pathMeta);
-            }
-          }
-        });
-      }
-
-      // Remove from root components
-      if (meta?.components) {
-        setShadowMetadata(thisKey, [], meta);
-      }
+      unregisterComponent(thisKey, componentKey);
     };
-  }, []);
+  }, [thisKey, reactiveType]);
+
+  useEffect(() => {
+    if (!noStateKey) return;
+    return () => {
+      // Generated keys belong to this hook; named shared state persists.
+      shadowStateStore.delete(thisKey);
+      shadowStateStore.delete(`[${thisKey}`);
+      updateBatchQueue = updateBatchQueue.filter(
+        (item) => item.stateKey !== thisKey
+      );
+      const current = getGlobalStore.getState();
+      for (const key of current.pathSubscribers.keys()) {
+        if (key === thisKey || key.startsWith(thisKey + '.')) {
+          current.pathSubscribers.delete(key);
+        }
+      }
+      getGlobalStore.setState((state) => {
+        const initialStateGlobal = { ...state.initialStateGlobal };
+        const initialStateOptions = { ...state.initialStateOptions };
+        const stateLog = new Map(state.stateLog);
+        const selectedIndicesMap = new Map(state.selectedIndicesMap);
+        delete initialStateGlobal[thisKey];
+        delete initialStateOptions[thisKey];
+        stateLog.delete(thisKey);
+        for (const key of selectedIndicesMap.keys()) {
+          if (key === thisKey || key.startsWith(thisKey + '.')) {
+            selectedIndicesMap.delete(key);
+          }
+        }
+        return {
+          initialStateGlobal,
+          initialStateOptions,
+          stateLog,
+          selectedIndicesMap,
+        };
+      });
+    };
+  }, [noStateKey, thisKey]);
 
   const effectiveSetState = createEffectiveSetState(
     thisKey,
@@ -1839,7 +1804,7 @@ export function useCogsStateFn<
     latestInitialOptionsRef
   );
 
-  if (!getGlobalStore.getState().initialStateGlobal[thisKey]) {
+  if (!noStateKey && !getGlobalStore.getState().initialStateGlobal[thisKey]) {
     updateInitialStateGlobal(thisKey, stateObject);
   }
 
@@ -1913,15 +1878,7 @@ const registerComponentDependency = (
   const rootMeta = getShadowMetadata(stateKey, []);
   const component = rootMeta?.components?.get(fullComponentId);
 
-  if (
-    !component ||
-    component.reactiveType === 'none' ||
-    !(
-      Array.isArray(component.reactiveType)
-        ? component.reactiveType
-        : [component.reactiveType]
-    ).includes('component')
-  ) {
+  if (!component || component.reactiveType === 'none') {
     return;
   }
 
@@ -1933,22 +1890,6 @@ const notifySelectionComponents = (
   currentSelected?: string | undefined
 ) => {
   const rootMeta = getShadowMetadata(stateKey, []);
-  const notifiedComponents = new Set<string>();
-
-  // Handle "all" reactive components first
-  if (rootMeta?.components) {
-    rootMeta.components.forEach((component, componentId) => {
-      const reactiveTypes = Array.isArray(component.reactiveType)
-        ? component.reactiveType
-        : [component.reactiveType || 'component'];
-
-      if (reactiveTypes.includes('all')) {
-        component.forceUpdate();
-        notifiedComponents.add(componentId);
-      }
-    });
-  }
-
   getShadowMetadata(stateKey, [
     ...parentPath,
     'getSelected',
@@ -2090,6 +2031,8 @@ function createProxyHandler<
   sessionId?: string
 ): StateObject<T, TPlugins> {
   const proxyCache = new Map<string, any>();
+  // A mounted owner can visit indefinitely many item paths and derived views.
+  const maxCachedProxies = 1000;
 
   function rebuildStateShape({
     path = [],
@@ -2112,7 +2055,10 @@ function createProxyHandler<
     const cacheKey =
       path.join('.') + ':' + componentId + ':' + derivationSignature;
     if (proxyCache.has(cacheKey)) {
-      return proxyCache.get(cacheKey);
+      const cached = proxyCache.get(cacheKey);
+      proxyCache.delete(cacheKey);
+      proxyCache.set(cacheKey, cached);
+      return cached;
     }
     const stateKeyPathKey = [stateKey, ...path].join('.');
 
@@ -2343,8 +2289,7 @@ function createProxyHandler<
                       : [
                           {
                             source: 'client',
-                            message:
-                              zodErrors[0]?.message || 'Invalid value',
+                            message: zodErrors[0]?.message || 'Invalid value',
                             severity: 'error',
                             code: zodErrors[0]?.code,
                           },
@@ -2353,9 +2298,12 @@ function createProxyHandler<
                     validatedValue: targetValue,
                   },
                 });
-                store.notifyPathSubscribers([stateKey, ...targetPath].join('.'), {
-                  type: 'VALIDATION_UPDATE',
-                });
+                store.notifyPathSubscribers(
+                  [stateKey, ...targetPath].join('.'),
+                  {
+                    type: 'VALIDATION_UPDATE',
+                  }
+                );
 
                 return {
                   key,
@@ -2452,13 +2400,17 @@ function createProxyHandler<
           return (keys?: readonly string[]) => {
             const store = getGlobalStore.getState();
             const summarizePath = (targetPath: string[]) => {
-              const validationState =
-                store.getShadowMetadata(stateKey, targetPath)?.validation;
+              const validationState = store.getShadowMetadata(
+                stateKey,
+                targetPath
+              )?.validation;
               const allErrors = (validationState?.errors || []).map((err) => ({
                 ...err,
                 path: targetPath,
               }));
-              const errors = allErrors.filter((err) => err.severity === 'error');
+              const errors = allErrors.filter(
+                (err) => err.severity === 'error'
+              );
               const warnings = allErrors.filter(
                 (err) => err.severity === 'warning'
               );
@@ -2713,6 +2665,15 @@ function createProxyHandler<
               const arrayPathKey = path.length > 0 ? path.join('.') : 'root';
 
               const validIds = applyTransforms(stateKey, path, meta);
+
+              useEffect(() => {
+                const activeIds = new Set(validIds);
+                for (const itemKey of componentIdsRef.current.keys()) {
+                  if (!activeIds.has(itemKey)) {
+                    componentIdsRef.current.delete(itemKey);
+                  }
+                }
+              });
 
               // Memoize the updated meta to prevent creating new objects on every render
               const updatedMeta = useMemo(() => {
@@ -3081,14 +3042,61 @@ function createProxyHandler<
           };
         }
 
+        if (prop === '$derive') {
+          return (selector: (state: any) => any) => {
+            if (typeof selector !== 'function') {
+              throw new Error(
+                'CogsState: $derive requires a selector function.'
+              );
+            }
+
+            return selector(
+              rebuildStateShape({
+                path,
+                componentId,
+                meta,
+              })
+            );
+          };
+        }
+
         if (prop === '$$derive') {
-          return (fn: any) =>
-            $cogsSignal({
+          return (
+            arg1: readonly SignalDependency<any>[] | ((state: any) => any),
+            arg2?: (values: any[]) => any
+          ) => {
+            if (Array.isArray(arg1)) {
+              if (typeof arg2 !== 'function') {
+                throw new Error(
+                  'CogsState: $$derive(dependencies, selector) requires a selector function.'
+                );
+              }
+
+              return $cogsSignal({
+                _stateKey: stateKey,
+                _path: path,
+                _effect: arg2.toString(),
+                _dependencies: arg1.map((dependency) => ({
+                  stateKey: dependency.$_stateKey,
+                  path: dependency.$_path,
+                })),
+                _meta: meta,
+              });
+            }
+
+            if (typeof arg1 !== 'function') {
+              throw new Error(
+                'CogsState: $$derive requires a selector function.'
+              );
+            }
+
+            return $cogsSignal({
               _stateKey: stateKey,
               _path: path,
-              _effect: fn.toString(),
+              _effect: arg1.toString(),
               _meta: meta,
             });
+          };
         }
 
         if (prop === '$$get') {
@@ -3483,7 +3491,9 @@ function createProxyHandler<
         if (prop === '$isolate') {
           // We accept (renderFn) OR (deps, renderFn)
           return (
-            arg1: any[] | ((state: any) => ReactNode),
+            arg1:
+              | readonly SignalDependency<any>[]
+              | ((state: any) => ReactNode),
             arg2?: (state: any) => ReactNode
           ) => {
             // Check if the first argument is the dependency array
@@ -3534,6 +3544,9 @@ function createProxyHandler<
     };
 
     const proxyInstance = new Proxy(proxyTarget, handler);
+    if (proxyCache.size >= maxCachedProxies) {
+      proxyCache.delete(proxyCache.keys().next().value!);
+    }
     proxyCache.set(cacheKey, proxyInstance);
 
     return proxyInstance;
@@ -3602,7 +3615,9 @@ function createProxyHandler<
 
         if (stateEntry) {
           stateEntry?.components?.forEach((component) => {
-            component.forceUpdate();
+            if (component.reactiveType !== 'none') {
+              component.forceUpdate();
+            }
           });
         }
       });
@@ -3621,35 +3636,50 @@ function createProxyHandler<
   return returnShape;
 }
 
-export function $cogsSignal(proxy: {
+type SignalPathDependency = {
+  stateKey: string;
+  path: string[];
+};
+
+type CogsSignalDescriptor = {
   _path: string[];
   _stateKey: string;
   _effect?: string;
-
+  _dependencies?: SignalPathDependency[];
   _meta?: MetaData;
-}) {
+};
+
+export function $cogsSignal(proxy: CogsSignalDescriptor) {
   return createElement(SignalRenderer, { proxy });
 }
 
-function SignalRenderer({
-  proxy,
-}: {
-  proxy: {
-    _path: string[];
-    _stateKey: string;
-    _effect?: string;
-    _meta?: MetaData;
-  };
-}) {
+function SignalRenderer({ proxy }: { proxy: CogsSignalDescriptor }) {
   const elementRef = useRef<HTMLSpanElement>(null);
   const instanceIdRef = useRef<string | null>(null);
   const isSetupRef = useRef(false);
-  const signalId = `${proxy._stateKey}-${proxy._path.join('.')}`;
+  const dependencies = proxy._dependencies?.length
+    ? proxy._dependencies
+    : [{ stateKey: proxy._stateKey, path: proxy._path }];
+  const uniqueDependencies = dependencies.filter(
+    (dependency, index, all) =>
+      all.findIndex(
+        (candidate) =>
+          candidate.stateKey === dependency.stateKey &&
+          candidate.path.join('\x00') === dependency.path.join('\x00')
+      ) === index
+  );
+  const signalId = uniqueDependencies
+    .map(({ stateKey, path }) => `${stateKey}-${path.join('.')}`)
+    .join('--');
 
   const arrayPathKey = proxy._path.length > 0 ? proxy._path.join('.') : 'root';
   const viewIds = proxy._meta?.arrayViews?.[arrayPathKey];
 
-  const value = getShadowValue(proxy._stateKey, proxy._path, viewIds);
+  const value = proxy._dependencies?.length
+    ? uniqueDependencies.map(({ stateKey, path }) =>
+        getShadowValue(stateKey, path)
+      )
+    : getShadowValue(proxy._stateKey, proxy._path, viewIds);
 
   useEffect(() => {
     const element = elementRef.current;
@@ -3673,24 +3703,26 @@ function SignalRenderer({
 
       instanceIdRef.current = `instance-${crypto.randomUUID()}`;
 
-      const currentMeta =
-        getGlobalStore
-          .getState()
-          .getShadowMetadata(proxy._stateKey, proxy._path) || {};
-      const signals = currentMeta.signals || [];
-      signals.push({
+      const signalRegistration = {
         instanceId: instanceIdRef.current,
         parentId,
         position,
         effect: proxy._effect,
-      });
+        dependencies: proxy._dependencies?.length
+          ? uniqueDependencies
+          : undefined,
+      };
 
-      getGlobalStore
-        .getState()
-        .setShadowMetadata(proxy._stateKey, proxy._path, {
+      uniqueDependencies.forEach(({ stateKey, path }) => {
+        const currentMeta =
+          getGlobalStore.getState().getShadowMetadata(stateKey, path) || {};
+        const signals = [...(currentMeta.signals || []), signalRegistration];
+
+        getGlobalStore.getState().setShadowMetadata(stateKey, path, {
           ...currentMeta,
           signals,
         });
+      });
 
       let displayValue = value;
       if (proxy._effect) {
@@ -3715,18 +3747,19 @@ function SignalRenderer({
     return () => {
       clearTimeout(timeoutId);
       if (instanceIdRef.current) {
-        const currentMeta =
-          getGlobalStore
-            .getState()
-            .getShadowMetadata(proxy._stateKey, proxy._path) || {};
-        if (currentMeta.signals) {
-          currentMeta.signals = currentMeta.signals.filter(
-            (s) => s.instanceId !== instanceIdRef.current
-          );
-          getGlobalStore
-            .getState()
-            .setShadowMetadata(proxy._stateKey, proxy._path, currentMeta);
-        }
+        uniqueDependencies.forEach(({ stateKey, path }) => {
+          const currentMeta =
+            getGlobalStore.getState().getShadowMetadata(stateKey, path) || {};
+          if (currentMeta.signals) {
+            const signals = currentMeta.signals.filter(
+              (signal) => signal.instanceId !== instanceIdRef.current
+            );
+            getGlobalStore.getState().setShadowMetadata(stateKey, path, {
+              ...currentMeta,
+              signals,
+            });
+          }
+        });
       }
     };
   }, []);

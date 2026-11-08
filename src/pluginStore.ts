@@ -38,7 +38,10 @@ export type ClientActivityEvent = {
 
 type PluginRegistryStore = {
   stateHandlers: Map<string, StateObject<any>>; // stateKey -> handler
-  registerStateHandler: (stateKey: string, handler: StateObject<any>) => void;
+  registerStateHandler: (
+    stateKey: string,
+    handler: StateObject<any>
+  ) => () => void;
   unregisterStateHandler: (stateKey: string) => void;
   registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
   setRegisteredPlugins: (
@@ -73,20 +76,59 @@ type PluginRegistryStore = {
   removeHookResult: (stateKey: string, pluginName: string) => void;
 };
 
+// Each mounted consumer owns one registration, even when handlers are shared.
+const stateHandlerRegistrations = new Map<
+  string,
+  Map<symbol, StateObject<any>>
+>();
+
 export const pluginStore = create<PluginRegistryStore>((set, get) => ({
   stateHandlers: new Map(),
-  registerStateHandler: (stateKey, handler) =>
+  registerStateHandler: (stateKey, handler) => {
+    const registrations =
+      (get().stateHandlers.has(stateKey)
+        ? stateHandlerRegistrations.get(stateKey)
+        : undefined) ?? new Map<symbol, StateObject<any>>();
+    const token = Symbol();
+    registrations.set(token, handler);
+    stateHandlerRegistrations.set(stateKey, registrations);
     set((state) => {
       const newMap = new Map(state.stateHandlers);
       newMap.set(stateKey, handler);
       return { stateHandlers: newMap };
-    }),
-  unregisterStateHandler: (stateKey) =>
+    });
+    return () => {
+      if (
+        stateHandlerRegistrations.get(stateKey) !== registrations ||
+        !registrations.delete(token)
+      )
+        return;
+      if (registrations.size === 0) {
+        get().unregisterStateHandler(stateKey);
+      } else {
+        const remainingHandler = Array.from(registrations.values()).pop()!;
+        set((state) => {
+          if (state.stateHandlers.get(stateKey) === remainingHandler)
+            return state;
+          const stateHandlers = new Map(state.stateHandlers);
+          stateHandlers.set(stateKey, remainingHandler);
+          return { stateHandlers };
+        });
+      }
+    };
+  },
+  unregisterStateHandler: (stateKey) => {
+    stateHandlerRegistrations.delete(stateKey);
     set((state) => {
-      const newMap = new Map(state.stateHandlers);
-      newMap.delete(stateKey);
-      return { stateHandlers: newMap };
-    }),
+      const stateHandlers = new Map(state.stateHandlers);
+      const pluginOptions = new Map(state.pluginOptions);
+      const hookResults = new Map(state.hookResults);
+      stateHandlers.delete(stateKey);
+      pluginOptions.delete(stateKey);
+      hookResults.delete(stateKey);
+      return { stateHandlers, pluginOptions, hookResults };
+    });
+  },
   registeredPlugins: [],
   pluginOptions: new Map(),
 

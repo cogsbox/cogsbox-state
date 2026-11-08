@@ -23,23 +23,36 @@ vi.mock('react-intersection-observer', () => ({
 const { useCogsState } = createCogsState({
   componentTestState: {
     name: 'John',
-      age: 30,
-      settings: {
-        theme: 'dark',
-        notifications: true,
-      },
-      tags: ['react', 'typescript'],
-      users: [
-        { id: 1, name: 'Alice', email: 'alice@test.com', active: true },
-        { id: 2, name: 'Bob', email: 'bob@test.com', active: false },
-        { id: 3, name: 'Charlie', email: 'charlie@test.com', active: true },
+    age: 30,
+    settings: {
+      theme: 'dark',
+      notifications: true,
+    },
+    tags: ['react', 'typescript'],
+    users: [
+      { id: 1, name: 'Alice', email: 'alice@test.com', active: true },
+      { id: 2, name: 'Bob', email: 'bob@test.com', active: false },
+      { id: 3, name: 'Charlie', email: 'charlie@test.com', active: true },
+    ],
+    nested: {
+      items: [
+        { value: 10, label: 'Item A' },
+        { value: 20, label: 'Item B' },
       ],
-      nested: {
-        items: [
-          { value: 10, label: 'Item A' },
-          { value: 20, label: 'Item B' },
-        ],
-      },
+    },
+  },
+  explicitExclusiveState: {
+    name: 'John',
+    age: 30,
+  },
+  derivedReactState: {
+    name: 'John',
+    age: 30,
+    email: 'john@test.com',
+  },
+  derivedSignalState: {
+    age: 30,
+    itemValue: 10,
   },
 });
 
@@ -784,6 +797,141 @@ describe('$isolate and $formElement interaction', () => {
 
       // ASSERT: Monitor SHOULD have been called
       expect(renderMonitor).toHaveBeenCalled();
+    });
+
+    it('should treat explicit dependencies as exclusive', async () => {
+      const renderMonitor = vi.fn();
+
+      const TestComponent = () => {
+        const state = useCogsState('explicitExclusiveState');
+
+        return (
+          <div>
+            {state.$isolate([state.name], (proxy) => {
+              renderMonitor();
+              return (
+                <span data-testid="exclusive-derived">
+                  {proxy.name.$get()}:{proxy.age.$get()}
+                </span>
+              );
+            })}
+            <button onClick={() => state.age.$update(31)}>Update age</button>
+            <button onClick={() => state.name.$update('Jane')}>
+              Update name
+            </button>
+          </div>
+        );
+      };
+
+      render(<TestComponent />);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+      renderMonitor.mockClear();
+
+      fireEvent.click(screen.getByText('Update age'));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+
+      expect(renderMonitor).not.toHaveBeenCalled();
+      expect(screen.getByTestId('exclusive-derived')).toHaveTextContent(
+        'John:30'
+      );
+
+      fireEvent.click(screen.getByText('Update name'));
+      await waitFor(() => {
+        expect(screen.getByTestId('exclusive-derived')).toHaveTextContent(
+          'Jane:31'
+        );
+      });
+      expect(renderMonitor).toHaveBeenCalled();
+    });
+  });
+
+  describe('derived values', () => {
+    it('should track every reactive read made by $derive', async () => {
+      const renderMonitor = vi.fn();
+
+      const TestComponent = () => {
+        const state = useCogsState('derivedReactState');
+        renderMonitor();
+        const label = state.$derive(
+          (current) => `${current.name.$get()}:${current.age.$get()}`
+        );
+
+        return (
+          <div>
+            <span data-testid="react-derived">{label}</span>
+            <button onClick={() => state.email.$update('changed@test.com')}>
+              Update unrelated
+            </button>
+            <button onClick={() => state.age.$update(32)}>
+              Update dependency
+            </button>
+          </div>
+        );
+      };
+
+      render(<TestComponent />);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+      renderMonitor.mockClear();
+
+      fireEvent.click(screen.getByText('Update unrelated'));
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+      expect(renderMonitor).not.toHaveBeenCalled();
+
+      fireEvent.click(screen.getByText('Update dependency'));
+      await waitFor(() => {
+        expect(screen.getByTestId('react-derived')).toHaveTextContent(
+          'John:32'
+        );
+      });
+      expect(renderMonitor).toHaveBeenCalled();
+    });
+
+    it('should update a signal derived from multiple paths', async () => {
+      const TestComponent = () => {
+        const state = useCogsState('derivedSignalState', {
+          reactiveType: 'none',
+        });
+
+        return (
+          <div>
+            <span data-testid="signal-derived">
+              {state.$$derive(
+                [state.age, state.itemValue],
+                ([age, itemValue]) => age + itemValue
+              )}
+            </span>
+            <button onClick={() => state.age.$update(40)}>
+              Update signal age
+            </button>
+            <button onClick={() => state.itemValue.$update(15)}>
+              Update signal item
+            </button>
+          </div>
+        );
+      };
+
+      render(<TestComponent />);
+      await waitFor(() => {
+        expect(screen.getByTestId('signal-derived')).toHaveTextContent('40');
+      });
+
+      fireEvent.click(screen.getByText('Update signal age'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signal-derived')).toHaveTextContent('50');
+      });
+
+      fireEvent.click(screen.getByText('Update signal item'));
+      await waitFor(() => {
+        expect(screen.getByTestId('signal-derived')).toHaveTextContent('55');
+      });
     });
   });
 });

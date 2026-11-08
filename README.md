@@ -100,10 +100,11 @@ Every state property gets these core methods:
 #### Primitives (strings, numbers, booleans)
 
 - `.$get()` - read values reactively
+- `.$derive()` - calculate a React value and track every `.$get()` it reads
 - `.$update()` - set values
 - `.$toggle()` - flip booleans
-- `.$$get()` - non-reactive read (signals)
-- `.$$derive()` - computed signals
+- `.$$get()` - render a value as a DOM signal without re-rendering the component
+- `.$$derive()` - render a computed DOM signal
 
 #### Objects
 
@@ -131,12 +132,33 @@ const isDarkMode = settings.darkMode.$get();
 const counterValue = user.stats.counter.$get();
 const firstTodo = todos.$index(0)?.$get();
 
-// Non-reactive reads (no re-renders, for signals)
-const userNameStatic = user.name.$$get();
+// A React-derived value automatically tracks both paths
+const fullName = user.$derive(
+  (current) => `${current.firstName.$get()} ${current.lastName.$get()}`
+);
 
-// Computed signals (transforms value without re-renders)
-const todoCount = todos.$$derive((todos) => todos.length);
+// Signals are rendered directly in JSX without re-rendering this component
+return (
+  <>
+    <span>{user.name.$$get()}</span>
+    <span>{todos.$$derive((items) => items.length)}</span>
+  </>
+);
 ```
+
+For a signal derived from multiple paths, pass the paths followed by a selector:
+
+```tsx
+<span>
+  {order.$$derive(
+    [order.price, order.quantity],
+    ([price, quantity]) => price * quantity
+  )}
+</span>
+```
+
+Signal selectors are serialized, so they must be self-contained and must not
+capture variables from the surrounding component.
 
 ### Updating State
 
@@ -415,9 +437,10 @@ function MessageList() {
 
 ## Reactivity Control
 
-Cogsbox offers different reactivity modes for performance optimization:
+Cogsbox tracks reactive reads by path. The component using the state only
+re-renders when a path read through `.$get()` changes.
 
-### Component Reactivity (Default)
+### Automatic Reactivity (Default)
 
 ```typescript
 // Re-renders when any accessed state changes
@@ -426,39 +449,63 @@ const user = useCogsState('user');
 const user = useCogsState('user', { reactiveType: 'component' });
 ```
 
-### Dependency-Based Reactivity
+Calculated values use the same automatic tracking:
 
-```typescript
-// Only re-renders when specified dependencies change
-const user = useCogsState('user', {
-  reactiveType: 'deps',
-  reactiveDeps: (state) => [state.name, state.stats.counter],
-});
+```tsx
+const summary = user.$derive(
+  (current) => `${current.name.$get()}: ${current.stats.counter.$get()}`
+);
 ```
 
-### Full Reactivity
+### Isolated Rendering
 
-```typescript
-// Re-renders on ANY change to the state slice
-const user = useCogsState('user', { reactiveType: 'all' });
+Use `$isolate` when only a small part of the UI should update. Without an
+explicit list, reads inside the isolated render are tracked automatically:
+
+```tsx
+return (
+  <section>
+    {user.$isolate((current) => <span>{current.name.$get()}</span>)}
+  </section>
+);
 ```
 
-### No Reactivity
+An explicit dependency list is exclusive. Only those paths trigger the
+isolated render, even if it reads other paths:
 
-```typescript
-// Never re-renders (useful with signals)
+```tsx
+return (
+  <section>
+    {user.$isolate([user.name, user.online], (current) => (
+      <span>
+        {current.name.$get()} is{' '}
+        {current.online.$get() ? 'online' : 'offline'}
+      </span>
+    ))}
+  </section>
+);
+```
+
+### Disabling Hook-Component Reactivity
+
+```tsx
 const todos = useCogsState('todos', { reactiveType: 'none' });
+
+return <span>{todos.$$derive((items) => items.length)}</span>;
 ```
 
-### Multiple Reactivity Types
+`none` disables reactive path registration for the component calling
+`useCogsState`. Library-owned child boundaries such as lists, isolated renders,
+and form elements retain their own subscriptions so they can continue updating.
 
-```typescript
-// Combine multiple reactivity modes
-const user = useCogsState('user', {
-  reactiveType: ['component', 'deps'],
-  reactiveDeps: (state) => [state.online],
-});
-```
+### Migration from Earlier Reactivity Options
+
+The former `deps` and `all` modes, reactivity-mode arrays, `reactiveDeps`, and
+the hook-level `dependencies` option have been removed. Use automatic `.$get()`
+tracking or `.$derive()` for React values, `$isolate([...])` for an explicit UI
+boundary, and `.$$derive([...], selector)` for a multi-path signal. State
+reinitialization should be explicit through the state initialization methods,
+not coupled to a React dependency array.
 
 ## Form Management
 
@@ -580,7 +627,7 @@ current validation state for that path:
     ],
     getData: () => '',
   },
-]
+];
 ```
 
 Pass a type-safe string array to read only specific fields. This is useful for
@@ -588,10 +635,7 @@ multi-stage forms where a stage should not advance while selected fields have
 errors.
 
 ```typescript
-const stageValidation = userForm.$validationErrors([
-  'name',
-  'email',
-]);
+const stageValidation = userForm.$validationErrors(['name', 'email']);
 
 if (stageValidation.some((field) => field.hasErrors)) {
   return;

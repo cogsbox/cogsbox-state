@@ -31,10 +31,7 @@ export type ComponentsType = {
     {
       forceUpdate: () => void;
       paths: Set<string>;
-      deps?: any[];
-      prevDeps?: any[];
-      depsFunction?: (state: any) => any[] | true;
-      reactiveType: ReactivityType[] | ReactivityType;
+      reactiveType: ReactivityType;
     }
   >;
 };
@@ -150,6 +147,10 @@ export type ShadowMetadata = {
     parentId: string;
     position: number;
     effect?: string;
+    dependencies?: Array<{
+      stateKey: string;
+      path: string[];
+    }>;
   }>;
   transformCaches?: Map<
     string,
@@ -669,8 +670,7 @@ function getSchemaAtPath(schema: any, path: string[]): any {
     if (typeIdentifier === 'ZodObject' || typeIdentifier === 'object') {
       const rawShape =
         def?.shape ?? containerSchema.shape ?? containerSchema._shape;
-      const shape =
-        typeof rawShape === 'function' ? rawShape() : rawShape;
+      const shape = typeof rawShape === 'function' ? rawShape() : rawShape;
       currentSchema = shape?.[segment];
     } else if (typeIdentifier === 'ZodArray' || typeIdentifier === 'array') {
       // For arrays, the next schema is always the element's schema.
@@ -758,13 +758,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // metadata across a full merge/replace, which is why removing it was a mistake.
     let preservedMetadata: Partial<ShadowMetadata> = {};
     if (existingRoot?._meta) {
-      const {
-        components,
-        features,
-        pathComponents,
-        signals,
-        validation,
-      } = existingRoot._meta;
+      const { components, features, pathComponents, signals, validation } =
+        existingRoot._meta;
 
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
@@ -927,10 +922,7 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
 
     if (existingRoot?._meta) {
-      const {
-        components,
-        features,
-      } = existingRoot._meta;
+      const { components, features } = existingRoot._meta;
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
     }
@@ -1400,6 +1392,21 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
   unregisterComponent: (stateKey, fullComponentId) => {
     const rootMeta = get().getShadowMetadata(stateKey, []);
     if (!rootMeta?.components) return;
+    const component = rootMeta.components.get(fullComponentId);
+    component?.paths.forEach((fullPath) => {
+      const path =
+        fullPath === stateKey
+          ? []
+          : fullPath.slice(stateKey.length + 1).split('.');
+      // Read only existing nodes: an item may already have been removed.
+      const metadata = get().getShadowMetadata(stateKey, path);
+      if (metadata?.pathComponents) {
+        metadata.pathComponents.delete(fullComponentId);
+        if (metadata.pathComponents.size === 0) {
+          delete metadata.pathComponents;
+        }
+      }
+    });
     const components = new Map(rootMeta.components);
     if (components.delete(fullComponentId)) {
       get().setShadowMetadata(stateKey, [], { components });
