@@ -926,9 +926,6 @@ export const createCogsState = <
 ): CreateCogsStateReturn<State, TPlugins> => {
   type PluginOptions = PluginOptionsMap<TPlugins>;
 
-  if (opt?.plugins) {
-    pluginStore.getState().setRegisteredPlugins(opt.plugins as any);
-  }
   type UnionToIntersection<U> = (
     U extends any ? (k: U) => void : never
   ) extends (k: infer I) => void
@@ -949,6 +946,10 @@ export const createCogsState = <
 
   const [statePart, initialOptionsPart] =
     transformStateFunc<FullState>(mergedInitialState);
+
+  pluginStore
+    .getState()
+    .setRegisteredPlugins(opt?.plugins ?? [], Object.keys(statePart));
 
   Object.keys(statePart).forEach((key) => {
     let mergedOptions: any = {};
@@ -1074,7 +1075,9 @@ export const createCogsState = <
       loadAndApplyLocalStorage(stateKey as string, options);
     }
     if (options.formElements) {
-      const currentPlugins = pluginStore.getState().registeredPlugins;
+      const currentPlugins = pluginStore
+        .getState()
+        .getRegisteredPluginsForState(stateKey as string);
 
       const updatedPlugins = currentPlugins.map((plugin) => {
         // Use `options.formElements` as the source
@@ -1087,7 +1090,9 @@ export const createCogsState = <
         return plugin;
       });
 
-      pluginStore.getState().setRegisteredPlugins(updatedPlugins as any);
+      pluginStore
+        .getState()
+        .setRegisteredPlugins(updatedPlugins as any, [stateKey as string]);
     }
     notifyComponents(stateKey as string);
   }
@@ -1647,6 +1652,7 @@ export function useCogsStateFn<
   const [noStateKey] = useState(!stateKey);
   const [thisKey] = useState(stateKey ?? uuidv4());
   const componentIdRef = useRef(componentId ?? uuidv4());
+  const ownedStoreGeneration = useRef(0);
   const latestInitialOptionsRef = useRef<OptionsType<TStateObject> | null>(
     null
   );
@@ -1667,7 +1673,11 @@ export function useCogsStateFn<
 
       const currentOptions = optionsToUse;
       const finalDefaultState =
-        currentOptions?.defaultState || defaultState || stateObject;
+        currentOptions?.defaultState !== undefined
+          ? currentOptions.defaultState
+          : defaultState !== undefined
+            ? defaultState
+            : stateObject;
 
       // Check localStorage
       if (currentOptions?.localStorage?.key && sessionId) {
@@ -1690,7 +1700,7 @@ export function useCogsStateFn<
 
       // Use default state
       return {
-        value: finalDefaultState || (stateObject as any),
+        value: finalDefaultState as TStateObject,
         source: 'default',
         timestamp: Date.now(),
       };
@@ -1698,40 +1708,8 @@ export function useCogsStateFn<
     [thisKey, defaultState, stateObject, sessionId]
   );
 
-  // Removed: Server state effects are now owned by Shape Plugin
-  useEffect(() => {
-    const options = getInitialOptions(thisKey as string);
-
-    const features = {
-      localStorageEnabled: !!options?.localStorage?.key,
-    };
-
-    setShadowMetadata(thisKey, [], {
-      features,
-    });
-
-    if (options?.defaultState !== undefined || defaultState !== undefined) {
-      const finalDefaultState = options?.defaultState || defaultState;
-      if (!options?.defaultState) {
-        setAndMergeOptions(thisKey as string, {
-          defaultState: finalDefaultState,
-        });
-      }
-    }
-
-    const { value: resolvedState } = resolveInitialState();
-    initializeShadowState(thisKey, resolvedState);
-
-    const validation = getInitialOptions(thisKey as string)?.validation;
-    if (validation?.zodSchemaV4) {
-      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV4, 'zod4');
-    } else if (validation?.zodSchemaV3) {
-      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV3, 'zod3');
-    }
-
-    notifyComponents(thisKey);
-  }, [thisKey]);
-
+  // Resolve defaults and hydration once, before registering this consumer.
+  // Later consumers attach to the live tree instead of rebuilding it.
   useLayoutEffect(() => {
     if (noStateKey) {
       if (!(thisKey in getGlobalStore.getState().initialStateGlobal)) {
@@ -1745,6 +1723,56 @@ export function useCogsStateFn<
       });
     }
 
+    const options = getInitialOptions(thisKey as string);
+    const existingRoot = getGlobalStore.getState().getShadowNode(thisKey, []);
+
+    if (!existingRoot?._meta?.hookInitialized) {
+      const { value: resolvedState, source } = resolveInitialState();
+      if (
+        !existingRoot ||
+        noStateKey ||
+        source === 'localStorage' ||
+        options?.defaultState !== undefined ||
+        defaultState !== undefined
+      ) {
+        initializeShadowState(thisKey, resolvedState);
+      }
+      setShadowMetadata(thisKey, [], { hookInitialized: true });
+    }
+
+    const features = {
+      localStorageEnabled: !!options?.localStorage?.key,
+    };
+
+    setShadowMetadata(thisKey, [], {
+      features,
+    });
+
+    if (options?.defaultState !== undefined || defaultState !== undefined) {
+      const finalDefaultState =
+        options?.defaultState !== undefined
+          ? options.defaultState
+          : defaultState;
+      if (options?.defaultState === undefined) {
+        setAndMergeOptions(thisKey as string, {
+          defaultState: finalDefaultState,
+        });
+      }
+    }
+
+    const validation = getInitialOptions(thisKey as string)?.validation;
+    if (validation?.zodSchemaV4) {
+      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV4, 'zod4');
+    } else if (validation?.zodSchemaV3) {
+      updateShadowTypeInfo(thisKey as string, validation.zodSchemaV3, 'zod3');
+    }
+  }, [thisKey]);
+
+  useEffect(() => {
+    notifyComponents(thisKey);
+  }, [thisKey]);
+
+  useLayoutEffect(() => {
     const componentKey = `${thisKey}////${componentIdRef.current}`;
 
     registerComponent(thisKey, componentKey, {
@@ -1761,38 +1789,44 @@ export function useCogsStateFn<
 
   useEffect(() => {
     if (!noStateKey) return;
+    const generation = ++ownedStoreGeneration.current;
     return () => {
-      // Generated keys belong to this hook; named shared state persists.
-      shadowStateStore.delete(thisKey);
-      shadowStateStore.delete(`[${thisKey}`);
-      updateBatchQueue = updateBatchQueue.filter(
-        (item) => item.stateKey !== thisKey
-      );
-      const current = getGlobalStore.getState();
-      for (const key of current.pathSubscribers.keys()) {
-        if (key === thisKey || key.startsWith(thisKey + '.')) {
-          current.pathSubscribers.delete(key);
-        }
-      }
-      getGlobalStore.setState((state) => {
-        const initialStateGlobal = { ...state.initialStateGlobal };
-        const initialStateOptions = { ...state.initialStateOptions };
-        const stateLog = new Map(state.stateLog);
-        const selectedIndicesMap = new Map(state.selectedIndicesMap);
-        delete initialStateGlobal[thisKey];
-        delete initialStateOptions[thisKey];
-        stateLog.delete(thisKey);
-        for (const key of selectedIndicesMap.keys()) {
+      // StrictMode reconnects effects immediately. Only destroy an owned store
+      // when this cleanup was not followed by another setup.
+      queueMicrotask(() => {
+        if (ownedStoreGeneration.current !== generation) return;
+        // Generated keys belong to this hook; named shared state persists.
+        shadowStateStore.delete(thisKey);
+        shadowStateStore.delete(`[${thisKey}`);
+        updateBatchQueue = updateBatchQueue.filter(
+          (item) => item.stateKey !== thisKey
+        );
+        const current = getGlobalStore.getState();
+        for (const key of current.pathSubscribers.keys()) {
           if (key === thisKey || key.startsWith(thisKey + '.')) {
-            selectedIndicesMap.delete(key);
+            current.pathSubscribers.delete(key);
           }
         }
-        return {
-          initialStateGlobal,
-          initialStateOptions,
-          stateLog,
-          selectedIndicesMap,
-        };
+        getGlobalStore.setState((state) => {
+          const initialStateGlobal = { ...state.initialStateGlobal };
+          const initialStateOptions = { ...state.initialStateOptions };
+          const stateLog = new Map(state.stateLog);
+          const selectedIndicesMap = new Map(state.selectedIndicesMap);
+          delete initialStateGlobal[thisKey];
+          delete initialStateOptions[thisKey];
+          stateLog.delete(thisKey);
+          for (const key of selectedIndicesMap.keys()) {
+            if (key === thisKey || key.startsWith(thisKey + '.')) {
+              selectedIndicesMap.delete(key);
+            }
+          }
+          return {
+            initialStateGlobal,
+            initialStateOptions,
+            stateLog,
+            selectedIndicesMap,
+          };
+        });
       });
     };
   }, [noStateKey, thisKey]);
@@ -1804,7 +1838,10 @@ export function useCogsStateFn<
     latestInitialOptionsRef
   );
 
-  if (!noStateKey && !getGlobalStore.getState().initialStateGlobal[thisKey]) {
+  if (
+    !noStateKey &&
+    !(thisKey in getGlobalStore.getState().initialStateGlobal)
+  ) {
     updateInitialStateGlobal(thisKey, stateObject);
   }
 
@@ -2153,7 +2190,9 @@ function createProxyHandler<
         if (typeof prop === 'string' && prop.startsWith('$')) {
           const methodName = prop.slice(1);
           const { value } = getScopedData(stateKey, path, meta);
-          const registeredPlugins = pluginStore.getState().registeredPlugins;
+          const registeredPlugins = pluginStore
+            .getState()
+            .getRegisteredPluginsForState(stateKey);
           for (const plugin of registeredPlugins) {
             const chainMethod = (plugin.chainMethods as any)?.[methodName];
             if (!chainMethod) continue;

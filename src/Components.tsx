@@ -86,10 +86,12 @@ export function ValidationWrapper({
       : warningMessages.length > 0
         ? 'warning'
         : undefined;
-  const { registeredPlugins } = pluginStore.getState();
+  const registeredPlugins = pluginStore
+    .getState()
+    .getRegisteredPluginsForState(stateKey!);
   const pluginsApi: PluginsApi = {};
 
-  // We iterate over ALL registered plugins in the app.
+  // Only expose plugins belonging to this state.
   registeredPlugins.forEach((plugin) => {
     if (thisStateOpts && thisStateOpts.hasOwnProperty(plugin.name)) {
       const pluginName = plugin.name;
@@ -693,7 +695,8 @@ const PluginWrapper = memo(function PluginWrapper({
 
   const plugin = pluginStore
     .getState()
-    .registeredPlugins.find((p) => p.name === pluginName);
+    .getRegisteredPluginsForState(stateKey)
+    .find((p) => p.name === pluginName);
 
   const stateHandler: StateObject<any> | undefined = pluginStore
     .getState()

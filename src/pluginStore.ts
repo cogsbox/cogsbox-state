@@ -44,8 +44,16 @@ type PluginRegistryStore = {
   ) => () => void;
   unregisterStateHandler: (stateKey: string) => void;
   registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
+  registeredPluginsByState: Map<
+    string,
+    readonly CogsPlugin<any, any, any, any, any>[]
+  >;
+  getRegisteredPluginsForState: (
+    stateKey: string
+  ) => readonly CogsPlugin<any, any, any, any, any>[];
   setRegisteredPlugins: (
-    plugins: readonly CogsPlugin<any, any, any, any, any>[]
+    plugins: readonly CogsPlugin<any, any, any, any, any>[],
+    stateKeys?: readonly string[]
   ) => void;
 
   // Store options keyed by stateKey and pluginName
@@ -130,9 +138,24 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
     });
   },
   registeredPlugins: [],
+  registeredPluginsByState: new Map(),
   pluginOptions: new Map(),
 
-  setRegisteredPlugins: (plugins) => set({ registeredPlugins: plugins }),
+  getRegisteredPluginsForState: (stateKey) =>
+    get().registeredPluginsByState.get(stateKey) ?? get().registeredPlugins,
+  setRegisteredPlugins: (plugins, stateKeys) => {
+    if (!stateKeys) {
+      set({ registeredPlugins: plugins });
+      return;
+    }
+    set((state) => {
+      const registeredPluginsByState = new Map(state.registeredPluginsByState);
+      for (const stateKey of stateKeys) {
+        registeredPluginsByState.set(stateKey, plugins);
+      }
+      return { registeredPluginsByState };
+    });
+  },
 
   setPluginOptionsForState: (stateKey, pluginOptions) =>
     set((state) => {
@@ -142,7 +165,11 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
       // Store each plugin's options
       Object.entries(pluginOptions).forEach(([pluginName, options]) => {
         // Only store if this is actually a registered plugin
-        if (state.registeredPlugins.some((p) => p.name === pluginName)) {
+        if (
+          state
+            .getRegisteredPluginsForState(stateKey)
+            .some((p) => p.name === pluginName)
+        ) {
           statePluginMap.set(pluginName, options);
         }
       });
@@ -159,7 +186,8 @@ export const pluginStore = create<PluginRegistryStore>((set, get) => ({
     const stateOptions = state.pluginOptions.get(stateKey);
     if (!stateOptions) return [];
 
-    return state.registeredPlugins
+    return state
+      .getRegisteredPluginsForState(stateKey)
       .map((plugin) => {
         const options = stateOptions.get(plugin.name);
         if (options !== undefined) {

@@ -33,6 +33,7 @@ beforeEach(() => {
     pluginOptions: new Map(),
     hookResults: new Map(),
     registeredPlugins: [],
+    registeredPluginsByState: new Map(),
     updateSubscribers: new Set(),
     formUpdateSubscribers: new Set(),
   });

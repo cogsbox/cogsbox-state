@@ -1,7 +1,7 @@
 import { jsx as E, Fragment as q } from "react/jsx-runtime";
 import { pluginStore as C } from "./pluginStore.js";
 import { createScopedMetadataContext as J, toDeconstructedMethods as et } from "./plugins.js";
-import j, { memo as Q, useState as R, useRef as W, useCallback as L, useEffect as P, useLayoutEffect as nt, useMemo as ot } from "react";
+import j, { memo as Q, useState as R, useRef as P, useCallback as L, useEffect as W, useLayoutEffect as nt, useMemo as ot } from "react";
 import { getGlobalStore as b } from "./store.js";
 import { useInView as rt } from "react-intersection-observer";
 import { v4 as X } from "uuid";
@@ -26,7 +26,7 @@ function dt({
   const { getInitialOptions: l, getShadowMetadata: p, getShadowValue: r } = b.getState(), c = l(o), h = p(o, t)?.validation, A = h?.status || "NOT_VALIDATED", m = (h?.errors || []).map((v) => ({
     ...v,
     path: t
-  })), d = m.filter((v) => v.severity === "error").map((v) => v.message), a = m.filter((v) => v.severity === "warning").map((v) => v.message), T = d[0] || a[0], S = d.length > 0 ? "error" : a.length > 0 ? "warning" : void 0, { registeredPlugins: s } = C.getState(), y = {};
+  })), d = m.filter((v) => v.severity === "error").map((v) => v.message), a = m.filter((v) => v.severity === "warning").map((v) => v.message), T = d[0] || a[0], S = d.length > 0 ? "error" : a.length > 0 ? "warning" : void 0, s = C.getState().getRegisteredPluginsForState(o), y = {};
   return s.forEach((v) => {
     if (c && c.hasOwnProperty(v.name)) {
       const N = v.name, O = C.getState().getHookResult(o, N), k = J(
@@ -68,7 +68,7 @@ function gt({
   rebuildStateShape: p,
   renderFn: r
 }) {
-  const [, c] = R({}), { ref: f, inView: h } = rt(), A = W(null), m = [e, ...o].join(".");
+  const [, c] = R({}), { ref: f, inView: h } = rt(), A = P(null), m = [e, ...o].join(".");
   z(e, t, c);
   const d = L(
     (s) => {
@@ -76,7 +76,7 @@ function gt({
     },
     [f]
   );
-  P(() => {
+  W(() => {
     const s = lt(m, (y) => {
       c({});
     });
@@ -105,12 +105,12 @@ function It({
   formOpts: l,
   setState: p
 }) {
-  const r = W(X()).current, [, c] = R({}), f = W(null), h = [e, ...t].join(".");
+  const r = P(X()).current, [, c] = R({}), f = P(null), h = [e, ...t].join(".");
   z(e, r, c);
-  const m = b.getState().getShadowNode(e, t)?._meta?.typeInfo, d = B(e, t), [a, T] = R(d), S = W(!1), s = W(null);
-  P(() => {
+  const m = b.getState().getShadowNode(e, t)?._meta?.typeInfo, d = B(e, t), [a, T] = R(d), S = P(!1), s = P(null);
+  W(() => {
     !S.current && !it(d, a) && T(d);
-  }, [d]), P(() => {
+  }, [d]), W(() => {
     const { getShadowMetadata: n, setShadowMetadata: i } = b.getState(), g = n(e, t) || {};
     g.clientActivityState || (g.clientActivityState = { elements: /* @__PURE__ */ new Map() });
     const w = () => {
@@ -296,7 +296,7 @@ function Ct({
     o?.length ? "none" : "component"
   );
   const c = ot(() => o && o.length > 0 ? o.map((h) => [h.$_stateKey, ...h.$_path].join(".")) : [[e, ...t].join(".")], [e, t, o]);
-  P(() => {
+  W(() => {
     const h = b.getState(), A = c.map((m) => h.subscribeToPath(m, () => {
       r({});
     }));
@@ -319,13 +319,13 @@ Q(function({
   wrapperDepth: p
 }) {
   const [, r] = R({});
-  P(() => {
+  W(() => {
     const T = [o, ...u].join(".");
     return b.getState().subscribeToPath(T, () => {
       r({});
     });
   }, [o, u]);
-  const c = C.getState().registeredPlugins.find((T) => T.name === l), f = C.getState().stateHandlers.get(o), h = b.getState().getShadowNode(o, u)?._meta?.typeInfo, A = C.getState().pluginOptions.get(o)?.get(l), m = C.getState().getHookResult(o, l);
+  const c = C.getState().getRegisteredPluginsForState(o).find((T) => T.name === l), f = C.getState().stateHandlers.get(o), h = b.getState().getShadowNode(o, u)?._meta?.typeInfo, A = C.getState().pluginOptions.get(o)?.get(l), m = C.getState().getHookResult(o, l);
   if (!c?.formWrapper || !f)
     return /* @__PURE__ */ E(q, { children: t });
   const d = et(f), a = J(

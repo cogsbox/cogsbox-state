@@ -112,6 +112,7 @@ function createShapeStylePlugin() {
 describe('Plugin onFormUpdate validation', () => {
   beforeEach(() => {
     pluginStore.getState().registeredPlugins = [];
+    pluginStore.getState().registeredPluginsByState.clear();
     pluginStore.getState().pluginOptions.clear();
     pluginStore.getState().stateHandlers.clear();
     pluginStore.getState().updateSubscribers.clear();

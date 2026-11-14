@@ -59,7 +59,9 @@ type PluginRegistryStore = {
     registerStateHandler: (stateKey: string, handler: StateObject<any>) => () => void;
     unregisterStateHandler: (stateKey: string) => void;
     registeredPlugins: readonly CogsPlugin<any, any, any, any, any>[];
-    setRegisteredPlugins: (plugins: readonly CogsPlugin<any, any, any, any, any>[]) => void;
+    registeredPluginsByState: Map<string, readonly CogsPlugin<any, any, any, any, any>[]>;
+    getRegisteredPluginsForState: (stateKey: string) => readonly CogsPlugin<any, any, any, any, any>[];
+    setRegisteredPlugins: (plugins: readonly CogsPlugin<any, any, any, any, any>[], stateKeys?: readonly string[]) => void;
     pluginOptions: Map<string, Map<string, any>>;
     setPluginOptionsForState: (stateKey: string, pluginOptions: Record<string, any>) => void;
     getPluginConfigsForState: (stateKey: string) => Array<{

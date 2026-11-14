@@ -80,6 +80,7 @@ export type ClientActivityState = {
     }>;
 };
 export type ShadowMetadata = {
+    hookInitialized?: boolean;
     value?: any;
     id?: string;
     typeInfo?: SchemaTypeInfo;

@@ -127,6 +127,8 @@ export type ClientActivityState = {
 };
 // Update ShadowMetadata to include typeInfo
 export type ShadowMetadata = {
+  // Defaults and localStorage hydration have been applied by the first hook.
+  hookInitialized?: boolean;
   value?: any;
   id?: string;
   typeInfo?: SchemaTypeInfo;
@@ -758,9 +760,16 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     // metadata across a full merge/replace, which is why removing it was a mistake.
     let preservedMetadata: Partial<ShadowMetadata> = {};
     if (existingRoot?._meta) {
-      const { components, features, pathComponents, signals, validation } =
-        existingRoot._meta;
+      const {
+        components,
+        features,
+        pathComponents,
+        signals,
+        validation,
+        hookInitialized,
+      } = existingRoot._meta;
 
+      if (hookInitialized) preservedMetadata.hookInitialized = hookInitialized;
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
       if (pathComponents) preservedMetadata.pathComponents = pathComponents;
@@ -922,7 +931,8 @@ export const getGlobalStore = create<CogsGlobalState>((set, get) => ({
     }
 
     if (existingRoot?._meta) {
-      const { components, features } = existingRoot._meta;
+      const { components, features, hookInitialized } = existingRoot._meta;
+      if (hookInitialized) preservedMetadata.hookInitialized = hookInitialized;
       if (components) preservedMetadata.components = components;
       if (features) preservedMetadata.features = features;
     }

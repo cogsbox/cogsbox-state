@@ -17,6 +17,7 @@ describe('Plugin Hook to Transform Flow', () => {
   beforeEach(() => {
     // Clear any plugin store state
     pluginStore.getState().registeredPlugins = [];
+    pluginStore.getState().registeredPluginsByState.clear();
     pluginStore.getState().pluginOptions.clear();
     pluginStore.getState().stateHandlers.clear();
     // Clear update subscribers to prevent tests from interfering

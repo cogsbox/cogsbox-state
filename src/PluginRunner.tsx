@@ -177,7 +177,7 @@ const PluginInstance = React.memo(
  * and renders a `PluginInstance` controller for each active plugin.
  */
 export function PluginRunner({ children }: { children: ReactNode }) {
-  const { pluginOptions, stateHandlers, registeredPlugins } =
+  const { pluginOptions, stateHandlers, getRegisteredPluginsForState } =
     useSyncExternalStore(
       pluginStore.subscribe,
       () => pluginStore.getState(),
@@ -197,20 +197,21 @@ export function PluginRunner({ children }: { children: ReactNode }) {
   return (
     <>
       {Array.from(stateHandlers.entries()).flatMap(([stateKey, stateHandler]) =>
-        registeredPlugins.filter(pluginNeedsRunner).map((plugin) => {
-          const options =
-            pluginOptions.get(stateKey)?.get(plugin.name) ?? {};
+        getRegisteredPluginsForState(stateKey)
+          .filter(pluginNeedsRunner)
+          .map((plugin) => {
+            const options = pluginOptions.get(stateKey)?.get(plugin.name) ?? {};
 
-          return (
-            <PluginInstance
-              key={`${stateKey}:${plugin.name}`}
-              stateKey={stateKey}
-              plugin={plugin}
-              options={options}
-              stateHandler={stateHandler}
-            />
-          );
-        })
+            return (
+              <PluginInstance
+                key={`${stateKey}:${plugin.name}`}
+                stateKey={stateKey}
+                plugin={plugin}
+                options={options}
+                stateHandler={stateHandler}
+              />
+            );
+          })
       )}
 
       {children}
